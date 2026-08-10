@@ -1,0 +1,1 @@
+ALTER TABLE papers DROP COLUMN markdown_hash;

@@ -1,0 +1,13 @@
+# Go sources are stored with LF. Without this pin, core.autocrlf=true checks
+# them out as CRLF on Windows and `gofmt -l .` reports every file as
+# unformatted — making the format gate fire permanently on line-ending noise
+# rather than on real drift.
+*.go text eol=lf
+
+# The Go toolchain rewrites these as LF on every touch, so under
+# core.autocrlf=true git reports them permanently modified while their content
+# is byte-identical. Reviewing the go.sum diff is the mitigation for dependency
+# substitution — a pair of files that always shows as modified is exactly where
+# a real dependency change would hide.
+go.mod text eol=lf
+go.sum text eol=lf

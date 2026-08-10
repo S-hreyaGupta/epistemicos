@@ -1,0 +1,30 @@
+# Binaries
+/bin/
+/dist/
+/epistemicos-api
+/epistemicos-cli
+# Windows: `go build ./cmd/epistemicos-cli/` emits epistemicos-cli.exe, which
+# the extensionless patterns above do not cover.
+/epistemicos-api.exe
+/epistemicos-cli.exe
+
+# Test artifacts
+*.test
+*.out
+coverage.out
+
+# Local config — NEVER commit. Contains Mathpix and database credentials.
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local agent-tool settings (user-scoped, not project artefacts)
+.claude/
+
+# Local PDF / data volume
+/data/

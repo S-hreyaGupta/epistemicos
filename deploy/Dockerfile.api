@@ -1,0 +1,19 @@
+# Single-stage Go build. There is no frontend stage — this system has no
+# frontend; the API and CLI are the whole surface.
+
+FROM golang:1.24-alpine AS api-build
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+
+RUN CGO_ENABLED=0 go build -o /bin/epistemicos-api ./cmd/epistemicos-api
+
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates wget
+COPY --from=api-build /bin/epistemicos-api /bin/epistemicos-api
+
+EXPOSE 9082
+ENTRYPOINT ["/bin/epistemicos-api"]

@@ -9,6 +9,127 @@ PDF  →  download  →  hash  →  Mathpix  →  markdown + SHA-256  →  Postg
 An HTTP API and a CLI, backed by Postgres. Thirty-nine files, four direct
 dependencies.
 
+A description of every file is in [`docs/FILES.md`](docs/FILES.md).
+
+---
+
+## How it works
+
+The whole pipeline lives in `internal/core/services/ingest/ingest.go`. Everything
+else is plumbing around it. Nine steps, in order.
+
+### 1 · A PDF arrives
+
+Two ways in, and they converge immediately.
+
+**By URL** — `POST /api/v1/papers` with `{"url": "..."}`, or
+`epistemicos-cli ingest <url>`. `pdfdownloader` fetches it and returns a stream.
+
+**By upload** — `POST /api/v1/papers` as `multipart/form-data` with a `file`
+field.
+
+Both land in the same private method, so there is one conversion path rather
+than two.
+
+### 2 · Staged to disk
+
+The stream is written to a temporary file under `PAPERLY_PDF_VOLUME`, named
+`tmp-<uuid>.pdf`.
+
+It goes to disk rather than staying in memory because both of the next two steps
+need a file path: hashing reads it, and Mathpix uploads it.
+
+### 3 · Hashed
+
+`hasher` computes an MD5 over the file. This is the **content** hash — it
+identifies the PDF itself, and it is the dedupe key.
+
+MD5 is deliberate. This is not a security boundary; it is a lookup key, and
+collisions between two real research papers are not a practical concern.
+
+### 4 · Deduped
+
+`GetByHash` asks whether this exact PDF has been seen before.
+
+**If yes** — the temporary file is deleted and the existing record returned. No
+Mathpix call, no cost, no duplicate row. Submitting the same paper twice is
+free.
+
+**If no** — carry on.
+
+The unique constraint on `papers.hash` in the database backs this up, so two
+simultaneous ingests of the same paper cannot both create a row.
+
+### 5 · A pending row is written
+
+Before any slow work begins, a row is saved with `status = pending`.
+
+That ordering matters: if conversion fails or the process dies, there is a
+visible record of the attempt with an error message, rather than silence.
+
+### 6 · The PDF is moved to its permanent home
+
+Renamed from `tmp-<uuid>.pdf` to `<paper-id>.pdf`. From here the file is
+addressable by the paper's identity rather than by an accident of upload order.
+
+### 7 · Mathpix converts it
+
+Status moves to `processing`, then `mathpix.Client.Process` runs three phases,
+because the Mathpix API is asynchronous:
+
+**Upload** — the PDF is POSTed as multipart with
+`options_json: {"conversion_formats":{"md":true}}`. Mathpix returns a `pdf_id`.
+
+**Poll** — status is checked on an interval until it reports `completed`. An
+`error` status fails the run with the message Mathpix gave.
+
+**Fetch** — the finished markdown is retrieved.
+
+A title is extracted best-effort from the first heading in the output. Many
+papers yield nothing here, which is expected and not an error.
+
+Requesting the `md` format specifically means maths comes back
+dollar-delimited (`$$ … $$`) rather than in LaTeX bracket form.
+
+### 8 · The markdown is hashed
+
+`sha256(markdown)`, hex-encoded.
+
+Note this is a **different hash from step 3**, over different bytes, for a
+different purpose. Step 3 identifies the source PDF. This one lets any consumer
+prove the markdown it holds is the markdown that was stored.
+
+### 9 · Both are written together
+
+```go
+store.UpdateMarkdown(ctx, id, title, markdown, markdownHash)
+```
+
+One call, one SQL statement. The markdown and its hash cannot diverge, because
+there is no code path that writes one without the other.
+
+Status becomes `ready`.
+
+---
+
+## Why the hash matters
+
+**Mathpix output is not byte-reproducible.** Converting the same PDF twice
+returns files of identical length but differing content — presumably an embedded
+identifier of fixed width.
+
+So re-converting a paper invalidates anything recorded against the previous
+conversion. Byte offsets into the old markdown will still be valid *numbers*;
+they will simply point at the wrong text, silently.
+
+`papers.markdown_hash` is what catches that. Any consumer holding offsets, or a
+copy of the text, checks the hash before trusting what it has.
+
+The same guarantee is why `export-markdown` is a subcommand rather than a shell
+pipeline: piping the API response through `jq` into a redirect appends a newline
+and can inject CRLF, either of which breaks the property the hash exists to
+protect.
+
 ---
 
 ## Layout
@@ -34,30 +155,11 @@ internal/platform/         config, logging, metrics, security, preflight
 ```
 
 Hexagonal: the core depends on interfaces, adapters implement them, and nothing
-in `internal/core` imports from `internal/adapters`.
+in `internal/core` imports from `internal/adapters`. That direction is what
+keeps Mathpix swappable and the ingest logic testable without a network.
 
 Dependencies are pgx, golang-migrate, uuid and godotenv. No web framework, no
 ORM, no DI container.
-
----
-
-## The contract worth knowing
-
-`ingest.Service` computes the SHA-256 of the markdown and hands it to
-`PaperStore.UpdateMarkdown` in the same call that writes the markdown itself.
-One statement, so the two cannot diverge.
-
-Anything downstream that indexes into this text — by byte offset or otherwise —
-can check what it holds against `papers.markdown_hash` before trusting it.
-
-That guarantee is why `export-markdown` is a subcommand rather than a shell
-pipeline: piping the API response through `jq` into a redirect appends a newline
-and can inject CRLF, either of which silently breaks it.
-
-**Mathpix output is not byte-reproducible.** Converting the same PDF twice
-returns files of identical length but differing content. Re-converting a paper
-therefore invalidates any offsets recorded against the previous conversion, and
-the hash is what catches that.
 
 ---
 
@@ -77,11 +179,8 @@ make build                   # build both binaries
 ./bin/epistemicos-cli export-markdown <paper-id> --out paper.md
 ```
 
-`export-markdown` writes the stored markdown byte-exactly — no trimming, no
-line-ending translation, no trailing newline — and prints its hash.
-
 Mathpix credentials are required to convert. Without them the service still
-starts and serves reads, but ingest fails at the conversion step and
+starts and serves reads, but ingest fails at step 7 and
 `/api/v1/capabilities` reports `mathpix_enabled: false`.
 
 ---
@@ -98,16 +197,26 @@ starts and serves reads, but ingest fails at the conversion step and
 | `GET` | `/metrics` | Prometheus text format |
 
 Every request carries an `X-Correlation-ID`, minted server-side or accepted
-inbound. Logs are `log/slog` JSON — grep by `correlation_id`.
-
-Ingest dedupes on the content hash of the source PDF, so submitting the same
-paper twice returns the existing record without re-converting.
+inbound. Logs are `log/slog` JSON — grep by `correlation_id` to follow one
+request end to end.
 
 ---
 
 ## Database
 
 One table beyond migration bookkeeping: `papers`.
+
+| Column | Holds |
+|---|---|
+| `id` | UUID, the paper's identity |
+| `url` | Source URL, empty for direct uploads |
+| `hash` | MD5 of the source PDF — unique, the dedupe key |
+| `title` | Best-effort, extracted from the markdown |
+| `status` | `pending` / `downloading` / `processing` / `ready` / `failed` |
+| `error` | Populated when `status = failed` |
+| `markdown` | The Mathpix output |
+| `markdown_hash` | SHA-256 of that markdown |
+| `created_at` / `updated_at` | Timestamps |
 
 | Migration | Adds |
 |---|---|

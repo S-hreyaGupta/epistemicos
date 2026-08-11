@@ -1,4 +1,4 @@
-// Package security holds the HTTP middleware that hardens paperly-api
+// Package security holds the HTTP middleware that hardens epistemicos-api
 // for production exposure: CORS, security headers, and a simple
 // per-IP token-bucket rate limiter for mutating endpoints.
 //

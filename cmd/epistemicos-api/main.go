@@ -1,8 +1,7 @@
 // epistemicos-api is the HTTP server for the ingest path:
 // POST/GET /api/v1/papers, /health, /metrics.
 //
-// There is no analyze endpoint and no LLM client. This binary's entire job
-// is PDF in, markdown out, persisted with its content hash.
+// Its whole job is PDF in, markdown out, persisted with its content hash.
 package main
 
 import (

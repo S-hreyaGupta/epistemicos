@@ -1,6 +1,3 @@
-# Single-stage Go build. There is no frontend stage — this system has no
-# frontend; the API and CLI are the whole surface.
-
 FROM golang:1.24-alpine AS api-build
 
 WORKDIR /app

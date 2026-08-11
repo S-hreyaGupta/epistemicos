@@ -8,38 +8,38 @@ import (
 
 func TestCounter_AccumulatesPerLabelSet(t *testing.T) {
 	r := New()
-	c := r.NewCounter("paperly_extractor_calls_total", "extractor invocations")
-	c.Inc("type", "method_of_record")
-	c.Inc("type", "method_of_record")
-	c.Inc("type", "disclosure")
+	c := r.NewCounter("ingest_calls_total", "ingest invocations")
+	c.Inc("source", "url")
+	c.Inc("source", "url")
+	c.Inc("source", "upload")
 
 	var buf bytes.Buffer
 	if err := r.WriteText(&buf); err != nil {
 		t.Fatalf("WriteText: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, `paperly_extractor_calls_total{type="method_of_record"} 2`) {
+	if !strings.Contains(out, `ingest_calls_total{source="url"} 2`) {
 		t.Errorf("missing series:\n%s", out)
 	}
-	if !strings.Contains(out, `paperly_extractor_calls_total{type="disclosure"} 1`) {
+	if !strings.Contains(out, `ingest_calls_total{source="upload"} 1`) {
 		t.Errorf("missing series:\n%s", out)
 	}
 }
 
 func TestCounter_NoLabels(t *testing.T) {
 	r := New()
-	c := r.NewCounter("paperly_analyze_total", "analyses")
+	c := r.NewCounter("ingest_total", "ingests")
 	c.Add(3)
 	var buf bytes.Buffer
 	_ = r.WriteText(&buf)
-	if !strings.Contains(buf.String(), "paperly_analyze_total 3") {
+	if !strings.Contains(buf.String(), "ingest_total 3") {
 		t.Errorf("missing unlabeled series:\n%s", buf.String())
 	}
 }
 
 func TestHistogram_Buckets(t *testing.T) {
 	r := New()
-	h := r.NewHistogram("paperly_extractor_latency_seconds", "latency", []float64{0.1, 1, 10})
+	h := r.NewHistogram("conversion_latency_seconds", "latency", []float64{0.1, 1, 10})
 	h.Observe(0.05) // bucket 0.1
 	h.Observe(0.5)  // bucket 1
 	h.Observe(5)    // bucket 10
@@ -48,31 +48,31 @@ func TestHistogram_Buckets(t *testing.T) {
 	var buf bytes.Buffer
 	_ = r.WriteText(&buf)
 	out := buf.String()
-	if !strings.Contains(out, "paperly_extractor_latency_seconds_count 4") {
+	if !strings.Contains(out, "conversion_latency_seconds_count 4") {
 		t.Errorf("expected count=4:\n%s", out)
 	}
-	if !strings.Contains(out, `paperly_extractor_latency_seconds_bucket{le="0.1"} 1`) {
+	if !strings.Contains(out, `conversion_latency_seconds_bucket{le="0.1"} 1`) {
 		t.Errorf("expected 0.1 bucket=1:\n%s", out)
 	}
-	if !strings.Contains(out, `paperly_extractor_latency_seconds_bucket{le="1"} 2`) {
+	if !strings.Contains(out, `conversion_latency_seconds_bucket{le="1"} 2`) {
 		t.Errorf("expected 1 bucket=2 (cumulative):\n%s", out)
 	}
-	if !strings.Contains(out, `paperly_extractor_latency_seconds_bucket{le="10"} 3`) {
+	if !strings.Contains(out, `conversion_latency_seconds_bucket{le="10"} 3`) {
 		t.Errorf("expected 10 bucket=3 (cumulative):\n%s", out)
 	}
-	if !strings.Contains(out, `paperly_extractor_latency_seconds_bucket{le="+Inf"} 4`) {
+	if !strings.Contains(out, `conversion_latency_seconds_bucket{le="+Inf"} 4`) {
 		t.Errorf("expected +Inf bucket=4:\n%s", out)
 	}
 }
 
 func TestGauge_SetAndAdd(t *testing.T) {
 	r := New()
-	g := r.NewGauge("paperly_active_analyses", "in-flight")
+	g := r.NewGauge("active_conversions", "in-flight")
 	g.Set(5)
 	g.Add(-2)
 	var buf bytes.Buffer
 	_ = r.WriteText(&buf)
-	if !strings.Contains(buf.String(), "paperly_active_analyses 3") {
+	if !strings.Contains(buf.String(), "active_conversions 3") {
 		t.Errorf("expected 3:\n%s", buf.String())
 	}
 }

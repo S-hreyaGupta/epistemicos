@@ -1,7 +1,6 @@
 // Package preflight performs startup-time validation of external
-// service credentials. Catches "ANTHROPIC_API_KEY is empty" and
-// "MATHPIX_APP_ID is malformed" before the first user click rather
-// than at first analysis attempt.
+// service credentials. Catches "MATHPIX_APP_ID is malformed" at boot
+// rather than at the first conversion attempt.
 //
 // Designed to be cheap and non-fatal: probe results are returned to
 // the caller (typically main.go), which logs them and adjusts the
@@ -11,10 +10,8 @@ package preflight
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -26,57 +23,6 @@ type Result struct {
 }
 
 const probeTimeout = 5 * time.Second
-
-// CheckAnthropic verifies that the configured Anthropic API key is
-// shape-valid and accepted by the Messages endpoint. Sends a minimal
-// 1-token request to keep the probe cost negligible. Returns OK=true
-// only on a 2xx response.
-func CheckAnthropic(ctx context.Context, baseURL, key, model string) Result {
-	r := Result{Service: "anthropic"}
-	if key == "" {
-		r.Reason = "ANTHROPIC_API_KEY is empty"
-		return r
-	}
-	if !strings.HasPrefix(key, "sk-ant-") {
-		r.Reason = "ANTHROPIC_API_KEY does not look like an Anthropic key (expected sk-ant- prefix)"
-		return r
-	}
-	if model == "" {
-		r.Reason = "PAPERLY_LLM_MODEL is empty"
-		return r
-	}
-
-	probeCtx, cancel := context.WithTimeout(ctx, probeTimeout)
-	defer cancel()
-
-	body := map[string]any{
-		"model":      model,
-		"max_tokens": 1,
-		"messages":   []map[string]string{{"role": "user", "content": "ping"}},
-	}
-	raw, _ := json.Marshal(body)
-	req, err := http.NewRequestWithContext(probeCtx, http.MethodPost, baseURL+"/v1/messages", strings.NewReader(string(raw)))
-	if err != nil {
-		r.Reason = fmt.Sprintf("build request: %v", err)
-		return r
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", key)
-	req.Header.Set("anthropic-version", "2023-06-01")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		r.Reason = fmt.Sprintf("probe call failed: %v", err)
-		return r
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		r.OK = true
-		return r
-	}
-	r.Reason = fmt.Sprintf("Anthropic API returned %d", resp.StatusCode)
-	return r
-}
 
 // CheckMathpix verifies the configured Mathpix credentials. Hits the
 // /v3/pdf-results endpoint with a clearly-invalid ID; expects 401 if

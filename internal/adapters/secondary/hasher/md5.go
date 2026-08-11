@@ -1,6 +1,7 @@
 // Package hasher implements content-addressed hashing for paper dedupe.
-// Lifted from v1 (internal/ingest/adapters/hasher/md5.go), adapted to
-// the v2 paper.Hash type and the ports.Hasher contract.
+//
+// It implements ports.Hasher and produces a paper.Hash. MD5 is adequate
+// here: the hash is a dedupe key, not a security boundary.
 package hasher
 
 import (

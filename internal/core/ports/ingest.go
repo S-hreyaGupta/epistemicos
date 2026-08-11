@@ -23,7 +23,7 @@ type PDFDownloader interface {
 
 // MarkdownProcessor turns a PDF into markdown-with-LaTeX. Mathpix is
 // the production implementation. The contract is markdown that
-// preserves LaTeX expressions — Paperly does not re-OCR.
+// preserves LaTeX expressions; this system does not re-OCR.
 type MarkdownProcessor interface {
 	// Process consumes a PDF file path and returns (title, markdown).
 	// The title is best-effort extracted from the first heading.

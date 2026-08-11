@@ -1,8 +1,8 @@
 // Package pdfdownloader fetches PDFs from URLs.
-// Lifted from v1 (internal/ingest/adapters/pdf/downloader.go) and
-// adapted to the v2 ports.PDFDownloader contract (returns a
-// ReadCloser instead of writing to a destination path — the ingest
-// service owns the local-file lifecycle).
+//
+// It implements ports.PDFDownloader and returns a ReadCloser rather than
+// writing to a destination path — the ingest service owns the local-file
+// lifecycle.
 package pdfdownloader
 
 import (

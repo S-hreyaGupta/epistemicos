@@ -2,10 +2,9 @@
 // variables. Kept deliberately small — each field has a default
 // where one is sane.
 //
-// Every field here backs something this system actually does. There are no
-// LLM settings, no extractor knobs and no analysis toggle, because this
-// system makes no LLM calls and runs no analysis — it downloads a PDF,
-// converts it, and stores the result.
+// Every field here backs something this system does: connect to Postgres,
+// bind the API, stage PDFs, authenticate to Mathpix, and bound inbound
+// request rates.
 package config
 
 import (

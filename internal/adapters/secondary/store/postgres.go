@@ -1,7 +1,7 @@
 // Package store implements PaperStore on top of pgx.
 //
-// v1 used gorm; v2 uses pgx directly for simpler control and fewer
-// dependencies. Migrations are handled by golang-migrate; see
+// pgx is used directly rather than through an ORM, for simpler control and
+// fewer dependencies. Migrations are handled by golang-migrate; see
 // internal/adapters/secondary/store/migrations.
 package store
 

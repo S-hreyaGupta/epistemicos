@@ -1,14 +1,12 @@
 // Package paper defines the Paper aggregate.
 //
-// A Paper is the unit of analysis. It carries its source markdown
+// A Paper is one ingested document. It carries its source markdown
 // (produced upstream by Mathpix), a content hash of the source PDF for
 // dedupe, and a separate hash of the markdown itself for integrity.
 //
-// A Span/Document/Section trio used to live alongside this type, describing a
-// paper's sections for the extractor pipeline. Both were removed: nothing here
-// consumes them, and their CharStart/CharEnd fields held byte values under
-// character names. Anything downstream that sections a paper should index the
-// markdown by byte offset and verify those offsets against MarkdownHash.
+// Anything downstream that indexes into a paper's markdown should do so by
+// byte offset, and should verify those offsets against MarkdownHash before
+// trusting them.
 package paper
 
 import "time"

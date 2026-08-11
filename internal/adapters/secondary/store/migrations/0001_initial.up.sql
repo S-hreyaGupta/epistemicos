@@ -1,5 +1,4 @@
--- Slice 1: papers table only. Slot/flag tables land in later slices
--- where their schemas are pinned down by the rule layer.
+-- The papers table: one row per ingested document.
 
 CREATE TABLE IF NOT EXISTS papers (
     id          UUID PRIMARY KEY,

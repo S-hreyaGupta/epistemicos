@@ -3,8 +3,8 @@
 // resulting markdown together with its SHA-256.
 //
 // The hash is computed here, in the same call that writes the markdown, so
-// the two cannot diverge. Segmentation consumes it to prove the offsets it
-// produced belong to the text it was given.
+// the two cannot diverge. A consumer holding a copy of the text can check
+// it against the stored hash before trusting it.
 package ingest
 
 import (

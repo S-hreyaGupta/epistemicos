@@ -14,8 +14,10 @@
 coverage.out
 
 # Local config — NEVER commit. Contains Mathpix and database credentials.
-.env
-.env.local
+# Glob-matched deliberately: Notepad silently saves ".env" as ".env.txt",
+# which an exact-name rule would miss and `git add -A` would then stage.
+.env*
+!.env.example
 
 # IDE
 .idea/
@@ -28,3 +30,6 @@ coverage.out
 
 # Local PDF / data volume
 /data/
+
+# Sample conversions
+demo*.md

@@ -1,9 +1,8 @@
 // Package mathpix implements ports.MarkdownProcessor against the
 // Mathpix v3 PDF-to-markdown API.
 //
-// Lifted with minimal changes from v1 (internal/ingest/adapters/mathpix/client.go).
 // Mathpix is the production input contract: PDFs in, markdown-with-LaTeX
-// out. Paperly v2 does not re-OCR — fidelity at this layer is
+// out. This system does not re-OCR — fidelity at this layer is
 // upstream's responsibility.
 package mathpix
 

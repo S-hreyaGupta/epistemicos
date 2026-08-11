@@ -14,17 +14,14 @@ import (
 	"github.com/EpistemicOS/epistemicos/internal/platform/config"
 )
 
-// exportFlags holds the parsed arguments for export-markdown. It is
-// deliberately NOT reviewerFlags: that type is shared by the two
-// reviewer-matching subcommands and its name would be misleading on a
-// command that has nothing to do with reviewer matching.
+// exportFlags holds the parsed arguments for export-markdown.
 type exportFlags struct {
 	paperID string
 	outPath string
 }
 
-// parseExportFlags is a hand-rolled flag parser, matching
-// parseReviewerFlags in reviewer.go, to keep dependencies minimal. The
+// parseExportFlags is a hand-rolled flag parser, to keep dependencies
+// minimal. The
 // first positional argument is the paper-id; the rest are --key value
 // pairs.
 func parseExportFlags(args []string) exportFlags {
@@ -46,7 +43,7 @@ func parseExportFlags(args []string) exportFlags {
 	return f
 }
 
-// runExportMarkdown implements paperly-cli export-markdown <paper-id> --out <path>.
+// runExportMarkdown implements epistemicos-cli export-markdown <paper-id> --out <path>.
 //
 // It loads the paper from Postgres and writes Paper.Markdown to the
 // named file BYTE-EXACTLY, then prints the byte count and the stored
@@ -83,8 +80,8 @@ func runExportMarkdown(args []string) {
 	}
 	defer pool.Close()
 
-	// GetByID directly rather than reviewer.go readMarkdown: this
-	// command also needs p.MarkdownHash, which readMarkdown discards.
+	// GetByID rather than a markdown-only read: this command also needs
+	// p.MarkdownHash to print alongside the file.
 	paperStore := store.NewPostgresPaperStore(pool)
 	p, err := paperStore.GetByID(context.Background(), paper.ID(flags.paperID))
 	if err != nil {

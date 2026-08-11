@@ -13,9 +13,7 @@ var ErrNotFound = errors.New("not found")
 
 // PaperStore persists Paper aggregates.
 //
-// This is the only store this system defines. The analysis-side stores
-// (slots, flags, editor notes) belonged to the archetype pipeline and are
-// deliberately absent — see the README on what this repository is and is not.
+// This is the only store this system defines.
 type PaperStore interface {
 	// Save inserts or updates a paper. Idempotent on ID.
 	Save(ctx context.Context, p *paper.Paper) error

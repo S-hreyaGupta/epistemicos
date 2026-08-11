@@ -4,9 +4,6 @@
 //	epistemicos-cli ingest <url>                     Ingest a paper by URL
 //	epistemicos-cli list                             List ingested papers
 //	epistemicos-cli export-markdown <id> --out <p>   Write stored markdown byte-exactly
-//
-// There is no analyze command. Slot extraction and archetype rules belonged
-// to the v2 pipeline and are not part of this system.
 package main
 
 import (

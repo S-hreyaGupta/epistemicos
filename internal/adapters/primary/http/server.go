@@ -1,9 +1,6 @@
 // Package http hosts the REST API.
 //
 // The surface is deliberately small: ingest a PDF, list papers, fetch one.
-// There are no analysis endpoints — slot extraction, archetype rules, flags
-// and their dismissal belonged to the v2 pipeline and are not part of this
-// system. See docs/architecture.md.
 package http
 
 import (

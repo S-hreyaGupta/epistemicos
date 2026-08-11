@@ -1,17 +1,17 @@
 // Package metrics is a tiny in-process metrics registry that emits
 // Prometheus-format text. Hand-rolled to avoid a heavy client
-// dependency — v2 Phase 2 needs counters and histograms, not the full
+// dependency: this system needs counters and histograms, not the full
 // Prometheus client surface.
 //
 // Three primitives:
 //
-//   - Counter: monotonically increasing (extraction calls, flags
-//     emitted, dismissals).
-//   - Gauge: arbitrary float (active analyses).
-//   - Histogram: latency buckets (extraction latency per slot type).
+//   - Counter: monotonically increasing (ingests started, conversions
+//     completed, failures).
+//   - Gauge: arbitrary float (conversions in flight).
+//   - Histogram: latency buckets (conversion latency).
 //
 // Each metric supports labels for low-cardinality breakdowns. Cardinality
-// must be bounded — never label by paper ID or flag ID.
+// must be bounded — never label by paper ID.
 package metrics
 
 import (
@@ -116,8 +116,8 @@ type Histogram struct {
 	totals  map[string]uint64
 }
 
-// DefaultBuckets cover the analyze pipeline range — fast LLM hits to
-// upper-bound timeouts.
+// DefaultBuckets cover the conversion range — a cached hit through to an
+// upper-bound timeout on a long document.
 var DefaultBuckets = []float64{0.05, 0.1, 0.5, 1, 2, 5, 10, 20, 30, 60}
 
 // Observe records one latency in seconds.

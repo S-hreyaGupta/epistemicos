@@ -11,3 +11,13 @@
 # a real dependency change would hide.
 go.mod text eol=lf
 go.sum text eol=lf
+
+# Step 3 test fixtures are compared by exact byte offset, so their bytes must
+# survive checkout unaltered on every platform. `-text` disables all line-ending
+# conversion. Without it, core.autocrlf=true rewrites LF to CRLF on a Windows
+# checkout and every one of the 22 spans in expected.json shifts by one byte per
+# preceding line — a failure that reads as a segmentation bug rather than as a
+# checkout artefact. The test asserts the fixture's SHA-256 before comparing so
+# that this fails loudly if the pin is ever removed.
+internal/core/domain/segment/testdata/demo.md -text
+internal/core/domain/segment/testdata/expected.json -text

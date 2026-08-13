@@ -31,5 +31,8 @@ coverage.out
 # Local PDF / data volume
 /data/
 
-# Sample conversions
-demo*.md
+# Sample conversions in the working root. Anchored with a leading slash so it
+# cannot reach test fixtures: internal/core/domain/segment/testdata/demo.md is
+# the Step 3 reference fixture (§15) and MUST be committed. An unanchored
+# `demo*.md` matched it at every depth and silently excluded it.
+/demo*.md

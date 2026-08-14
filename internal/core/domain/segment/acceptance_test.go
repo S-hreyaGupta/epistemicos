@@ -444,3 +444,8 @@ func TestAC14_PreHeadingContentHasNoNode(t *testing.T) {
 // internal/adapters/secondary/approved/papers_test.go. The check lives in the
 // adapter, so the test lives there too; a package that takes []byte and returns
 // nodes cannot reach a database row.
+//
+// AC-15 (2.2 parent inheritance, with its four limits) IS TESTED, in
+// inherit_test.go. It lives in its own file rather than here because four of
+// its five clauses are about what inheritance must NOT do, and a rule is only
+// worth having if its limits are tested as carefully as its effect.

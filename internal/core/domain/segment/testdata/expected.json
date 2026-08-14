@@ -1,5 +1,5 @@
 {
-  "_generated_by": "reference implementation of step3_spec_v2.md",
+  "_generated_by": "reference implementation of step3_spec_v2.2.md and step3_table_v2.2.json, written independently of the Go implementation it checks. Regenerating this file from the code would turn a test into a snapshot.",
   "_fixture_input": {
     "file": "demo.md",
     "bytes": 81492,

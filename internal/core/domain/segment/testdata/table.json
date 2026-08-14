@@ -1,8 +1,8 @@
 {
   "_meta": {
-    "description": "Section-role table for Step 3 v2.0. Parent-independent deterministic classification of every H2-H4 heading (and non-first H1s) against section_roles; appendix modeled as a structural container, not a role; no LLM, no tie-breaking. Companion to step3_spec_v2.md, which is authoritative for process, persistence, and invariants.",
-    "version": "mvp-reduced-2.1",
-    "supersedes": "mvp-reduced-1.1 (step3_mvp_reduced_table) and mvp-reduced-2.0 (step3_table_v2). Both retired.",
+    "description": "Section-role table for Step 3 v2.2. Deterministic classification of every H2-H4 heading (and non-first H1s) against section_roles; appendix modeled as a structural container, not a role; no LLM in the pipeline. A heading that matches nothing may take its parent's role (see matching_rule.parent_inheritance); every other outcome depends on the heading alone. Companion to step3_spec_v2.2.md, which is authoritative for process, persistence, and invariants.",
+    "version": "mvp-reduced-2.2",
+    "supersedes": "mvp-reduced-1.1 (step3_mvp_reduced_table), mvp-reduced-2.0 (step3_table_v2) and mvp-reduced-2.1. All retired.",
     "encoding": "UTF-8, validated",
     "structural_contract": {
       "document_title_level": 1,
@@ -26,7 +26,7 @@
       },
       "distinct_role_counting": "Ambiguity is counted in roles, never keywords. Multiple keyword hits within one role ('prior research and extant literature' -> literature_review twice) = 1 distinct role = resolved, no task.",
       "no_tie_breaking": "Longest-phrase-wins does not exist in this version. Load-bearing ordering: exact match runs BEFORE the phrase scan and resolves immediately -- 'Summary and Conclusions' and 'Background literature' are literal keywords (conclusion, literature_review) and therefore resolve cleanly, never reaching distinct-role counting. Genuine multi_role_match cases are non-exact headings whose phrase hits span roles, e.g. 'Theoretical background and hypotheses derivation' (theory + introduction) or 'Background and literature review' (introduction + literature_review). Verified against this table.",
-      "parent_independence": "No role inheritance, no parent-context weighting, no LLM. A node's classification depends only on its own semantic_heading."
+      "parent_inheritance": "A heading that produces 0 distinct roles takes its PARENT's role, recorded as classification_method = inherited. Four limits, each load-bearing: (a) never overrides a heading that matched -- direct evidence outranks positional evidence; (b) never overrides a 2+ distinct-role tie -- a tie is a real question with a real shortlist, and burying it would discard the best information the reviewer has; (c) never inherits from an unresolved parent -- a guess must not descend from a guess; (d) never inherits from the document_title node, which has no role by design, so sitting directly beneath the title yields no information. Where no limit applies the node stays unresolved and raises ReviewTask(zero_role_match). There is still no parent-context WEIGHTING and no LLM: inheritance is a fallback applied after the role table has spoken, never an input to it."
     },
     "deferred_llm_design": "The two-function LLM design (constrained candidate disambiguation for multi-role hits; contextual plausibility for zero-match H3/H4 against a reliable resolved ancestor), including its model/prompt provenance contract and strict output-validation/retry contract, is deferred out of MVP in full. It is preserved as deferred item 1 in step3_spec_v2.md section 13 and re-enters only if review-task volume becomes operationally excessive. No field in this table references it.",
     "changelog_from_1.1": [
@@ -43,14 +43,22 @@
       "No eval harness, gold corpus, or CI accuracy gate exists in this specification: demo.md is a reference test fixture only (spec section 15); the runtime zero-silent-loss invariant is the sole hard gate",
       "Effective document-title overlay added (spec section 8): a human title ReviewDecision overrides the run's machine title determination at read time; SegmentationRun's stored title fields are never mutated, and reviewer_confirmed/human exist only as effective values"
     ],
-    "companion_spec": "step3_spec_v2.1.md",
+    "companion_spec": "step3_spec_v2.2.md",
     "reference_fixture": "step3_expected_output_demo.json — expected output for demo.md, byte offsets per spec §3 (2.1 semantics).",
-    "verification": "Verified 13 Aug 2026: a reference implementation built from step3_spec_v2.1.md and this table alone reproduces spec §15 exactly on demo.md — 22 SectionNodes (H1 1, H2 8, H3 12, H4 1), 6 ReviewTasks (1 multi_role_match with candidates [introduction, theory]; 5 zero_role_match on 2.1, 2.2, 2.3, 2.4, 4.2), all 15 named classifications, zero-loss invariant passing. 27/27 assertions. No table defect found; this file is unchanged from 2.0 apart from metadata.",
+    "verification": "Verified 13 Aug 2026 at 2.1: a reference implementation built from step3_spec_v2.2.md and this table alone reproduced spec §15 exactly on demo.md -- 22 SectionNodes (H1 1, H2 8, H3 12, H4 1), 6 ReviewTasks, all 15 named classifications, zero-loss invariant passing, 27/27 assertions. Re-verified 14 Aug 2026 at 2.2: the same 22 SectionNodes, now 5 ReviewTasks (1 multi_role_match with candidates [introduction, theory]; 4 zero_role_match on 2.1, 2.2, 2.3, 2.4). The sixth task is gone because 4.2 Structural model now inherits results from its parent, 4 Data analysis and results. The fixture was regenerated from the spec, not snapshotted from the implementation.",
     "changelog_from_2.0": [
       "Metadata only. No keyword, role, container or matching-rule change.",
       "Version aligned with spec 2.1 (clarification amendments; structural contract unchanged).",
       "Recorded the verification result and the machine-readable reference fixture.",
       "structural_rule_version persisted on SegmentationRun remains \"2.0\": the H1-H4 structural contract did not change in 2.1."
+    ],
+    "changelog_from_2.1": [
+      "First version whose changes alter classifications, and therefore the first to bump structural_rule_version, which stayed \"2.0\" through the whole of 2.1.",
+      "matching_rule.parent_independence replaced by matching_rule.parent_inheritance: a zero-match heading takes its parent's role, with four limits (no override of a match, no override of a tie, no inheritance from an unresolved parent, no inheritance from the document title).",
+      "classification_method gains \"inherited\", stored distinctly from \"rule\" so a role guessed from position stays countable and auditable against a role read from the heading itself.",
+      "structural_containers.appendix gains unmatched_suffix_behavior: an appendix whose suffix matches no role resolves to Unknown structurally instead of raising a question, matching what a bare 'Appendix B' already did. The suffix is still recorded in semantic_heading, so nothing is lost by not asking.",
+      "methodology keywords gain the singular \"variable\" alongside \"variables\", so '4.2 Dependent variable' classifies from its own heading rather than by inheritance. 156 keywords becomes 157.",
+      "structural_rule_version persisted on SegmentationRun becomes \"2.2\"."
     ]
   },
   "section_roles": {
@@ -316,20 +324,22 @@
       ],
       "parse_rule": "If the normalized heading begins with a trigger: structural_container = appendix; an immediately following short token ('B', '1', 'A1') is captured as appendix_label; any remaining text after separator (':' '.' '-') becomes semantic_heading and is classified normally through the role table. If the heading is only the trigger (+ optional label), or matches an alias exactly: semantic_heading = null.",
       "bare_container_behavior": "semantic_heading = null -> primary_role = Unknown, content_class = analytical, classification_status = resolved, classification_method = structural, NO ReviewTask. Children classify independently.",
+      "unmatched_suffix_behavior": "semantic_heading is present but matches 0 roles -> primary_role = Unknown, content_class = analytical, classification_status = resolved, classification_method = structural, NO ReviewTask. semantic_heading is RETAINED. Before 2.2 this raised zero_role_match, which meant adding unparseable words to a bare 'Appendix B' turned a resolved answer into an unresolved one -- backwards, since the extra words carry no epistemic claim to adjudicate. A suffix that DOES match keeps its role: 'Appendix B: Robustness checks' is still results (rule).",
       "examples": {
         "appendix b: robustness checks": "container=appendix, label=B, semantic_heading='robustness checks' -> primary_role=results (rule)",
         "appendix c: measures": "container=appendix, label=C -> primary_role=methodology (rule)",
         "appendix b": "container=appendix, label=B, semantic_heading=null -> primary_role=Unknown (structural)",
-        "supporting information": "container=appendix (alias), label=null -> primary_role=Unknown (structural)"
+        "supporting information": "container=appendix (alias), label=null -> primary_role=Unknown (structural)",
+        "appendix a - isolating extended supply chains": "container=appendix, label=A, semantic_heading='isolating extended supply chains' matches no role -> primary_role=Unknown (structural), no ReviewTask"
       },
       "note": "Appendix answers WHERE content is located; roles answer WHAT epistemic function content performs. Appendix therefore does not compete as a primary_role."
     }
   },
   "synthetic_roles": {
     "unknown": {
-      "assigned_when": "(a) no headings exist in the document at all -- single whole-document node; or (b) a structural container heading has no semantic suffix (bare 'Appendix B', or a container alias like 'Supporting information')",
+      "assigned_when": "(a) no headings exist in the document at all -- single whole-document node; (b) a structural container heading has no semantic suffix (bare 'Appendix B', or a container alias like 'Supporting information'); or (c) as of 2.2, a structural container heading whose semantic suffix matches no role",
       "content_class": "analytical",
-      "note": "Deliberate assignments (classification_status = resolved, method = structural), NOT classification failures, and generate no ReviewTask. Ordinary zero-match or multi-role headings do NOT receive Unknown in v2.0 -- they get primary_role = null, unresolved, and a ReviewTask (changed from 1.1)."
+      "note": "Deliberate assignments (classification_status = resolved, method = structural), NOT classification failures, and generate no ReviewTask. Ordinary zero-match or multi-role headings still do NOT receive Unknown: they get primary_role = null, unresolved, and a ReviewTask -- unless 2.2 inheritance resolves them from a parent, which records method = inherited and a real role, never Unknown."
     }
   },
   "node_kinds": {

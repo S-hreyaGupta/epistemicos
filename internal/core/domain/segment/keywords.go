@@ -79,6 +79,11 @@ var roleKeywords = map[Role][]string{
 		"operationalization",
 		"operationalisation",
 		"variables",
+		// Singular too. The plural alone resolved "4.3 Independent variables" and
+		// "4.4 Control variables" while leaving "4.2 Dependent variable" unmatched
+		// in the same paper — one letter apart, and the reviewer got a question
+		// about a heading whose siblings had answered themselves.
+		"variable",
 		"instrument",
 		"instruments",
 		"survey instrument",

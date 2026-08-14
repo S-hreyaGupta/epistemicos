@@ -104,8 +104,8 @@ func TestSaveAndGetRun(t *testing.T) {
 	if got.ApprovedMarkdownHash != want.ApprovedMarkdownHash {
 		t.Errorf("approved_markdown_hash = %q, want %q", got.ApprovedMarkdownHash, want.ApprovedMarkdownHash)
 	}
-	if got.StructuralRuleVersion != "2.0" {
-		t.Errorf("structural_rule_version = %q, want \"2.0\"", got.StructuralRuleVersion)
+	if got.StructuralRuleVersion != "2.2" {
+		t.Errorf("structural_rule_version = %q, want \"2.2\"", got.StructuralRuleVersion)
 	}
 	if got.Status != segment.RunCompleted {
 		t.Errorf("status = %q, want %q", got.Status, segment.RunCompleted)
@@ -204,11 +204,16 @@ func TestSaveRun_UnresolvedNodeCannotCarryARole(t *testing.T) {
 
 	// Corrupt one node the way a careless caller might: unresolved, but
 	// carrying a role anyway.
-	for i := range run.Nodes {
-		if run.Nodes[i].Classification.Status == segment.StatusUnresolved {
-			run.Nodes[i].Classification.Role = segment.RoleMethodology
-			break
-		}
+	//
+	// The invalid state is constructed OUTRIGHT rather than found by searching
+	// for an existing unresolved node. An earlier version did search, and under
+	// rule version 2.2 it silently stopped testing anything: parent inheritance
+	// resolved the only unresolved node in this fixture, the loop found nothing
+	// to corrupt, and the save succeeded — so a test about a database constraint
+	// was quietly passing on a row that was never invalid.
+	run.Nodes[len(run.Nodes)-1].Classification = segment.Classification{
+		Role:   segment.RoleMethodology,
+		Status: segment.StatusUnresolved,
 	}
 
 	if err := s.SaveRun(ctx, &run); err == nil {
@@ -302,8 +307,10 @@ func TestSaveRun_FixtureRoundTripsAllOffsets(t *testing.T) {
 	if len(got.Nodes) != 22 {
 		t.Fatalf("read back %d nodes, want 22", len(got.Nodes))
 	}
-	if len(got.Tasks) != 6 {
-		t.Errorf("read back %d tasks, want 6", len(got.Tasks))
+	// Five under rule version 2.2: "4.2 Structural model" now inherits results
+	// from its parent, so §15's sixth task no longer exists.
+	if len(got.Tasks) != 5 {
+		t.Errorf("read back %d tasks, want 5", len(got.Tasks))
 	}
 
 	for i := range run.Nodes {

@@ -4,6 +4,7 @@
 //	epistemicos-cli ingest <url>                     Ingest a paper by URL
 //	epistemicos-cli ingest-file <path>               Ingest a PDF already on disk
 //	epistemicos-cli segment <paper-id>               Run Step 3 over an ingested paper
+//	epistemicos-cli suggest <run-id>                 Ask an LLM about unresolved sections (advisory)
 //	epistemicos-cli list                             List ingested papers
 //	epistemicos-cli export-markdown <id> --out <p>   Write stored markdown byte-exactly
 package main
@@ -44,6 +45,8 @@ func main() {
 		runIngestFile(args)
 	case "segment":
 		runSegment(args)
+	case "suggest":
+		runSuggest(args)
 	case "list":
 		runList()
 	case "export-markdown":
@@ -65,6 +68,9 @@ Commands:
   ingest <url>             Ingest a paper from a URL
   ingest-file <path>       Ingest a PDF already on disk
   segment <paper-id>       Run Step 3: segment and classify an ingested paper
+  suggest <run-id>         Ask an LLM which role each unresolved section fits.
+                           ADVISORY: prints suggestions, writes nothing. Needs
+                           ANTHROPIC_API_KEY.
   list                     List ingested papers
   export-markdown <paper-id> --out <path>
                            Write a paper's stored markdown to a file byte-exactly (no

@@ -91,6 +91,19 @@ const (
 
 	// MethodStructural: assigned by §7's container rule, not by any keyword.
 	MethodStructural ClassificationMethod = "structural"
+
+	// MethodInherited: no keyword matched, so the node took its parent's role.
+	//
+	// This is deliberately its OWN method rather than being folded into
+	// MethodRule. An inherited role is a weaker claim than a matched one — it
+	// says "this sits under a methodology section" rather than "this heading
+	// says methodology" — and the two must stay distinguishable in the stored
+	// data. Merging them would make it impossible to ask afterwards how many
+	// roles were guessed from position, or to check whether the guess was right.
+	//
+	// Same principle as never overwriting the machine's answer with a human's:
+	// keep the provenance, and let a reader decide how much to trust it.
+	MethodInherited ClassificationMethod = "inherited"
 )
 
 // NodeKind separates a node's structural position from its semantic role, which

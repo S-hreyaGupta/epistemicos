@@ -18,8 +18,8 @@ func TestNewRun_Fixture(t *testing.T) {
 	if run.Status != RunCompleted {
 		t.Errorf("status = %q, want %q", run.Status, RunCompleted)
 	}
-	if run.StructuralRuleVersion != "2.0" {
-		t.Errorf("structural_rule_version = %q, want \"2.0\" — the 2.1 amendments changed no behaviour and must not distinguish a node set", run.StructuralRuleVersion)
+	if run.StructuralRuleVersion != "2.2" {
+		t.Errorf("structural_rule_version = %q, want \"2.2\" — 2.2 is the first version that changes classifications, so it is the first that earns a new number", run.StructuralRuleVersion)
 	}
 	if run.DocumentTitleStatus != TitleIdentified {
 		t.Errorf("title status = %q, want %q", run.DocumentTitleStatus, TitleIdentified)

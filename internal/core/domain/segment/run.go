@@ -117,12 +117,26 @@ type Run struct {
 // StructuralRuleVersion is the value persisted on every run produced by this
 // implementation.
 //
-// It is "2.0" and not "2.1" on purpose. The 2.1 amendments clarified offset
-// semantics, review context, title parentage and the input trust boundary;
-// none of them changes what nodes come out or how they are classified, so a
-// node set produced under 2.0 and one produced under 2.1 are the same node set
-// and must not be distinguished by this field.
-const StructuralRuleVersion = "2.0"
+// It stayed "2.0" through the whole of 2.1, because those amendments clarified
+// offset semantics, review context, title parentage and the input trust
+// boundary without changing what came out. A node set produced under 2.0 and
+// one produced under 2.1 were the same node set, and distinguishing them would
+// have been a lie.
+//
+// 2.2 is the first version that changes classifications, so it is the first
+// that earns a new number. Two rules were added:
+//
+//   - A section whose heading matched nothing takes its parent's role, recorded
+//     as MethodInherited. This relaxes §3's parent-independence, which ruled out
+//     rescue mechanisms by name.
+//   - An appendix whose suffix matched nothing resolves to Unknown structurally
+//     rather than raising a question, matching what a bare "Appendix B" already
+//     did.
+//
+// On the reference fixture the visible effect is one node: "4.2 Structural
+// model" now inherits results from "4 Data analysis and results", and §15's
+// review-task count goes from six to five.
+const StructuralRuleVersion = "2.2"
 
 // NewRun assembles a persistable run from a segmented document, including one
 // review task per unresolved node and one for an unidentified title.

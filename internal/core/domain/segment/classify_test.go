@@ -279,6 +279,18 @@ func TestClassifyReproducesFixture(t *testing.T) {
 		if want.NodeKind == "document_title" {
 			continue
 		}
+		// This test verifies §6 ALONE, so it must skip nodes whose stored role
+		// did not come from §6. Two 2.2 rules produce such nodes: a section that
+		// inherited its parent's role, and an appendix whose suffix matched
+		// nothing and fell back to Unknown. Both are covered by their own tests
+		// in inherit_test.go; comparing them here would be comparing the output
+		// of one rule against the expectations of another.
+		if derefOrEmpty(want.ClassificationMethod) == string(MethodInherited) {
+			continue
+		}
+		if want.StructuralContainer != nil && derefOrEmpty(want.PrimaryRole) == string(RoleUnknown) {
+			continue
+		}
 
 		t.Run(want.SectionID, func(t *testing.T) {
 			_, _, semantic := ParseContainer(StripIdentifiers(Normalize(want.HeadingRaw)))
@@ -298,7 +310,10 @@ func TestClassifyReproducesFixture(t *testing.T) {
 			}
 		})
 
-		if _, _, semantic := ParseContainer(StripIdentifiers(Normalize(want.HeadingRaw))); Classify(semantic).Status == StatusUnresolved {
+		// Count from the STORED status, not from a fresh Classify call: after
+		// 2.2 the two legitimately differ for inherited and fallback nodes, and
+		// the review tasks follow what was stored.
+		if want.ClassificationStatus == string(StatusUnresolved) {
 			unresolved = append(unresolved, want.SectionID)
 		}
 	}
@@ -380,7 +395,9 @@ func TestClassifyReproducesFixtureTaskDetail(t *testing.T) {
 		})
 	}
 
-	if multi != 1 || zero != 5 {
-		t.Errorf("review reasons: %d multi_role_match and %d zero_role_match, §15 claims 1 and 5", multi, zero)
+	// §15 claimed 1 and 5 under 2.0. Under 2.2 "4.2 Structural model" inherits
+	// results from its parent, so one zero-match becomes a resolved node.
+	if multi != 1 || zero != 4 {
+		t.Errorf("review reasons: %d multi_role_match and %d zero_role_match, want 1 and 4 under rule version 2.2", multi, zero)
 	}
 }

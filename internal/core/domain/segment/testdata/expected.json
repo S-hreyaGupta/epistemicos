@@ -9,7 +9,7 @@
     "segmentation_run_id": "seg_demo_0001",
     "extraction_run_id": "<supplied by caller>",
     "approved_markdown_hash": "a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e",
-    "structural_rule_version": "2.0",
+    "structural_rule_version": "2.2",
     "document_title_level": 1,
     "supported_node_levels": [
       2,
@@ -287,10 +287,10 @@
       "appendix_label": null,
       "start_offset": 32360,
       "end_offset": 38641,
-      "primary_role": null,
-      "content_class": null,
-      "classification_status": "unresolved",
-      "classification_method": null
+      "primary_role": "results",
+      "content_class": "analytical",
+      "classification_status": "resolved",
+      "classification_method": "inherited"
     },
     {
       "section_id": "n016",
@@ -454,14 +454,6 @@
     {
       "review_task_id": "t005",
       "section_id": "n008",
-      "review_reason": "zero_role_match",
-      "candidate_roles": [],
-      "matched_keywords": [],
-      "status": "open"
-    },
-    {
-      "review_task_id": "t006",
-      "section_id": "n015",
       "review_reason": "zero_role_match",
       "candidate_roles": [],
       "matched_keywords": [],

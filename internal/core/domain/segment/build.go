@@ -94,6 +94,7 @@ func Build(md []byte) (Document, error) {
 	}
 
 	linkParents(nodes)
+	inheritFromParents(nodes)
 
 	doc := Document{
 		Nodes:         nodes,
@@ -147,6 +148,29 @@ func buildNode(md []byte, ordinal int, h Heading, end int) SectionNode {
 	normalized := Normalize(raw)
 	container, label, semantic := ParseContainer(StripIdentifiers(normalized))
 
+	classification := Classify(semantic)
+
+	// A container whose suffix classified as nothing is still a container.
+	//
+	// §7 already resolves a BARE container — "Appendix B", with no suffix — to
+	// Unknown by structural assignment, raising no question, because the
+	// heading carries no epistemic claim to adjudicate. But an appendix whose
+	// suffix matched no keyword was becoming a question, which means ADDING
+	// WORDS WE CANNOT PARSE turned a resolved answer into an unresolved one.
+	// That is backwards: we know exactly as much as we did about the bare case.
+	//
+	// Nothing is lost by not asking. The suffix survives in SemanticHeading, so
+	// this decides only what reaches the review queue, not what is recorded —
+	// an appendix with an unclassified suffix remains findable at any time.
+	if container != "" && classification.Status == StatusUnresolved {
+		classification = Classification{
+			Role:         RoleUnknown,
+			ContentClass: ContentClassFor(RoleUnknown),
+			Status:       StatusResolved,
+			Method:       MethodStructural,
+		}
+	}
+
 	return SectionNode{
 		Ordinal:           ordinal,
 		ParentOrdinal:     -1, // linkParents fills this in
@@ -159,7 +183,7 @@ func buildNode(md []byte, ordinal int, h Heading, end int) SectionNode {
 		AppendixLabel:     label,
 		StartOffset:       spanStart(md, h),
 		EndOffset:         end,
-		Classification:    Classify(semantic),
+		Classification:    classification,
 	}
 }
 
@@ -295,6 +319,73 @@ func linkParents(nodes []SectionNode) {
 		// preceded that H2 and could parent to a node outside its subtree.
 		for l := level + 1; l <= 4; l++ {
 			byLevel[l] = -1
+		}
+	}
+}
+
+// inheritFromParents gives an unresolved node its parent's role.
+//
+// # This is a rescue mechanism, and the specification rules one out
+//
+// §3 says every node "runs the same parent-independent classification pipeline"
+// and that "no promotion or rescue mechanism exists or is needed." This is
+// exactly such a mechanism, added deliberately after a real paper showed that
+// seven of its nine open questions were answered by the parent heading alone:
+// "2.1 ESG disclosure in supply chains" is uninterpretable by itself and
+// obvious beneath "2 Literature Review".
+//
+// Parent-independence remains true where it matters. A heading that MATCHED
+// keeps its own answer; position never overrules evidence. What changes is only
+// what happens when there is no evidence at all.
+//
+// # Three limits, each preventing a specific failure
+//
+// ONLY WHEN NOTHING MATCHED. A resolved node is left alone, and so is a
+// multi-role tie — a tie is a real question with a real shortlist, and burying
+// it under the parent's role would silently discard the reviewer's best
+// information. Without this limit, "4.1 Preliminary results" under a methodology
+// section would become methodology, overruling the keyword that got it right.
+//
+// ONLY FROM A RESOLVED PARENT. If the parent is itself unresolved the child
+// stays unresolved. Otherwise guesses inherit from guesses and nothing records
+// how far any given answer is from actual evidence.
+//
+// NEVER FROM THE DOCUMENT TITLE. The title has no role by design (§4), so there
+// is nothing to inherit. This is why "5 EMPIRICAL ANALYSIS" and "Appendix A",
+// which sit directly beneath the title, remain questions — correctly, since
+// their placement tells a reviewer nothing.
+//
+// The result is marked MethodInherited rather than MethodRule, so an inherited
+// role stays distinguishable from a matched one for as long as it is stored.
+func inheritFromParents(nodes []SectionNode) {
+	for i := range nodes {
+		c := nodes[i].Classification
+
+		if c.Status != StatusUnresolved {
+			continue // it has an answer; leave it alone
+		}
+		if len(c.CandidateRoles) > 0 {
+			continue // a tie is a real question with a real shortlist
+		}
+
+		p := nodes[i].ParentOrdinal
+		if p < 0 || p >= i {
+			continue
+		}
+
+		parent := nodes[p]
+		if parent.Kind == KindDocumentTitle {
+			continue // the title has no role to give
+		}
+		if parent.Classification.Status != StatusResolved || parent.Classification.Role == "" {
+			continue // no guesses inheriting from guesses
+		}
+
+		nodes[i].Classification = Classification{
+			Role:         parent.Classification.Role,
+			ContentClass: parent.Classification.ContentClass,
+			Status:       StatusResolved,
+			Method:       MethodInherited,
 		}
 	}
 }

@@ -37,6 +37,15 @@ type expectedNode struct {
 	HeadingLevel int    `json:"heading_level"`
 	StartOffset  int    `json:"start_offset"`
 	EndOffset    int    `json:"end_offset"`
+
+	// The §6 and §7 pipeline outputs. The three nullable fields are pointers
+	// because null and "" are different states here: a null semantic_heading
+	// means a bare structural container with nothing to classify, while an
+	// empty string would mean a heading that normalized away to nothing.
+	HeadingNormalized   string  `json:"heading_normalized"`
+	SemanticHeading     *string `json:"semantic_heading"`
+	StructuralContainer *string `json:"structural_container"`
+	AppendixLabel       *string `json:"appendix_label"`
 }
 
 type expectedOutput struct {

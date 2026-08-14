@@ -1,0 +1,342 @@
+{
+  "_meta": {
+    "description": "Section-role table for Step 3 v2.0. Parent-independent deterministic classification of every H2-H4 heading (and non-first H1s) against section_roles; appendix modeled as a structural container, not a role; no LLM, no tie-breaking. Companion to step3_spec_v2.md, which is authoritative for process, persistence, and invariants.",
+    "version": "mvp-reduced-2.1",
+    "supersedes": "mvp-reduced-1.1 (step3_mvp_reduced_table) and mvp-reduced-2.0 (step3_table_v2). Both retired.",
+    "encoding": "UTF-8, validated",
+    "structural_contract": {
+      "document_title_level": 1,
+      "supported_node_levels": [
+        2,
+        3,
+        4
+      ],
+      "embedded_levels": [
+        5,
+        6
+      ],
+      "note": "Fixed mapping per Mathpix markdown convention. Levels are never inferred from heading frequency. Every H2-H4 heading becomes exactly one SectionNode (zero-silent-loss invariant, spec section 10)."
+    },
+    "matching_rule": {
+      "pipeline": "normalize (lowercase, collapse whitespace, strip trailing ':' '.') -> strip identifiers (numeric '2.1', alphabetic 'A.', Roman 'IV.', 'Section 4:') -> appendix-container parse -> exact match on semantic_heading, else whole-word phrase scan -> count DISTINCT ROLES among hits",
+      "outcomes": {
+        "1_distinct_role": "primary_role = that role; classification_status = resolved; classification_method = rule",
+        "0_distinct_roles": "primary_role = null; unresolved; ReviewTask(zero_role_match)",
+        "2plus_distinct_roles": "primary_role = null; unresolved; candidate_roles recorded; ReviewTask(multi_role_match)"
+      },
+      "distinct_role_counting": "Ambiguity is counted in roles, never keywords. Multiple keyword hits within one role ('prior research and extant literature' -> literature_review twice) = 1 distinct role = resolved, no task.",
+      "no_tie_breaking": "Longest-phrase-wins does not exist in this version. Load-bearing ordering: exact match runs BEFORE the phrase scan and resolves immediately -- 'Summary and Conclusions' and 'Background literature' are literal keywords (conclusion, literature_review) and therefore resolve cleanly, never reaching distinct-role counting. Genuine multi_role_match cases are non-exact headings whose phrase hits span roles, e.g. 'Theoretical background and hypotheses derivation' (theory + introduction) or 'Background and literature review' (introduction + literature_review). Verified against this table.",
+      "parent_independence": "No role inheritance, no parent-context weighting, no LLM. A node's classification depends only on its own semantic_heading."
+    },
+    "deferred_llm_design": "The two-function LLM design (constrained candidate disambiguation for multi-role hits; contextual plausibility for zero-match H3/H4 against a reliable resolved ancestor), including its model/prompt provenance contract and strict output-validation/retry contract, is deferred out of MVP in full. It is preserved as deferred item 1 in step3_spec_v2.md section 13 and re-enters only if review-task volume becomes operationally excessive. No field in this table references it.",
+    "changelog_from_1.1": [
+      "Appendix removed from section_roles entirely; re-modeled as structural_containers.appendix with prefix parsing ('Appendix B: X' -> container + label + semantic_heading) and bare-container behavior (primary_role = Unknown, no ReviewTask)",
+      "All LLM machinery removed: llm_plausibility_check block deleted; context_assigned status, classification_method=llm, resolved_via_parent_role no longer exist",
+      "Matching outcome for zero-match and multi-role headings changed from 'Unknown' to primary_role = null + unresolved + ReviewTask; the synthetic Unknown role is now reserved for the no-headings whole-document node and bare structural containers only",
+      "Distinct-role counting made explicit: same-role multi-keyword hits are not ambiguity",
+      "Identifier stripping extended: alphabetic ('A.') and Roman ('IV.') prefixes now stripped alongside numeric and 'Section N:' forms",
+      "Longest-phrase-wins deleted (was in the pre-1.1 full design and under consideration); 2+ distinct roles always -> review at MVP",
+      "G2 alias set added: container aliases (supporting information, supplementary material(s), supplementary information, online appendix, electronic supplementary material) and role aliases (credit authorship contribution statement -> author_contributions; competing interest / declaration of competing interest(s) -> conflict_of_interest)",
+      "content_class four-way split (analytical / citation_source / compliance_disclosure / administrative) unchanged from 1.1",
+      "Empty-body headings now classify normally from heading text (1.1 tagged them unresolved)",
+      "Preamble no longer produces a node: the 1.1 Title_and_front_matter synthetic role is removed entirely. Pre-heading text remains unsegmented in approved_markdown per the G1 ruling (MVP segments only explicit supported headings); zero-loss counts detected headings only, and the Data Availability-in-preamble case now lives in raw markdown outside every node (spec section 12)",
+      "No eval harness, gold corpus, or CI accuracy gate exists in this specification: demo.md is a reference test fixture only (spec section 15); the runtime zero-silent-loss invariant is the sole hard gate",
+      "Effective document-title overlay added (spec section 8): a human title ReviewDecision overrides the run's machine title determination at read time; SegmentationRun's stored title fields are never mutated, and reviewer_confirmed/human exist only as effective values"
+    ],
+    "companion_spec": "step3_spec_v2.1.md",
+    "reference_fixture": "step3_expected_output_demo.json — expected output for demo.md, byte offsets per spec §3 (2.1 semantics).",
+    "verification": "Verified 13 Aug 2026: a reference implementation built from step3_spec_v2.1.md and this table alone reproduces spec §15 exactly on demo.md — 22 SectionNodes (H1 1, H2 8, H3 12, H4 1), 6 ReviewTasks (1 multi_role_match with candidates [introduction, theory]; 5 zero_role_match on 2.1, 2.2, 2.3, 2.4, 4.2), all 15 named classifications, zero-loss invariant passing. 27/27 assertions. No table defect found; this file is unchanged from 2.0 apart from metadata.",
+    "changelog_from_2.0": [
+      "Metadata only. No keyword, role, container or matching-rule change.",
+      "Version aligned with spec 2.1 (clarification amendments; structural contract unchanged).",
+      "Recorded the verification result and the machine-readable reference fixture.",
+      "structural_rule_version persisted on SegmentationRun remains \"2.0\": the H1-H4 structural contract did not change in 2.1."
+    ]
+  },
+  "section_roles": {
+    "abstract": {
+      "keywords": [
+        "abstract",
+        "summary"
+      ],
+      "content_class": "analytical"
+    },
+    "introduction": {
+      "keywords": [
+        "introduction",
+        "background",
+        "overview"
+      ],
+      "content_class": "analytical"
+    },
+    "literature_review": {
+      "keywords": [
+        "literature review",
+        "related work",
+        "related literature",
+        "prior research",
+        "prior literature",
+        "review of literature",
+        "background literature",
+        "state of the art",
+        "extant literature"
+      ],
+      "content_class": "analytical"
+    },
+    "theory": {
+      "keywords": [
+        "theoretical framework",
+        "theoretical background",
+        "conceptual framework",
+        "theory development",
+        "theory and hypotheses",
+        "hypothesis development",
+        "hypotheses development",
+        "conceptual model",
+        "research model",
+        "theoretical foundations"
+      ],
+      "content_class": "analytical"
+    },
+    "methodology": {
+      "keywords": [
+        "method",
+        "methods",
+        "methodology",
+        "research design",
+        "research methodology",
+        "empirical strategy",
+        "empirical approach",
+        "analytic approach",
+        "estimation strategy",
+        "materials and methods",
+        "study design",
+        "data and methods",
+        "data and method",
+        "sample",
+        "sampling",
+        "participants",
+        "respondents",
+        "data collection",
+        "data source",
+        "data sources",
+        "study sample",
+        "sample and data",
+        "sample characteristics",
+        "population and sample",
+        "measures",
+        "measurement",
+        "measurement model",
+        "operationalization",
+        "operationalisation",
+        "variables",
+        "instrument",
+        "instruments",
+        "survey instrument",
+        "construct measurement",
+        "procedure",
+        "procedures",
+        "data collection procedure",
+        "case description",
+        "research setting",
+        "empirical setting",
+        "study context",
+        "case study context",
+        "site description",
+        "field setting",
+        "manipulation check",
+        "manipulation checks",
+        "construct validity",
+        "discriminant validity",
+        "convergent validity",
+        "reliability analysis",
+        "model specification",
+        "hypothesis testing"
+      ],
+      "content_class": "analytical",
+      "note": "Includes flattened method-subsection and validity-check keywords (no subroles exist at MVP)."
+    },
+    "results": {
+      "keywords": [
+        "results",
+        "empirical results",
+        "findings",
+        "analysis and results",
+        "descriptive statistics",
+        "results and analysis",
+        "empirical findings",
+        "quantitative results",
+        "additional analyses",
+        "supplementary analyses",
+        "post hoc analysis",
+        "post hoc analyses",
+        "robustness checks",
+        "robustness check",
+        "robustness tests",
+        "sensitivity analysis",
+        "sensitivity analyses",
+        "replication study",
+        "replication analysis",
+        "boundary conditions",
+        "thematic findings",
+        "case findings",
+        "qualitative results"
+      ],
+      "content_class": "analytical",
+      "note": "Includes flattened robustness/replication keywords and former qualitative_findings keywords. A bare 'Findings' heading matches this single role (one distinct role) and resolves by rule."
+    },
+    "discussion": {
+      "keywords": [
+        "discussion",
+        "general discussion",
+        "discussion of results",
+        "discussion and implications",
+        "theoretical implications",
+        "implications for theory",
+        "contribution to theory",
+        "practical implications",
+        "implications for practice",
+        "managerial implications",
+        "implications for managers",
+        "policy implications",
+        "implications for policy"
+      ],
+      "content_class": "analytical",
+      "note": "Includes flattened theoretical/practical-implications keywords."
+    },
+    "limitations": {
+      "keywords": [
+        "limitations",
+        "study limitations",
+        "limitations of the study",
+        "future research",
+        "future research directions",
+        "directions for future research",
+        "avenues for future research"
+      ],
+      "content_class": "analytical",
+      "note": "Includes flattened future_research keywords."
+    },
+    "conclusion": {
+      "keywords": [
+        "conclusion",
+        "conclusions",
+        "concluding remarks",
+        "summary and conclusion",
+        "summary and conclusions",
+        "final remarks"
+      ],
+      "content_class": "analytical"
+    },
+    "acknowledgments": {
+      "keywords": [
+        "acknowledgments",
+        "acknowledgements"
+      ],
+      "content_class": "administrative"
+    },
+    "funding": {
+      "keywords": [
+        "funding",
+        "funding statement",
+        "financial support",
+        "grant information"
+      ],
+      "content_class": "administrative"
+    },
+    "author_contributions": {
+      "keywords": [
+        "author contributions",
+        "authors' contributions",
+        "credit statement",
+        "credit author statement",
+        "credit authorship contribution statement"
+      ],
+      "content_class": "administrative",
+      "note": "'credit authorship contribution statement' added per G2 alias set (CRediT convention)."
+    },
+    "data_availability": {
+      "keywords": [
+        "data availability",
+        "data availability statement",
+        "availability of data"
+      ],
+      "content_class": "compliance_disclosure",
+      "note": "Skipped for claim extraction, but actively read by the Reporting Compliance Agent's Tier 1 disclosure check. Distinct from administrative content, which nothing downstream currently consumes."
+    },
+    "ethics_statement": {
+      "keywords": [
+        "ethics statement",
+        "ethical approval",
+        "irb approval",
+        "institutional review board",
+        "research ethics",
+        "informed consent"
+      ],
+      "content_class": "compliance_disclosure",
+      "note": "Same reasoning as data_availability -- consumed by the Reporting Compliance Agent, not genuinely unused."
+    },
+    "conflict_of_interest": {
+      "keywords": [
+        "conflict of interest",
+        "conflicts of interest",
+        "competing interests",
+        "competing interest",
+        "declaration of interest",
+        "declaration of competing interest",
+        "declaration of competing interests"
+      ],
+      "content_class": "administrative",
+      "note": "Singular 'competing interest' and 'declaration of competing interest(s)' variants added per G2 alias set (Elsevier convention)."
+    },
+    "references": {
+      "keywords": [
+        "references",
+        "bibliography",
+        "works cited",
+        "reference list"
+      ],
+      "content_class": "citation_source"
+    }
+  },
+  "structural_containers": {
+    "appendix": {
+      "triggers": [
+        "appendix",
+        "appendices"
+      ],
+      "aliases_g2": [
+        "supporting information",
+        "supplementary material",
+        "supplementary materials",
+        "supplementary information",
+        "online appendix",
+        "electronic supplementary material"
+      ],
+      "parse_rule": "If the normalized heading begins with a trigger: structural_container = appendix; an immediately following short token ('B', '1', 'A1') is captured as appendix_label; any remaining text after separator (':' '.' '-') becomes semantic_heading and is classified normally through the role table. If the heading is only the trigger (+ optional label), or matches an alias exactly: semantic_heading = null.",
+      "bare_container_behavior": "semantic_heading = null -> primary_role = Unknown, content_class = analytical, classification_status = resolved, classification_method = structural, NO ReviewTask. Children classify independently.",
+      "examples": {
+        "appendix b: robustness checks": "container=appendix, label=B, semantic_heading='robustness checks' -> primary_role=results (rule)",
+        "appendix c: measures": "container=appendix, label=C -> primary_role=methodology (rule)",
+        "appendix b": "container=appendix, label=B, semantic_heading=null -> primary_role=Unknown (structural)",
+        "supporting information": "container=appendix (alias), label=null -> primary_role=Unknown (structural)"
+      },
+      "note": "Appendix answers WHERE content is located; roles answer WHAT epistemic function content performs. Appendix therefore does not compete as a primary_role."
+    }
+  },
+  "synthetic_roles": {
+    "unknown": {
+      "assigned_when": "(a) no headings exist in the document at all -- single whole-document node; or (b) a structural container heading has no semantic suffix (bare 'Appendix B', or a container alias like 'Supporting information')",
+      "content_class": "analytical",
+      "note": "Deliberate assignments (classification_status = resolved, method = structural), NOT classification failures, and generate no ReviewTask. Ordinary zero-match or multi-role headings do NOT receive Unknown in v2.0 -- they get primary_role = null, unresolved, and a ReviewTask (changed from 1.1)."
+    }
+  },
+  "node_kinds": {
+    "document_title": {
+      "note": "node_kind, deliberately NOT a section role. primary_role = null, content_class = administrative, classification_method = structural. Only the first H1 can be the title candidate; identification rules and run-level title fields are in spec sections 4 and 8."
+    },
+    "section": {
+      "note": "Every other node, including non-first H1s (anomalous, classified deterministically like any node)."
+    }
+  }
+}

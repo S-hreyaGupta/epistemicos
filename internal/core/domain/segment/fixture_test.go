@@ -46,10 +46,35 @@ type expectedNode struct {
 	SemanticHeading     *string `json:"semantic_heading"`
 	StructuralContainer *string `json:"structural_container"`
 	AppendixLabel       *string `json:"appendix_label"`
+
+	// The §6 classification outputs. PrimaryRole and ClassificationMethod are
+	// null on every unresolved node, which is the point: §8's overlay model
+	// requires the stored determination to record having no answer rather than
+	// carrying a placeholder a later reader would mistake for a decision.
+	//
+	// ContentClass is null on unresolved nodes too, since it is derived from
+	// the role — but NOT on the document title, which has a null role and an
+	// administrative class. The title is not unclassified; it is classified as
+	// something that is not a section role.
+	PrimaryRole          *string `json:"primary_role"`
+	ContentClass         *string `json:"content_class"`
+	ClassificationStatus string  `json:"classification_status"`
+	ClassificationMethod *string `json:"classification_method"`
+}
+
+// expectedTask mirrors one entry of expected.json's ReviewTasks.
+type expectedTask struct {
+	ReviewTaskID    string   `json:"review_task_id"`
+	SectionID       string   `json:"section_id"`
+	ReviewReason    string   `json:"review_reason"`
+	CandidateRoles  []string `json:"candidate_roles"`
+	MatchedKeywords []string `json:"matched_keywords"`
+	Status          string   `json:"status"`
 }
 
 type expectedOutput struct {
 	SectionNodes []expectedNode `json:"SectionNodes"`
+	ReviewTasks  []expectedTask `json:"ReviewTasks"`
 }
 
 // loadFixture returns the fixture's bytes, having first proved they are the

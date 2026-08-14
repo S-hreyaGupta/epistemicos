@@ -2,6 +2,8 @@
 //
 //	epistemicos-cli migrate up                       Apply DB migrations
 //	epistemicos-cli ingest <url>                     Ingest a paper by URL
+//	epistemicos-cli ingest-file <path>               Ingest a PDF already on disk
+//	epistemicos-cli segment <paper-id>               Run Step 3 over an ingested paper
 //	epistemicos-cli list                             List ingested papers
 //	epistemicos-cli export-markdown <id> --out <p>   Write stored markdown byte-exactly
 package main
@@ -38,6 +40,10 @@ func main() {
 		runMigrate(args)
 	case "ingest":
 		runIngest(args)
+	case "ingest-file":
+		runIngestFile(args)
+	case "segment":
+		runSegment(args)
 	case "list":
 		runList()
 	case "export-markdown":
@@ -57,6 +63,8 @@ func usage() {
 Commands:
   migrate up               Apply DB migrations
   ingest <url>             Ingest a paper from a URL
+  ingest-file <path>       Ingest a PDF already on disk
+  segment <paper-id>       Run Step 3: segment and classify an ingested paper
   list                     List ingested papers
   export-markdown <paper-id> --out <path>
                            Write a paper's stored markdown to a file byte-exactly (no

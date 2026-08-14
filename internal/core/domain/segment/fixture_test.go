@@ -34,10 +34,10 @@ type expectedNode struct {
 	SectionID       string  `json:"section_id"`
 	ParentSectionID *string `json:"parent_section_id"`
 	NodeKind        string  `json:"node_kind"`
-	HeadingRaw   string `json:"heading_raw"`
-	HeadingLevel int    `json:"heading_level"`
-	StartOffset  int    `json:"start_offset"`
-	EndOffset    int    `json:"end_offset"`
+	HeadingRaw      string  `json:"heading_raw"`
+	HeadingLevel    int     `json:"heading_level"`
+	StartOffset     int     `json:"start_offset"`
+	EndOffset       int     `json:"end_offset"`
 
 	// The §6 and §7 pipeline outputs. The three nullable fields are pointers
 	// because null and "" are different states here: a null semantic_heading

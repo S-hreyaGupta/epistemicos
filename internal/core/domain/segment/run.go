@@ -101,6 +101,17 @@ type Run struct {
 
 	Nodes []SectionNode
 	Tasks []ReviewTask
+
+	// NodeIDs and TaskIDs are parallel to Nodes and Tasks, assigned by the
+	// service layer before persistence.
+	//
+	// Identity is kept alongside the values rather than inside them so this
+	// package never needs a UUID generator. That is what holds the import set
+	// down to goldmark and keeps the architecture guard meaningful: with no
+	// generator and no ports, there is nothing in here that could be made
+	// non-deterministic by a wiring change.
+	NodeIDs []string
+	TaskIDs []string
 }
 
 // StructuralRuleVersion is the value persisted on every run produced by this

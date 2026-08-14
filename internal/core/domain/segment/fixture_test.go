@@ -31,8 +31,9 @@ const fixtureBytes = 81492
 // remaining fields — roles, content classes, classification status — are
 // produced by phases 2 through 4 and are asserted there.
 type expectedNode struct {
-	SectionID    string `json:"section_id"`
-	NodeKind     string `json:"node_kind"`
+	SectionID       string  `json:"section_id"`
+	ParentSectionID *string `json:"parent_section_id"`
+	NodeKind        string  `json:"node_kind"`
 	HeadingRaw   string `json:"heading_raw"`
 	HeadingLevel int    `json:"heading_level"`
 	StartOffset  int    `json:"start_offset"`

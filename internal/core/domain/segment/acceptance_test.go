@@ -14,8 +14,9 @@ import (
 // these are named for a contract that does not.
 //
 // AC-11, AC-12 and AC-13 are not here. They concern the pointer chain, Step 4's
-// consumption and the hash gate, which live outside this package; see the notes
-// at the bottom of the file.
+// consumption and the hash gate, which live outside this package. See the notes
+// at the bottom of the file, and docs/DEFERRED_CRITERIA.md for the version
+// addressed to whoever builds Step 2 and Step 4.
 
 // AC-01 — a standard paper produces a title node plus one node per detected
 // H2-H4, with conventional headings resolved by rule and content_class
@@ -422,24 +423,24 @@ func TestAC14_PreHeadingContentHasNoNode(t *testing.T) {
 	}
 }
 
-// AC-11, AC-12 and AC-13 are recorded here rather than implemented, because
-// each is a claim about something outside this package.
+// AC-11 and AC-12 are not implemented here, and AC-13 is implemented elsewhere.
+// Each is a claim about something outside this package, and all three are
+// carried forward in docs/DEFERRED_CRITERIA.md so the obligation lands on
+// whoever builds the step that owns it.
 //
-// AC-11 (reprocessing advances current_segmentation_run_id only on Completed)
-// requires the §9 pointer chain. ExtractionRun does not exist in this
-// repository, so the advancement is a deferred obligation under §12 G5 — see
-// TODO(step9-pointer) in internal/adapters/secondary/approved. Testing it here
-// would mean testing a column that was invented for the test.
+// AC-11 (the current-run pointer advances only on Completed) belongs to STEP 2.
+// It requires §9's pointer chain, and ExtractionRun does not exist in this
+// repository. Testing it here would mean creating the column purely so a test
+// could read it back. See TODO(step9-pointer) in
+// internal/adapters/secondary/approved.
 //
-// AC-12 (funding never reaches Step 4; references and data_availability are
-// available to their consumers) is a claim about Step 4's behaviour. What this
-// package owes it is that the content_class is present and correct on every
-// node, which TestAC01_StandardPaper and TestRoleTableMatchesTable together
-// establish. The consumption rule itself belongs to Step 4's tests.
+// AC-12 (funding never reaches extraction; references and data_availability
+// stay available to their consumers) belongs to STEP 4. It is a claim about
+// what Step 4 does with the labels. What this package owes it — that every
+// section carries the correct content_class — is established by
+// TestAC01_StandardPaper and TestRoleTableMatchesTable.
 //
-// AC-13 (hash mismatch fails the run and writes nothing) is enforced in two
-// places outside the domain: the adapter re-verifies the stored hash before
-// returning markdown, and the service re-verifies again after fetching. Both
-// are in internal/adapters/secondary/approved and
-// internal/core/services/segmentation respectively, and neither is reachable
-// from a package that takes []byte and returns nodes.
+// AC-13 (a hash mismatch fails the run and writes nothing) IS TESTED, in
+// internal/adapters/secondary/approved/papers_test.go. The check lives in the
+// adapter, so the test lives there too; a package that takes []byte and returns
+// nodes cannot reach a database row.

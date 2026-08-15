@@ -104,6 +104,23 @@ const (
 	// Same principle as never overwriting the machine's answer with a human's:
 	// keep the provenance, and let a reader decide how much to trust it.
 	MethodInherited ClassificationMethod = "inherited"
+
+	// MethodChildConsensus: no keyword matched, so the node took the role that
+	// every one of its subsections independently matched.
+	//
+	// The evidence here runs the opposite way to MethodInherited, and it is a
+	// different kind of claim, so it gets a different value rather than being
+	// folded in. "This sits under a methodology section" and "everything
+	// underneath this says results" are not interchangeable, and a reader who
+	// cannot tell them apart cannot audit either.
+	//
+	// The word INDEPENDENTLY is doing the work. Consensus is only evidence
+	// because each subsection reached its role from its own heading, without
+	// consulting the parent or each other. That is why only MethodRule children
+	// count: a child that inherited its role is not a second opinion, it is an
+	// echo, and counting echoes as agreement would manufacture confidence out of
+	// a single fact.
+	MethodChildConsensus ClassificationMethod = "child_consensus"
 )
 
 // NodeKind separates a node's structural position from its semantic role, which

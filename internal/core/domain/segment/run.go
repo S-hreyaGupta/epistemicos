@@ -136,7 +136,18 @@ type Run struct {
 // On the reference fixture the visible effect is one node: "4.2 Structural
 // model" now inherits results from "4 Data analysis and results", and §15's
 // review-task count goes from six to five.
-const StructuralRuleVersion = "2.2"
+//
+// 2.3 adds the rule that runs the other way. A section that matched nothing, and
+// has no parent to inherit from, takes the role every one of its subsections
+// independently matched. It requires unanimity among at least two children, each
+// of which resolved by MethodRule — a child that inherited its role is an echo,
+// not a second opinion, which also means the rule never chains.
+//
+// The reference fixture is UNCHANGED by 2.3, and deliberately so: its one
+// multi-role heading is the parent of its four zero-match ones, so a rule that
+// respects both limits has nothing to do there. TestConsensus_DoesNotDisturbThe
+// Fixture asserts that rather than leaving it to be noticed later.
+const StructuralRuleVersion = "2.3"
 
 // NewRun assembles a persistable run from a segmented document, including one
 // review task per unresolved node and one for an unidentified title.

@@ -95,6 +95,7 @@ func Build(md []byte) (Document, error) {
 
 	linkParents(nodes)
 	inheritFromParents(nodes)
+	inheritFromChildren(nodes)
 
 	doc := Document{
 		Nodes:         nodes,
@@ -386,6 +387,137 @@ func inheritFromParents(nodes []SectionNode) {
 			ContentClass: parent.Classification.ContentClass,
 			Status:       StatusResolved,
 			Method:       MethodInherited,
+		}
+	}
+}
+
+// inheritFromChildren gives an unresolved node the role its subsections agree on.
+//
+// # Why this exists
+//
+// A real paper's "5 EMPIRICAL ANALYSIS" matched nothing, sat directly beneath
+// the document title so there was nothing to inherit downward, and was the last
+// open question in a 46-page document. Its three subsections were "5.1
+// Regression results", "5.2 Robustness checks" and "5.3 Robustness checks", all
+// three of which matched RESULTS from their own headings, unanimously.
+//
+// The answer was in the document. Asking a person for it, or paying an LLM for
+// it, was asking for something already written down.
+//
+// # Why unanimity among MATCHED children, and not something looser
+//
+// Consensus is evidence only because each child reached its role independently,
+// from its own heading, without consulting the parent or its siblings. Three
+// independent readings agreeing is a fact about the section. Three readings that
+// all descend from one earlier guess are that guess repeated, and treating
+// repetition as corroboration is how a system talks itself into confidence it
+// has not earned.
+//
+// So only MethodRule children count. A child that inherited downward is not a
+// second opinion; a child resolved by its OWN children's consensus is a guess
+// two hops from evidence. Both are excluded, which also makes the rule
+// self-limiting: it fires at most once per node and never chains.
+//
+// # The limits, and the specific failure each one prevents
+//
+// ONLY WHEN NOTHING MATCHED. Same first limit as inheritFromParents, for the
+// same reason: a heading that spoke for itself is not improved by its children.
+// A multi-role tie is likewise left alone — it carries a shortlist a reviewer
+// can act on, and overwriting it would replace a good question with a plausible
+// answer.
+//
+// UNANIMOUS, NOT MAJORITY. One dissenting child and the node stays a question.
+// A parent whose subsections disagree is exactly the case where a human should
+// look, and a majority rule would silence the disagreement that makes it
+// interesting.
+//
+// AT LEAST TWO CHILDREN. With one child there is no agreement, only a single
+// data point that happens to be nested. A lone subsection is as likely to
+// specialise its parent as to describe it, and calling that "consensus" would
+// be dressing one weak signal in the language of several.
+//
+// UNKNOWN NEVER COUNTS. §7's Unknown is a placeholder meaning "this heading
+// carries no semantic content", not a role. A parent of two bare appendices has
+// learned nothing about itself.
+//
+// NEVER THE DOCUMENT TITLE. §4 leaves the title's role null deliberately. A
+// paper whose sections were all methodology would not make the paper
+// methodology, and the two-axis model exists precisely so the title does not
+// have to pretend to a role.
+//
+// # Ordering
+//
+// Runs after inheritFromParents, and iterates in reverse so deeper nodes settle
+// before shallower ones. The two rules cannot collide: downward reads a RESOLVED
+// parent, upward writes an UNRESOLVED one. And a child of an unresolved node can
+// never carry MethodInherited, since the only node it could have inherited from
+// is the unresolved node itself.
+func inheritFromChildren(nodes []SectionNode) {
+	children := make([][]int, len(nodes))
+	for i := range nodes {
+		if p := nodes[i].ParentOrdinal; p >= 0 && p < len(nodes) {
+			children[p] = append(children[p], i)
+		}
+	}
+
+	for i := len(nodes) - 1; i >= 0; i-- {
+		c := nodes[i].Classification
+
+		if c.Status != StatusUnresolved {
+			continue // it has an answer; leave it alone
+		}
+		if len(c.CandidateRoles) > 0 {
+			continue // a tie is a real question with a real shortlist
+		}
+		// Redundant today: applyTitle marks the title StatusResolved, so the
+		// check above already skipped it. Kept because it states the actual
+		// reason. §4 could reasonably leave the title unresolved instead, and on
+		// the day someone makes that change this line is the only thing standing
+		// between a paper's sections and a title that claims to be methodology.
+		if nodes[i].Kind == KindDocumentTitle {
+			continue
+		}
+
+		kids := children[i]
+		if len(kids) < 2 {
+			continue // one child is a data point, not an agreement
+		}
+
+		role := Role("")
+		unanimous := true
+		for _, k := range kids {
+			kc := nodes[k].Classification
+
+			// Only a role the child read off its OWN heading is independent
+			// evidence. Anything else is this same rule, or the downward one,
+			// looking at itself.
+			if kc.Method != MethodRule || kc.Status != StatusResolved {
+				unanimous = false
+				break
+			}
+			if kc.Role == "" || kc.Role == RoleUnknown {
+				unanimous = false
+				break
+			}
+			if role == "" {
+				role = kc.Role
+				continue
+			}
+			if kc.Role != role {
+				unanimous = false
+				break
+			}
+		}
+
+		if !unanimous || role == "" {
+			continue
+		}
+
+		nodes[i].Classification = Classification{
+			Role:         role,
+			ContentClass: ContentClassFor(role),
+			Status:       StatusResolved,
+			Method:       MethodChildConsensus,
 		}
 	}
 }

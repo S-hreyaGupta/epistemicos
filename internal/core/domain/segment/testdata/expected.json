@@ -1,5 +1,5 @@
 {
-  "_generated_by": "reference implementation of step3_spec_v2.2.md and step3_table_v2.2.json, written independently of the Go implementation it checks. Regenerating this file from the code would turn a test into a snapshot.",
+  "_generated_by": "reference implementation of step3_spec_v2.3.md and step3_table_v2.3.json, written independently of the Go implementation it checks. Regenerating this file from the code would turn a test into a snapshot. Unchanged from 2.2 apart from the version string: the 2.3 consensus rule has nothing to do here, because this fixture's one multi-role heading is the parent of its four zero-match ones.",
   "_fixture_input": {
     "file": "demo.md",
     "bytes": 81492,
@@ -9,7 +9,7 @@
     "segmentation_run_id": "seg_demo_0001",
     "extraction_run_id": "<supplied by caller>",
     "approved_markdown_hash": "a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e",
-    "structural_rule_version": "2.2",
+    "structural_rule_version": "2.3",
     "document_title_level": 1,
     "supported_node_levels": [
       2,

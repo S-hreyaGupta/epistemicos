@@ -449,3 +449,7 @@ func TestAC14_PreHeadingContentHasNoNode(t *testing.T) {
 // inherit_test.go. It lives in its own file rather than here because four of
 // its five clauses are about what inheritance must NOT do, and a rule is only
 // worth having if its limits are tested as carefully as its effect.
+//
+// AC-16 (2.3 child consensus, with its five limits) IS TESTED, in
+// consensus_test.go, for the same reason. Seven of its eight tests describe
+// cases where the rule must decline to fire.

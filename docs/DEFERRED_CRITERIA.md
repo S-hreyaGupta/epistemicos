@@ -1,7 +1,7 @@
 # Deferred acceptance criteria
 
-Step 3's specification (v2.2 §14) lists fifteen acceptance criteria. Twelve are
-tested inside Step 3. Three could not be, because each is a claim about
+Step 3's specification (v2.3 §14) lists sixteen acceptance criteria. Thirteen
+are tested inside Step 3. Three could not be, because each is a claim about
 something that lives outside it.
 
 This file exists so they are not forgotten. Each one names the step that owns
@@ -16,6 +16,7 @@ rediscovering it.
 | AC-12 | Sections reach the right consumers | **Step 4** | Waiting on Step 4 |
 | AC-13 | A hash mismatch fails the run and writes nothing | **Step 3 (adapter)** | ✅ Done — `internal/adapters/secondary/approved/papers_test.go` |
 | AC-15 | Parent inheritance, and its four limits | **Step 3 (domain)** | ✅ Done — `internal/core/domain/segment/inherit_test.go` |
+| AC-16 | Child consensus, and its five limits | **Step 3 (domain)** | ✅ Done — `internal/core/domain/segment/consensus_test.go` |
 
 ---
 

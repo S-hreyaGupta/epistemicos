@@ -104,8 +104,8 @@ func TestSaveAndGetRun(t *testing.T) {
 	if got.ApprovedMarkdownHash != want.ApprovedMarkdownHash {
 		t.Errorf("approved_markdown_hash = %q, want %q", got.ApprovedMarkdownHash, want.ApprovedMarkdownHash)
 	}
-	if got.StructuralRuleVersion != "2.7" {
-		t.Errorf("structural_rule_version = %q, want \"2.7\"", got.StructuralRuleVersion)
+	if got.StructuralRuleVersion != "2.8" {
+		t.Errorf("structural_rule_version = %q, want \"2.8\"", got.StructuralRuleVersion)
 	}
 	if got.Status != segment.RunCompleted {
 		t.Errorf("status = %q, want %q", got.Status, segment.RunCompleted)

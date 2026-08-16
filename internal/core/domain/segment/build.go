@@ -352,6 +352,30 @@ func suppressTitleCandidate(nodes []SectionNode, counts map[int]int) int {
 		return -1
 	}
 
+	// A STRUCTURAL CONTAINER IS NEVER A TITLE (2.8). "Appendix B" is not what a
+	// paper is called, whatever level it arrives at. §7 already resolved it, and
+	// un-resolving it to ask a question nobody needs asked is worse than the
+	// problem this rule exists to fix.
+	if nodes[0].Container != "" {
+		return -1
+	}
+
+	// A HEADING THAT *IS* A ROLE KEYWORD IS THAT ROLE, NOT A TITLE (2.8).
+	// A paper is never called "Methodology".
+	//
+	// The test is EXACT match, not "resolved by rule", and the difference is the
+	// entire reason this rule suppresses rather than promotes. §4's existing
+	// wording for H1s says a first heading "deterministically resolving to an
+	// ordinary role" is that section — but the systematic review's title
+	// resolved to `theory`, because the title itself reads "…A theoretical
+	// framework of supply chain adaptations…". Applying §4's looser test here
+	// would let that paper's title keep a role it should never have had.
+	//
+	// Containing a role keyword is something titles do. BEING one is not.
+	if _, exact := keywordToRole[nodes[0].SemanticHeading]; exact {
+		return -1
+	}
+
 	nodes[0].Classification = Classification{
 		Status: StatusUnresolved,
 	}

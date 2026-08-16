@@ -342,11 +342,21 @@ func TestClassifyReproducesFixture(t *testing.T) {
 
 // TestClassifyReproducesFixtureTaskDetail checks the reason and candidates of
 // every expected review task, not merely that the right nodes are unresolved.
+// The two reasons demand different things of a reviewer, since only one of them
+// comes with a shortlist.
 //
-// §15 claims one multi_role_match and five zero_role_match. A run that produced
-// six of either would satisfy the count check above while getting the harder
-// property wrong — and the two reasons demand different things of a reviewer,
-// since only one of them comes with a shortlist.
+// AT 2.7 THIS TEST GOES QUIET, AND THAT IS WORTH SAYING OUT LOUD.
+//
+// The fixture now raises no tasks at all, so the loop below runs zero times and
+// checks nothing. It was passing an assertion of "1 multi and 4 zero" hardcoded
+// from 2.2, which is how the emptiness got noticed: the numbers stopped matching
+// rather than the test quietly succeeding.
+//
+// It is kept, and its assertion rewritten to guard the OPPOSITE property: that
+// the fixture still has none. If a future change reintroduces a review task on
+// demo.md, this fails and the detail checks come back to life with it. A test
+// that verifies nothing today but fails the moment there is something to verify
+// is worth more than a deleted one.
 func TestClassifyReproducesFixtureTaskDetail(t *testing.T) {
 	exp := loadExpected(t)
 
@@ -399,9 +409,15 @@ func TestClassifyReproducesFixtureTaskDetail(t *testing.T) {
 		})
 	}
 
-	// §15 claimed 1 and 5 under 2.0. Under 2.2 "4.2 Structural model" inherits
-	// results from its parent, so one zero-match becomes a resolved node.
-	if multi != 1 || zero != 4 {
-		t.Errorf("review reasons: %d multi_role_match and %d zero_role_match, want 1 and 4 under rule version 2.2", multi, zero)
+	// The count over time: 1 multi and 5 zero at 2.1; 1 and 4 at 2.2, once "4.2
+	// Structural model" inherited results from its parent; 0 and 0 at 2.7, once
+	// nested-occurrence suppression resolved the multi and its four subsections
+	// inherited from it.
+	//
+	// Asserting zero is asserting that the loop above SHOULD have been vacuous.
+	// If either count moves, demo.md has an open question again and the detail
+	// checks start running — which is the state this test was written for.
+	if multi != 0 || zero != 0 {
+		t.Errorf("review reasons: %d multi_role_match and %d zero_role_match, want 0 and 0 — demo.md classifies cleanly at 2.7", multi, zero)
 	}
 }

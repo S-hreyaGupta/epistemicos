@@ -1,5 +1,5 @@
 {
-  "_generated_by": "reference implementation of step3_spec_v2.7.md and step3_table_v2.7.json, written independently of the Go implementation it checks. Regenerating this file from the code would turn a test into a snapshot. FIRST CHANGE SINCE 2.2: 2.7's nested-occurrence suppression resolves \"2 Theoretical background and hypotheses derivation\" to theory, because the `background` hit lay inside the `theoretical background` hit and was never independent evidence. Its four subsections then inherit theory, and demo.md classifies with no open questions at all.",
+  "_generated_by": "reference implementation of step3_spec_v2.8.md and step3_table_v2.8.json, written independently of the Go implementation it checks. Regenerating this file from the code would turn a test into a snapshot. FIRST CHANGE SINCE 2.2: 2.7's nested-occurrence suppression resolves \"2 Theoretical background and hypotheses derivation\" to theory, because the `background` hit lay inside the `theoretical background` hit and was never independent evidence. Its four subsections then inherit theory, and demo.md classifies with no open questions at all. 2.8's title-candidate gates change nothing here: demo.md has an H1 and its title is identified, so the rule does not apply.",
   "_fixture_input": {
     "file": "demo.md",
     "bytes": 81492,
@@ -9,7 +9,7 @@
     "segmentation_run_id": "seg_demo_0001",
     "extraction_run_id": "<supplied by caller>",
     "approved_markdown_hash": "a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e",
-    "structural_rule_version": "2.7",
+    "structural_rule_version": "2.8",
     "document_title_level": 1,
     "supported_node_levels": [
       2,

@@ -198,3 +198,73 @@ func TestTitleCandidate_NeverResolvedByChildren(t *testing.T) {
 		t.Errorf("candidate role = %q, want empty", doc.Nodes[0].Classification.Role)
 	}
 }
+
+// TestTitleCandidate_NeverAStructuralContainer is one of two gates added at 2.8.
+//
+// "Appendix B" is not what a paper is called, whatever heading level it arrives
+// at. §7 already resolved it structurally, and un-resolving it to ask a question
+// nobody needs asked is worse than the problem 2.6 exists to fix.
+//
+// Found by TestAC06_AppendixContainers, which had been passing since 2.0 and
+// broke the moment 2.6 shipped without this gate.
+func TestTitleCandidate_NeverAStructuralContainer(t *testing.T) {
+	for _, md := range [][]byte{
+		[]byte("## Appendix B: Robustness checks\n\nBody.\n"),
+		[]byte("## Appendix B\n\nBody.\n\n### Robustness checks\n\nChild body.\n"),
+		[]byte("## Supporting information\n\nBody.\n"),
+	} {
+		doc, err := Build(md)
+		if err != nil {
+			t.Fatalf("Build: %v", err)
+		}
+
+		if doc.TitleCandidateOrdinal != -1 {
+			t.Errorf("%q: candidate ordinal = %d, want -1 — a container is never a title", md, doc.TitleCandidateOrdinal)
+		}
+		if doc.Nodes[0].Classification.Role != RoleUnknown {
+			t.Errorf("%q: role = %q, want %q", md, doc.Nodes[0].Classification.Role, RoleUnknown)
+		}
+		if doc.Nodes[0].Classification.Method != MethodStructural {
+			t.Errorf("%q: method = %q, want %q", md, doc.Nodes[0].Classification.Method, MethodStructural)
+		}
+	}
+}
+
+// TestTitleCandidate_NeverAnExactKeyword is the second 2.8 gate, and the test
+// is EXACT match rather than "resolved by rule" on purpose.
+//
+// A paper is never called "Methodology". But a paper IS called "A systematic
+// review on regenerative supply chains: A theoretical framework of supply chain
+// adaptations…", and that title resolves to `theory` by rule, because it
+// contains `theoretical framework`. §4's existing wording for H1s — a heading
+// "deterministically resolving to an ordinary role" is that section — would
+// therefore exclude the very case 2.6 was written for.
+//
+// Containing a role keyword is something titles do. BEING one is not.
+func TestTitleCandidate_NeverAnExactKeyword(t *testing.T) {
+	doc, err := Build([]byte("## Methodology\n## Results\n\nResults prose.\n"))
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	if doc.TitleCandidateOrdinal != -1 {
+		t.Errorf("candidate ordinal = %d, want -1 — the heading IS a role keyword", doc.TitleCandidateOrdinal)
+	}
+	if doc.Nodes[0].Classification.Role != RoleMethodology {
+		t.Errorf("role = %q, want %q", doc.Nodes[0].Classification.Role, RoleMethodology)
+	}
+
+	// The other half: a heading that merely CONTAINS a keyword is still a
+	// candidate. This is the real paper's title, shortened.
+	doc2, err := Build([]byte("## A systematic review: a theoretical framework for supply chains\n\n#### Abstract\n\nProse.\n"))
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	if doc2.TitleCandidateOrdinal != 0 {
+		t.Errorf("candidate ordinal = %d, want 0 — this contains a keyword but is not one", doc2.TitleCandidateOrdinal)
+	}
+	if doc2.Nodes[0].Classification.Status != StatusUnresolved {
+		t.Errorf("status = %q, want %q", doc2.Nodes[0].Classification.Status, StatusUnresolved)
+	}
+}

@@ -199,7 +199,24 @@ type Run struct {
 // FIRST VERSION TO CHANGE THE REFERENCE FIXTURE. demo.md's sole multi_role_match
 // was this same illusion, so it resolves to theory, its four subsections inherit,
 // and §15 goes from five review tasks to NONE.
-const StructuralRuleVersion = "2.7"
+//
+// 2.8 closes two gaps in 2.6's title-candidate rule, found by tests that 2.7
+// forced a proper re-run of. A structural container is never a title candidate,
+// and neither is a heading that IS a role keyword.
+//
+// "Appendix B" is not what a paper is called. Neither is "Methodology". 2.6
+// tested only whether a node was first and shallowest, so on a short document
+// beginning with either, it un-resolved a perfectly good answer to ask a
+// question nobody needed asked.
+//
+// The second test is EXACT match, not "resolved by rule", and that is the whole
+// care in it. §4's existing wording for H1s says a first heading "resolving to
+// an ordinary role" is that section — but the systematic review's title resolved
+// to `theory`, because the title reads "…A theoretical framework of supply chain
+// adaptations…". Reusing §4's looser test would have let that paper's title keep
+// a role it should never have had, which is the case 2.6 exists for. Containing
+// a role keyword is something titles do; BEING one is not.
+const StructuralRuleVersion = "2.8"
 
 // NewRun assembles a persistable run from a segmented document, including one
 // review task per unresolved node and one for an unidentified title.

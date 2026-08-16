@@ -1,9 +1,9 @@
 package segment
 
 // roleKeywords is the role table's keyword set, transcribed from
-// section_roles[*].keywords in step3_table_v2.3.json.
+// section_roles[*].keywords in step3_table_v2.4.json.
 //
-// 157 keywords across 16 roles, and no keyword appears under two roles — a
+// 156 keywords across 16 roles, and no keyword appears under two roles — a
 // property TestRoleTableMatchesTable asserts, because the matching rule in §6
 // step 5 counts DISTINCT ROLES rather than keyword hits, and a keyword owned by
 // two roles would make a single hit ambiguous on its own.
@@ -127,7 +127,18 @@ var roleKeywords = map[Role][]string{
 		"sensitivity analyses",
 		"replication study",
 		"replication analysis",
-		"boundary conditions",
+		// "boundary conditions" was here and was removed in 2.4.
+		//
+		// It classified "4.5 RESEARCH FIELD AND BOUNDARY CONDITIONS" as results
+		// inside a methodology section. The phrase is far more common in theory
+		// and methodology than in results, so as a results keyword it was simply
+		// miscategorised, and being a keyword it outranked the parent that had
+		// the right answer.
+		//
+		// Note what removing it does NOT do. That heading does not become
+		// methodology; its parent is itself unresolved, so nothing can be
+		// inherited. It becomes an honest question instead of a confident wrong
+		// answer, which is the trade this removal is actually making.
 		"thematic findings",
 		"case findings",
 		"qualitative results",

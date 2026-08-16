@@ -1,6 +1,6 @@
 # Deferred acceptance criteria
 
-Step 3's specification (v2.3 §14) lists sixteen acceptance criteria. Thirteen
+Step 3's specification (v2.4 §14) lists sixteen acceptance criteria. Thirteen
 are tested inside Step 3. Three could not be, because each is a claim about
 something that lives outside it.
 

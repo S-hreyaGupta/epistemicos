@@ -147,7 +147,14 @@ type Run struct {
 // multi-role heading is the parent of its four zero-match ones, so a rule that
 // respects both limits has nothing to do there. TestConsensus_DoesNotDisturbThe
 // Fixture asserts that rather than leaving it to be noticed later.
-const StructuralRuleVersion = "2.3"
+//
+// 2.4 removes one keyword: "boundary conditions" from results. No rule changed.
+//
+// A keyword change earns a number by the same test 2.2 set. This field exists so
+// a reader of stored data knows which rules produced it, and the keyword set is
+// part of those rules — two runs under different keyword sets can classify the
+// same heading differently, which is exactly what the version is for.
+const StructuralRuleVersion = "2.4"
 
 // NewRun assembles a persistable run from a segmented document, including one
 // review task per unresolved node and one for an unidentified title.

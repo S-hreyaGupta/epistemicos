@@ -1,8 +1,8 @@
 {
   "_meta": {
-    "description": "Section-role table for Step 3 v2.7. Deterministic classification of every H2-H4 heading (and non-first H1s) against section_roles; appendix modeled as a structural container, not a role; no LLM in the pipeline. A heading that matches nothing may take its parent's role, or the role its subsections unanimously matched (see matching_rule.parent_inheritance and matching_rule.child_consensus); every other outcome depends on the heading alone. Companion to step3_spec_v2.7.md, which is authoritative for process, persistence, and invariants.",
-    "version": "mvp-reduced-2.7",
-    "supersedes": "mvp-reduced-1.1 and 2.0 through 2.6. All retired.",
+    "description": "Section-role table for Step 3 v2.8. Deterministic classification of every H2-H4 heading (and non-first H1s) against section_roles; appendix modeled as a structural container, not a role; no LLM in the pipeline. A heading that matches nothing may take its parent's role, or the role its subsections unanimously matched (see matching_rule.parent_inheritance and matching_rule.child_consensus); every other outcome depends on the heading alone. Companion to step3_spec_v2.8.md, which is authoritative for process, persistence, and invariants.",
+    "version": "mvp-reduced-2.8",
+    "supersedes": "mvp-reduced-1.1 and 2.0 through 2.7. All retired.",
     "encoding": "UTF-8, validated",
     "structural_contract": {
       "document_title_level": 1,
@@ -45,9 +45,9 @@
       "No eval harness, gold corpus, or CI accuracy gate exists in this specification: demo.md is a reference test fixture only (spec section 15); the runtime zero-silent-loss invariant is the sole hard gate",
       "Effective document-title overlay added (spec section 8): a human title ReviewDecision overrides the run's machine title determination at read time; SegmentationRun's stored title fields are never mutated, and reviewer_confirmed/human exist only as effective values"
     ],
-    "companion_spec": "step3_spec_v2.7.md",
+    "companion_spec": "step3_spec_v2.8.md",
     "reference_fixture": "step3_expected_output_demo.json — expected output for demo.md, byte offsets per spec §3 (2.1 semantics).",
-    "verification": "Verified 13 Aug 2026 at 2.1: 22 SectionNodes, 6 ReviewTasks, 27/27 assertions. 5 tasks at 2.2. Unchanged through 2.3, 2.4, 2.5 and 2.6. CHANGED AT 2.7, the first version to move the fixture: nested-occurrence suppression resolves '2 Theoretical background and hypotheses derivation' to theory, its four subsections then inherit theory, and demo.md classifies with ZERO open questions. Same 22 nodes throughout. The fixture is regenerated from the spec, never snapshotted from the implementation.",
+    "verification": "Verified 13 Aug 2026 at 2.1: 22 SectionNodes, 6 ReviewTasks, 27/27 assertions. 5 tasks at 2.2. Unchanged through 2.3, 2.4, 2.5 and 2.6. CHANGED AT 2.7, the first version to move the fixture: nested-occurrence suppression resolves '2 Theoretical background and hypotheses derivation' to theory, its four subsections then inherit theory, and demo.md classifies with ZERO open questions. Same 22 nodes throughout. The fixture is regenerated from the spec, never snapshotted from the implementation. Unchanged at 2.8: demo.md has an H1 and its title is identified, so neither title-candidate gate is reached.",
     "changelog_from_2.0": [
       "Metadata only. No keyword, role, container or matching-rule change.",
       "Version aligned with spec 2.1 (clarification amendments; structural contract unchanged).",
@@ -99,6 +99,14 @@
       "matching_rule.no_tie_breaking still holds and says why.",
       "FIRST VERSION TO CHANGE THE REFERENCE FIXTURE: 5 review tasks becomes 0.",
       "structural_rule_version becomes \"2.7\"."
+    ],
+    "changelog_from_2.7": [
+      "NO KEYWORD, ROLE OR CONTAINER CHANGE. 2.8 closes two gaps in 2.6's §4 title-candidate rule.",
+      "A structural container is never a title candidate. \"Appendix B\" is not what a paper is called, whatever heading level it arrives at.",
+      "A heading that IS a role keyword is never a title candidate. A paper is not called \"Methodology\".",
+      "The second gate tests EXACT match, not \"resolves to an ordinary role\". §4's existing wording for H1s uses the looser test, and reusing it here would have excluded the very case 2.6 exists for: the systematic review's title resolves to `theory` because the title reads \"...A theoretical framework of supply chain adaptations...\". Containing a role keyword is something titles do; BEING one is not.",
+      "Found by three tests that had passed since 2.0 and broke the moment 2.6 shipped. 2.6 tested only whether a node was first and shallowest, both of which are true of a short document beginning with \"## Appendix B\" or \"## Methodology\".",
+      "structural_rule_version becomes \"2.8\". Reference fixture unchanged."
     ]
   },
   "section_roles": {

@@ -1,7 +1,7 @@
 package segment
 
 // roleKeywords is the role table's keyword set, transcribed from
-// section_roles[*].keywords in step3_table_v2.5.json.
+// section_roles[*].keywords in step3_table_v2.6.json.
 //
 // 156 keywords across 16 roles, and no keyword appears under two roles — a
 // property TestRoleTableMatchesTable asserts, because the matching rule in §6

@@ -166,7 +166,22 @@ type Run struct {
 // of the body, and which part of a paper an appendix supports is not
 // recoverable from its title. The suffix is still parsed and retained in
 // SemanticHeading; it is simply no longer read as a role.
-const StructuralRuleVersion = "2.5"
+//
+// 2.6 stops classifying the first node of a document that has NO H1 at all, when
+// that node sits at the shallowest heading level present.
+//
+// Mathpix emits an H1 or not depending on a PDF's typography, not on whether the
+// document has a title, and two of the first four real papers had none. Their
+// titles came through as H2s and ran the ordinary pipeline: one resolved to
+// THEORY with a three-byte span, which Step 4 would have read as content.
+//
+// It SUPPRESSES rather than promotes. The heuristic that would gate promotion —
+// a title matches no keyword — fails on the very paper that raised the problem.
+// With no reliable signal, the honest move is to stop asserting one: the node
+// keeps its text, its span and its place in the tree, carries no role, and the
+// title_ambiguity task points at it so a reviewer has a candidate to confirm
+// rather than a blank question about the whole document.
+const StructuralRuleVersion = "2.6"
 
 // NewRun assembles a persistable run from a segmented document, including one
 // review task per unresolved node and one for an unidentified title.
@@ -204,6 +219,14 @@ func NewRun(doc Document, extractionRunID, markdownHash string) Run {
 			continue
 		}
 
+		// The suppressed title candidate is unresolved on purpose, and the
+		// title_ambiguity task below already points at it. Raising a
+		// zero_role_match here as well would put the same section in the queue
+		// twice, asking a reviewer to answer one question in two places.
+		if n.Ordinal == doc.TitleCandidateOrdinal {
+			continue
+		}
+
 		reason := ReasonZeroRoleMatch
 		if len(n.Classification.CandidateRoles) > 0 {
 			reason = ReasonMultiRoleMatch
@@ -222,8 +245,12 @@ func NewRun(doc Document, extractionRunID, markdownHash string) Run {
 	// nothing is auto-promoted. Raising the task is what stops "no title" from
 	// quietly becoming "no title needed".
 	if doc.TitleStatus == TitleUnresolved {
+		// Point at the candidate when there is one (2.6). A task carrying -1
+		// asks "what is this paper called?" against a whole document; one
+		// carrying an ordinal asks "is this it?" against a specific heading,
+		// which is a question a reviewer can answer by looking.
 		run.Tasks = append(run.Tasks, ReviewTask{
-			SectionOrdinal: -1,
+			SectionOrdinal: doc.TitleCandidateOrdinal,
 			Reason:         ReasonTitleAmbiguity,
 			Status:         TaskOpen,
 		})

@@ -1,8 +1,8 @@
 {
   "_meta": {
-    "description": "Section-role table for Step 3 v2.5. Deterministic classification of every H2-H4 heading (and non-first H1s) against section_roles; appendix modeled as a structural container, not a role; no LLM in the pipeline. A heading that matches nothing may take its parent's role, or the role its subsections unanimously matched (see matching_rule.parent_inheritance and matching_rule.child_consensus); every other outcome depends on the heading alone. Companion to step3_spec_v2.5.md, which is authoritative for process, persistence, and invariants.",
-    "version": "mvp-reduced-2.5",
-    "supersedes": "mvp-reduced-1.1, 2.0, 2.1, 2.2, 2.3 and 2.4. All retired.",
+    "description": "Section-role table for Step 3 v2.6. Deterministic classification of every H2-H4 heading (and non-first H1s) against section_roles; appendix modeled as a structural container, not a role; no LLM in the pipeline. A heading that matches nothing may take its parent's role, or the role its subsections unanimously matched (see matching_rule.parent_inheritance and matching_rule.child_consensus); every other outcome depends on the heading alone. Companion to step3_spec_v2.6.md, which is authoritative for process, persistence, and invariants.",
+    "version": "mvp-reduced-2.6",
+    "supersedes": "mvp-reduced-1.1, 2.0, 2.1, 2.2, 2.3, 2.4 and 2.5. All retired.",
     "encoding": "UTF-8, validated",
     "structural_contract": {
       "document_title_level": 1,
@@ -44,9 +44,9 @@
       "No eval harness, gold corpus, or CI accuracy gate exists in this specification: demo.md is a reference test fixture only (spec section 15); the runtime zero-silent-loss invariant is the sole hard gate",
       "Effective document-title overlay added (spec section 8): a human title ReviewDecision overrides the run's machine title determination at read time; SegmentationRun's stored title fields are never mutated, and reviewer_confirmed/human exist only as effective values"
     ],
-    "companion_spec": "step3_spec_v2.5.md",
+    "companion_spec": "step3_spec_v2.6.md",
     "reference_fixture": "step3_expected_output_demo.json — expected output for demo.md, byte offsets per spec §3 (2.1 semantics).",
-    "verification": "Verified 13 Aug 2026 at 2.1 (22 SectionNodes, 6 ReviewTasks, 27/27 assertions). Re-verified 14 Aug 2026 at 2.2: same 22 nodes, 5 ReviewTasks, the sixth resolved because 4.2 Structural model inherits results from its parent. UNCHANGED at 2.3, and deliberately so: this fixture's one multi_role_match heading is the parent of its four zero_role_match ones, so a consensus rule that respects limits (a) and (b) has nothing to do here. A test asserts that rather than leaving it to be noticed later. The fixture is regenerated from the spec, never snapshotted from the implementation. UNCHANGED again at 2.4: the removed keyword appears in no demo.md heading, so the fixture's 22 nodes and 5 tasks are untouched. UNCHANGED again at 2.5: this fixture's only container, \"Supporting information\", is a bare alias and already resolved to Unknown, so the appendix ruling has nothing to change here.",
+    "verification": "Verified 13 Aug 2026 at 2.1 (22 SectionNodes, 6 ReviewTasks, 27/27 assertions). Re-verified 14 Aug 2026 at 2.2: same 22 nodes, 5 ReviewTasks, the sixth resolved because 4.2 Structural model inherits results from its parent. UNCHANGED at 2.3, and deliberately so: this fixture's one multi_role_match heading is the parent of its four zero_role_match ones, so a consensus rule that respects limits (a) and (b) has nothing to do here. A test asserts that rather than leaving it to be noticed later. The fixture is regenerated from the spec, never snapshotted from the implementation. UNCHANGED again at 2.4: the removed keyword appears in no demo.md heading, so the fixture's 22 nodes and 5 tasks are untouched. UNCHANGED again at 2.5: this fixture's only container, \"Supporting information\", is a bare alias and already resolved to Unknown, so the appendix ruling has nothing to change here. UNCHANGED again at 2.6: demo.md has exactly one H1 and its title is identified, so the title-candidate rule does not apply.",
     "changelog_from_2.0": [
       "Metadata only. No keyword, role, container or matching-rule change.",
       "Version aligned with spec 2.1 (clarification amendments; structural contract unchanged).",
@@ -82,6 +82,13 @@
       "semantic_heading is still parsed and RETAINED, so an appendix stays searchable by what it is about. The two-axis model already separates WHERE content sits from WHAT it does; this makes the appendix answer only the first, which is the only one its title answers.",
       "No ReviewTask either. A human cannot recover the role from the title either, so routing it to review would be asking someone to guess with exactly the information the machine had.",
       "structural_rule_version becomes \"2.5\". Reference fixture unchanged."
+    ],
+    "changelog_from_2.5": [
+      "NO TABLE CHANGE. 2.6 is a §4 rule and touches no keyword, role or container.",
+      "Recorded here because structural_rule_version moves to \"2.6\" and this file's version tracks it.",
+      "The rule: in a document with NO H1 at all, the first node is un-classified when it sits at the shallowest heading level present. It carries no role, and the title_ambiguity ReviewTask points at it instead of at the whole document.",
+      "It SUPPRESSES rather than promotes. The heuristic that would gate promotion -- a title matches no keyword -- fails on the paper that raised the problem, whose title matched 'theory'. With no reliable signal the honest move is to stop asserting one.",
+      "The shallowest-level condition is load-bearing: one no-H1 paper's first node is 'Abstract' at H4 with H2s beneath it, a real section that must keep its role. Being first is not enough; a title also has nothing above it."
     ]
   },
   "section_roles": {

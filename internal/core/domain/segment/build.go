@@ -39,6 +39,14 @@ type Document struct {
 	// TitleMethod is empty when the title is unresolved.
 	TitleMethod TitleMethod
 
+	// TitleCandidateOrdinal is the node §4 could not confirm as the title but
+	// could not dismiss either, or -1 when there is no such node. See
+	// suppressTitleCandidate.
+	//
+	// It is NOT a title. It is the question "is this one?", pointed at something
+	// specific so a reviewer has a candidate rather than a blank prompt.
+	TitleCandidateOrdinal int
+
 	// HeadingCounts is the number of detected headings per level, 1 to 6.
 	// H5 and H6 are counted although they produce no node, because §10's
 	// invariant is stated over DETECTED headings and the count is what makes
@@ -93,16 +101,27 @@ func Build(md []byte) (Document, error) {
 		applyTitle(&nodes[titleOrdinal])
 	}
 
+	// Runs BEFORE the two inheritance rules, so the suppressed candidate cannot
+	// pick a role back up from its neighbours. It has no parent (it is the
+	// shallowest node), and its children must not decide what it is either: a
+	// paper whose sections all report results does not make the paper "results",
+	// which is the same reason §4 leaves a confirmed title's role null.
+	candidate := -1
+	if titleStatus == TitleUnresolved {
+		candidate = suppressTitleCandidate(nodes, counts)
+	}
+
 	linkParents(nodes)
 	inheritFromParents(nodes)
-	inheritFromChildren(nodes)
+	inheritFromChildren(nodes, candidate)
 
 	doc := Document{
-		Nodes:         nodes,
-		TitleOrdinal:  titleOrdinal,
-		TitleStatus:   titleStatus,
-		TitleMethod:   titleMethod,
-		HeadingCounts: counts,
+		Nodes:                 nodes,
+		TitleOrdinal:          titleOrdinal,
+		TitleStatus:           titleStatus,
+		TitleMethod:           titleMethod,
+		TitleCandidateOrdinal: candidate,
+		HeadingCounts:         counts,
 	}
 
 	if err := ValidateNoSilentLoss(doc, headings); err != nil {
@@ -136,10 +155,13 @@ func buildHeadlessDocument(md []byte, counts map[int]int) Document {
 	}
 
 	return Document{
-		Nodes:         []SectionNode{node},
-		TitleOrdinal:  -1,
-		TitleStatus:   TitleUnresolved,
-		HeadingCounts: counts,
+		Nodes:        []SectionNode{node},
+		TitleOrdinal: -1,
+		TitleStatus:  TitleUnresolved,
+		// No candidate. A document with no headings has nothing that could be
+		// its title, so the task stays addressed to the whole document.
+		TitleCandidateOrdinal: -1,
+		HeadingCounts:         counts,
 	}
 }
 
@@ -278,6 +300,62 @@ func identifyTitle(nodes []SectionNode, h1Count int) (ordinal int, status TitleS
 		return first, TitleIdentified, MethodSingletonH1
 	}
 	return first, TitleIdentified, MethodStructuralRule
+}
+
+// suppressTitleCandidate un-classifies the first node when a document has no H1
+// at all, and returns its ordinal, or -1 when the rule does not apply.
+//
+// # The problem
+//
+// §4 admits only the first H1 as a title candidate. Two of the first four real
+// papers had no H1: Mathpix emits one or not depending on the PDF's typography,
+// not on whether the document has a title. So the paper's title arrived as an H2,
+// classified through the ordinary pipeline, and acquired a role. On a systematic
+// review, "A systematic review on regenerative supply chains…" came out as
+// THEORY, with a three-byte span, and Step 4 would have read it as content.
+//
+// # Why this suppresses rather than promotes
+//
+// The obvious alternative is to promote the first H2 to title when no H1 exists.
+// The heuristic that would gate it — "a title matches no keyword" — fails on the
+// exact paper that raised the problem, whose title matched `theory`. There is no
+// reliable signal here, so the honest move is to stop asserting one. The node
+// keeps its text, its offsets and its place in the tree; it simply carries no
+// role, and a human is asked.
+//
+// # Why the shallowest-level condition
+//
+// Without it this breaks the other no-H1 paper. That DBA proposal's first node is
+// "Abstract" at H4, with H2s beneath it — a real section that resolves correctly
+// and should keep its role. Being first is not enough; a title also has nothing
+// above it. Requiring the node to sit at the shallowest level present separates
+// the two cases exactly.
+//
+// # Scope
+//
+// Only the no-H1 case. §4's other unresolved-title case is a first H1 that
+// classified as an ordinary section, and there the heading matched a keyword on
+// its own terms — suppressing it would discard a good answer to fix a different
+// problem.
+func suppressTitleCandidate(nodes []SectionNode, counts map[int]int) int {
+	if counts[1] != 0 || len(nodes) == 0 {
+		return -1
+	}
+
+	shallowest := nodes[0].HeadingLevel
+	for _, n := range nodes {
+		if n.HeadingLevel < shallowest {
+			shallowest = n.HeadingLevel
+		}
+	}
+	if nodes[0].HeadingLevel != shallowest {
+		return -1
+	}
+
+	nodes[0].Classification = Classification{
+		Status: StatusUnresolved,
+	}
+	return 0
 }
 
 // applyTitle converts a node into the document-title node: §4.
@@ -462,7 +540,11 @@ func inheritFromParents(nodes []SectionNode) {
 // parent, upward writes an UNRESOLVED one. And a child of an unresolved node can
 // never carry MethodInherited, since the only node it could have inherited from
 // is the unresolved node itself.
-func inheritFromChildren(nodes []SectionNode) {
+// titleCandidate is the ordinal suppressTitleCandidate un-classified, or -1.
+// It is excluded for the same reason the document title is: a paper whose
+// sections all report results is not itself "results", and the node this points
+// at is a title candidate rather than a section.
+func inheritFromChildren(nodes []SectionNode, titleCandidate int) {
 	children := make([][]int, len(nodes))
 	for i := range nodes {
 		if p := nodes[i].ParentOrdinal; p >= 0 && p < len(nodes) {
@@ -485,6 +567,9 @@ func inheritFromChildren(nodes []SectionNode) {
 		// the day someone makes that change this line is the only thing standing
 		// between a paper's sections and a title that claims to be methodology.
 		if nodes[i].Kind == KindDocumentTitle {
+			continue
+		}
+		if i == titleCandidate {
 			continue
 		}
 

@@ -475,3 +475,7 @@ func TestAC14_PreHeadingContentHasNoNode(t *testing.T) {
 // AC-16 (2.3 child consensus, with its five limits) IS TESTED, in
 // consensus_test.go, for the same reason. Seven of its eight tests describe
 // cases where the rule must decline to fire.
+//
+// AC-17 (2.6's title candidate) IS TESTED, in title_test.go. Four of its six
+// tests are about where the rule must NOT apply, which is the whole difficulty:
+// "the first heading is the title" is true often enough to be dangerous.

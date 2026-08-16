@@ -149,21 +149,31 @@ func buildNode(md []byte, ordinal int, h Heading, end int) SectionNode {
 	normalized := Normalize(raw)
 	container, label, semantic := ParseContainer(StripIdentifiers(normalized))
 
+	// EVERY appendix resolves structurally. Its suffix is never classified.
+	//
+	// Through 2.4 an appendix suffix ran the ordinary pipeline, so
+	// "Appendix B: Robustness checks" became RESULTS and "Appendix B" alone
+	// became Unknown. 2.5 removes that split: an appendix is an appendix, its
+	// class is analytical, and it carries no role.
+	//
+	// The reason is that an appendix title says what the appendix is ABOUT, not
+	// what epistemic work it does. "Detailed Results of Model Selection" sounds
+	// like results and may equally be methodology a reviewer moved out of the
+	// body; "Class Distributions" could support either. Appendices exist to hold
+	// material that did not fit, and which part of the paper they support is not
+	// recoverable from the title. Reading a role off it was reading confidence
+	// into a coincidence of vocabulary.
+	//
+	// Nothing is lost. The suffix survives in SemanticHeading, so an appendix
+	// stays searchable by what it is about; the two-axis model already keeps
+	// WHERE content sits separate from WHAT it does, and this makes the appendix
+	// answer only the first question, which is the only one its title answers.
+	//
+	// No ReviewTask either. A human cannot recover the role from the title
+	// either, so routing it to review would be asking someone to guess with
+	// exactly the information the machine had.
 	classification := Classify(semantic)
-
-	// A container whose suffix classified as nothing is still a container.
-	//
-	// §7 already resolves a BARE container — "Appendix B", with no suffix — to
-	// Unknown by structural assignment, raising no question, because the
-	// heading carries no epistemic claim to adjudicate. But an appendix whose
-	// suffix matched no keyword was becoming a question, which means ADDING
-	// WORDS WE CANNOT PARSE turned a resolved answer into an unresolved one.
-	// That is backwards: we know exactly as much as we did about the bare case.
-	//
-	// Nothing is lost by not asking. The suffix survives in SemanticHeading, so
-	// this decides only what reaches the review queue, not what is recorded —
-	// an appendix with an unclassified suffix remains findable at any time.
-	if container != "" && classification.Status == StatusUnresolved {
+	if container != "" {
 		classification = Classification{
 			Role:         RoleUnknown,
 			ContentClass: ContentClassFor(RoleUnknown),

@@ -1,5 +1,5 @@
 {
-  "_generated_by": "reference implementation of step3_spec_v2.4.md and step3_table_v2.4.json, written independently of the Go implementation it checks. Regenerating this file from the code would turn a test into a snapshot. Unchanged from 2.2 apart from the version string: the 2.3 consensus rule has nothing to do here, and 2.4's removed keyword appears in no demo.md heading.",
+  "_generated_by": "reference implementation of step3_spec_v2.5.md and step3_table_v2.5.json, written independently of the Go implementation it checks. Regenerating this file from the code would turn a test into a snapshot. Unchanged since 2.2 apart from the version string: 2.3's consensus rule has nothing to do here, 2.4's removed keyword appears in no demo.md heading, and 2.5's appendix ruling changes nothing because this fixture's only container, \"Supporting information\", is bare and already resolved to Unknown.",
   "_fixture_input": {
     "file": "demo.md",
     "bytes": 81492,
@@ -9,7 +9,7 @@
     "segmentation_run_id": "seg_demo_0001",
     "extraction_run_id": "<supplied by caller>",
     "approved_markdown_hash": "a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e",
-    "structural_rule_version": "2.4",
+    "structural_rule_version": "2.5",
     "document_title_level": 1,
     "supported_node_levels": [
       2,

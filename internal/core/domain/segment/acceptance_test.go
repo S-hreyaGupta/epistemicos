@@ -159,22 +159,44 @@ func TestAC05_IdentifiersAreStripped(t *testing.T) {
 	}
 }
 
-// AC-06 — appendix containers. A labelled container with a semantic suffix
-// classifies on the suffix; a bare one resolves to Unknown structurally with no
-// task; and a child classifies independently of either.
+// AC-06 (2.5) — appendix containers. EVERY appendix resolves to Unknown
+// structurally, whatever its suffix says, and raises no task. The suffix is
+// still parsed and retained; it is simply not classified.
 func TestAC06_AppendixContainers(t *testing.T) {
-	t.Run("labelled with suffix", func(t *testing.T) {
-		container, label, semantic := ParseContainer(StripIdentifiers(Normalize("Appendix B: Robustness checks")))
+	t.Run("labelled with suffix is still Unknown", func(t *testing.T) {
+		md := []byte("## Appendix B: Robustness checks\n\nBody.\n")
 
-		if container != ContainerAppendix {
-			t.Errorf("container = %q, want %q", container, ContainerAppendix)
+		doc, err := Build(md)
+		if err != nil {
+			t.Fatalf("Build: %v", err)
 		}
-		if label != "B" {
-			t.Errorf("label = %q, want \"B\"", label)
+		n := doc.Nodes[0]
+
+		if n.Container != ContainerAppendix {
+			t.Errorf("container = %q, want %q", n.Container, ContainerAppendix)
+		}
+		if n.AppendixLabel != "B" {
+			t.Errorf("label = %q, want \"B\"", n.AppendixLabel)
 		}
 
-		if got := Classify(semantic); got.Role != RoleResults {
-			t.Errorf("role = %q, want %q", got.Role, RoleResults)
+		// The suffix "robustness checks" is a results keyword and must NOT be
+		// read as one. An appendix title says what the appendix is about, not
+		// what work it does, and which part of the paper it supports is not
+		// recoverable from the title.
+		if n.Classification.Role != RoleUnknown {
+			t.Errorf("role = %q, want %q — an appendix suffix is not classified", n.Classification.Role, RoleUnknown)
+		}
+		if n.Classification.ContentClass != ClassAnalytical {
+			t.Errorf("class = %q, want %q", n.Classification.ContentClass, ClassAnalytical)
+		}
+		if n.Classification.Method != MethodStructural {
+			t.Errorf("method = %q, want %q", n.Classification.Method, MethodStructural)
+		}
+
+		// Retained, not discarded. This is what makes the change a decision
+		// about roles rather than about what is kept.
+		if n.SemanticHeading != "robustness checks" {
+			t.Errorf("semantic heading = %q, want it retained", n.SemanticHeading)
 		}
 	})
 

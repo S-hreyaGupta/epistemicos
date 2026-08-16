@@ -154,7 +154,19 @@ type Run struct {
 // a reader of stored data knows which rules produced it, and the keyword set is
 // part of those rules — two runs under different keyword sets can classify the
 // same heading differently, which is exactly what the version is for.
-const StructuralRuleVersion = "2.4"
+//
+// 2.5 stops classifying appendix suffixes. Every appendix now resolves to
+// Unknown / analytical / structural, whatever its title says.
+//
+// Through 2.4, "Appendix B: Robustness checks" was RESULTS and "Appendix B" was
+// Unknown, so the same container answered differently depending on how much its
+// author wrote in the heading. The ruling is that an appendix title says what
+// the appendix is ABOUT, not what epistemic work it does: "Detailed Results of
+// Model Selection" reads like results and may equally be methodology moved out
+// of the body, and which part of a paper an appendix supports is not
+// recoverable from its title. The suffix is still parsed and retained in
+// SemanticHeading; it is simply no longer read as a role.
+const StructuralRuleVersion = "2.5"
 
 // NewRun assembles a persistable run from a segmented document, including one
 // review task per unresolved node and one for an unidentified title.

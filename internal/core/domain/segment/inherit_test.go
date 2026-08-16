@@ -170,10 +170,20 @@ func TestAppendix_UnmatchedSuffixResolvesStructurally(t *testing.T) {
 	}
 }
 
-// TestAppendix_MatchedSuffixStillClassifies guards the other direction. The
-// fallback must not swallow a suffix that DID match — "Appendix B - Robustness
-// checks" is an appendix and it is results, and both facts are worth keeping.
-func TestAppendix_MatchedSuffixStillClassifies(t *testing.T) {
+// TestAppendix_MatchedSuffixIsStillNotClassified is the 2.5 reversal.
+//
+// Through 2.4 this heading resolved to RESULTS, because "robustness checks" is
+// a results keyword. It no longer does, and the reason is that an appendix title
+// says what the appendix is ABOUT rather than what it does. "Detailed Results of
+// Model Selection" sounds like results and may equally be methodology that a
+// reviewer asked to be moved out of the body. Which part of the paper an
+// appendix supports is not recoverable from its title, so reading a role off it
+// was reading confidence into a coincidence of vocabulary.
+//
+// This test exists in its inverted form on purpose. Deleting it would leave no
+// record that the old behaviour was considered and rejected, and someone would
+// eventually re-add suffix classification as an improvement.
+func TestAppendix_MatchedSuffixIsStillNotClassified(t *testing.T) {
 	md := []byte("# A Study Of Things\n\nAuthors.\n\n" +
 		"## Appendix B - Robustness checks\n\nProse.\n")
 
@@ -187,10 +197,16 @@ func TestAppendix_MatchedSuffixStillClassifies(t *testing.T) {
 	if n.Container != ContainerAppendix || n.AppendixLabel != "B" {
 		t.Errorf("container/label = %q/%q, want appendix/B", n.Container, n.AppendixLabel)
 	}
-	if n.Classification.Role != RoleResults {
-		t.Errorf("role = %q, want %q — a suffix that matched must keep its answer", n.Classification.Role, RoleResults)
+	if n.Classification.Role != RoleUnknown {
+		t.Errorf("role = %q, want %q — the suffix matched a results keyword and must not be read as one", n.Classification.Role, RoleUnknown)
 	}
-	if n.Classification.Method != MethodRule {
-		t.Errorf("method = %q, want %q", n.Classification.Method, MethodRule)
+	if n.Classification.Method != MethodStructural {
+		t.Errorf("method = %q, want %q", n.Classification.Method, MethodStructural)
+	}
+	if n.Classification.ContentClass != ClassAnalytical {
+		t.Errorf("class = %q, want %q", n.Classification.ContentClass, ClassAnalytical)
+	}
+	if n.SemanticHeading != "robustness checks" {
+		t.Errorf("semantic heading = %q, want it retained — the suffix is not classified, but it is kept", n.SemanticHeading)
 	}
 }

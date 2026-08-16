@@ -47,9 +47,41 @@ type Classification struct {
 	// there is nothing to offer.
 	CandidateRoles []Role
 
-	// MatchedKeywords are the keywords that fired, sorted. Empty on a
-	// zero-match and on a structural assignment.
+	// MatchedKeywords are the keywords that COUNTED, deduplicated and sorted.
+	// Empty on a zero-match and on a structural assignment. A keyword suppressed
+	// under §6 step 5a is absent here and present in Matches.
 	MatchedKeywords []string
+
+	// Matches is every occurrence the phrase scan found, in position order,
+	// including the ones that were suppressed. Empty on an exact match and on a
+	// structural assignment.
+	//
+	// The suppressed ones are kept rather than discarded so that "why did this
+	// resolve to theory when `background` is an introduction keyword?" has an
+	// answer in the data instead of requiring someone to re-derive it. Same
+	// principle as never overwriting the machine's determination with a human's:
+	// keep the reasoning, and let a reader judge it.
+	Matches []KeywordMatch
+}
+
+// KeywordMatch is ONE OCCURRENCE of one keyword at one position in a heading.
+//
+// The distinction between an occurrence and a keyword is the whole point of this
+// type. "Background and theoretical background" contains the keyword `background`
+// twice: once standing alone, and once inside `theoretical background`. Those are
+// the same string and two different pieces of evidence, and a rule that reasons
+// about keywords rather than positions cannot tell them apart.
+type KeywordMatch struct {
+	Keyword string
+	Role    Role
+
+	// Start and End are byte offsets into the semantic heading, half-open.
+	Start int
+	End   int
+
+	// SuppressedBy names the longer overlapping keyword that swallowed this
+	// occurrence, or is empty when the occurrence counted toward the role tally.
+	SuppressedBy string
 }
 
 // Classify determines a role for one semantic heading: §6 steps 4-5.
@@ -68,8 +100,32 @@ type Classification struct {
 //     that also appears inside several theory keywords — from producing a tie
 //     when it stands alone as the whole heading.
 //
-//  2. WHOLE-WORD PHRASE SCAN otherwise. Every keyword occurring as a whole word
-//     anywhere in the heading contributes its role.
+//  2. WHOLE-WORD PHRASE SCAN otherwise. Every OCCURRENCE of every keyword,
+//     with its position, is collected. Positions matter — see step 2a.
+//
+//     2a. NESTED-OCCURRENCE SUPPRESSION (2.7). An occurrence whose span lies
+//     strictly inside another occurrence's span is suppressed and does not
+//     count toward the role tally.
+//
+//     Five keywords in the table sit inside a longer keyword of a different
+//     role: `background` inside `theoretical background` and inside
+//     `background literature`, `results` inside `discussion of results`, and
+//     `summary` inside both `summary and conclusion(s)`. Whenever the longer
+//     one fires the shorter one fires too, and the pair looks like two roles
+//     disagreeing when it is one span read twice.
+//
+//     This is NOT tie-breaking, which §6 forbids and should keep forbidding.
+//     Tie-breaking picks a winner between two genuine matches. This removes a
+//     match that was never independent: `background` observed nothing about
+//     "Argumentation: Theoretical Background" that `theoretical background`
+//     had not already observed.
+//
+//     The rule is stated over SPANS, not keywords, and the difference is
+//     load-bearing. "Background and theoretical background" contains
+//     `background` twice — once alone, once nested. Suppressing the keyword
+//     would discard both and resolve the heading to theory, silently losing a
+//     real ambiguity. Suppressing the occurrence keeps the standalone one, and
+//     the heading correctly stays a question.
 //
 //  3. COUNT DISTINCT ROLES, not keyword hits. Three methodology keywords in one
 //     heading are one role and resolve cleanly; one methodology keyword and one
@@ -102,12 +158,20 @@ func Classify(semanticHeading string) Classification {
 		}
 	}
 
+	matches := scanKeywords(s)
+	suppressNested(matches)
+
 	roles := map[Role]bool{}
+	seen := map[string]bool{}
 	var matched []string
-	for keyword, role := range keywordToRole {
-		if containsWholeWord(s, keyword) {
-			roles[role] = true
-			matched = append(matched, keyword)
+	for _, m := range matches {
+		if m.SuppressedBy != "" {
+			continue
+		}
+		roles[m.Role] = true
+		if !seen[m.Keyword] {
+			seen[m.Keyword] = true
+			matched = append(matched, m.Keyword)
 		}
 	}
 	sort.Strings(matched)
@@ -124,12 +188,17 @@ func Classify(semanticHeading string) Classification {
 			Status:          StatusResolved,
 			Method:          MethodRule,
 			MatchedKeywords: matched,
+			Matches:         matches,
 		}
 
 	case 0:
 		// Nothing matched. No candidates to offer — the reviewer chooses from
 		// the full role set rather than from a shortlist.
-		return Classification{Status: StatusUnresolved}
+		//
+		// Matches is carried even here: a heading where every occurrence was
+		// suppressed is a different situation from one where nothing fired at
+		// all, and the two must stay distinguishable.
+		return Classification{Status: StatusUnresolved, Matches: matches}
 
 	default:
 		candidates := make([]Role, 0, len(roles))
@@ -142,8 +211,94 @@ func Classify(semanticHeading string) Classification {
 			Status:          StatusUnresolved,
 			CandidateRoles:  candidates,
 			MatchedKeywords: matched,
+			Matches:         matches,
 		}
 	}
+}
+
+// scanKeywords returns every whole-word occurrence of every keyword in s,
+// ordered by position, then longest first, then alphabetically.
+//
+// The ordering is not cosmetic. keywordToRole is a map and Go randomises map
+// iteration, so without a total order the suppression pass below would name a
+// different suppressor on different runs and two runs over the same paper would
+// store different provenance. Deterministic output is the whole product here.
+func scanKeywords(s string) []KeywordMatch {
+	var out []KeywordMatch
+	for keyword, role := range keywordToRole {
+		for _, span := range wholeWordSpans(s, keyword) {
+			out = append(out, KeywordMatch{
+				Keyword: keyword,
+				Role:    role,
+				Start:   span[0],
+				End:     span[1],
+			})
+		}
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Start != out[j].Start {
+			return out[i].Start < out[j].Start
+		}
+		if out[i].End != out[j].End {
+			return out[i].End > out[j].End
+		}
+		return out[i].Keyword < out[j].Keyword
+	})
+	return out
+}
+
+// suppressNested marks every occurrence strictly contained by a longer one.
+//
+// STRICTLY: an occurrence never suppresses itself, and two occurrences with
+// identical spans cannot exist, because an identical span is an identical
+// substring and therefore the same keyword.
+//
+// Containment is transitive, so a three-deep nest resolves to the outermost
+// survivor without iterating: if x is inside y and y is inside z, then x is
+// inside z, and the loop finds a suppressor for both x and y.
+func suppressNested(matches []KeywordMatch) {
+	for i := range matches {
+		a := matches[i]
+		for j := range matches {
+			if i == j {
+				continue
+			}
+			b := matches[j]
+			if b.Start <= a.Start && a.End <= b.End && (b.End-b.Start) > (a.End-a.Start) {
+				matches[i].SuppressedBy = b.Keyword
+				break
+			}
+		}
+	}
+}
+
+// wholeWordSpans returns the half-open byte span of every occurrence of keyword
+// in s that is bounded by non-word characters.
+//
+// Occurrences are found by advancing ONE BYTE past each candidate start rather
+// than past its end. Overlapping occurrences are possible, and skipping to the
+// end would miss the second "art" in "art art".
+func wholeWordSpans(s, keyword string) [][2]int {
+	if keyword == "" {
+		return nil
+	}
+
+	var out [][2]int
+	for offset := 0; offset <= len(s)-len(keyword); {
+		i := strings.Index(s[offset:], keyword)
+		if i < 0 {
+			break
+		}
+		start := offset + i
+		end := start + len(keyword)
+
+		if isWordBoundaryBefore(s, start) && isWordBoundaryAfter(s, end) {
+			out = append(out, [2]int{start, end})
+		}
+		offset = start + 1
+	}
+	return out
 }
 
 // containsWholeWord reports whether keyword occurs in s bounded by non-word
@@ -158,32 +313,11 @@ func Classify(semanticHeading string) Classification {
 // "resultsets", and — the case that actually bites — "art" must not fire on
 // "particular". A plain strings.Contains would classify half the corpus as
 // literature_review on the strength of "state of the art".
+// It delegates to wholeWordSpans so there is exactly one implementation of the
+// boundary test. Two would drift, and a drift here is a wrong role rather than
+// a visible failure.
 func containsWholeWord(s, keyword string) bool {
-	if keyword == "" {
-		return false
-	}
-
-	for offset := 0; ; {
-		i := strings.Index(s[offset:], keyword)
-		if i < 0 {
-			return false
-		}
-		start := offset + i
-		end := start + len(keyword)
-
-		if !isWordBoundaryBefore(s, start) || !isWordBoundaryAfter(s, end) {
-			// Advance one byte past this occurrence's start rather than past
-			// its end: overlapping occurrences are possible and skipping to
-			// end would miss "art" in "art art" style repetition.
-			offset = start + 1
-			if offset >= len(s) {
-				return false
-			}
-			continue
-		}
-
-		return true
-	}
+	return len(wholeWordSpans(s, keyword)) > 0
 }
 
 // isWordBoundaryBefore reports whether the rune ending at byte index i is a

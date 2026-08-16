@@ -181,7 +181,25 @@ type Run struct {
 // keeps its text, its span and its place in the tree, carries no role, and the
 // title_ambiguity task points at it so a reviewer has a candidate to confirm
 // rather than a blank question about the whole document.
-const StructuralRuleVersion = "2.6"
+//
+// 2.7 suppresses a keyword occurrence whose span lies strictly inside another
+// occurrence's span, before distinct roles are counted.
+//
+// Five keywords sit inside a longer keyword of a different role — `background`
+// inside `theoretical background`, `results` inside `discussion of results`, and
+// three more. Whenever the longer fires the shorter fires too, and the pair looks
+// like two roles disagreeing when it is one span read twice.
+//
+// The rule is stated over SPANS rather than keywords, and that distinction is the
+// whole of it. An earlier draft said "discard the shorter KEYWORD", which would
+// have resolved "Background and theoretical background" to theory by discarding
+// both occurrences of `background` — including the standalone one that was real
+// evidence. GPT caught it; the counter-example reproduces exactly.
+//
+// FIRST VERSION TO CHANGE THE REFERENCE FIXTURE. demo.md's sole multi_role_match
+// was this same illusion, so it resolves to theory, its four subsections inherit,
+// and §15 goes from five review tasks to NONE.
+const StructuralRuleVersion = "2.7"
 
 // NewRun assembles a persistable run from a segmented document, including one
 // review task per unresolved node and one for an unidentified title.

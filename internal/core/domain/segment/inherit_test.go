@@ -63,7 +63,7 @@ func TestInherit_NeverOverridesAMatch(t *testing.T) {
 func TestInherit_NeverOverridesATie(t *testing.T) {
 	md := []byte("# A Study Of Things\n\nAuthors.\n\n" +
 		"## 4 Methodology\n\nProse.\n\n" +
-		"### 4.1 Theoretical background and hypotheses derivation\n\nMore prose.\n")
+		"### 4.1 Background and literature review\n\nMore prose.\n")
 
 	doc, err := Build(md)
 	if err != nil {

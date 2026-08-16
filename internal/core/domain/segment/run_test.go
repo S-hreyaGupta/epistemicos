@@ -3,7 +3,7 @@ package segment
 import "testing"
 
 // TestNewRun_Fixture checks the run-level fields §15 predicts, and that task
-// generation produces exactly the five tasks expected.json records.
+// generation matches the task set expected.json records — which at 2.7 is empty.
 func TestNewRun_Fixture(t *testing.T) {
 	md := loadFixture(t)
 	exp := loadExpected(t)
@@ -18,8 +18,8 @@ func TestNewRun_Fixture(t *testing.T) {
 	if run.Status != RunCompleted {
 		t.Errorf("status = %q, want %q", run.Status, RunCompleted)
 	}
-	if run.StructuralRuleVersion != "2.6" {
-		t.Errorf("structural_rule_version = %q, want \"2.6\"", run.StructuralRuleVersion)
+	if run.StructuralRuleVersion != "2.7" {
+		t.Errorf("structural_rule_version = %q, want \"2.7\"", run.StructuralRuleVersion)
 	}
 	if run.DocumentTitleStatus != TitleIdentified {
 		t.Errorf("title status = %q, want %q", run.DocumentTitleStatus, TitleIdentified)

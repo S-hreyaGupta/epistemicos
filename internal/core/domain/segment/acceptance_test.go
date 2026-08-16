@@ -90,8 +90,15 @@ func TestAC02_AbstractResolvesByOrdinaryMatch(t *testing.T) {
 
 // AC-03 — a heading hitting two distinct roles is unresolved, with both
 // candidates recorded and NO tie-break applied.
+//
+// The example CHANGED at 2.7. It used to be "theoretical background and
+// hypotheses derivation", which was never a genuine tie: its `background` hit
+// lay inside its `theoretical background` hit, so one span was being counted as
+// two opinions. That heading now resolves to theory, and nested_test.go covers
+// it. "Background and literature review" is a real tie — neither keyword
+// contains the other — which is what this criterion is actually about.
 func TestAC03_MultiRoleMatchIsNotTieBroken(t *testing.T) {
-	got := Classify("theoretical background and hypotheses derivation")
+	got := Classify("background and literature review")
 
 	if got.Status != StatusUnresolved {
 		t.Fatalf("status = %q, want %q — a tie must not be resolved by preference order", got.Status, StatusUnresolved)
@@ -99,8 +106,13 @@ func TestAC03_MultiRoleMatchIsNotTieBroken(t *testing.T) {
 	if got.Role != "" {
 		t.Errorf("role = %q, want empty", got.Role)
 	}
+	for _, m := range got.Matches {
+		if m.SuppressedBy != "" {
+			t.Errorf("%q suppressed by %q; neither keyword contains the other, so this must be a real tie", m.Keyword, m.SuppressedBy)
+		}
+	}
 
-	want := []Role{RoleIntroduction, RoleTheory}
+	want := []Role{RoleIntroduction, RoleLiteratureReview}
 	if len(got.CandidateRoles) != len(want) {
 		t.Fatalf("candidates = %v, want %v", got.CandidateRoles, want)
 	}
@@ -479,3 +491,8 @@ func TestAC14_PreHeadingContentHasNoNode(t *testing.T) {
 // AC-17 (2.6's title candidate) IS TESTED, in title_test.go. Four of its six
 // tests are about where the rule must NOT apply, which is the whole difficulty:
 // "the first heading is the title" is true often enough to be dangerous.
+//
+// AC-18 (2.7's nested-occurrence suppression) IS TESTED, in nested_test.go. Its
+// first test is the counter-example that corrected the rule from keywords to
+// spans, and it is first on purpose: the version that reasoned about keywords
+// passed every other test in that file.

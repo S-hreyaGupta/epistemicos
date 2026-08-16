@@ -92,9 +92,13 @@ func TestClassify_DistinctRoleCounting(t *testing.T) {
 // TestClassify_MultiRoleMatch covers the tie: two distinct roles, no winner,
 // candidates offered for a human to choose between.
 //
-// This heading is the fixture's own multi-role case, and §15 names it.
+// The heading CHANGED at 2.7. "Theoretical background and hypotheses derivation"
+// was the fixture's multi-role case and turned out never to have been a tie:
+// `background` was hitting inside `theoretical background`, one span counted
+// twice. Here `background` and `literature review` are separate spans, so the
+// disagreement is real and must survive.
 func TestClassify_MultiRoleMatch(t *testing.T) {
-	got := Classify("theoretical background and hypotheses derivation")
+	got := Classify("background and literature review")
 
 	if got.Status != StatusUnresolved {
 		t.Fatalf("status = %q, want %q", got.Status, StatusUnresolved)
@@ -109,7 +113,7 @@ func TestClassify_MultiRoleMatch(t *testing.T) {
 		t.Errorf("method = %q, want empty — nothing was decided, so no method decided it", got.Method)
 	}
 
-	want := []Role{RoleIntroduction, RoleTheory}
+	want := []Role{RoleIntroduction, RoleLiteratureReview}
 	if len(got.CandidateRoles) != len(want) {
 		t.Fatalf("candidate roles = %v, want %v", got.CandidateRoles, want)
 	}

@@ -104,8 +104,8 @@ func TestSaveAndGetRun(t *testing.T) {
 	if got.ApprovedMarkdownHash != want.ApprovedMarkdownHash {
 		t.Errorf("approved_markdown_hash = %q, want %q", got.ApprovedMarkdownHash, want.ApprovedMarkdownHash)
 	}
-	if got.StructuralRuleVersion != "2.6" {
-		t.Errorf("structural_rule_version = %q, want \"2.6\"", got.StructuralRuleVersion)
+	if got.StructuralRuleVersion != "2.7" {
+		t.Errorf("structural_rule_version = %q, want \"2.7\"", got.StructuralRuleVersion)
 	}
 	if got.Status != segment.RunCompleted {
 		t.Errorf("status = %q, want %q", got.Status, segment.RunCompleted)
@@ -307,10 +307,17 @@ func TestSaveRun_FixtureRoundTripsAllOffsets(t *testing.T) {
 	if len(got.Nodes) != 22 {
 		t.Fatalf("read back %d nodes, want 22", len(got.Nodes))
 	}
-	// Five under rule version 2.2: "4.2 Structural model" now inherits results
-	// from its parent, so §15's sixth task no longer exists.
-	if len(got.Tasks) != 5 {
-		t.Errorf("read back %d tasks, want 5", len(got.Tasks))
+	// NONE under rule version 2.7. Six at 2.1, five at 2.2 once "4.2 Structural
+	// model" inherited results, and zero at 2.7 once nested-occurrence
+	// suppression resolved "2 Theoretical background and hypotheses derivation"
+	// and its four subsections inherited theory.
+	//
+	// The count is asserted rather than derived, deliberately. This is a
+	// PERSISTENCE test: a run with no tasks must still round-trip, and a store
+	// that silently dropped every task would pass any assertion computed from
+	// the run it was just handed.
+	if len(got.Tasks) != 0 {
+		t.Errorf("read back %d tasks, want 0", len(got.Tasks))
 	}
 
 	for i := range run.Nodes {

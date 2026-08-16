@@ -1,6 +1,6 @@
 # Deferred acceptance criteria
 
-Step 3's specification (v2.6 §14) lists seventeen acceptance criteria. Fourteen
+Step 3's specification (v2.7 §14) lists eighteen acceptance criteria. Fifteen
 are tested inside Step 3. Three could not be, because each is a claim about
 something that lives outside it.
 
@@ -18,6 +18,7 @@ rediscovering it.
 | AC-15 | Parent inheritance, and its four limits | **Step 3 (domain)** | ✅ Done — `internal/core/domain/segment/inherit_test.go` |
 | AC-16 | Child consensus, and its five limits | **Step 3 (domain)** | ✅ Done — `internal/core/domain/segment/consensus_test.go` |
 | AC-17 | The title candidate, and its scope | **Step 3 (domain)** | ✅ Done — `internal/core/domain/segment/title_test.go` |
+| AC-18 | Nested-occurrence suppression, stated over spans | **Step 3 (domain)** | ✅ Done — `internal/core/domain/segment/nested_test.go` |
 
 ---
 

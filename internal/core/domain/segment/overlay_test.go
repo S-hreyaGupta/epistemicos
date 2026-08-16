@@ -103,10 +103,20 @@ func TestEffectiveTitleFor(t *testing.T) {
 
 // TestContextFor_TheTwoByteNode is the amendment's whole reason for existing.
 //
-// n004 — "2 Theoretical background and hypotheses derivation" — is the fixture's
-// sole multi_role_match, the one genuine judgement call, and its own span is two
-// bytes. Under the unamended rule a reviewer would open it and see a heading and
-// nothing else.
+// "2 Theoretical background and hypotheses derivation" owns two bytes: its first
+// subsection begins on the next line. Under the unamended rule a reviewer opening
+// it would see a heading and nothing else.
+//
+// THE SELECTION CHANGED AT 2.7, and the reason is worth recording. This test
+// used to find its target by looking for a multi_role_match, on the stated
+// grounds that classification was more stable than an index. Then 2.7's
+// nested-occurrence suppression resolved that heading, the fixture lost its last
+// unresolved node, and the search found nothing.
+//
+// The lesson is not that the old approach was careless. It is that the test was
+// keyed on a property incidental to what it checks. A tiny span is the thing
+// ContextFor exists for, so a tiny span is what to search for — and that holds
+// however the node is classified.
 func TestContextFor_TheTwoByteNode(t *testing.T) {
 	md := loadFixture(t)
 
@@ -115,22 +125,31 @@ func TestContextFor_TheTwoByteNode(t *testing.T) {
 		t.Fatalf("Build: %v", err)
 	}
 
-	// Locate the multi-role node by its classification rather than by index, so
-	// the test survives a fixture change.
-	target := -1
+	// The narrowest node that has children. A node with no children has no
+	// subtree to widen into and would not exercise the amendment.
+	target, narrowest := -1, 1<<30
 	for i, n := range doc.Nodes {
-		if len(n.Classification.CandidateRoles) > 1 {
-			target = i
-			break
+		hasChild := false
+		for _, c := range doc.Nodes {
+			if c.ParentOrdinal == i {
+				hasChild = true
+				break
+			}
+		}
+		if !hasChild {
+			continue
+		}
+		if span := n.EndOffset - n.StartOffset; span < narrowest {
+			target, narrowest = i, span
 		}
 	}
 	if target < 0 {
-		t.Fatal("no multi-role node in the fixture")
+		t.Fatal("no parent node in the fixture")
 	}
 
 	own := doc.Nodes[target].EndOffset - doc.Nodes[target].StartOffset
 	if own > 32 {
-		t.Fatalf("the multi-role node owns %d bytes, so this test is no longer exercising the case it was written for", own)
+		t.Fatalf("the narrowest parent owns %d bytes, so this test is no longer exercising the case it was written for", own)
 	}
 
 	ctx, ok := ContextFor(doc.Nodes, target)

@@ -131,7 +131,7 @@ func TestConsensus_NeverOverridesAMatch(t *testing.T) {
 // and the shortlist is the most useful thing anyone has about that heading.
 func TestConsensus_NeverOverridesATie(t *testing.T) {
 	md := []byte("# A Study Of Things\n\nAuthors.\n\n" +
-		"## 2 Theoretical background and hypotheses derivation\n\nProse.\n\n" +
+		"## 2 Background and literature review\n\nProse.\n\n" +
 		"### 2.1 Regression results\n\nProse.\n\n" +
 		"### 2.2 Robustness checks\n\nProse.\n")
 
@@ -252,11 +252,16 @@ func TestConsensus_NeverTheDocumentTitle(t *testing.T) {
 
 // TestConsensus_DoesNotDisturbTheFixture.
 //
-// The reference fixture must be unchanged by this rule, and for a reason worth
-// asserting rather than assuming: its one multi-role heading is the parent of
-// its four zero-match ones, so both of the first two limits are engaged at once.
-// If either weakens, this test notices before the fixture is quietly rewritten
-// to match.
+// The consensus rule must find nothing to do on demo.md, and that stayed true
+// through a change that altered everything around it. Until 2.7 the fixture's
+// one multi-role heading was the parent of its four zero-match ones, so limits
+// (a) and (b) were both engaged. At 2.7 that heading resolves and its children
+// inherit, so the fixture now has no unresolved nodes at all and consensus has
+// nothing to fire on for an entirely different reason.
+//
+// Both routes must end in the same place. The assertion is on the outcome, so
+// it survives the fixture changing underneath it — which is exactly what it just
+// did.
 func TestConsensus_DoesNotDisturbTheFixture(t *testing.T) {
 	md := loadFixture(t)
 
@@ -266,9 +271,10 @@ func TestConsensus_DoesNotDisturbTheFixture(t *testing.T) {
 	}
 
 	run := NewRun(doc, "test", fixtureSHA256)
+	exp := loadExpected(t)
 
-	if len(run.Tasks) != 5 {
-		t.Errorf("fixture produced %d tasks, want 5 — the consensus rule must not touch it", len(run.Tasks))
+	if len(run.Tasks) != len(exp.ReviewTasks) {
+		t.Errorf("fixture produced %d tasks, want %d", len(run.Tasks), len(exp.ReviewTasks))
 	}
 	for _, n := range doc.Nodes {
 		if n.Classification.Method == MethodChildConsensus {

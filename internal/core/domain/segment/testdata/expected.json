@@ -1,5 +1,5 @@
 {
-  "_generated_by": "reference implementation of step3_spec_v2.6.md and step3_table_v2.6.json, written independently of the Go implementation it checks. Regenerating this file from the code would turn a test into a snapshot. Unchanged since 2.2 apart from the version string: 2.3's consensus rule has nothing to do here, 2.4's removed keyword appears in no demo.md heading, 2.5's appendix ruling finds only a bare container already resolved to Unknown, and 2.6's title rule does not apply because demo.md has exactly one H1 and its title is identified.",
+  "_generated_by": "reference implementation of step3_spec_v2.7.md and step3_table_v2.7.json, written independently of the Go implementation it checks. Regenerating this file from the code would turn a test into a snapshot. FIRST CHANGE SINCE 2.2: 2.7's nested-occurrence suppression resolves \"2 Theoretical background and hypotheses derivation\" to theory, because the `background` hit lay inside the `theoretical background` hit and was never independent evidence. Its four subsections then inherit theory, and demo.md classifies with no open questions at all.",
   "_fixture_input": {
     "file": "demo.md",
     "bytes": 81492,
@@ -9,7 +9,7 @@
     "segmentation_run_id": "seg_demo_0001",
     "extraction_run_id": "<supplied by caller>",
     "approved_markdown_hash": "a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e",
-    "structural_rule_version": "2.6",
+    "structural_rule_version": "2.7",
     "document_title_level": 1,
     "supported_node_levels": [
       2,
@@ -100,10 +100,10 @@
       "appendix_label": null,
       "start_offset": 11134,
       "end_offset": 11136,
-      "primary_role": null,
-      "content_class": null,
-      "classification_status": "unresolved",
-      "classification_method": null
+      "primary_role": "theory",
+      "content_class": "analytical",
+      "classification_status": "resolved",
+      "classification_method": "rule"
     },
     {
       "section_id": "n005",
@@ -117,10 +117,10 @@
       "appendix_label": null,
       "start_offset": 11161,
       "end_offset": 15306,
-      "primary_role": null,
-      "content_class": null,
-      "classification_status": "unresolved",
-      "classification_method": null
+      "primary_role": "theory",
+      "content_class": "analytical",
+      "classification_status": "resolved",
+      "classification_method": "inherited"
     },
     {
       "section_id": "n006",
@@ -134,10 +134,10 @@
       "appendix_label": null,
       "start_offset": 15363,
       "end_offset": 16766,
-      "primary_role": null,
-      "content_class": null,
-      "classification_status": "unresolved",
-      "classification_method": null
+      "primary_role": "theory",
+      "content_class": "analytical",
+      "classification_status": "resolved",
+      "classification_method": "inherited"
     },
     {
       "section_id": "n007",
@@ -151,10 +151,10 @@
       "appendix_label": null,
       "start_offset": 16850,
       "end_offset": 20307,
-      "primary_role": null,
-      "content_class": null,
-      "classification_status": "unresolved",
-      "classification_method": null
+      "primary_role": "theory",
+      "content_class": "analytical",
+      "classification_status": "resolved",
+      "classification_method": "inherited"
     },
     {
       "section_id": "n008",
@@ -168,10 +168,10 @@
       "appendix_label": null,
       "start_offset": 20360,
       "end_offset": 23374,
-      "primary_role": null,
-      "content_class": null,
-      "classification_status": "unresolved",
-      "classification_method": null
+      "primary_role": "theory",
+      "content_class": "analytical",
+      "classification_status": "resolved",
+      "classification_method": "inherited"
     },
     {
       "section_id": "n009",
@@ -412,52 +412,5 @@
       "classification_method": "rule"
     }
   ],
-  "ReviewTasks": [
-    {
-      "review_task_id": "t001",
-      "section_id": "n004",
-      "review_reason": "multi_role_match",
-      "candidate_roles": [
-        "introduction",
-        "theory"
-      ],
-      "matched_keywords": [
-        "background",
-        "theoretical background"
-      ],
-      "status": "open"
-    },
-    {
-      "review_task_id": "t002",
-      "section_id": "n005",
-      "review_reason": "zero_role_match",
-      "candidate_roles": [],
-      "matched_keywords": [],
-      "status": "open"
-    },
-    {
-      "review_task_id": "t003",
-      "section_id": "n006",
-      "review_reason": "zero_role_match",
-      "candidate_roles": [],
-      "matched_keywords": [],
-      "status": "open"
-    },
-    {
-      "review_task_id": "t004",
-      "section_id": "n007",
-      "review_reason": "zero_role_match",
-      "candidate_roles": [],
-      "matched_keywords": [],
-      "status": "open"
-    },
-    {
-      "review_task_id": "t005",
-      "section_id": "n008",
-      "review_reason": "zero_role_match",
-      "candidate_roles": [],
-      "matched_keywords": [],
-      "status": "open"
-    }
-  ]
+  "ReviewTasks": []
 }

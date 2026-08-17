@@ -47,6 +47,8 @@ func main() {
 		runSegment(args)
 	case "suggest":
 		runSuggest(args)
+	case "methodology":
+		runMethodology(args)
 	case "list":
 		runList()
 	case "export-markdown":
@@ -71,6 +73,9 @@ Commands:
   suggest <run-id>         Ask an LLM which role each unresolved section fits.
                            ADVISORY: prints suggestions, writes nothing. Needs
                            ANTHROPIC_API_KEY.
+  methodology <paper-id>   Classify a paper as quantitative or qualitative from
+                           Step 2's markdown. Counts a published glossary; no model,
+                           no network, no training.
   list                     List ingested papers
   export-markdown <paper-id> --out <path>
                            Write a paper's stored markdown to a file byte-exactly (no

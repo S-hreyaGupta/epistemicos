@@ -134,14 +134,23 @@ const (
 	// decisionMargin is how far from zero the score must sit before a side is
 	// called.
 	//
-	// The four single-method papers scored -0.92, -0.51, +0.98, +0.98, so 0.20
-	// separates them comfortably. The two mixed-methods papers scored -0.39 and
-	// +0.20, and THAT is the honest picture: one reads qualitative, the other
-	// lands within a rounding error of the threshold.
+	// Measured: the four single-method papers scored -0.92, -0.55, +0.98, +0.98,
+	// so 0.20 separates them with room to spare. The two mixed-methods papers
+	// scored -0.37 and +0.19 — one reads qualitative, the other falls inside the
+	// band.
 	//
 	// So this constant does not separate mixed from single-method and is not
-	// trying to. MixedFlag does that, and the near-miss on +0.20 is coincidence
-	// rather than calibration.
+	// trying to. MixedFlag does that.
+	//
+	// 0.40 WOULD SCORE SIX OUT OF SIX, and was rejected. The only evidence for it
+	// is that it fits these six papers, and it was found by looking at their
+	// results. The marker lists above were chosen before anything was measured
+	// precisely so they would not be fitted to a sample this small; moving the
+	// threshold afterwards to make that sample come out clean would spend that
+	// discipline on a number with no support outside it.
+	//
+	// If a larger corpus supports a wider band, widen it then. See
+	// TestCalibrationAgainstRealPapers.
 	decisionMargin = 0.20
 )
 

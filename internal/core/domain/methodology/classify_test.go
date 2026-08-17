@@ -158,13 +158,13 @@ func TestCountWholeWord(t *testing.T) {
 		want       int
 	}{
 		{"the sample was small", "sample", 1},
-		{"two samples were drawn", "sample", 1},          // plural tolerated
-		{"resampling is not sampling", "sampling", 1},    // must not fire inside "resampling"
-		{"a variable and two variables", "variable", 2},  // both forms
-		{"particular results", "art", 0},                 // the case that bites
+		{"two samples were drawn", "sample", 1},         // plural tolerated
+		{"resampling is not sampling", "sampling", 1},   // must not fire inside "resampling"
+		{"a variable and two variables", "variable", 2}, // both forms
+		{"particular results", "art", 0},                // the case that bites
 		{"mean, mean and mean again", "mean", 3},
 		{"meaning is not mean", "mean", 1},
-		{"análisis de la varianza", "varianza", 1},       // non-ASCII boundary
+		{"análisis de la varianza", "varianza", 1}, // non-ASCII boundary
 		{"", "sample", 0},
 		{"anything", "", 0},
 	}
@@ -240,18 +240,18 @@ func TestGlossaryMatchesTestdata(t *testing.T) {
 	}
 
 	var file struct {
-		Terms      []string `json:"terms"`
-		Qualitative []string `json:"qualitative_markers"`
+		Terms        []string `json:"terms"`
+		Qualitative  []string `json:"qualitative_markers"`
 		Quantitative []string `json:"quantitative_markers"`
-		Mixed      []string `json:"mixed_markers"`
+		Mixed        []string `json:"mixed_markers"`
 	}
 	if err := json.Unmarshal(raw, &file); err != nil {
 		t.Fatalf("parse glossary.json: %v", err)
 	}
 
 	for _, c := range []struct {
-		name       string
-		got, want  []string
+		name      string
+		got, want []string
 	}{
 		{"terms", glossaryTerms, file.Terms},
 		{"qualitative markers", qualitativeMarkers, file.Qualitative},
@@ -303,4 +303,45 @@ func TestCalibrationAgainstRealPapers(t *testing.T) {
 	if decisionMargin <= 0 || decisionMargin >= 0.51 {
 		t.Errorf("decisionMargin = %.2f; below 0 it decides everything, and at 0.51 it would fail to call qual_2 at -0.51", decisionMargin)
 	}
+}
+
+// TestEveryMarkerIsReachable is the test that would have caught a real bug, and
+// did not exist until the bug found itself.
+//
+// markerSet normalises typographic apostrophes into straight ones. The lookup
+// that classified each term did not, so "Cronbach’s Alpha" — the one glossary
+// entry with a curly apostrophe, and a quantitative marker — never matched its
+// own list. It counted toward nothing.
+//
+// Nothing failed. One missing marker out of sixty-six shifts a score slightly
+// and produces no error, which is why it survived unit tests and was only
+// visible when a real paper printed its evidence and the term read "neither"
+// beside a list that plainly contains it.
+//
+// This asserts the property directly: every marker, fed to Classify inside a
+// sentence, must come back attributed to the side it belongs to.
+func TestEveryMarkerIsReachable(t *testing.T) {
+	check := func(markers []string, want string) {
+		t.Helper()
+		for _, marker := range markers {
+			got := Classify("The study reports " + marker + " in detail here.")
+
+			var found bool
+			for _, m := range got.Matches {
+				if strings.EqualFold(m.Term, marker) {
+					found = true
+					if m.Marker != want {
+						t.Errorf("%q counted toward %q, want %q", marker, m.Marker, want)
+					}
+				}
+			}
+			if !found {
+				t.Errorf("%q did not match itself; it can never contribute", marker)
+			}
+		}
+	}
+
+	check(qualitativeMarkers, "qualitative")
+	check(quantitativeMarkers, "quantitative")
+	check(mixedMarkers, "mixed")
 }

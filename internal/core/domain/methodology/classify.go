@@ -173,7 +173,20 @@ func Classify(text string) Result {
 		}
 
 		m := TermMatch{Term: term, Count: n}
-		key := strings.ToLower(term)
+
+		// Normalise the apostrophe HERE TOO, not just when counting.
+		//
+		// markerSet stores its keys normalised, so looking up the raw term
+		// missed every entry containing a typographic apostrophe. Exactly one
+		// glossary term has one — "Cronbach's Alpha" — and it is a marker, so
+		// the bug silently demoted an unambiguous quantitative signal to
+		// counting toward nothing.
+		//
+		// It found itself: the term appeared in a real paper's evidence table
+		// as "neither" when the marker list plainly contains it. Nothing about
+		// the score looked wrong, which is the point — one missing marker out
+		// of sixty-six moves a number slightly and never fails.
+		key := strings.ToLower(strings.ReplaceAll(term, "’", "'"))
 		switch {
 		case mixed[key]:
 			m.Marker = "mixed"

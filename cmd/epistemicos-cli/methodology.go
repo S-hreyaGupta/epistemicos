@@ -97,4 +97,3 @@ func printMethodology(p *paper.Paper, r methodology.Result) {
 	fmt.Printf("They are the columns a trained model would use and this lexical rule does\n")
 	fmt.Printf("not, which is the gap between what we built and the published method.\n")
 }
-

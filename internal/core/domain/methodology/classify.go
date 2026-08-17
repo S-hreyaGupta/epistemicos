@@ -123,12 +123,11 @@ const (
 	// minDistinctMarkers is the floor below which a lean is not reported. It
 	// exists to catch a near-empty document, not to discriminate.
 	//
-	// Set to 4, and the reason is worth recording. The six test papers hit 6, 7,
-	// 12, 12, 18 and 24 distinct markers — so 6 is the OBSERVED MINIMUM, not a
-	// comfortable distance below it. A floor placed exactly on the lowest thing
-	// ever measured is one unremarkable paper away from rejecting a document it
-	// should have answered. 4 sits below the evidence, which is where a floor
-	// belongs.
+	// Set to 4. It was 6, which was wrong: the thinnest of the six test papers
+	// touched 20 distinct glossary terms and a marker count in single figures, so
+	// 6 sat AT the observed minimum rather than below it. A floor placed on the
+	// lowest thing ever measured is one unremarkable paper away from refusing a
+	// document it should have answered.
 	minDistinctMarkers = 4
 
 	// decisionMargin is how far from zero the score must sit before a side is

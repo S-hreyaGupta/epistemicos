@@ -52,4 +52,31 @@ type SegmentationStore interface {
 	// GetRun fetches a run with its nodes and tasks, ordered by ordinal.
 	// Returns ErrNotFound if the run does not exist.
 	GetRun(ctx context.Context, runID string) (*segment.Run, error)
+
+	// SaveDecision writes the single authoritative human decision for one review
+	// task and marks that task resolved, in one transaction.
+	//
+	// A correction UPDATES the existing decision in place rather than appending,
+	// which is the one deliberate exception to the pipeline's append-only
+	// discipline: there is never more than one competing human resolution per
+	// task, and 0005 enforces that with UNIQUE(review_task_id). Implementations
+	// MUST set decision.ID to the id of the row actually stored, which on a
+	// correction is the ORIGINAL id and not the one supplied — otherwise a caller
+	// holds an identifier for a row that does not exist.
+	//
+	// The task update belongs in the same transaction as the decision. A decision
+	// stored against a task still marked open is a question that has been
+	// answered and will be asked again; a task marked resolved with no decision is
+	// an answer that has been lost. Both are worse than failing.
+	//
+	// Returns ErrNotFound if the task does not exist.
+	SaveDecision(ctx context.Context, decision *segment.ReviewDecision) error
+
+	// GetDecisions returns every decision recorded against a run's tasks, keyed
+	// by review task id. An absent key means no human has answered that task.
+	//
+	// Keyed rather than ordered because that is how the overlay consumes it: one
+	// lookup per node, no scan. Returns an empty map, not an error, for a run
+	// nobody has reviewed.
+	GetDecisions(ctx context.Context, runID string) (map[string]*segment.ReviewDecision, error)
 }

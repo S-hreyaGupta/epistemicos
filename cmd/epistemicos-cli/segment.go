@@ -7,13 +7,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/EpistemicOS/epistemicos/internal/adapters/secondary/approved"
 	"github.com/EpistemicOS/epistemicos/internal/adapters/secondary/store"
 	"github.com/EpistemicOS/epistemicos/internal/core/domain/segment"
 	"github.com/EpistemicOS/epistemicos/internal/core/services/segmentation"
-	"github.com/EpistemicOS/epistemicos/internal/platform/config"
 )
 
 // runIngestFile ingests a PDF already on disk.
@@ -66,25 +63,22 @@ func runSegment(args []string) {
 	}
 	paperID := args[0]
 
-	cfg, err := config.Load()
-	if err != nil {
-		die(err)
-	}
-	pool, err := pgxpool.New(context.Background(), cfg.DBURL)
-	if err != nil {
-		die(err)
-	}
-	defer pool.Close()
+	pool, cleanup := openPool()
+	defer cleanup()
 
 	ctx := context.Background()
 
 	source := approved.NewPapersSource(pool)
 	segStore := store.NewPostgresSegmentationStore(pool)
-	svc := segmentation.New(source, segStore)
+	svc := segmentation.New(source, segStore, buildPaperType(pool))
+
+	fmt.Fprintln(os.Stderr, "checking the paper is empirical before segmenting...")
 
 	runID, err := svc.Segment(ctx, paperID)
 	if err != nil {
-		die(err)
+		// A gate refusal is the system working, not a crash, so it gets an
+		// explanation rather than a bare wrapped error.
+		explainGateFailure(paperID, err)
 	}
 
 	run, err := segStore.GetRun(ctx, runID)
@@ -189,9 +183,11 @@ func printRun(run *segment.Run) {
 	}
 	_ = tw.Flush()
 
-	fmt.Printf("\nThe reviewer's decision goes in the review_decisions table. It does not\n")
-	fmt.Printf("overwrite anything above — the machine's answer stays as provenance, and\n")
-	fmt.Printf("the effective value is computed at read time.\n")
+	fmt.Printf("\nto answer them:\n")
+	fmt.Printf("  epistemicos-cli review %s\n", run.ID)
+	fmt.Printf("\nAn answer does not overwrite anything above. The machine's determination\n")
+	fmt.Printf("stays as provenance and the effective value is computed at read time, which\n")
+	fmt.Printf("`epistemicos-cli effective %s` prints.\n", run.ID)
 }
 
 // indentFor renders the tree shape. H1 and H2 are both flush left because the

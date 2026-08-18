@@ -24,11 +24,22 @@ import (
 type Service struct {
 	source ports.ApprovedMarkdownSource
 	store  ports.SegmentationStore
+
+	// gate is the paper-type precondition. Step 3's role table is built from the
+	// sections empirical papers have, so a systematic review or a conceptual
+	// paper does not classify badly here — it classifies plausibly and wrongly.
+	gate ports.PaperTypeGate
 }
 
 // New returns a Service over the given port implementations.
-func New(source ports.ApprovedMarkdownSource, store ports.SegmentationStore) *Service {
-	return &Service{source: source, store: store}
+//
+// The gate is a REQUIRED argument rather than an optional setter, and that is the
+// whole design of it. An optional gate is one that can be omitted by accident,
+// and the omission looks exactly like a deliberate decision afterwards — which is
+// the failure mode the ApprovedMarkdownSource comment describes for the review
+// gate. Making it positional means a caller who does not want it has to say so.
+func New(source ports.ApprovedMarkdownSource, store ports.SegmentationStore, gate ports.PaperTypeGate) *Service {
+	return &Service{source: source, store: store, gate: gate}
 }
 
 // Segment fetches the approved markdown for runRef, segments it, and persists
@@ -42,6 +53,20 @@ func New(source ports.ApprovedMarkdownSource, store ports.SegmentationStore) *Se
 // caching layer normalising line endings, say — would pass the first check and
 // fail this one.
 func (s *Service) Segment(ctx context.Context, runRef string) (string, error) {
+	// The gate runs FIRST, before the markdown is even fetched for segmenting.
+	//
+	// Not for speed. A paper that must not be segmented must not produce a
+	// partial run either, and the cheapest way to guarantee that is to refuse
+	// before anything is built. A gate applied after Build would leave a node set
+	// in memory that only a discipline of not-persisting keeps out of the
+	// database.
+	if s.gate == nil {
+		return "", fmt.Errorf("segment: no paper-type gate configured; Step 3 must not run on an unclassified paper")
+	}
+	if err := s.gate.Allow(ctx, runRef); err != nil {
+		return "", fmt.Errorf("segment: %w", err)
+	}
+
 	markdown, hash, err := s.source.Get(ctx, runRef)
 	if err != nil {
 		return "", fmt.Errorf("segment: fetch approved markdown: %w", err)

@@ -3,7 +3,11 @@
 //	epistemicos-cli migrate up                       Apply DB migrations
 //	epistemicos-cli ingest <url>                     Ingest a paper by URL
 //	epistemicos-cli ingest-file <path>               Ingest a PDF already on disk
+//	epistemicos-cli classify <paper-id>              Is this paper empirical? Gates Step 3
 //	epistemicos-cli segment <paper-id>               Run Step 3 over an ingested paper
+//	epistemicos-cli review <run-id>                  List a run's open questions with their context
+//	epistemicos-cli resolve <run-id> <task-id> ...   Record a reviewer's answer
+//	epistemicos-cli effective <run-id>               Print the run with the review overlay applied
 //	epistemicos-cli suggest <run-id>                 Ask an LLM about unresolved sections (advisory)
 //	epistemicos-cli list                             List ingested papers
 //	epistemicos-cli export-markdown <id> --out <p>   Write stored markdown byte-exactly
@@ -43,8 +47,16 @@ func main() {
 		runIngest(args)
 	case "ingest-file":
 		runIngestFile(args)
+	case "classify":
+		runClassify(args)
 	case "segment":
 		runSegment(args)
+	case "review":
+		runReview(args)
+	case "resolve":
+		runResolve(args)
+	case "effective":
+		runEffective(args)
 	case "suggest":
 		runSuggest(args)
 	case "methodology":
@@ -69,7 +81,26 @@ Commands:
   migrate up               Apply DB migrations
   ingest <url>             Ingest a paper from a URL
   ingest-file <path>       Ingest a PDF already on disk
-  segment <paper-id>       Run Step 3: segment and classify an ingested paper
+  classify <paper-id>      Classify the paper's research type and print the
+                           evidence. A = empirical and proceeds; B, C, D and
+                           UNCLASSIFIED are out of scope. This gate runs
+                           automatically before segment; run it directly to see
+                           why a paper was accepted or refused.
+                           Add --force to ask again rather than read the stored
+                           verdict. Needs ANTHROPIC_API_KEY.
+  segment <paper-id>       Run Step 3: segment and classify an ingested paper.
+                           Refuses a paper the classifier put out of scope.
+  review <run-id>          List a run's review tasks with the text needed to
+                           answer them, and any answer already recorded.
+                           Add --full to print whole sections.
+  resolve <run-id> <task-id> --by <reviewer> [--note "..."]
+                           Record an answer. Exactly one of:
+                             --role <role>            a section's role
+                             --title "..." [--node <section-id>]
+                                                      the document title
+                           A second answer to the same task corrects the first.
+  effective <run-id>       Print the run as a consumer reads it, with human
+                           decisions overlaid on the machine's.
   suggest <run-id>         Ask an LLM which role each unresolved section fits.
                            ADVISORY: prints suggestions, writes nothing. Needs
                            ANTHROPIC_API_KEY.

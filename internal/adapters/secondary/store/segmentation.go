@@ -315,6 +315,141 @@ func (s *PostgresSegmentationStore) GetRun(ctx context.Context, runID string) (*
 	return run, nil
 }
 
+// SaveDecision upserts one human decision and resolves its task, atomically.
+//
+// # Why ON CONFLICT rather than an insert
+//
+// 0005 puts UNIQUE on review_task_id and its comment explains the intent: a
+// correction updates the row in place. Attempting a plain insert would make the
+// ordinary act of a reviewer changing their mind fail with a constraint
+// violation, and the obvious workaround — delete then insert — would lose
+// created_at, which is the only record of when the question was first answered.
+//
+// review_decision_id is deliberately NOT in the SET list. On a correction the
+// row keeps the identity it was created with, and RETURNING hands that identity
+// back so the caller is not left holding an id that never reached the database.
+func (s *PostgresSegmentationStore) SaveDecision(ctx context.Context, d *segment.ReviewDecision) error {
+	if d == nil {
+		return errors.New("store: nil review decision")
+	}
+	if d.ID == "" {
+		return errors.New("store: review decision has no id; the service layer assigns identifiers before persistence")
+	}
+	if d.ReviewTaskID == "" {
+		return errors.New("store: review decision has no review task id")
+	}
+	if d.ReviewerID == "" {
+		return errors.New("store: review decision has no reviewer; the domain constructors reject this, so reaching here means one was bypassed")
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// The task must exist and must be resolved by the same transaction. Doing
+	// this FIRST means an unknown task id costs nothing but a rollback, and the
+	// row count is the existence check — the foreign key below would report the
+	// same problem far less legibly.
+	tag, err := tx.Exec(ctx, `
+		UPDATE review_tasks
+		   SET status = 'resolved'
+		 WHERE review_task_id = $1`, d.ReviewTaskID)
+	if err != nil {
+		return fmt.Errorf("resolve review task %s: %w", d.ReviewTaskID, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ports.ErrNotFound
+	}
+
+	var storedID string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO review_decisions (
+			review_decision_id, review_task_id,
+			assigned_role, assigned_content_class,
+			assigned_document_title_text, assigned_document_title_node_id,
+			human_review_comment, reviewer_id
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		ON CONFLICT (review_task_id) DO UPDATE SET
+			assigned_role                   = EXCLUDED.assigned_role,
+			assigned_content_class          = EXCLUDED.assigned_content_class,
+			assigned_document_title_text    = EXCLUDED.assigned_document_title_text,
+			assigned_document_title_node_id = EXCLUDED.assigned_document_title_node_id,
+			human_review_comment            = EXCLUDED.human_review_comment,
+			reviewer_id                     = EXCLUDED.reviewer_id,
+			updated_at                      = NOW()
+		RETURNING review_decision_id`,
+		d.ID, d.ReviewTaskID,
+		nullIfEmpty(string(d.AssignedRole)), nullIfEmpty(string(d.AssignedContentClass)),
+		nullIfEmpty(d.AssignedDocumentTitleText), nullIfEmpty(d.AssignedDocumentTitleNodeID),
+		d.Comment, d.ReviewerID,
+	).Scan(&storedID)
+	if err != nil {
+		return fmt.Errorf("upsert review decision for task %s: %w", d.ReviewTaskID, err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	// After the commit, not before. Until it commits, the id the caller supplied
+	// is still the only one that has any claim to be real.
+	d.ID = storedID
+	return nil
+}
+
+// GetDecisions reads every decision against a run's tasks, keyed by task id.
+//
+// The join is on review_tasks because review_decisions has no run column — a
+// decision belongs to a task, and a task belongs to a run. Denormalising the run
+// id onto the decision would create a second place for it to be wrong.
+func (s *PostgresSegmentationStore) GetDecisions(ctx context.Context, runID string) (map[string]*segment.ReviewDecision, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT d.review_decision_id, d.review_task_id,
+		       d.assigned_role, d.assigned_content_class,
+		       d.assigned_document_title_text, d.assigned_document_title_node_id,
+		       d.human_review_comment, d.reviewer_id
+		  FROM review_decisions d
+		  JOIN review_tasks t ON t.review_task_id = d.review_task_id
+		 WHERE t.segmentation_run_id = $1
+		 ORDER BY d.created_at, d.review_decision_id`, runID)
+	if err != nil {
+		return nil, fmt.Errorf("select review decisions: %w", err)
+	}
+	defer rows.Close()
+
+	out := map[string]*segment.ReviewDecision{}
+
+	for rows.Next() {
+		var (
+			d                    segment.ReviewDecision
+			role, class          *string
+			titleText, titleNode *string
+		)
+		if err := rows.Scan(
+			&d.ID, &d.ReviewTaskID,
+			&role, &class,
+			&titleText, &titleNode,
+			&d.Comment, &d.ReviewerID,
+		); err != nil {
+			return nil, fmt.Errorf("scan review decision: %w", err)
+		}
+
+		d.AssignedRole = segment.Role(deref(role))
+		d.AssignedContentClass = segment.ContentClass(deref(class))
+		d.AssignedDocumentTitleText = deref(titleText)
+		d.AssignedDocumentTitleNodeID = deref(titleNode)
+
+		out[d.ReviewTaskID] = &d
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate review decisions: %w", err)
+	}
+
+	return out, nil
+}
+
 // headingCountsJSON renders counts as {"H1":n,...} for all six levels.
 //
 // Absent levels are written as zero rather than omitted. A missing key and a

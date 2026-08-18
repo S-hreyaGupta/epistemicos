@@ -61,6 +61,8 @@ func main() {
 		runSuggest(args)
 	case "methodology":
 		runMethodology(args)
+	case "exhibits":
+		runExhibits(args)
 	case "list":
 		runList()
 	case "export-markdown":
@@ -107,6 +109,9 @@ Commands:
   methodology <paper-id>   Classify a paper as quantitative or qualitative from
                            Step 2's markdown. Counts a published glossary; no model,
                            no network, no training.
+  exhibits <paper-id>      Extract the paper's tables and figures from Step 2's
+                           markdown. Add --rows to print the table contents.
+                           No model, no network.
   list                     List ingested papers
   export-markdown <paper-id> --out <path>
                            Write a paper's stored markdown to a file byte-exactly (no

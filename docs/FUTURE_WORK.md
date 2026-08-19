@@ -1,21 +1,41 @@
-# Parked work
+# Future work
 
-Work that was built or investigated and then deliberately set aside. Not
-abandoned, and not unfinished by accident.
+Everything known and not done. Two kinds of entry, kept in one file on purpose:
+**parked** work that was built and then set aside, and a **to-do list** of smaller
+things that are simply not done yet.
 
-This file exists because the two failure modes around parked work are both
-expensive. One is rediscovering a problem somebody already solved. The other is
-finding a half-built package and having to guess whether it was left that way on
-purpose. Each entry below says what exists, what does not, why it stopped, and
-what would restart it.
+The two failure modes around deferred work are both expensive. One is
+rediscovering a problem somebody already solved. The other is finding a half-built
+package and having to guess whether it was left that way on purpose. So each
+parked entry says what exists, what does not, why it stopped, and what would
+restart it.
 
 **Status at 17 August 2026**
+
+## Parked
 
 | | Parked | Code in the repo? | Decided by |
 |---|---|---|---|
 | 1 | Table and figure extraction | **Yes**, tested, wired to a CLI command | Alex, 17 Aug |
 | 2 | The published XGBoost methodology model | No | Alex, 17 Aug |
 | 3 | Weak-keyword tier for section roles | No | Alex, 16 Aug |
+
+## To do
+
+Smallest first. Each names the file it belongs to, so it can be picked up without
+reading this whole document.
+
+| | Item | Where | Size |
+|---|---|---|---|
+| A | **Strip LaTeX from table cells.** 27 of 74 tables carry `$\beta$`, `$\mathrm{R}^{2}$` and similar, so a numeric column is not yet numeric. `HasLatex` flags them; nothing acts on it. | `domain/exhibit` | hours |
+| B | **Unescape captions.** Figure B1 of the ESG paper reads `Distribution of N/As count and N/A\%`. Captions need the same treatment as cells, sharing one function rather than growing two. | `domain/exhibit` | minutes |
+| C | **Persist exhibits.** The `exhibits` command prints and stores nothing. Deliberate: look at the output on a few papers and agree the shape first. | new migration | day |
+| D | **Store tables by cross-reference as well as position.** A caption lands where it fitted on the page, not where its table is discussed. Nineteen lines across the ten papers say things like *"Table 3 shows the results"* — that is the document naming its own link. | `domain/exhibit` | day |
+| E | **Download figure images at ingest.** All 26 images point at `cdn.mathpix.com`. Nothing is stored our side. See parked item 1 for the deadline this carries. | `services/ingest` | day |
+| F | **Label more of the 301 glossary terms.** Only 95 are marked; the other 206 are counted and move nothing. On the ESG paper the verdict rested on a quarter of what fired. | `domain/methodology` | morning |
+| G | **A borderline test case for the paper-type gate.** Five of five is five papers. The cases that will break it are conceptual-versus-narrative-review, and empirical-with-a-formal-model. | `domain/papertype` | hours |
+| H | **Report exhibit counts per paper.** One paper hid a total extraction failure. Anything built on this should make a sudden zero visible rather than silent. | wherever it lands | hours |
+| I | **Rotate the Mathpix key, and unpin the credentials message.** The console password has been sitting in a pinned WhatsApp message for weeks. | operational | minutes |
 
 ---
 
@@ -56,6 +76,12 @@ papers and the shape agreed before it is written down.
 **LaTeX stripping.** 27 of 74 tables have math in their cells, so those values
 are not plain strings and a numeric column is not yet numeric. Flagged per table
 as `HasLatex`; nothing acts on the flag.
+
+**Escapes leak into captions.** Seen on the first real run: the ESG paper's
+figure B1 comes back as `Distribution of N/As count and N/A\%` — Mathpix's
+backslash-escaped percent sign, passed through verbatim. Captions need the same
+unescaping as cells, and the two should share one function rather than growing
+separate ones.
 
 **Section attribution is positional only.** See below.
 

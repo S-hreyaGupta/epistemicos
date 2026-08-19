@@ -6,7 +6,7 @@
 // pipeline can operate without table data for now, so extraction stops at the
 // `exhibits` CLI command: there is no persistence, no migration, and no store.
 //
-// That is a stopping point, not an unfinished job. docs/PARKED.md records what
+// That is a stopping point, not an unfinished job. docs/FUTURE_WORK.md records what
 // exists, what does not, and the three findings that would otherwise have to be
 // rediscovered — chiefly that the obvious detection rule fails SILENTLY, scoring
 // zero of twenty tables on one real paper while raising no error.

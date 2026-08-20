@@ -29,6 +29,11 @@ type Heading struct {
 
 	// TextStop is exclusive. TextStart == TextStop for an empty heading.
 	TextStop int
+
+	// Inferred marks a heading this package recovered from plain text because
+	// Mathpix did not emit one (§3.1, rule version 2.9). goldmark never sets it;
+	// only inferReferencesHeading does.
+	Inferred bool
 }
 
 // mdParser is the block-only markdown parser this package detects headings

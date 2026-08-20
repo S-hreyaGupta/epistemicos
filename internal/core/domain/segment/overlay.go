@@ -17,6 +17,11 @@ type ReviewDecision struct {
 	ID           string
 	ReviewTaskID string
 
+	// Decision is which of the two things this is. It is not derivable from the
+	// other fields: a rejection assigns nothing, and so does a decision whose
+	// assignment failed to save, and those must not read the same.
+	Decision Decision
+
 	AssignedRole         Role
 	AssignedContentClass ContentClass
 
@@ -24,8 +29,35 @@ type ReviewDecision struct {
 	AssignedDocumentTitleText   string
 	AssignedDocumentTitleNodeID string
 
+	// Comment is optional on a resolve and MANDATORY on a reject, because on a
+	// rejection it is the sentence the author reads. Enforced by the
+	// constructors and again by a CHECK in migration 0010: the constructor can
+	// be bypassed by an import script and the database cannot.
 	Comment    string
 	ReviewerID string
+}
+
+// Decision is what a reviewer did with a task.
+type Decision string
+
+const (
+	// DecisionResolve: the reviewer supplied an answer — a role, or the title.
+	DecisionResolve Decision = "resolve"
+
+	// DecisionReject: the reviewer looked and no assignment is defensible. The
+	// heading is unintelligible, the structure is defective, or the document has
+	// no identifiable title and needs one.
+	//
+	// This means "send it back", not "the machine should not have asked". The
+	// second thing may turn out to be worth having, but it is a different verb
+	// with a different consequence — a task that closes and goes nowhere — and
+	// conflating them would make the run state unreadable.
+	DecisionReject Decision = "reject"
+)
+
+// Rejected is a nil-safe test used by the overlay and the gate.
+func (d *ReviewDecision) Rejected() bool {
+	return d != nil && d.Decision == DecisionReject
 }
 
 // EffectiveStatus is a classification status after the review overlay is
@@ -42,6 +74,15 @@ const (
 	// is deliberate: a node row that claimed it would mean a human decision had
 	// been written over the machine's, which the overlay exists to prevent.
 	EffectiveReviewerConfirmed EffectiveStatus = "reviewer_confirmed"
+
+	// EffectiveReviewerRejected is a human looking and finding no answer.
+	//
+	// Deliberately NOT unresolved. Unresolved means the machine had no answer
+	// and nobody has looked yet; this means somebody looked and the question
+	// cannot be answered. Collapsing the two would make a finished review
+	// indistinguishable from an abandoned one, which is precisely what the run
+	// gate has to tell apart.
+	EffectiveReviewerRejected EffectiveStatus = "reviewer_rejected"
 )
 
 // EffectiveClassification is what a consumer should act on: the machine's
@@ -67,6 +108,18 @@ type EffectiveClassification struct {
 //
 // decision may be nil, which is the ordinary case.
 func EffectiveFor(n SectionNode, decision *ReviewDecision) EffectiveClassification {
+	// A rejection carries no assignment, so there is nothing to overlay. What it
+	// contributes is the status: a reader must not see this node as merely
+	// unresolved, because a human has already been here.
+	if decision.Rejected() {
+		return EffectiveClassification{
+			Role:         "",
+			ContentClass: "",
+			Status:       EffectiveReviewerRejected,
+			FromReview:   true,
+		}
+	}
+
 	if decision != nil {
 		return EffectiveClassification{
 			Role:         decision.AssignedRole,
@@ -98,6 +151,18 @@ type EffectiveTitle struct {
 // per title_ambiguity task, corrected in place, and the run's stored title
 // fields never overwritten.
 func EffectiveTitleFor(run Run, decision *ReviewDecision) EffectiveTitle {
+	// A rejected title task means the reviewer could not name the paper either.
+	// The run's own determination stays visible as provenance; the status is
+	// what changes, for the same reason it does on a node.
+	if decision.Rejected() {
+		return EffectiveTitle{
+			Text:       run.DocumentTitleText,
+			Status:     EffectiveReviewerRejected,
+			Method:     string(run.DocumentTitleMethod),
+			FromReview: true,
+		}
+	}
+
 	if decision != nil {
 		return EffectiveTitle{
 			Text:       decision.AssignedDocumentTitleText,

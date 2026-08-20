@@ -37,6 +37,14 @@ type fakeStore struct {
 	decisions map[string]*segment.ReviewDecision
 	saved     []segment.ReviewDecision
 	saveErr   error
+
+	// consumedBy and returned record the two terminal acts, so a test can assert
+	// that Consume and ReturnToAuthor actually froze the run rather than merely
+	// reporting that they had.
+	consumedBy string
+	consumed   bool
+	returned   []segment.AuthorReturnItem
+	returnErr  error
 }
 
 func (f *fakeStore) SaveRun(_ context.Context, run *segment.Run) error {
@@ -68,6 +76,27 @@ func (f *fakeStore) GetDecisions(_ context.Context, _ string) (map[string]*segme
 		return map[string]*segment.ReviewDecision{}, nil
 	}
 	return f.decisions, nil
+}
+
+func (f *fakeStore) SaveAuthorReturn(_ context.Context, _, _, consumedBy string, items []segment.AuthorReturnItem) error {
+	if f.returnErr != nil {
+		return f.returnErr
+	}
+	f.returned = items
+	f.consumed = true
+	f.consumedBy = consumedBy
+	return nil
+}
+
+func (f *fakeStore) MarkConsumed(_ context.Context, _, consumedBy string) error {
+	// Idempotent, matching the real store: the FIRST consumption is the one that
+	// counts, because that is the moment the decisions stopped being editable.
+	if f.consumed {
+		return nil
+	}
+	f.consumed = true
+	f.consumedBy = consumedBy
+	return nil
 }
 
 // fakeGate stands in for the paper-type classifier. Review and Resolve never

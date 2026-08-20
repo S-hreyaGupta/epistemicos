@@ -144,7 +144,12 @@ func printRun(run *segment.Run) {
 			}
 		}
 
+		// An inferred heading is marked, so nobody reads it as one the document
+		// actually had. Only 2.9's recovered bibliography carries this today.
 		heading := strings.Repeat("  ", indentFor(n.HeadingLevel)) + truncate(n.HeadingRaw, 44)
+		if n.HeadingSource == segment.HeadingInferred {
+			heading += "  ‹inferred›"
+		}
 
 		fmt.Fprintf(w, "%d\tH%d\t%s\t%s\t%s\t%s\t%s\t%d–%d\n",
 			n.Ordinal, n.HeadingLevel, heading,

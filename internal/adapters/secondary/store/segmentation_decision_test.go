@@ -131,6 +131,7 @@ func TestSaveDecision_ResolvesItsTask(t *testing.T) {
 	decision := segment.ReviewDecision{
 		ID:                   uuid.NewString(),
 		ReviewTaskID:         taskID,
+		Decision:             segment.DecisionResolve,
 		AssignedRole:         segment.RoleResults,
 		AssignedContentClass: segment.ClassAnalytical,
 		ReviewerID:           "shreya",
@@ -172,6 +173,7 @@ func TestSaveDecision_CorrectionUpdatesInPlace(t *testing.T) {
 	first := segment.ReviewDecision{
 		ID:                   uuid.NewString(),
 		ReviewTaskID:         taskID,
+		Decision:             segment.DecisionResolve,
 		AssignedRole:         segment.RoleResults,
 		AssignedContentClass: segment.ClassAnalytical,
 		ReviewerID:           "shreya",
@@ -185,6 +187,7 @@ func TestSaveDecision_CorrectionUpdatesInPlace(t *testing.T) {
 	second := segment.ReviewDecision{
 		ID:                   uuid.NewString(),
 		ReviewTaskID:         taskID,
+		Decision:             segment.DecisionResolve,
 		AssignedRole:         segment.RoleDiscussion,
 		AssignedContentClass: segment.ClassAnalytical,
 		ReviewerID:           "alex",
@@ -230,6 +233,7 @@ func TestSaveDecision_UnknownTask(t *testing.T) {
 	decision := segment.ReviewDecision{
 		ID:                   uuid.NewString(),
 		ReviewTaskID:         uuid.NewString(),
+		Decision:             segment.DecisionResolve,
 		AssignedRole:         segment.RoleResults,
 		AssignedContentClass: segment.ClassAnalytical,
 		ReviewerID:           "shreya",
@@ -272,6 +276,7 @@ func TestGetDecisions_ScopedToTheRun(t *testing.T) {
 	decision := segment.ReviewDecision{
 		ID:                   uuid.NewString(),
 		ReviewTaskID:         taskA,
+		Decision:             segment.DecisionResolve,
 		AssignedRole:         segment.RoleResults,
 		AssignedContentClass: segment.ClassAnalytical,
 		ReviewerID:           "shreya",

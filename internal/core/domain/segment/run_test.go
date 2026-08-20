@@ -18,8 +18,8 @@ func TestNewRun_Fixture(t *testing.T) {
 	if run.Status != RunCompleted {
 		t.Errorf("status = %q, want %q", run.Status, RunCompleted)
 	}
-	if run.StructuralRuleVersion != "2.8" {
-		t.Errorf("structural_rule_version = %q, want \"2.8\"", run.StructuralRuleVersion)
+	if run.StructuralRuleVersion != "2.9" {
+		t.Errorf("structural_rule_version = %q, want \"2.9\"", run.StructuralRuleVersion)
 	}
 	if run.DocumentTitleStatus != TitleIdentified {
 		t.Errorf("title status = %q, want %q", run.DocumentTitleStatus, TitleIdentified)

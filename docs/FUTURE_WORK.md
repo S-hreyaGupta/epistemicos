@@ -10,7 +10,7 @@ package and having to guess whether it was left that way on purpose. So each
 parked entry says what exists, what does not, why it stopped, and what would
 restart it.
 
-**Status at 17 August 2026**
+**Status at 20 August 2026**
 
 ## Parked
 
@@ -35,7 +35,71 @@ reading this whole document.
 | F | **Label more of the 301 glossary terms.** Only 95 are marked; the other 206 are counted and move nothing. On the ESG paper the verdict rested on a quarter of what fired. | `domain/methodology` | morning |
 | G | **A borderline test case for the paper-type gate.** Five of five is five papers. The cases that will break it are conceptual-versus-narrative-review, and empirical-with-a-formal-model. | `domain/papertype` | hours |
 | H | **Report exhibit counts per paper.** One paper hid a total extraction failure. Anything built on this should make a sudden zero visible rather than silent. | wherever it lands | hours |
-| I | **Rotate the Mathpix key, and unpin the credentials message.** The console password has been sitting in a pinned WhatsApp message for weeks. | operational | minutes |
+| I | **Rotate the Mathpix key, and unpin the credentials message.** The console password has been sitting in a pinned WhatsApp message for weeks. **Oldest open item on this list.** | operational | minutes |
+| J | **The LLM adjudicator for ambiguous multi-study papers.** The gate already stops and asks a human on "Phase 1 / Phase 2" and the like. The prompt is written. Not built because it fires on **zero** of the ten papers, so it would be untested code on a route that has never run. **Trigger has now fired** — see K. Behind a port, verdict stored, quotes verified, exactly as `papertype` does it. | `domain/researchunit` | day |
+| K | **A paper that reports two studies without numbering them** is invisible to the gate. **No longer hypothetical:** the social mission paper has `4.1 Web survey` and `4.2 Case study` — two data collections, never numbered — and the gate returns `single`. Fixing it needs J, plus routing sibling method/analysis subsections to the model. That paper is the test case. | `domain/researchunit` | with J |
+| U | **Human review answers do not survive a rule-version bump.** A `ReviewDecision` is anchored to `review_task_id`, which belongs to one run. Re-reading a paper under a new rule version mints new tasks with new ids, so every answer a reviewer already gave is stranded. **Decided by Alex, 20 Aug: fix it with versioning of the papers**, so a decision attaches to the paper version rather than to the run that happened to be current. See below. | `review_decisions` schema | day |
+
+### U in full — why this is not the author-return loop
+
+Two different things create a second run over the same paper, and only one of them
+is a problem.
+
+**Author return** (Step 3R §6) is deliberate. A rejected manuscript goes back, the
+author edits it, and what returns is a *different document* — new bytes, new
+fingerprint, new `ManuscriptVersion`, full rerun of Steps 1–3. Nothing carries
+over, and nothing should: the old answers were given about text that no longer
+exists.
+
+**A rule-version bump is the opposite case.** The bytes are identical and
+approved; only our rules changed. A reviewer who answered eight questions at 2.7
+gets asked all eight again at 3.0, about the same headings in the same paper,
+because the task ids are new. Nothing about the document changed to justify that.
+
+This is not hypothetical arithmetic. Rule versions 2.1 through 2.9 shipped inside
+two weeks, and 3.0 arrives with the Step 3R review gate. Any paper reviewed before
+a bump loses its review the moment we re-read it, which is precisely when the
+review surface starts being used.
+
+**The approach, per Alex:** version the papers, and anchor a decision to the paper
+version plus the section's identity rather than to `review_task_id`. That is the
+same move the Citation Inventory spec already makes at §7.3, where decisions
+anchor to position so they re-apply mechanically — amendment Q below is the
+matching correction on the citation side.
+
+**The one thing that needs deciding first:** what identifies a section across rule
+versions, and it is harder than it looks. The obvious anchor is
+`(paper_version, start_offset, end_offset)`, but a section's span is exactly what
+a rule change is allowed to move. Rule 2.9 is the proof: it inserts a recovered
+References heading, which on four papers shortened the preceding section's end
+offset without a single byte of the markdown changing.
+
+So the anchor has to be the section's *start* — the offset of its own heading,
+which no rule to date has moved — and not its span. That is a claim worth
+measuring across all ten papers at 2.1 through 2.9 before it is built on, because
+if any rule version moved a heading start, the whole approach needs rethinking
+rather than patching.
+
+## Citation Inventory spec — amendments drafted, not applied
+
+Nine amendments are written as drop-in replacement text
+(`citation_spec_amendments.md`, outside the repo). They are listed here so the
+work is visible from inside it. Six close the critique attached to the spec; three
+came from testing the spec against our papers.
+
+| | Amendment | Papers affected today | Kind |
+|---|---|---|---|
+| L | **Two-author narrative citations.** `Smith and Jones (2019)` mis-keys to `jones\|2019` — a silently WRONG resolution. 132 occurrences, **57% of all narrative citations**. Fails wrong, not silent, which breaks the conservative-grammar premise. | **9 of 10** | behaviour |
+| M | **Offsets → bytes**, with the character-boundary rule. Already enforced our side at rule version 2.9; the spec still says code points. | all | contract |
+| N | **The bibliography may not be a section.** Four papers have no `citation_source` node, which under B-11 makes `orphan_confirmed` impossible for 40% of the corpus. Step 3 v2.9 recovers it; the spec should record `bibliography_source ∈ {detected, inferred, not_available}`. | **4 of 10** | behaviour |
+| O | **Universal probe before minting `orphan_confirmed`.** Pool completeness measures parse coverage, not split correctness, so a merged entry mints a FALSE orphan — in the exact class of evidence billed as high-precision. | unknown | behaviour |
+| P | **Partial entries need a review task** when they lack a match key, or the review loop cannot close for markers depending on them. | unknown | behaviour |
+| Q | **`atomic_key` in the decision-identity tuple.** Every citation from one surface marker shares its offsets by design, so offsets alone do not identify a row. | any multi-work marker | contract |
+| R | **B-15 contradicts B-18.** Determinism must be scoped over review-decision state, or the review loop violates the determinism criterion by design. | contract only | contract |
+| S | **Range and beyond-max guards.** `[3--50]` from one stray dash mints 20 false orphans against a 30-entry bibliography. | **0 of 10** — no numeric markers in our corpus | behaviour |
+| T | **Close the enumerations.** `failure_reason` trails off with `...` while §5 and §6 treat it as normative; whitespace collapsing and the Name charset need pinning down. | contract only | contract |
+
+**Do L, M and N first.** They are the three with measured exposure.
 
 ---
 

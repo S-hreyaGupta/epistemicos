@@ -11,6 +11,20 @@ import (
 // exist. Callers should errors.Is against it rather than string-match.
 var ErrNotFound = errors.New("not found")
 
+// ErrDecisionsFrozen is returned when a review decision is written against a run
+// that has already been consumed.
+//
+// A distinct error rather than a generic failure because the two responses are
+// different: a caller seeing this should tell the reviewer that the run has moved
+// on and their change needs a re-run, not offer a retry.
+var ErrDecisionsFrozen = errors.New("review decisions are frozen: the run has been consumed")
+
+// ErrAlreadyReturned is returned when a run already has an AuthorReturn.
+//
+// A report is a thing that was sent. Producing a second one for the same run
+// would leave two documents and nothing to say which the author received.
+var ErrAlreadyReturned = errors.New("this run has already been returned to the author")
+
 // PaperStore persists Paper aggregates.
 //
 // This is the only store this system defines.

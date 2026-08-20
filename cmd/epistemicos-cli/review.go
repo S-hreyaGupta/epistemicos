@@ -63,19 +63,24 @@ func runReview(args []string) {
 		die(err)
 	}
 
-	open, answered := 0, 0
+	open := 0
 	for _, it := range items {
 		if it.Decision == nil {
 			open++
-		} else {
-			answered++
 		}
 	}
+
+	// Recomputed from the same rows the gate uses rather than counted here, so
+	// this header and `gate` can never disagree about the same run.
+	_, gate, gerr := svc.GateState(context.Background(), runID)
 
 	fmt.Printf("segmentation run %s\n", run.ID)
 	fmt.Printf("  paper:         %s\n", run.ExtractionRunID)
 	fmt.Printf("  rule version:  %s\n", run.StructuralRuleVersion)
-	fmt.Printf("  questions:     %d open, %d answered\n\n", open, answered)
+	if gerr == nil {
+		printGate(gate)
+	}
+	fmt.Println()
 
 	if len(items) == 0 {
 		fmt.Printf("No review tasks. Every section classified cleanly.\n")
@@ -134,16 +139,29 @@ func runReview(args []string) {
 
 	if open == 0 {
 		fmt.Printf("\nEvery question has an answer.\n")
+		if gerr == nil {
+			fmt.Println()
+			printGate(gate)
+			if gate.Returned() {
+				fmt.Printf("\n  epistemicos-cli return-to-author %s --by <you>\n", runID)
+			}
+		}
 		return
 	}
 
 	fmt.Printf("\nto answer one:\n")
 	fmt.Printf("  epistemicos-cli resolve %s <task-id> --role <role> --by <you> [--note \"...\"]\n", runID)
-	fmt.Printf("  epistemicos-cli resolve %s <task-id> --title \"...\" --by <you> [--node <section-id>]\n\n", runID)
+	fmt.Printf("  epistemicos-cli resolve %s <task-id> --title \"...\" --by <you> [--node <section-id>]\n", runID)
+	fmt.Printf("  epistemicos-cli resolve %s <task-id> --structure --by <you>\n\n", runID)
+	fmt.Printf("or, if no answer is defensible:\n")
+	fmt.Printf("  epistemicos-cli reject %s <task-id> --by <you> --comment \"why\"\n\n", runID)
 	fmt.Printf("roles: %s\n", joinRoles(segment.AssignableRoles()))
 	fmt.Printf("\nAn answer never overwrites the machine's. Its determination stays as\n")
 	fmt.Printf("provenance and yours takes effect at read time, so \"the machine had no\n")
 	fmt.Printf("answer and a human supplied one\" stays distinguishable from agreement.\n")
+	fmt.Printf("\nA rejection is not an answer, it is the absence of one. It says a human\n")
+	fmt.Printf("looked and could not decide, which is different from nobody having looked,\n")
+	fmt.Printf("and it sends the whole manuscript back to its author.\n")
 }
 
 // runResolve records one reviewer's answer.
@@ -156,6 +174,7 @@ func runResolve(args []string) {
 	runID, taskID := args[0], args[1]
 
 	var role, title, nodeID, reviewer, note string
+	structure := false
 
 	// Parsed by hand rather than with the flag package because the two
 	// positional arguments come first, and flag.Parse stops at the first
@@ -166,6 +185,13 @@ func runResolve(args []string) {
 	rest := args[2:]
 	for i := 0; i < len(rest); i++ {
 		name := rest[i]
+
+		// --structure takes no value: it names WHICH question is being answered,
+		// not what the answer is. The optional --role beside it is the answer.
+		if name == "--structure" {
+			structure = true
+			continue
+		}
 
 		if name == "--role" || name == "--title" || name == "--node" ||
 			name == "--by" || name == "--note" || name == "--comment" {
@@ -193,8 +219,18 @@ func runResolve(args []string) {
 		os.Exit(2)
 	}
 
-	if (role == "") == (title == "") {
-		fmt.Fprintln(os.Stderr, "resolve: pass exactly one of --role (for a section) or --title (for a title question)")
+	// Three shapes of answer, exactly one of which must be chosen. --structure
+	// may carry a --role, so it is checked first and excludes --title rather
+	// than being folded into the role/title pair.
+	switch {
+	case structure && title != "":
+		fmt.Fprintln(os.Stderr, "resolve: --structure answers whether a document with no headings may proceed; it cannot also name the title")
+		os.Exit(2)
+	case !structure && (role == "") == (title == ""):
+		fmt.Fprintln(os.Stderr, "resolve: pass exactly one of:")
+		fmt.Fprintln(os.Stderr, "  --role <role>   a section's role")
+		fmt.Fprintln(os.Stderr, `  --title "..."   the document title`)
+		fmt.Fprintln(os.Stderr, "  --structure     a document with no headings may proceed as one node")
 		os.Exit(2)
 	}
 
@@ -207,9 +243,12 @@ func runResolve(args []string) {
 		decision *segment.ReviewDecision
 		err      error
 	)
-	if role != "" {
+	switch {
+	case structure:
+		decision, err = svc.AcceptStructure(ctx, runID, taskID, segment.Role(role), reviewer, note)
+	case role != "":
 		decision, err = svc.Resolve(ctx, runID, taskID, segment.Role(role), reviewer, note)
-	} else {
+	default:
 		decision, err = svc.ResolveTitle(ctx, runID, taskID, title, nodeID, reviewer, note)
 	}
 	if err != nil {
@@ -231,6 +270,18 @@ func runResolve(args []string) {
 
 	fmt.Printf("\nThe task is now resolved. The machine's determination on the node is\n")
 	fmt.Printf("unchanged; this decision takes effect at read time.\n")
+
+	// The run state, every time, because an answer is only interesting in
+	// relation to whether it was the last one. A reviewer who has just closed the
+	// final question should be told so here rather than discovering it by
+	// checking separately.
+	if _, gate, gerr := svc.GateState(ctx, runID); gerr == nil {
+		fmt.Println()
+		printGate(gate)
+		if gate.Passed() {
+			fmt.Printf("\nThat was the last one. Step 4 may now read this run.\n")
+		}
+	}
 }
 
 // runEffective prints a run as a consumer sees it, with the overlay applied.
@@ -278,6 +329,8 @@ func runEffective(args []string) {
 		byOrdinal[task.SectionOrdinal] = d
 	}
 
+	gate := segment.Gate(*run, decisions)
+
 	title := segment.EffectiveTitleFor(*run, titleDecision)
 
 	fmt.Printf("segmentation run %s — effective view\n", run.ID)
@@ -297,9 +350,14 @@ func runEffective(args []string) {
 		eff := segment.EffectiveFor(n, byOrdinal[n.Ordinal])
 
 		role := string(eff.Role)
-		if n.Kind == segment.KindDocumentTitle {
+		switch {
+		case n.Kind == segment.KindDocumentTitle:
 			role = "(document title)"
-		} else if role == "" {
+		case eff.Status == segment.EffectiveReviewerRejected:
+			// Not "still open". A human has been here and could not answer,
+			// which is a different fact and the one the gate acts on.
+			role = "— rejected"
+		case role == "":
 			role = "— still open"
 		}
 
@@ -321,6 +379,16 @@ func runEffective(args []string) {
 	fmt.Printf("\n%d of %d sections carry a human decision.\n", humans, len(run.Nodes))
 	fmt.Printf("Rows marked HUMAN read from review_decisions. The machine's own answer for\n")
 	fmt.Printf("those rows is still stored on the node and is visible with `segment`.\n")
+
+	// The gate goes at the END rather than the top, because this view is worth
+	// reading either way. Printing "not passed" first would suggest the rows
+	// below are not worth looking at, when inspecting them is exactly how a
+	// reviewer decides what to do next.
+	fmt.Println()
+	printGate(gate)
+	if !gate.Passed() {
+		fmt.Printf("\nThis is what Step 4 WOULD read. It may not read it yet: the run is %s.\n", gate.State)
+	}
 }
 
 func joinRoles(roles []segment.Role) string {

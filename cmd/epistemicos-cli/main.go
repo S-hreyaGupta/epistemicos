@@ -55,6 +55,12 @@ func main() {
 		runReview(args)
 	case "resolve":
 		runResolve(args)
+	case "reject":
+		runReject(args)
+	case "gate":
+		runGate(args)
+	case "return-to-author":
+		runReturnToAuthor(args)
 	case "effective":
 		runEffective(args)
 	case "suggest":
@@ -63,6 +69,8 @@ func main() {
 		runMethodology(args)
 	case "exhibits":
 		runExhibits(args)
+	case "research-unit":
+		runResearchUnit(args)
 	case "list":
 		runList()
 	case "export-markdown":
@@ -100,7 +108,21 @@ Commands:
                              --role <role>            a section's role
                              --title "..." [--node <section-id>]
                                                       the document title
-                           A second answer to the same task corrects the first.
+                             --structure [--role <role>]
+                                                      a document with no headings
+                                                      may proceed as one node
+                           A second answer to the same task corrects the first,
+                           until the run is consumed.
+  reject <run-id> <task-id> --by <reviewer> --comment "..."
+                           Record that a reviewer looked and no answer is
+                           defensible. The comment is REQUIRED: it is the
+                           sentence the author reads. One rejection returns the
+                           whole manuscript.
+  gate <run-id>            Print the run's review state: open, passed or
+                           returned. Read-only; looking does not freeze it.
+  return-to-author <run-id> --by <reviewer>
+                           Materialize the report for a returned run and freeze
+                           its decisions. Once per run.
   effective <run-id>       Print the run as a consumer reads it, with human
                            decisions overlaid on the machine's.
   suggest <run-id>         Ask an LLM which role each unresolved section fits.
@@ -109,6 +131,10 @@ Commands:
   methodology <paper-id>   Classify a paper as quantitative or qualitative from
                            Step 2's markdown. Counts a published glossary; no model,
                            no network, no training.
+  research-unit <paper-id> Apply the multi-study gate. A single-study paper gets
+                           RU1 and every section placed as study-level,
+                           manuscript-level or both. Two or more studies is out of
+                           scope for the MVP. Deterministic; no model, no network.
   exhibits <paper-id>      Extract the paper's tables and figures from Step 2's
                            markdown. Add --rows to print the table contents.
                            No model, no network.

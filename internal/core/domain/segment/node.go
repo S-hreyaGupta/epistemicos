@@ -60,6 +60,12 @@ type SectionNode struct {
 	// HeadingLevel is the markdown level, 1 to 4. H5 and H6 produce no node.
 	HeadingLevel int
 
+	// HeadingSource says whether a markdown heading existed here at all, or
+	// whether 2.9 recovered one from plain text. Empty on runs stored before
+	// 2.9, which is honest: those runs did not record the distinction because
+	// every node was detected.
+	HeadingSource HeadingSource
+
 	// Kind separates structural position from semantic role. At most one node
 	// per run is KindDocumentTitle.
 	Kind NodeKind

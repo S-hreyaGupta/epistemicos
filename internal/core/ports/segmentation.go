@@ -54,7 +54,17 @@ type SegmentationStore interface {
 	GetRun(ctx context.Context, runID string) (*segment.Run, error)
 
 	// SaveDecision writes the single authoritative human decision for one review
-	// task and marks that task resolved, in one transaction.
+	// task and closes that task, in one transaction.
+	//
+	// The task's new status MIRRORS the decision — resolved for a resolve,
+	// rejected for a reject. Collapsing both onto resolved would make a finished
+	// review that failed look identical to one that succeeded, which is exactly
+	// what the run gate has to tell apart.
+	//
+	// Implementations MUST refuse with ErrDecisionsFrozen when the run has been
+	// consumed, and MUST make that check inside the same transaction as the
+	// write. A run consumed between a check and a write is the one case a
+	// separate read cannot cover.
 	//
 	// A correction UPDATES the existing decision in place rather than appending,
 	// which is the one deliberate exception to the pipeline's append-only
@@ -79,4 +89,29 @@ type SegmentationStore interface {
 	// lookup per node, no scan. Returns an empty map, not an error, for a run
 	// nobody has reviewed.
 	GetDecisions(ctx context.Context, runID string) (map[string]*segment.ReviewDecision, error)
+
+	// SaveAuthorReturn materializes the report for a returned run and freezes the
+	// run's decisions in the same transaction.
+	//
+	// One per run, enforced by a UNIQUE constraint rather than by the caller
+	// checking first: two reports for one decision set would leave nothing to say
+	// which was sent. A second attempt returns ErrAlreadyReturned.
+	//
+	// The items are a SNAPSHOT of the rejections. Storing them rather than
+	// joining at render time is what makes the sent report and the stored report
+	// the same document, even after a later correction or a re-segmentation.
+	//
+	// Freezing here is not a side effect: materializing the report IS the act of
+	// consuming the decisions, and separating the two would leave a window in
+	// which a report had been produced from decisions that could still change.
+	SaveAuthorReturn(ctx context.Context, runID, returnID, consumedBy string, items []segment.AuthorReturnItem) error
+
+	// MarkConsumed freezes a run's decisions without producing a report, which is
+	// what Step 4 does when it reads a passed run.
+	//
+	// Idempotent: consuming an already-consumed run is not an error, because a
+	// consumer that legitimately re-reads a run must not be made to special-case
+	// the second read. The FIRST consumption timestamp is kept — it is the moment
+	// the decisions actually stopped being editable.
+	MarkConsumed(ctx context.Context, runID, consumedBy string) error
 }

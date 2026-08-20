@@ -24,14 +24,65 @@ const (
 	// ReasonTitleAmbiguity: §4 could not identify the document title. Nothing
 	// is auto-promoted, so the question goes to a human.
 	ReasonTitleAmbiguity ReviewReason = "title_ambiguity"
+
+	// ReasonNoStructure: the document has no headings at all, so §5 produced a
+	// single synthetic whole-document node.
+	//
+	// This is a SEPARATE question from the title one, and the separation is the
+	// whole point. Such a document also has no H1, so it already raises a
+	// title_ambiguity task and could never pass the gate unlooked-at. But that
+	// task asks what the paper is CALLED. A reviewer can answer it perfectly
+	// well while the document still has no structural signal of any kind, and
+	// the run would pass.
+	//
+	// One decision per task means the two cannot be merged: "the paper is
+	// called X" and "this document is unusable" are different answers, and a
+	// reviewer may reasonably want to give the first and reject on the second.
+	//
+	// The node's own classification is untouched. It stays resolved Unknown and
+	// the run stays Completed, exactly as title_ambiguity leaves the title
+	// fields alone. This is a gate requirement, not a classification failure.
+	ReasonNoStructure ReviewReason = "no_structure"
 )
 
 // TaskStatus is a review task's lifecycle state.
+//
+// TaskRejected is the third state and the reason Step 3R exists. Without it,
+// "nobody has looked at this" and "somebody looked and could not answer" are
+// the same row, and a run has no way to tell an unfinished review from a
+// finished one that failed.
 type TaskStatus string
 
 const (
 	TaskOpen     TaskStatus = "open"
 	TaskResolved TaskStatus = "resolved"
+	TaskRejected TaskStatus = "rejected"
+)
+
+// ReviewState is a run's gate state, computed from its tasks and never stored.
+//
+// Not stored for the same reason the effective classification is not stored: it
+// is derived from rows that already exist, and a stored copy is a second place
+// for one fact to live. The two would eventually disagree, and nothing would say
+// which was right.
+type ReviewState string
+
+const (
+	// ReviewOpen: at least one task has no decision. Step 4 must not run.
+	ReviewOpen ReviewState = "open"
+
+	// ReviewPassed: every task decided, none rejected. Step 4 consumes the
+	// effective classification. A run that raised no tasks at all is passed
+	// immediately, which is the ordinary machine-only case.
+	ReviewPassed ReviewState = "passed"
+
+	// ReviewReturned: every task decided, at least one rejected. The manuscript
+	// goes back to the author with the rejection comments.
+	//
+	// One rejection returns the WHOLE manuscript. Partial consumption of a
+	// half-good segmentation is not defined, and inventing it here would mean
+	// Step 4 acting on a document a reviewer said was defective.
+	ReviewReturned ReviewState = "returned"
 )
 
 // ReviewTask is one open question about one node.
@@ -216,7 +267,31 @@ type Run struct {
 // adaptations…". Reusing §4's looser test would have let that paper's title keep
 // a role it should never have had, which is the case 2.6 exists for. Containing
 // a role keyword is something titles do; BEING one is not.
-const StructuralRuleVersion = "2.8"
+// 2.9 recovers a references heading that Mathpix left as plain text.
+//
+// FOUND BY MEASUREMENT, not by reasoning. Four of the ten ingested papers carry
+// the word "References" on its own line with no heading markers. Step 3 is
+// heading-driven, so no citation_source node was created and the bibliography
+// was absorbed by whatever section preceded it:
+//
+//	"5.3. Future Directions"                     91% reference list
+//	"6. Further developments"                    88% reference list
+//	"10. Conclusion, limitations, and scope…"    85% reference list
+//	"6. Implications and recommendations…"       85% reference list
+//
+// Anything reading those sections was reading somebody else's bibliography, and
+// nothing failed to say so. That is wrong for every consumer, not only for the
+// citation work that exposed it.
+//
+// THE REPAIR CANNOT BE MADE TO THE TEXT. approved_markdown is fingerprinted and
+// every offset in the system indexes into it, so editing the markdown to insert
+// a heading would invalidate every stored span in every prior run. This version
+// changes only how the same bytes are read.
+//
+// Nodes now carry HeadingSource, so an inferred heading is never mistaken for
+// one the document actually had. On the six papers with a real references
+// heading, 2.9 changes nothing at all.
+const StructuralRuleVersion = "2.9"
 
 // NewRun assembles a persistable run from a segmented document, including one
 // review task per unresolved node and one for an unidentified title.
@@ -273,6 +348,32 @@ func NewRun(doc Document, extractionRunID, markdownHash string) Run {
 			CandidateRoles:  n.Classification.CandidateRoles,
 			MatchedKeywords: n.Classification.MatchedKeywords,
 			Status:          TaskOpen,
+		})
+	}
+
+	// A document with no headings at all raises its own question (3R §2).
+	//
+	// Detected by the shape §5 produces for that case and nothing else: exactly
+	// one node, which is the whole document, resolved structurally. Testing the
+	// shape rather than re-deriving "were there headings" keeps this true for
+	// any future path that legitimately produces a single synthetic node.
+	//
+	// This is NOT the same question as the title task below, and merging them
+	// was considered and rejected. There is one decision per task, so a merged
+	// task would force a reviewer who can name the paper but considers it
+	// structurally unusable to answer only one of those.
+	//
+	// The node's classification is untouched. It stays resolved Unknown and the
+	// run stays Completed. The task is a gate requirement, exactly as
+	// title_ambiguity is, not a report of a classification failure.
+	if len(doc.Nodes) == 1 &&
+		doc.Nodes[0].ParentOrdinal == -1 &&
+		doc.Nodes[0].HeadingLevel == 0 &&
+		doc.Nodes[0].Classification.Method == MethodStructural {
+		run.Tasks = append(run.Tasks, ReviewTask{
+			SectionOrdinal: doc.Nodes[0].Ordinal,
+			Reason:         ReasonNoStructure,
+			Status:         TaskOpen,
 		})
 	}
 

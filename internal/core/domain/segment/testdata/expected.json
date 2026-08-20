@@ -9,7 +9,7 @@
     "segmentation_run_id": "seg_demo_0001",
     "extraction_run_id": "<supplied by caller>",
     "approved_markdown_hash": "a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e",
-    "structural_rule_version": "2.8",
+    "structural_rule_version": "2.9",
     "document_title_level": 1,
     "supported_node_levels": [
       2,

@@ -85,6 +85,9 @@ func NewRoleDecision(task ReviewTask, taskID string, role Role, reviewerID, comm
 	if task.Reason == ReasonTitleAmbiguity {
 		return ReviewDecision{}, fmt.Errorf("%w: task %s asks what the paper is called, which a section role cannot answer; use NewTitleDecision", ErrDecisionInvalid, taskID)
 	}
+	if task.Reason == ReasonNoStructure {
+		return ReviewDecision{}, fmt.Errorf("%w: task %s asks whether a document with no headings is usable at all, not what one section is; use NewStructureDecision", ErrDecisionInvalid, taskID)
+	}
 	if !IsAssignableRole(role) {
 		return ReviewDecision{}, fmt.Errorf("%w: %q is not a role a reviewer may assign; choose one of %s", ErrDecisionInvalid, role, joinRoles(AssignableRoles()))
 	}
@@ -96,10 +99,111 @@ func NewRoleDecision(task ReviewTask, taskID string, role Role, reviewerID, comm
 
 	return ReviewDecision{
 		ReviewTaskID:         taskID,
+		Decision:             DecisionResolve,
 		AssignedRole:         role,
 		AssignedContentClass: ContentClassFor(role),
 		Comment:              strings.TrimSpace(comment),
 		ReviewerID:           reviewerID,
+	}, nil
+}
+
+// NewStructureDecision accepts a document that has no headings at all.
+//
+// It answers the no_structure question — "is this usable as a single node?" —
+// and not the role question, which is why it does not go through
+// NewRoleDecision.
+//
+// # Why RoleUnknown is allowed HERE and nowhere else
+//
+// AssignableRoles excludes Unknown on purpose: a task exists because something
+// could not be classified, and offering Unknown would let a reviewer close a
+// genuine question with the one value that means there was no question.
+//
+// That argument does not apply to this task. The whole-document node is ALREADY
+// resolved Unknown by rule §5 — the machine did not fail to classify it, it
+// classified it structurally. The reviewer is not being asked to supply a
+// missing role; they are being asked whether a document with no structure may
+// proceed. Unknown is the ordinary answer, meaning "no epistemic function,
+// proceed", and refusing it would leave this task with no way to say yes.
+//
+// role may be empty, which is read as Unknown. A reviewer who believes one role
+// genuinely describes the entire document may name it instead.
+func NewStructureDecision(task ReviewTask, taskID string, role Role, reviewerID, comment string) (ReviewDecision, error) {
+	if task.Reason != ReasonNoStructure {
+		return ReviewDecision{}, fmt.Errorf("%w: task %s is a %s; NewStructureDecision answers only the no-headings question", ErrDecisionInvalid, taskID, task.Reason)
+	}
+
+	if role == "" {
+		role = RoleUnknown
+	}
+	if _, ok := roleContentClass[role]; !ok {
+		return ReviewDecision{}, fmt.Errorf("%w: %q is not a role; leave it empty to accept the document as %s, or name one of %s", ErrDecisionInvalid, role, RoleUnknown, joinRoles(AssignableRoles()))
+	}
+
+	reviewerID = strings.TrimSpace(reviewerID)
+	if reviewerID == "" {
+		return ReviewDecision{}, fmt.Errorf("%w: a decision needs a reviewer; an anonymous answer that outranks the machine cannot be audited", ErrDecisionInvalid)
+	}
+
+	return ReviewDecision{
+		ReviewTaskID:         taskID,
+		Decision:             DecisionResolve,
+		AssignedRole:         role,
+		AssignedContentClass: ContentClassFor(role),
+		Comment:              strings.TrimSpace(comment),
+		ReviewerID:           reviewerID,
+	}, nil
+}
+
+// NewRejection builds a validated rejection for any task.
+//
+// # What rejection means here
+//
+// "I looked and no assignment is defensible." The heading is unintelligible, the
+// section is not a section, the structure is defective, or the document has no
+// identifiable title and needs one. The consequence is that the manuscript goes
+// back to the author.
+//
+// It does NOT mean "the machine should not have asked". That may turn out to be
+// worth having, but it is a different verb with a different consequence — a task
+// that closes and goes nowhere — and giving both meanings to one word would make
+// the run state unreadable: a run of nothing but rejections would be
+// indistinguishable from a run of nothing but false alarms.
+//
+// # Why any reason, including title_ambiguity
+//
+// The role constructors are split by reason because a role cannot answer "what
+// is this paper called". Rejection is not an answer to either question, it is
+// the absence of one, so the split does not apply. A reviewer who cannot name
+// the paper rejects the title task exactly as they would reject a heading.
+//
+// # Why the comment is required in the domain as well as the schema
+//
+// On a rejection the comment is not a note. It is the sentence the author reads,
+// and a rejection with no reason gives them nothing to act on — the same
+// discipline as an UNCLASSIFIED verdict being required to state why. The schema
+// enforces it too, because this constructor can be bypassed by an import script
+// and a CHECK cannot.
+func NewRejection(task ReviewTask, taskID, reviewerID, comment string) (ReviewDecision, error) {
+	reviewerID = strings.TrimSpace(reviewerID)
+	if reviewerID == "" {
+		return ReviewDecision{}, fmt.Errorf("%w: a decision needs a reviewer; an anonymous answer that outranks the machine cannot be audited", ErrDecisionInvalid)
+	}
+
+	comment = strings.TrimSpace(comment)
+	if comment == "" {
+		return ReviewDecision{}, fmt.Errorf("%w: a rejection needs a reason; it is the sentence the author reads, and \"unclear\" is not something they can act on", ErrDecisionInvalid)
+	}
+
+	// Assigns nothing, deliberately and explicitly. Leaving the assignment
+	// fields at their zero values is not enough on its own: the point is that
+	// the effective view's branch must be unambiguous, and a rejection carrying
+	// a role would make it two things at once.
+	return ReviewDecision{
+		ReviewTaskID: taskID,
+		Decision:     DecisionReject,
+		Comment:      comment,
+		ReviewerID:   reviewerID,
 	}, nil
 }
 
@@ -128,6 +232,7 @@ func NewTitleDecision(task ReviewTask, taskID, titleText, titleNodeID, reviewerI
 
 	return ReviewDecision{
 		ReviewTaskID:                taskID,
+		Decision:                    DecisionResolve,
 		AssignedDocumentTitleText:   titleText,
 		AssignedDocumentTitleNodeID: strings.TrimSpace(titleNodeID),
 		Comment:                     strings.TrimSpace(comment),

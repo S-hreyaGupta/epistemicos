@@ -40,6 +40,38 @@ reading this whole document.
 | K | **A paper that reports two studies without numbering them** is invisible to the gate. **No longer hypothetical:** the social mission paper has `4.1 Web survey` and `4.2 Case study` — two data collections, never numbered — and the gate returns `single`. Fixing it needs J, plus routing sibling method/analysis subsections to the model. That paper is the test case. | `domain/researchunit` | with J |
 | U | **Human review answers do not survive a rule-version bump.** A `ReviewDecision` is anchored to `review_task_id`, which belongs to one run. Re-reading a paper under a new rule version mints new tasks with new ids, so every answer a reviewer already gave is stranded. **Decided by Alex, 20 Aug: fix it with versioning of the papers**, so a decision attaches to the paper version rather than to the run that happened to be current. See below. | `review_decisions` schema | day |
 
+| V | **The two pre-Step-3 gates still have nowhere to file a question.** The research-unit gate returning `uncertain` and the paper-type gate returning `UNCLASSIFIED` or unverified quotes both produce a question a human could settle, and both currently print and stop. **Agreed with Alex, 20 Aug: they belong in the same review surface.** Not built: they run BEFORE Step 3, so there is no `segmentation_run_id` for a `review_tasks` row to reference. See below. | new table + `services/*` | day |
+
+### V in full — why this is not just a fifth review_reason
+
+The obvious implementation is to add two reasons to the enum and be done. It does
+not work, and the reason is structural rather than cosmetic.
+
+`review_tasks.segmentation_run_id` is NOT NULL and references
+`segmentation_runs`. Both gates run *before* segmentation and their whole purpose
+is to refuse a paper so that Step 3 never runs — so at the moment they have a
+question to ask, the row they would hang it on does not exist and by design never
+will.
+
+Three ways out, and the third is the one to take:
+
+1. **Make `segmentation_run_id` nullable.** Cheapest to type, worst to live with:
+   every CHECK on that table currently assumes a run, and a nullable key here
+   would make "which paper is this about?" answerable in two different ways.
+2. **Have the gates write a run in a refused state.** Dishonest. A
+   `segmentation_run` that never segmented anything is a row that lies about what
+   happened, and Step 3's own status enum would have to grow a state meaning "did
+   not run".
+3. **A second small table keyed to the paper**, sharing the decision vocabulary —
+   resolve, reject, mandatory comment on reject — and presented on the same
+   screen. One queue to a reviewer, two tables underneath, and each table says
+   what it is about.
+
+The gate states from 3R apply unchanged, so this is additive rather than a
+redesign. What needs deciding first is whether a rejection here returns the paper
+to its author on the same terms as a Step 3 rejection. It probably should: a
+paper the type gate cannot classify is a paper nobody can proceed with.
+
 ### U in full — why this is not the author-return loop
 
 Two different things create a second run over the same paper, and only one of them

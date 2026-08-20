@@ -79,13 +79,27 @@ func (s *PostgresSegmentationStore) SaveAuthorReturn(ctx context.Context, runID,
 	}
 
 	for i, it := range items {
+		// A nil slice reaches Postgres as NULL, and the column's DEFAULT '{}'
+		// does not apply to a value that was supplied — only to one omitted. So
+		// nil must become an empty array here or the insert violates NOT NULL.
+		//
+		// Nil is the ORDINARY case, not a rare one. A top-level node has no
+		// ancestors, which covers both of the tasks a headless document raises:
+		// no_structure sits on the whole-document node, and title_ambiguity has
+		// no node at all. Returning such a paper to its author is precisely the
+		// path this would have broken.
+		ancestors := it.AncestorHeadings
+		if ancestors == nil {
+			ancestors = []string{}
+		}
+
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO author_return_items (
 				author_return_item_id, author_return_id, review_task_id,
 				review_reason, heading_raw, ancestor_headings, human_review_comment
 			) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
 			uuid.NewString(), returnID, it.ReviewTaskID,
-			string(it.Reason), it.HeadingRaw, it.AncestorHeadings, it.Comment,
+			string(it.Reason), it.HeadingRaw, ancestors, it.Comment,
 		); err != nil {
 			return fmt.Errorf("insert author return item %d (task %s): %w", i, it.ReviewTaskID, err)
 		}

@@ -58,9 +58,24 @@ func runResearchUnit(args []string) {
 
 	gate := researchunit.Detect(headings, p.Markdown)
 
+	// Stored BEFORE the routing below, and for every verdict rather than only
+	// the ones that proceed.
+	//
+	// The refusals are the rows most worth having. A `multi` explains why a
+	// paper stopped, and an `uncertain` is the question a human will be asked —
+	// and "re-run the command and read the terminal" is not a review surface.
+	//
+	// Writing it first also means a paper that is about to be refused has its
+	// record on disk before the process is allowed to end.
+	if err := store.NewPostgresResearchUnitStore(pool).
+		SaveGate(context.Background(), string(p.ID), p.MarkdownHash, gate); err != nil {
+		die(fmt.Errorf("research-unit: store verdict: %w", err))
+	}
+
 	fmt.Printf("paper %s\n", p.ID)
 	fmt.Printf("  markdown:  %d characters\n", len(p.Markdown))
-	fmt.Printf("  sections:  %d\n\n", len(doc.Nodes))
+	fmt.Printf("  sections:  %d\n", len(doc.Nodes))
+	fmt.Printf("  rules:     %s\n\n", gate.RuleVersion)
 	fmt.Printf("  GATE:      %s\n", strings.ToUpper(string(gate.Verdict)))
 	fmt.Printf("  because:   %s\n", gate.Reason)
 
@@ -81,17 +96,22 @@ func runResearchUnit(args []string) {
 
 	switch gate.Verdict {
 	case researchunit.VerdictMulti:
-		fmt.Printf("\nOUT OF SCOPE. No research unit was created and nothing was written.\n\n")
+		fmt.Printf("\nOUT OF SCOPE. No research unit was created.\n\n")
 		fmt.Printf("This is the failure the gate exists to prevent: with %d studies in one\n", gate.StudyCount)
 		fmt.Printf("manuscript, a single-study pipeline would attach the method of one study to\n")
-		fmt.Printf("the results of another. That output looks like a finding rather than an error.\n")
+		fmt.Printf("the results of another. That output looks like a finding rather than an error.\n\n")
+		fmt.Printf("The verdict above and the %d labels behind it ARE stored, under rule version\n", len(gate.Evidence))
+		fmt.Printf("%s. A refusal with no record is a paper that stopped for reasons nobody can\n", gate.RuleVersion)
+		fmt.Printf("look up afterwards.\n")
 		return
 
 	case researchunit.VerdictUncertain:
 		fmt.Printf("\nNEEDS A HUMAN. No research unit was created.\n\n")
 		fmt.Printf("The signals could mean either one study in stages or several studies, and\n")
 		fmt.Printf("only reading the sections settles it. Answering \"single\" wrongly would\n")
-		fmt.Printf("corrupt every link in the paper, so the gate asks rather than guesses.\n")
+		fmt.Printf("corrupt every link in the paper, so the gate asks rather than guesses.\n\n")
+		fmt.Printf("The verdict and its evidence are stored, so the question survives this\n")
+		fmt.Printf("terminal. There is no queue to put it in yet — see FUTURE_WORK item V.\n")
 		return
 	}
 

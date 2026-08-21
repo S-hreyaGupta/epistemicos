@@ -51,6 +51,35 @@ type Heading struct {
 	Role string
 }
 
+// RuleVersion identifies the rules a stored verdict was reached under.
+//
+// # Why this exists at all
+//
+// Without it a stored verdict is an answer with no provenance. Step 3 learned
+// this as structural_rule_version and the paper-type gate as its prompt version
+// and model name; this package had neither, so a verdict written today and read
+// after a rule change could not say which rules produced it.
+//
+// # Why it buys more here than it does for the paper-type gate
+//
+// That gate is not deterministic, so it must store the model's entire response:
+// the same paper and prompt can yield a different verdict next month, and only
+// the raw text makes a disagreement investigable rather than arguable.
+//
+// This gate IS deterministic. The same markdown under the same rule version
+// always produces the same gate, so the pair (markdown hash, rule version) is
+// enough to reproduce a stored verdict exactly. That makes the version the
+// primary key of the answer rather than a footnote on it, and it is why storage
+// here can be idempotent — one row per version — where paper-type must append.
+//
+// # When to change it
+//
+// Whenever the ANSWER can change: the vocabularies, the four rules, the grouping
+// of "1A" under "1". Not for a clearer error message. A version that moves
+// without the behaviour moving invalidates stored verdicts that are still
+// correct.
+const RuleVersion = "1.0"
+
 // Verdict is the gate's decision.
 type Verdict string
 
@@ -91,6 +120,11 @@ type Evidence struct {
 
 // Gate is the decision plus everything it was based on.
 type Gate struct {
+	// RuleVersion is stamped by Detect, not by the caller. A caller that could
+	// choose it could label an answer with rules it was not reached under, and a
+	// verdict that misreports its own provenance is worse than one with none.
+	RuleVersion string
+
 	Verdict Verdict
 
 	// StudyCount is the number of distinct study groups found in headings. Zero
@@ -124,7 +158,7 @@ var (
 // study, and a paper's related-work section is full of them. So body evidence can
 // raise a question and never settles one.
 func Detect(headings []Heading, markdown string) Gate {
-	g := Gate{}
+	g := Gate{RuleVersion: RuleVersion}
 
 	headingGroups := map[string]bool{}
 	weakGroups := map[string]bool{}

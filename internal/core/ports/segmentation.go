@@ -114,4 +114,25 @@ type SegmentationStore interface {
 	// the second read. The FIRST consumption timestamp is kept — it is the moment
 	// the decisions actually stopped being editable.
 	MarkConsumed(ctx context.Context, runID, consumedBy string) error
+
+	// SaveRunRejection records an objection to a run as a whole, where no review
+	// task exists to hang one on.
+	//
+	// This is the only route for disagreeing with a determination the machine
+	// made confidently. Without it the gate can be challenged only where the
+	// machine already admitted doubt, which makes it a review of the machine's
+	// questions rather than of its answers.
+	//
+	// Implementations MUST allow this on a CONSUMED run. It does not edit what
+	// Step 4 read; it records that what Step 4 read was wrong, and marks the run
+	// superseded so anything derived from it is detectably stale. Refusing it
+	// after consumption would make a run unchallengeable from the moment it
+	// became worth challenging.
+	//
+	// Returns ErrAlreadyRejected if one exists; the first objection stands.
+	SaveRunRejection(ctx context.Context, runID, reviewerID, comment string) error
+
+	// GetRunRejection returns the objection against a run, or nil when there is
+	// none. Absence is the ordinary state and is not an error.
+	GetRunRejection(ctx context.Context, runID string) (*segment.RunRejection, error)
 }

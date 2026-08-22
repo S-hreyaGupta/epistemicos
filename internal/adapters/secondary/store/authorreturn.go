@@ -98,7 +98,10 @@ func (s *PostgresSegmentationStore) SaveAuthorReturn(ctx context.Context, runID,
 				author_return_item_id, author_return_id, review_task_id,
 				review_reason, heading_raw, ancestor_headings, human_review_comment
 			) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-			uuid.NewString(), returnID, it.ReviewTaskID,
+			// nullIfEmpty on the task id: a run-level objection belongs to no
+			// task, and "" would fail the foreign key rather than record the
+			// absence.
+			uuid.NewString(), returnID, nullIfEmpty(it.ReviewTaskID),
 			string(it.Reason), it.HeadingRaw, ancestors, it.Comment,
 		); err != nil {
 			return fmt.Errorf("insert author return item %d (task %s): %w", i, it.ReviewTaskID, err)

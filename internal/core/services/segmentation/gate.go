@@ -66,7 +66,33 @@ func (s *Service) GateState(ctx context.Context, runID string) (*segment.Run, se
 		return nil, segment.GateResult{}, fmt.Errorf("gate: load decisions for %s: %w", runID, err)
 	}
 
-	return run, segment.Gate(*run, decisions), nil
+	rejection, err := s.store.GetRunRejection(ctx, runID)
+	if err != nil {
+		return nil, segment.GateResult{}, fmt.Errorf("gate: load run rejection for %s: %w", runID, err)
+	}
+
+	return run, segment.GateWith(*run, decisions, rejection != nil), nil
+}
+
+// RejectRun records an objection to the run as a whole.
+//
+// No task id, deliberately: this exists for the case where there is no task. A
+// clean run raises none, passes immediately, and was until now unchallengeable.
+//
+// Deliberately permitted on a consumed run. See the port for why.
+func (s *Service) RejectRun(ctx context.Context, runID, reviewerID, comment string) (segment.GateResult, error) {
+	// Existence is checked by loading the run first, so a mistyped id fails
+	// before anything is written rather than after.
+	if _, _, err := s.GateState(ctx, runID); err != nil {
+		return segment.GateResult{}, err
+	}
+
+	if err := s.store.SaveRunRejection(ctx, runID, reviewerID, comment); err != nil {
+		return segment.GateResult{}, fmt.Errorf("reject run %s: %w", runID, err)
+	}
+
+	_, gate, err := s.GateState(ctx, runID)
+	return gate, err
 }
 
 // Consume is the precondition Step 4 must satisfy before reading a run.
@@ -112,13 +138,18 @@ func (s *Service) ReturnToAuthor(ctx context.Context, runID, returnedBy string) 
 		return segment.GateResult{}, nil, fmt.Errorf("return: load decisions for %s: %w", runID, err)
 	}
 
-	gate := segment.Gate(*run, decisions)
+	rejection, err := s.store.GetRunRejection(ctx, runID)
+	if err != nil {
+		return segment.GateResult{}, nil, fmt.Errorf("return: load run rejection for %s: %w", runID, err)
+	}
+
+	gate := segment.GateWith(*run, decisions, rejection != nil)
 	if !gate.Returned() {
-		return gate, nil, fmt.Errorf("run %s is %s, not returned: %d of %d questions open, %d rejected; a manuscript goes back only when every question is answered and at least one was rejected",
+		return gate, nil, fmt.Errorf("run %s is %s, not returned: %d of %d questions open, %d rejected; a manuscript goes back only when something was rejected",
 			runID, gate.State, gate.Open, gate.Total, gate.Rejected)
 	}
 
-	items := segment.BuildAuthorReturn(*run, decisions)
+	items := segment.BuildAuthorReturnWith(*run, decisions, rejection)
 
 	if err := s.store.SaveAuthorReturn(ctx, runID, uuid.NewString(), returnedBy, items); err != nil {
 		return gate, items, fmt.Errorf("return run %s: %w", runID, err)

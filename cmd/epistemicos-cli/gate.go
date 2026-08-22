@@ -47,15 +47,47 @@ func parseGateFlags(cmd string, rest []string) (reviewer, comment, role string) 
 	return reviewer, comment, role
 }
 
-// runReject records a rejection against one task.
+// runReject records a rejection against one task, or against the whole run.
+//
+// The --run form exists because the gate could previously be objected to only
+// where the machine had already admitted doubt. A run whose sections all
+// resolved raised no tasks, passed immediately, and offered a reviewer no action
+// at all — which made this a review of the machine's questions rather than of
+// its answers.
 func runReject(args []string) {
-	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "reject: run id and task id are required")
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "reject: a run id is required")
 		fmt.Fprintln(os.Stderr, `  epistemicos-cli reject <run-id> <task-id> --by <you> --comment "why"`)
+		fmt.Fprintln(os.Stderr, `  epistemicos-cli reject <run-id> --run --by <you> --comment "why"`)
 		os.Exit(2)
 	}
-	runID, taskID := args[0], args[1]
-	reviewer, comment, _ := parseGateFlags("reject", args[2:])
+	runID := args[0]
+
+	// --run may appear anywhere after the run id, so the task id is whatever
+	// second positional argument is not a flag.
+	wholeRun := false
+	taskID := ""
+	rest := args[1:]
+	for i := 0; i < len(rest); i++ {
+		if rest[i] == "--run" {
+			wholeRun = true
+			rest = append(append([]string{}, rest[:i]...), rest[i+1:]...)
+			i--
+			continue
+		}
+		if taskID == "" && !strings.HasPrefix(rest[i], "--") {
+			taskID = rest[i]
+			rest = append(append([]string{}, rest[:i]...), rest[i+1:]...)
+			i--
+		}
+	}
+
+	if wholeRun == (taskID != "") {
+		fmt.Fprintln(os.Stderr, "reject: pass either a task id, or --run to reject the whole run")
+		os.Exit(2)
+	}
+
+	reviewer, comment, _ := parseGateFlags("reject", rest)
 
 	// Checked here as well as in the domain so the message names the flag the
 	// operator has to add, rather than describing the rule abstractly.
@@ -70,6 +102,36 @@ func runReject(args []string) {
 	defer cleanup()
 
 	ctx := context.Background()
+
+	if wholeRun {
+		// The state BEFORE, so the message can say what is being overturned. A
+		// reviewer rejecting a run that already passed is doing something
+		// different from rejecting one still under review, and should be told so.
+		_, before, err := svc.GateState(ctx, runID)
+		if err != nil {
+			die(err)
+		}
+
+		gate, err := svc.RejectRun(ctx, runID, reviewer, comment)
+		if err != nil {
+			die(err)
+		}
+
+		fmt.Printf("rejected run %s\n", runID)
+		fmt.Printf("  reviewer: %s\n", reviewer)
+		fmt.Printf("  reason:   %s\n\n", comment)
+		printGate(gate)
+
+		if before.Passed() {
+			fmt.Printf("\nThis run had PASSED. It is now returned.\n")
+			fmt.Printf("Passed means currently accepted rather than permanently final, which is\n")
+			fmt.Printf("the only reading under which a clean run can be challenged at all.\n")
+			fmt.Printf("\nAnything already derived from this run is stale. The run is marked\n")
+			fmt.Printf("superseded, so a consumer holding its section map hash can tell.\n")
+		}
+		fmt.Printf("\n  epistemicos-cli return-to-author %s --by %s\n", runID, orPlaceholder(reviewer))
+		return
+	}
 
 	decision, err := svc.Reject(ctx, runID, taskID, reviewer, comment)
 	if err != nil {
@@ -93,8 +155,23 @@ func runReject(args []string) {
 	printGate(gate)
 
 	if gate.Returned() {
-		fmt.Printf("\nEvery question is answered and %d were rejected, so this manuscript\n", gate.Rejected)
-		fmt.Printf("goes back to its author. Step 4 will not run on it.\n")
+		fmt.Printf("\nThis manuscript now goes back to its author. Step 4 will not run on it.\n")
+
+		// A rejection now returns the run immediately, even with questions
+		// outstanding. That is the right state — "open" would read as nothing
+		// being wrong — but the author then receives one problem rather than
+		// all of them, so the reviewer is told here rather than discovering it
+		// when the paper comes back a second time.
+		if gate.Open > 0 {
+			fmt.Printf("\n%d question", gate.Open)
+			if gate.Open != 1 {
+				fmt.Printf("s")
+			}
+			fmt.Printf(" remain unanswered. The author will be told about the\n")
+			fmt.Printf("rejection only. Answering the rest first means they receive every\n")
+			fmt.Printf("problem in one round instead of one per round.\n")
+		}
+
 		fmt.Printf("\n  epistemicos-cli return-to-author %s --by %s\n", runID, orPlaceholder(reviewer))
 	}
 }
@@ -199,6 +276,13 @@ func printGate(g segment.GateResult) {
 	fmt.Printf("  REVIEW STATE: %s\n", strings.ToUpper(string(g.State)))
 	fmt.Printf("  questions:    %d total — %d open, %d resolved, %d rejected\n",
 		g.Total, g.Open, g.Resolved, g.Rejected)
+
+	// Printed separately from the counts because it is not one of them. A run
+	// rejection concerns no question, and adding it to "rejected" would make a
+	// run with zero tasks report one rejection out of none.
+	if g.RunRejected {
+		fmt.Printf("  the run itself was rejected\n")
+	}
 }
 
 func orPlaceholder(s string) string {

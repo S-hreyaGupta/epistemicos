@@ -71,25 +71,76 @@ func TestGate_StateTable(t *testing.T) {
 	}
 }
 
-// TestGate_RejectionDoesNotReturnWhileQuestionsRemain is the ordering rule, and
-// the one most likely to be "simplified" away later.
+// TestGate_RejectionTakesPrecedenceOverOpen is the ordering rule, and it is the
+// reverse of what this file asserted when it was written.
 //
-// A run with one rejection and two open questions is OPEN, not returned.
-// Returning early would send the manuscript back naming one problem while two
-// unexamined questions remained, and the author would fix that one thing and
-// receive the rest a round later. The gate closes only when every question has
-// been answered, which is what makes a returned run's report complete.
-func TestGate_RejectionDoesNotReturnWhileQuestionsRemain(t *testing.T) {
+// The original rule put `open` first: a run with one rejection and two
+// unanswered questions was OPEN, so that the review would be finished and the
+// author would receive every problem at once rather than one per round.
+//
+// That was wrong for a reason the completeness argument does not answer. It
+// produces a state reading "in progress" for a manuscript already known to be
+// going back, so anything checking the gate sees nothing wrong. A state that is
+// ambiguous AND looks benign is worse than an incomplete report.
+//
+// The completeness concern still holds and is handled at the CLI, which warns
+// when a rejection leaves questions unanswered. Information kept, state machine
+// left simple.
+func TestGate_RejectionTakesPrecedenceOverOpen(t *testing.T) {
 	g := Gate(runWithTasks(3), map[string]*ReviewDecision{"b": rejectD("b")})
 
-	if g.State != ReviewOpen {
-		t.Errorf("state = %q, want %q — a rejection with questions still open must not return the paper", g.State, ReviewOpen)
+	if g.State != ReviewReturned {
+		t.Errorf("state = %q, want %q — a rejection decides the run's fate immediately", g.State, ReviewReturned)
 	}
 	if g.Rejected != 1 || g.Open != 2 {
-		t.Errorf("counts = %d rejected, %d open; want 1 and 2", g.Rejected, g.Open)
+		t.Errorf("counts = %d rejected, %d open; want 1 and 2 — the counts still report the unanswered questions", g.Rejected, g.Open)
 	}
 	if g.Passed() {
-		t.Error("Passed() is true on an open run; Step 4 would run on a half-reviewed paper")
+		t.Error("Passed() is true on a returned run")
+	}
+}
+
+// TestGateWith_RunRejectionOnACleanRun is the hole this closes.
+//
+// A run where every section resolved raises no tasks and passes immediately.
+// Before run-level rejection there was no action a human could take against it:
+// the review gate could be objected to only where the machine had already
+// admitted doubt, which made it a review of the machine's questions rather than
+// of its answers.
+func TestGateWith_RunRejectionOnACleanRun(t *testing.T) {
+	clean := runWithTasks(0)
+
+	if g := Gate(clean, nil); g.State != ReviewPassed {
+		t.Fatalf("fixture is wrong: a zero-task run should pass, got %q", g.State)
+	}
+
+	g := GateWith(clean, nil, true)
+
+	if g.State != ReviewReturned {
+		t.Errorf("state = %q, want %q — a clean run must remain challengeable", g.State, ReviewReturned)
+	}
+	if !g.RunRejected {
+		t.Error("RunRejected is false after a run-level rejection")
+	}
+	if g.Total != 0 || g.Rejected != 0 {
+		t.Errorf("counts = %d total, %d rejected; a run rejection is not a task rejection and must not be counted as one", g.Total, g.Rejected)
+	}
+}
+
+// TestGateWith_RunRejectionOverridesPassed.
+//
+// `passed` means CURRENTLY accepted, not permanently final. A structural error
+// found after the fact must still be reportable, or an automatically passed
+// zero-task run is unchallengeable forever.
+func TestGateWith_RunRejectionOverridesPassed(t *testing.T) {
+	all := map[string]*ReviewDecision{"a": resolveD("a"), "b": resolveD("b"), "c": resolveD("c")}
+
+	if g := Gate(runWithTasks(3), all); g.State != ReviewPassed {
+		t.Fatalf("fixture is wrong: expected passed, got %q", g.State)
+	}
+
+	if g := GateWith(runWithTasks(3), all, true); g.State != ReviewReturned {
+		t.Errorf("state = %q, want %q — a passed run must stay rejectable", g.State, ReviewReturned)
 	}
 }
 

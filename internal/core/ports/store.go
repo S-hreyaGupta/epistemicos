@@ -25,6 +25,11 @@ var ErrDecisionsFrozen = errors.New("review decisions are frozen: the run has be
 // would leave two documents and nothing to say which the author received.
 var ErrAlreadyReturned = errors.New("this run has already been returned to the author")
 
+// ErrAlreadyRejected is returned when a run already carries a run-level
+// objection. The first one stands: its comment is what the author received, and
+// replacing it would change a message already sent.
+var ErrAlreadyRejected = errors.New("this run has already been rejected")
+
 // PaperStore persists Paper aggregates.
 //
 // This is the only store this system defines.

@@ -41,10 +41,11 @@ type fakeStore struct {
 	// consumedBy and returned record the two terminal acts, so a test can assert
 	// that Consume and ReturnToAuthor actually froze the run rather than merely
 	// reporting that they had.
-	consumedBy string
-	consumed   bool
-	returned   []segment.AuthorReturnItem
-	returnErr  error
+	consumedBy   string
+	consumed     bool
+	returned     []segment.AuthorReturnItem
+	returnErr    error
+	runRejection *segment.RunRejection
 }
 
 func (f *fakeStore) SaveRun(_ context.Context, run *segment.Run) error {
@@ -86,6 +87,18 @@ func (f *fakeStore) SaveAuthorReturn(_ context.Context, _, _, consumedBy string,
 	f.consumed = true
 	f.consumedBy = consumedBy
 	return nil
+}
+
+func (f *fakeStore) SaveRunRejection(_ context.Context, _, reviewerID, comment string) error {
+	if f.runRejection != nil {
+		return ports.ErrAlreadyRejected
+	}
+	f.runRejection = &segment.RunRejection{Comment: comment, ReviewerID: reviewerID}
+	return nil
+}
+
+func (f *fakeStore) GetRunRejection(_ context.Context, _ string) (*segment.RunRejection, error) {
+	return f.runRejection, nil
 }
 
 func (f *fakeStore) MarkConsumed(_ context.Context, _, consumedBy string) error {

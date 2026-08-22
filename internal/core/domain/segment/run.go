@@ -25,6 +25,15 @@ const (
 	// is auto-promoted, so the question goes to a human.
 	ReasonTitleAmbiguity ReviewReason = "title_ambiguity"
 
+	// ReasonRunRejected labels the run-level objection in an author return.
+	//
+	// It is NOT a review_reason in the schema sense and never appears on a
+	// ReviewTask — no task raises it, because its whole purpose is to exist
+	// where no task does. It exists so that an AuthorReturnItem can say which
+	// kind of objection it carries without a second enum that would have to be
+	// kept in step with this one.
+	ReasonRunRejected ReviewReason = "run_rejected"
+
 	// ReasonNoStructure: the document has no headings at all, so §5 produced a
 	// single synthetic whole-document node.
 	//

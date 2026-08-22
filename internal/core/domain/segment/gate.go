@@ -40,6 +40,16 @@ type GateResult struct {
 	Resolved int
 	Rejected int
 
+	// RunRejected is a human objecting to the run as a whole rather than to any
+	// one question.
+	//
+	// It exists because the gate could previously only be objected to where the
+	// machine had already admitted doubt. A run whose every section resolved
+	// cleanly raised no tasks, so it passed immediately and there was no action
+	// a reviewer could take against it — which made the review a review of the
+	// machine's own list of questions rather than of its answers.
+	RunRejected bool
+
 	// RejectedTaskIDs is in run task order, so a returned run's report lists the
 	// rejections in document order rather than in whatever order the decisions
 	// were written.
@@ -58,7 +68,17 @@ type GateResult struct {
 // while three unexamined questions remained, and the author would then fix one
 // thing and receive the rest a round later.
 func Gate(run Run, decisions map[string]*ReviewDecision) GateResult {
-	res := GateResult{Total: len(run.Tasks)}
+	return GateWith(run, decisions, false)
+}
+
+// GateWith computes the state including a run-level rejection.
+//
+// Kept as a second function rather than a field on Run because a rejection is
+// not part of the segmentation — it is a later judgement about it, loaded
+// separately, and threading it through Run would let a caller construct a run
+// that carries its own verdict.
+func GateWith(run Run, decisions map[string]*ReviewDecision, runRejected bool) GateResult {
+	res := GateResult{Total: len(run.Tasks), RunRejected: runRejected}
 
 	for i := range run.Tasks {
 		if i >= len(run.TaskIDs) {
@@ -84,15 +104,34 @@ func Gate(run Run, decisions map[string]*ReviewDecision) GateResult {
 		}
 	}
 
+	// REJECTION TAKES PRECEDENCE, and this ordering was reversed on purpose.
+	//
+	// It previously read: open first, so a run with one rejection and three
+	// unanswered questions was `open`. The argument was completeness — finish
+	// the review and the author gets every problem at once rather than one per
+	// round.
+	//
+	// The argument against is stronger. It produces a state that reads
+	// "in progress" for a manuscript already known to be going back, so a
+	// consumer checking the gate sees nothing wrong. An ambiguous state that
+	// looks benign is worse than an incomplete report.
+	//
+	// The completeness concern is real and is handled where it belongs: the CLI
+	// warns when a rejection leaves questions unanswered. That keeps the
+	// information without putting it in the state machine.
 	switch {
+	case res.RunRejected || res.Rejected > 0:
+		res.State = ReviewReturned
 	case res.Open > 0:
 		res.State = ReviewOpen
-	case res.Rejected > 0:
-		res.State = ReviewReturned
 	default:
 		// Includes Total == 0, which is the machine-only run: no questions were
 		// raised, so there is nothing to wait for and the run passes
 		// immediately. Its effective view is identical to its machine view.
+		//
+		// PASSED IS PROVISIONAL. It means currently accepted, not permanently
+		// final — a run-level rejection can move it to returned later, which is
+		// the only thing that makes a clean run challengeable at all.
 		res.State = ReviewPassed
 	}
 
@@ -138,9 +177,43 @@ type AuthorReturnItem struct {
 // an HTTP handler later — and a precondition enforced in one of them is not
 // enforced.
 func BuildAuthorReturn(run Run, decisions map[string]*ReviewDecision) []AuthorReturnItem {
-	g := Gate(run, decisions)
+	return BuildAuthorReturnWith(run, decisions, nil)
+}
+
+// RunRejection is a human objecting to a run as a whole.
+//
+// Separate from ReviewDecision because it answers no question: there is no task,
+// no assignment and nothing to overlay. Modelling it as a decision with a null
+// task would put a foreign key with no target in the one table whose whole
+// premise is one authoritative answer per question.
+type RunRejection struct {
+	Comment    string
+	ReviewerID string
+}
+
+// BuildAuthorReturnWith assembles the report, including a run-level rejection.
+//
+// A run rejected at run level with no tasks would otherwise produce an EMPTY
+// report — the run is returned, `Gate` agrees, and there are no rejected tasks
+// to iterate. The author would receive a manuscript back with nothing said about
+// it, which is the exact failure the mandatory-comment rule exists to prevent,
+// arriving by a different route.
+func BuildAuthorReturnWith(run Run, decisions map[string]*ReviewDecision, rejection *RunRejection) []AuthorReturnItem {
+	g := GateWith(run, decisions, rejection != nil)
 	if !g.Returned() {
 		return nil
+	}
+
+	var items []AuthorReturnItem
+
+	// The run-level objection goes FIRST. It concerns the document as a whole
+	// and frames whatever follows; a reader who meets it after four heading
+	// complaints has already formed the wrong idea of what is wrong.
+	if rejection != nil {
+		items = append(items, AuthorReturnItem{
+			Reason:  ReasonRunRejected,
+			Comment: rejection.Comment,
+		})
 	}
 
 	byID := map[string]int{}
@@ -148,7 +221,6 @@ func BuildAuthorReturn(run Run, decisions map[string]*ReviewDecision) []AuthorRe
 		byID[id] = i
 	}
 
-	items := make([]AuthorReturnItem, 0, len(g.RejectedTaskIDs))
 	for _, id := range g.RejectedTaskIDs {
 		i, ok := byID[id]
 		if !ok || i >= len(run.Tasks) {

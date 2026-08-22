@@ -118,6 +118,12 @@ Commands:
                            defensible. The comment is REQUIRED: it is the
                            sentence the author reads. One rejection returns the
                            whole manuscript.
+  reject <run-id> --run --by <reviewer> --comment "..."
+                           Object to the run as a whole, where no task exists.
+                           This is the only way to disagree with something the
+                           machine was confident about. Works on a run that has
+                           already passed: passed means currently accepted, not
+                           permanently final.
   gate <run-id>            Print the run's review state: open, passed or
                            returned. Read-only; looking does not freeze it.
   return-to-author <run-id> --by <reviewer>

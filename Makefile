@@ -18,7 +18,7 @@ help:
 up:
 	docker compose up -d postgres
 	@echo "Waiting for postgres..."
-	@until docker compose exec -T postgres pg_isready -U paperly -d paperly > /dev/null 2>&1; do sleep 1; done
+	@until docker compose exec -T postgres pg_isready -U epistemicos -d epistemicos > /dev/null 2>&1; do sleep 1; done
 	@echo "Postgres ready"
 
 down:

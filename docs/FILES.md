@@ -161,7 +161,7 @@ consistent.
 ### `internal/platform/config/config.go` — 90 lines
 
 Reads seven environment variables, applies defaults, and refuses to start
-without `PAPERLY_DB_URL`. Every field backs something the system actually does.
+without `EPISTEMIC_OS_DB_URL`. Every field backs something the system actually does.
 
 ### `internal/platform/logging/logging.go` — 75 lines
 

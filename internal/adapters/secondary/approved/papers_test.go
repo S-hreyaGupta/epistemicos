@@ -16,7 +16,7 @@ import (
 	"github.com/EpistemicOS/epistemicos/internal/core/ports"
 )
 
-// testPool connects to PAPERLY_DB_URL, or skips.
+// testPool connects to EPISTEMIC_OS_DB_URL, or skips.
 //
 // Skipping rather than failing keeps a developer without Docker from seeing a
 // red build for a reason unrelated to their change. The skip message names the
@@ -24,9 +24,9 @@ import (
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
-	url := os.Getenv("PAPERLY_DB_URL")
+	url := os.Getenv("EPISTEMIC_OS_DB_URL")
 	if url == "" {
-		t.Skip("PAPERLY_DB_URL is not set; start postgres and export it to run these tests")
+		t.Skip("EPISTEMIC_OS_DB_URL is not set; start postgres and export it to run these tests")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

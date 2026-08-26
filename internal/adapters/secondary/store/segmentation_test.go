@@ -13,7 +13,7 @@ import (
 	"github.com/EpistemicOS/epistemicos/internal/core/ports"
 )
 
-// testPool connects to the database named by PAPERLY_DB_URL, or skips.
+// testPool connects to the database named by EPISTEMIC_OS_DB_URL, or skips.
 //
 // Skipping rather than failing is the right posture for a store test: a
 // developer without Docker running should not see a red build for a reason
@@ -23,9 +23,9 @@ import (
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
-	url := os.Getenv("PAPERLY_DB_URL")
+	url := os.Getenv("EPISTEMIC_OS_DB_URL")
 	if url == "" {
-		t.Skip("PAPERLY_DB_URL is not set; start postgres and export it to run the store tests")
+		t.Skip("EPISTEMIC_OS_DB_URL is not set; start postgres and export it to run the store tests")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -37,7 +37,7 @@ func testPool(t *testing.T) *pgxpool.Pool {
 	}
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
-		t.Skipf("cannot reach postgres at PAPERLY_DB_URL: %v", err)
+		t.Skipf("cannot reach postgres at EPISTEMIC_OS_DB_URL: %v", err)
 	}
 
 	t.Cleanup(pool.Close)

@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: paperly
-      POSTGRES_USER: paperly
-      POSTGRES_PASSWORD: paperly
+      POSTGRES_DB: epistemicos
+      POSTGRES_USER: epistemicos
+      POSTGRES_PASSWORD: epistemicos
     ports:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U paperly -d paperly"]
+      test: ["CMD-SHELL", "pg_isready -U epistemicos -d epistemicos"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,12 +25,12 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      PAPERLY_DB_URL: postgres://paperly:paperly@postgres:5432/paperly?sslmode=disable
-      PAPERLY_LISTEN_ADDR: ":9082"
-      PAPERLY_PDF_VOLUME: /data/pdfs
-      PAPERLY_CORS_ALLOWED_ORIGINS: ${PAPERLY_CORS_ALLOWED_ORIGINS:-*}
-      PAPERLY_RATE_LIMIT_RPM: ${PAPERLY_RATE_LIMIT_RPM:-60}
-      PAPERLY_RATE_LIMIT_BURST: ${PAPERLY_RATE_LIMIT_BURST:-20}
+      EPISTEMIC_OS_DB_URL: postgres://epistemicos:epistemicos@postgres:5432/epistemicos?sslmode=disable
+      EPISTEMIC_OS_LISTEN_ADDR: ":9082"
+      EPISTEMIC_OS_PDF_VOLUME: /data/pdfs
+      EPISTEMIC_OS_CORS_ALLOWED_ORIGINS: ${EPISTEMIC_OS_CORS_ALLOWED_ORIGINS:-*}
+      EPISTEMIC_OS_RATE_LIMIT_RPM: ${EPISTEMIC_OS_RATE_LIMIT_RPM:-60}
+      EPISTEMIC_OS_RATE_LIMIT_BURST: ${EPISTEMIC_OS_RATE_LIMIT_BURST:-20}
       MATHPIX_APP_ID: ${MATHPIX_APP_ID:-}
       MATHPIX_APP_KEY: ${MATHPIX_APP_KEY:-}
     volumes:

@@ -33,7 +33,7 @@ than two.
 
 ### 2 · Staged to disk
 
-The stream is written to a temporary file under `PAPERLY_PDF_VOLUME`, named
+The stream is written to a temporary file under `EPISTEMIC_OS_PDF_VOLUME`, named
 `tmp-<uuid>.pdf`.
 
 It goes to disk rather than staying in memory because both of the next two steps
@@ -183,6 +183,38 @@ Mathpix credentials are required to convert. Without them the service still
 starts and serves reads, but ingest fails at step 7 and
 `/api/v1/capabilities` reports `mathpix_enabled: false`.
 
+### If you have a database from before 24 August 2026
+
+The environment prefix was renamed `PAPERLY_` → `EPISTEMIC_OS_`, and the Postgres
+database, role and password were renamed `paperly` → `epistemicos`.
+
+**`make up` will not do this for you.** Postgres runs its init only on an *empty*
+data directory, so an existing `pg_data` volume still holds a database called
+`paperly` owned by a role called `paperly`. The container starts cleanly and every
+connection then fails with `database "epistemicos" does not exist`.
+
+Rename in place, once, with nothing else connected:
+
+```bash
+docker compose up -d postgres
+docker compose exec -T postgres psql -U paperly -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+ALTER DATABASE paperly RENAME TO epistemicos;
+ALTER ROLE     paperly RENAME TO epistemicos;
+ALTER ROLE     epistemicos WITH PASSWORD 'epistemicos';
+SQL
+docker compose restart postgres
+make migrate
+```
+
+The password reset is not redundant. Under `md5` authentication the stored
+verifier is derived from the role name, so renaming the role invalidates it;
+Postgres 16 defaults to `scram-sha-256`, where it survives. Resetting costs one
+line and removes the need to know which you are on.
+
+**Do not delete the volume instead.** The eleven ingested papers hold Mathpix
+conversions that cost money and an afternoon to reproduce, and every stored byte
+offset is indexed against exactly those bytes.
+
 ---
 
 ## API
@@ -255,15 +287,15 @@ Copy `.env.example` to `.env`.
 
 | Variable | Required | Default |
 |---|---|---|
-| `PAPERLY_DB_URL` | yes | — |
+| `EPISTEMIC_OS_DB_URL` | yes | — |
 | `MATHPIX_APP_ID` / `MATHPIX_APP_KEY` | for conversion | — |
-| `PAPERLY_LISTEN_ADDR` | no | `:9082` |
-| `PAPERLY_PDF_VOLUME` | no | `./data/pdfs` |
-| `PAPERLY_CORS_ALLOWED_ORIGINS` | no | `*` |
-| `PAPERLY_RATE_LIMIT_RPM` | no | `60` |
-| `PAPERLY_RATE_LIMIT_BURST` | no | `20` |
+| `EPISTEMIC_OS_LISTEN_ADDR` | no | `:9082` |
+| `EPISTEMIC_OS_PDF_VOLUME` | no | `./data/pdfs` |
+| `EPISTEMIC_OS_CORS_ALLOWED_ORIGINS` | no | `*` |
+| `EPISTEMIC_OS_RATE_LIMIT_RPM` | no | `60` |
+| `EPISTEMIC_OS_RATE_LIMIT_BURST` | no | `20` |
 
-The `PAPERLY_` prefix is legacy naming retained so existing deployments and
+The `EPISTEMIC_OS_` prefix is legacy naming retained so existing deployments and
 `.env` files keep working. Renaming it is a breaking change for anything already
 running.
 

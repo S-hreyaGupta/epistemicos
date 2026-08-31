@@ -1,18 +1,18 @@
 {
   "manifest_version": 1,
   "purpose": "Freeze record for the Phase 1 PLAN set. Hashes are SHA-256 over the exact committed bytes. Any edit to a plan invalidates this manifest and requires a re-freeze.",
-  "supersedes": "d90b10d",
-  "supersedes_note": "Set to d90b10d per operator instruction: this manifest supersedes the review-of-record freeze that both Alex and Codex cycle 1 reviewed. The IMMEDIATE predecessor is d92a8c9, which froze plan bytes cdad611; d92a8c9 superseded dd69e0e (bytes 09a88c9), which superseded d90b10d (bytes 940727c). Full chain: 940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/d92a8c9 -> 19209e1/this. Every earlier freeze is an unaltered record of what was reviewed at that point. Do not delete or edit any of them.",
+  "supersedes": "39021b3",
+  "supersedes_note": "39021b3 froze the plan set at 19209e1 -- the state carrying the go vet correction (Alex finding 5). This freeze supersedes it with the preamble-declaration change (Alex finding 1, option C). Full chain: 940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/d92a8c9 -> 19209e1/39021b3 -> 4d18eba/this. d90b10d remains the review-of-record freeze that both Alex and Codex cycle 1 reviewed. Every earlier freeze is an unaltered record of what was reviewed at that point. Do not delete or edit any of them.",
   "phase": {
     "number": "1",
     "name": "Escalation Mechanism and Fixture Invariant",
     "dir": ".planning/phases/01-escalation-mechanism-and-fixture-invariant"
   },
   "freeze": {
-    "commit": "19209e1414a0da59ec343cfff2ac32b4ab77d0c1",
-    "short": "19209e1",
-    "committed_at": "2026-08-31T20:48:06+05:30",
-    "verified": "working tree byte-identical to committed blobs at freeze time; each sha256 was computed twice, once over the working-tree file and once over `git show HEAD:<path>`, and the two agreed for all three plans. Only 01-01 changed in this freeze; 01-02 and 01-03 hash identically to the cdad611 freeze."
+    "commit": "4d18eba5d2a3ca76f345a11c64158ebba3f29eff",
+    "short": "4d18eba",
+    "committed_at": "2026-09-01T00:54:23+05:30",
+    "verified": "working tree byte-identical to committed blobs at freeze time; each sha256 was computed twice, once over the working-tree file and once over `git show HEAD:<path>`, and the two agreed for all three plans. 01-02 and 01-03 changed in this freeze; 01-01 hashes identically to the 19209e1 freeze."
   },
   "review_cycle": {
     "cycle": 2,
@@ -119,31 +119,31 @@
       ],
       "previous_sha256": "b5bf59e04a03814339d925117d6c0ca787fe10228f29364263c2cd8fac728a4e",
       "previous_sha256_freeze": "cdad611",
-      "previous_sha256_note": "changed by the go vet correction at 19209e1 (Alex finding 5)"
+      "previous_sha256_note": "changed by the go vet correction at 19209e1 (Alex finding 5)",
+      "unchanged_since": "19209e1",
+      "unchanged_note": "byte-identical to the 19209e1 freeze; not touched by the 4d18eba change"
     },
     {
       "plan": "01-02",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-02-PLAN.md",
-      "sha256": "9a61c8f519c2773fc042d40d05666ab6b715e5aa99bff19cac328d060647ef98",
-      "bytes": 30714,
-      "lines": 419,
+      "sha256": "9dd75245deb93323c573b1fb98c41210875dd320fbf4627a69768af24b813bea",
+      "bytes": 39298,
+      "lines": 503,
       "wave": 1,
       "depends_on": [],
       "requirements": [
         "GATE-04"
       ],
-      "previous_sha256": "d414eedc81fe3cc7b7094af0a40c433d26fa7d107750c9bb0482451da6f9f76c",
-      "unchanged_since": "cdad611",
-      "unchanged_note": "byte-identical to the cdad611 freeze; not touched by the 19209e1 correction",
-      "previous_sha256_freeze": "d90b10d",
-      "previous_sha256_note": "The pre-09a88c9 (cycle-1) hash. This plan has not changed since 09a88c9, so previous_sha256 refers to the freeze before that one."
+      "previous_sha256": "9a61c8f519c2773fc042d40d05666ab6b715e5aa99bff19cac328d060647ef98",
+      "previous_sha256_freeze": "19209e1",
+      "previous_sha256_note": "changed by the preamble-declaration change at 4d18eba (Alex finding 1, option C)"
     },
     {
       "plan": "01-03",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-03-PLAN.md",
-      "sha256": "8be496b1c5bde97208fc2e4a707a5b3d29ed7613664bfb799b363314be6f764e",
-      "bytes": 71588,
-      "lines": 721,
+      "sha256": "db95c8185e28bd964d8c19fd306878aea7394bb5bc6d443924fbae250aa555d2",
+      "bytes": 73408,
+      "lines": 741,
       "wave": 2,
       "depends_on": [
         "01-01",
@@ -153,10 +153,9 @@
         "GATE-04",
         "GATE-05"
       ],
-      "previous_sha256": "8975731d4743e1510d25f29a95e444314f00dba61181c4b627ecd166029686bb",
-      "previous_sha256_freeze": "dd69e0e",
-      "unchanged_since": "cdad611",
-      "unchanged_note": "byte-identical to the cdad611 freeze; not touched by the 19209e1 correction"
+      "previous_sha256": "8be496b1c5bde97208fc2e4a707a5b3d29ed7613664bfb799b363314be6f764e",
+      "previous_sha256_freeze": "19209e1",
+      "previous_sha256_note": "changed by the preamble-declaration change at 4d18eba (Alex finding 1, option C)"
     }
   ],
   "blocking": [
@@ -289,11 +288,27 @@
       "corrected_in": [
         "01-01-PLAN.md"
       ]
+    },
+    {
+      "id": "C-08",
+      "source": "Alex, independent review of 940727c/d90b10d; disposition recorded 2026-09-01",
+      "finding": "01-02 made absence of a non-whitespace preamble a hard TestFixtureIntegrity failure, contradicting GATE-04, under which a genuinely preamble-free fixture is legitimate signal whose skips stay green.",
+      "found_by_convergence": "partially -- Codex cycle 1 raised it as LOW, framed as a wording ambiguity rather than a policy contradiction",
+      "disposition": "option C -- allow a preamble-free fixture, but require it to be declared",
+      "decided_by": "Alex",
+      "decided_on": "2026-09-01",
+      "note": "Implemented as fixtureHasPreamble, a third pinned constant declared immediately after fixtureBytes, so a repin changes hash, length and declaration in one diff. preambleInvariant takes the declaration as a third parameter so the control test drives both branches; the integrity test passes the constant, never a literal. The gate is narrow: it waives the two preamble checks only. The no-headings check runs first and unconditionally, because a heading-free fixture makes AC-14 index headings[0] and panic, and a panic is neither green nor silent. The declaration is a value and never a skip (t.Skip count pinned at 0, unchanged from the phase base); the absent case is closed by the compiler, since the test reads the constant and deleting it fails the build.",
+      "corrected_at": "4d18eba",
+      "corrected_in": [
+        "01-02-PLAN.md",
+        "01-03-PLAN.md"
+      ]
     }
   ],
   "adjudication": {
     "document": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-ADJUDICATION.md",
-    "commit": "8f3cb01",
-    "note": "Reconciles the independent review by Alex of 940727c/d90b10d against the three Codex convergence cycles and the orchestrator measurements. Finding 5 (go build cannot name unused imports in _test.go files) was missed by all three cycles and is corrected at 19209e1."
+    "commit": "179680e",
+    "supersedes": "8f3cb01",
+    "note": "Reconciles the independent review by Alex of 940727c/d90b10d against the three Codex convergence cycles and the orchestrator measurements. Amended at 179680e to record finding 2 as partially fixed: the guard added to 01-01 Task 1 catches a wrong anchor, not an ungated substitution. Finding 5 corrected at 19209e1; finding 1 dispositioned by Alex and implemented at 4d18eba."
   }
 }

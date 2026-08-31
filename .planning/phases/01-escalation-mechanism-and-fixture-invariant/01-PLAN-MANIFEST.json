@@ -1,0 +1,119 @@
+{
+  "manifest_version": 1,
+  "purpose": "Freeze record for the Phase 1 PLAN set. Hashes are SHA-256 over the exact committed bytes. Any edit to a plan invalidates this manifest and requires a re-freeze.",
+  "phase": {
+    "number": "1",
+    "name": "Escalation Mechanism and Fixture Invariant",
+    "dir": ".planning/phases/01-escalation-mechanism-and-fixture-invariant"
+  },
+  "freeze": {
+    "commit": "940727c5d99ff76c3db8a91fa38ee0a88f208ec3",
+    "short": "940727c",
+    "committed_at": "2026-08-31T16:04:38+05:30",
+    "verified": "working tree byte-identical to committed blobs at freeze time"
+  },
+  "phase_base_commit": "fcebad17569568c125ca88e10d0659a3586c28dd",
+  "requirements_covered": [
+    "GATE-04",
+    "GATE-05"
+  ],
+  "plans": [
+    {
+      "plan": "01-01",
+      "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-01-PLAN.md",
+      "sha256": "5af1bb1ca2b5e7769977e55977e3f07700f6d27b08d0b973e8b91b9c42a7d47f",
+      "bytes": 30155,
+      "lines": 479,
+      "wave": 1,
+      "depends_on": [],
+      "requirements": [
+        "GATE-05"
+      ]
+    },
+    {
+      "plan": "01-02",
+      "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-02-PLAN.md",
+      "sha256": "d414eedc81fe3cc7b7094af0a40c433d26fa7d107750c9bb0482451da6f9f76c",
+      "bytes": 17637,
+      "lines": 295,
+      "wave": 1,
+      "depends_on": [],
+      "requirements": [
+        "GATE-04"
+      ]
+    },
+    {
+      "plan": "01-03",
+      "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-03-PLAN.md",
+      "sha256": "286720f554c992e205079c7733f28a52366ab284cf278d3c9814d800811268c4",
+      "bytes": 27579,
+      "lines": 402,
+      "wave": 2,
+      "depends_on": [
+        "01-01",
+        "01-02"
+      ],
+      "requirements": [
+        "GATE-04",
+        "GATE-05"
+      ]
+    }
+  ],
+  "blocking": [
+    {
+      "id": "T-01-01",
+      "severity": "high",
+      "plan": "01-01",
+      "summary": "pgxpool.New echoes the connection string verbatim on parse failure; existing helpers pass it to t.Fatalf, so a malformed DSN carrying a password would reach CI logs. Pre-existing at HEAD."
+    },
+    {
+      "id": "T-01-09",
+      "severity": "high",
+      "plan": "01-03",
+      "summary": "Standing credential-canary audit over both the connect and parse paths; a non-zero password count blocks the phase."
+    },
+    {
+      "id": "T-01-10",
+      "severity": "high",
+      "plan": "01-03",
+      "summary": "Hash-pinned fixture is moved aside during the unreadable-fixture proof; restore must run regardless of exit status."
+    }
+  ],
+  "awaiting_disposition": {
+    "contract_decisions": [
+      "Package path internal/platform/testenv and its exported function names",
+      "Flag name EPISTEMIC_OS_TEST_REQUIRE_DB with presence-based semantics (=0 enables escalation)",
+      "Flag documented in the package doc comment only; README and Makefile deferred to Phase 2"
+    ],
+    "probe_edges": [
+      {
+        "id": "E1",
+        "requirement": "GATE-04",
+        "category": "unclassified",
+        "status": "unresolved"
+      },
+      {
+        "id": "E2",
+        "requirement": "GATE-05",
+        "category": "adjacency",
+        "status": "unresolved"
+      },
+      {
+        "id": "E3",
+        "requirement": "GATE-05",
+        "category": "empty",
+        "status": "unresolved"
+      },
+      {
+        "id": "E4",
+        "requirement": "GATE-05",
+        "category": "ordering",
+        "status": "unresolved"
+      }
+    ],
+    "accounting": "4 surfaced == 0 authored into must_haves.truths + 4 flagged"
+  },
+  "known_corrections": [
+    "PROJECT.md Constraints names testify; go.mod has no assertion library. Plans mandate stdlib testing only."
+  ]
+}

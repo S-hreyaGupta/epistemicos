@@ -1,0 +1,5 @@
+authored_under_gsd_version: 1.11.0
+captured_under_gsd_version: 1.11.0
+captured_at: 2026-08-31T17:33:29+05:30
+source_run_dir: /tmp/gsd-review-tE5Muk
+note: added by hand for the GSD pilot; not upstream. Re-check after any /gsd-update.

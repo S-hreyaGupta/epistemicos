@@ -1,0 +1,6 @@
+authored_under_gsd_version: 1.11.0
+captured_under_gsd_version: 1.11.0
+captured_at: 2026-08-31T18:44:36+05:30
+source_run_dir: /tmp/gsd-review-NibyUx
+cycle: 2
+note: added by hand for the GSD pilot; not upstream. Re-check after any /gsd-update.

@@ -1,0 +1,9 @@
+{
+  "slug": "codex",
+  "ok": true,
+  "stubbed": false,
+  "model": {
+    "value": "gpt-5.6-sol (reasoning=low)",
+    "source": "banner"
+  }
+}

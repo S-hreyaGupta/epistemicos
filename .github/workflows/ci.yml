@@ -10,6 +10,31 @@ jobs:
   go:
     name: vet + test + fmt
     runs-on: ubuntu-latest
+
+    # The 38 store and approved tests connect to a real Postgres. Without this
+    # service they skip, and `go test` reports ok for a suite that tested
+    # nothing. Image and credentials match docker-compose.yml so a failure here
+    # reproduces locally with `make up`.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: epistemicos
+          POSTGRES_USER: epistemicos
+          POSTGRES_PASSWORD: epistemicos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U epistemicos -d epistemicos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Host is localhost, not the service name: this job runs directly on the
+      # runner, so the service reaches it through the mapped port.
+      EPISTEMIC_OS_DB_URL: postgres://epistemicos:epistemicos@localhost:5432/epistemicos?sslmode=disable
+
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +60,12 @@ jobs:
 
       - name: go build
         run: go build ./...
+
+      # The store tests assume the schema already exists; they do not apply
+      # migrations themselves. A missing table surfaces as a query error rather
+      # than a skip, so this step failing is loud, not silent.
+      - name: migrate
+        run: go run ./cmd/epistemicos-cli migrate up
 
       - name: go test
         run: go test ./... -count=1

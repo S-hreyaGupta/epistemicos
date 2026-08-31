@@ -34,10 +34,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. With the flag unset, `go test ./...` skips exactly as it does today — a developer without Docker still gets a green run
   4. `TestFixtureIntegrity` asserts `demo.md` has a non-whitespace preamble, and `acceptance_test.go:438,451` stay green and silent
   5. `make gate` behaves exactly as before this phase — the tree is green with and without a database
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD at planning
+- [ ] 01-01-PLAN.md — Shared escalation helper: one package owns the skip-or-fail decision for all three environment conditions, and all 38 call sites across 6 test files reach it
+- [ ] 01-02-PLAN.md — Fixture invariant: TestFixtureIntegrity proves demo.md has a non-whitespace preamble, and the AC-14 content skips stay untouched, green and silent
+- [ ] 01-03-PLAN.md — Non-enforcement audit: escalated run reaches 0 skips against a live database, each condition names its cause, and `make gate` is measured unchanged
 
 ### Phase 2: Enforcement and a Single Gate Definition
 **Goal**: `make gate` sets the escalation flag and fails on any environment skip in the database-backed packages, and `ci.yml` calls `make gate` instead of re-implementing vet / gofmt / build / test as inline steps — resolving the CI-only `migrate` step introduced at `868d45b`.
@@ -77,6 +79,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Escalation Mechanism and Fixture Invariant | 0/TBD | Not started | - |
+| 1. Escalation Mechanism and Fixture Invariant | 0/3 | Planned | - |
 | 2. Enforcement and a Single Gate Definition | 0/TBD | Not started | - |
 | 3. Automated Proof | 0/TBD | Not started | - |

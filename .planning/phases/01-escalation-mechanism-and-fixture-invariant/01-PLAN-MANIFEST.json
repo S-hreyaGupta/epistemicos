@@ -1,18 +1,18 @@
 {
   "manifest_version": 1,
   "purpose": "Freeze record for the Phase 1 PLAN set. Hashes are SHA-256 over the exact committed bytes. Any edit to a plan invalidates this manifest and requires a re-freeze.",
-  "supersedes": "dd69e0e",
-  "supersedes_note": "dd69e0e froze the plan set at 09a88c9 - the exact byte state Codex reviewed in cycle 2, recorded in 01-REVIEWS.md. That freeze is deliberately left unannotated so it remains an unaltered record of what was reviewed; this manifest carries the supersession instead. dd69e0e in turn superseded d90b10d, which froze the cycle-1 review state at 940727c. The chain is 940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/this. Do not delete or edit any earlier freeze.",
+  "supersedes": "d90b10d",
+  "supersedes_note": "Set to d90b10d per operator instruction: this manifest supersedes the review-of-record freeze that both Alex and Codex cycle 1 reviewed. The IMMEDIATE predecessor is d92a8c9, which froze plan bytes cdad611; d92a8c9 superseded dd69e0e (bytes 09a88c9), which superseded d90b10d (bytes 940727c). Full chain: 940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/d92a8c9 -> 19209e1/this. Every earlier freeze is an unaltered record of what was reviewed at that point. Do not delete or edit any of them.",
   "phase": {
     "number": "1",
     "name": "Escalation Mechanism and Fixture Invariant",
     "dir": ".planning/phases/01-escalation-mechanism-and-fixture-invariant"
   },
   "freeze": {
-    "commit": "cdad6111e6ebbc28d6ae4527e3b7718ef0380575",
-    "short": "cdad611",
-    "committed_at": "2026-08-31T18:59:56+05:30",
-    "verified": "working tree byte-identical to committed blobs at freeze time; each sha256 was computed twice, once over the working-tree file and once over `git show HEAD:<path>`, and the two agreed for all three plans. 01-01 and 01-02 hash identically to the 09a88c9 freeze, which is the mechanical confirmation that cycle 3 did not touch them."
+    "commit": "19209e1414a0da59ec343cfff2ac32b4ab77d0c1",
+    "short": "19209e1",
+    "committed_at": "2026-08-31T20:48:06+05:30",
+    "verified": "working tree byte-identical to committed blobs at freeze time; each sha256 was computed twice, once over the working-tree file and once over `git show HEAD:<path>`, and the two agreed for all three plans. Only 01-01 changed in this freeze; 01-02 and 01-03 hash identically to the cdad611 freeze."
   },
   "review_cycle": {
     "cycle": 2,
@@ -109,19 +109,17 @@
     {
       "plan": "01-01",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-01-PLAN.md",
-      "sha256": "b5bf59e04a03814339d925117d6c0ca787fe10228f29364263c2cd8fac728a4e",
-      "bytes": 50913,
-      "lines": 650,
+      "sha256": "776afe5f6b057a1d3f651f59f6e37a15f5c003dede1d43a4e1211e13f967da77",
+      "bytes": 51227,
+      "lines": 654,
       "wave": 1,
       "depends_on": [],
       "requirements": [
         "GATE-05"
       ],
-      "previous_sha256": "5af1bb1ca2b5e7769977e55977e3f07700f6d27b08d0b973e8b91b9c42a7d47f",
-      "unchanged_since": "09a88c9",
-      "unchanged_note": "Byte-identical to the cycle-2 freeze. Cycle 2 raised no actionable finding against this plan and cycle 3 did not edit it; the matching hash is the proof, not the claim.",
-      "previous_sha256_freeze": "d90b10d",
-      "previous_sha256_note": "The pre-09a88c9 (cycle-1) hash. This plan has not changed since 09a88c9, so previous_sha256 refers to the freeze before that one."
+      "previous_sha256": "b5bf59e04a03814339d925117d6c0ca787fe10228f29364263c2cd8fac728a4e",
+      "previous_sha256_freeze": "cdad611",
+      "previous_sha256_note": "changed by the go vet correction at 19209e1 (Alex finding 5)"
     },
     {
       "plan": "01-02",
@@ -135,8 +133,8 @@
         "GATE-04"
       ],
       "previous_sha256": "d414eedc81fe3cc7b7094af0a40c433d26fa7d107750c9bb0482451da6f9f76c",
-      "unchanged_since": "09a88c9",
-      "unchanged_note": "Byte-identical to the cycle-2 freeze. Cycle 2 raised no actionable finding against this plan and cycle 3 did not edit it; the matching hash is the proof, not the claim.",
+      "unchanged_since": "cdad611",
+      "unchanged_note": "byte-identical to the cdad611 freeze; not touched by the 19209e1 correction",
       "previous_sha256_freeze": "d90b10d",
       "previous_sha256_note": "The pre-09a88c9 (cycle-1) hash. This plan has not changed since 09a88c9, so previous_sha256 refers to the freeze before that one."
     },
@@ -156,7 +154,9 @@
         "GATE-05"
       ],
       "previous_sha256": "8975731d4743e1510d25f29a95e444314f00dba61181c4b627ecd166029686bb",
-      "previous_sha256_freeze": "dd69e0e"
+      "previous_sha256_freeze": "dd69e0e",
+      "unchanged_since": "cdad611",
+      "unchanged_note": "byte-identical to the cdad611 freeze; not touched by the 19209e1 correction"
     }
   ],
   "blocking": [
@@ -278,6 +278,22 @@
     "Cycle 1 anchored the phase at fcebad1. It is an ancestor of HEAD but fails both audit criteria; see phase_base_correction.",
     "The STATE.md resume note assumed jq would be on PATH. It is not, as of this freeze; no command in the phase may depend on it.",
     "Cycle 2 found the \"unconditional\" fixture restore in 01-03 was not unconditional: restore and trap-clearing were `;`-separated with no `set -e`. Corrected to a fail-closed inbound path; see review_cycle.findings and blocking.T-01-10.",
-    "The skip/pass comparison is set CONTAINMENT (baseline skip set is a subset of the escalated pass set), not set equality. Cycle 1 and 2 prose mislabelled it; corrected at cycle 3."
-  ]
+    "The skip/pass comparison is set CONTAINMENT (baseline skip set is a subset of the escalated pass set), not set equality. Cycle 1 and 2 prose mislabelled it; corrected at cycle 3.",
+    {
+      "id": "C-07",
+      "source": "Alex, independent review of 940727c/d90b10d",
+      "finding": "01-01 instructed the executor to run `go build ./...` to find unused imports in test files. go build does not compile _test.go files, so it exits 0 and names nothing.",
+      "found_by_convergence": false,
+      "note": "Missed by all three Codex cycles; Codex cycle 1 explicitly endorsed the instruction. Measured on Go 1.24.13: go build exits 0, while go vet and go test both report the unused import. The <automated> blocks already run go vet and go test, so verification would have caught it -- the defect was a misleading action instruction, not an undetected escape.",
+      "corrected_at": "19209e1",
+      "corrected_in": [
+        "01-01-PLAN.md"
+      ]
+    }
+  ],
+  "adjudication": {
+    "document": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-ADJUDICATION.md",
+    "commit": "8f3cb01",
+    "note": "Reconciles the independent review by Alex of 940727c/d90b10d against the three Codex convergence cycles and the orchestrator measurements. Finding 5 (go build cannot name unused imports in _test.go files) was missed by all three cycles and is corrected at 19209e1."
+  }
 }

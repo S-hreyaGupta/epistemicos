@@ -1,6 +1,8 @@
 ---
 phase: 1
 document: adjudication
+supersedes: 8f3cb01
+supersedes_note: amends finding 2 from `fixed` to `partially fixed`; scoreboard row and status text only, no other change
 subject: three independent review passes over the Phase 1 plan set
 adjudicated_at: 2026-08-31
 plan_set_reviewed: cdad611 (freeze d92a8c9), planning-complete ded50c2
@@ -43,7 +45,7 @@ artifact retains. This document is the retention.
 | # | Alex's finding | Found by a cycle? | Raised by | Fixed now? |
 |---|---|---|---|---|
 | 1 | 01-02 AC-14 policy contradiction | Partially, cycle 1, LOW | Codex | Narrowed and deferred, not eliminated |
-| 2 | Frozen baseline changeable after freeze | Adjacent, cycle 1, HIGH | Orchestrator | Yes |
+| 2 | Frozen baseline changeable after freeze | Adjacent, cycle 1, HIGH | Orchestrator | Partially — value corrected, substitution procedure still unguarded |
 | 3 | Credential-canary proof insufficient | Yes, cycle 1, MEDIUM + HIGH | Codex, then orchestrator | Yes |
 | 4 | 01-01 tracer loses expected-failure exit status | Yes, cycle 1, HIGH | Codex | Yes |
 | 5 | `go build ./...` to find unused imports in test files | **No — missed by all three cycles** | — | **Fixed by this adjudication** |
@@ -98,12 +100,17 @@ Codex asserted the opposite, calling the range *"presently valid"*.
 Alex's finding is the governance defect one level up: not that the base was wrong,
 but that the plan permitted changing a frozen value without re-freezing.
 
-**Status: fixed, by the remedy Alex specified.** The `"substitute the actual
-commit this phase branched from"` clause is gone from all three plans. The base is
-re-anchored to `030521b`, and `01-01` Task 1 carries a `<precondition>` asserting
-all four properties, so a wrong anchor halts at phase start rather than surfacing
-as a false audit failure after code has landed (`01-01-PLAN.md:109`). The manifest
-was re-frozen. That is halt-then-re-freeze.
+**Status: partially fixed.** The wrong *value* is corrected and recorded: the
+`"substitute the actual commit this phase branched from"` clause is gone from all
+three plans, the base is re-anchored to `030521b`, and `01-01` Task 1 carries a
+`<precondition>` asserting all four properties (`01-01-PLAN.md:109`).
+
+That guard catches a **wrong anchor**. It does not catch an **ungated
+substitution**, and the second is what Alex objected to. A base moved forward past
+a real change satisfies all four properties — which is precisely why `030521b`
+passes them. The substitution *procedure* is therefore still unguarded: the
+specific `fcebad1` error is gone, the mechanism that permitted it is not. The
+substitution at `dd69e0e` was itself neither halted nor human-approved.
 
 ## 3 — Credential-canary proof insufficient
 

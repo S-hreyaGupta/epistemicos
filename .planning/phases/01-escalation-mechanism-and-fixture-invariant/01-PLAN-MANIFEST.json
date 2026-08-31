@@ -1,18 +1,10 @@
 {
   "manifest_version": 1,
   "purpose": "Freeze record for the Phase 1 PLAN set. Hashes are SHA-256 over the exact committed bytes. Any edit to a plan invalidates this manifest and requires a re-freeze.",
-  "supersedes": "d464319",
-  "supersedes_note": "d464319 froze the plan set at 4d18eba -- the state carrying the preamble declaration (Alex finding 1, option C). This freeze supersedes it with the base-substitution guard (Alex finding 2). Full chain: 940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/d92a8c9 -> 19209e1/39021b3 -> 4d18eba/d464319 -> 2cc3b42/this. d90b10d remains the review-of-record freeze that both Alex and Codex cycle 1 reviewed. Every earlier freeze is an unaltered record of what was reviewed at that point. Do not delete or edit any of them.",
   "phase": {
     "number": "1",
     "name": "Escalation Mechanism and Fixture Invariant",
     "dir": ".planning/phases/01-escalation-mechanism-and-fixture-invariant"
-  },
-  "freeze": {
-    "commit": "2cc3b42e4671213c0f47d0923a44f86a886c4403",
-    "short": "2cc3b42",
-    "committed_at": "2026-09-01T00:59:10+05:30",
-    "verified": "working tree byte-identical to committed blobs at freeze time; each sha256 was computed twice, once over the working-tree file and once over `git show HEAD:<path>`, and the two agreed for all three plans. 01-01 and 01-03 changed in this freeze; 01-02 hashes identically to the 4d18eba freeze."
   },
   "review_cycle": {
     "cycle": 2,
@@ -318,7 +310,7 @@
         "01-03-PLAN.md",
         "01-PLAN-MANIFEST.json"
       ],
-      "open_item": "phase_base_approval.status is `awaiting_approval`. The phase halts at 01-01 Task 1 until a human approves the 030521b anchor or names a different one."
+      "open_item": "phase_base_approval.status is `awaiting_approval`. The phase halts at 01-01 Task 1 until a human approves the 030521b anchor or names a different one. The plan set is deliberately left UNFROZEN until then -- see freeze_invalidated -- because a freeze over an undecided base reproduces the defect this correction closes."
     }
   ],
   "adjudication": {
@@ -362,5 +354,24 @@
       ".github/workflows/ci.yml": "fdbf98f47f2292ea141da2dfe91604486172bf50"
     },
     "base_independence_evidence": "The ci.yml blob is fdbf98f4 at both 030521b and 868d45b, but 74971632 at fcebad1 -- the change 868d45b made. The pin therefore catches exactly what the commit-count criterion missed, and cannot be satisfied by moving the phase base."
+  },
+  "freeze_invalidated": {
+    "state": "NOT FROZEN",
+    "reason": "The phase base anchor is undecided. phase_base_approval.status is `awaiting_approval`, so certifying a frozen plan set on top of it would assert validity resting on an unapproved anchor -- the exact pattern Alex's finding 2 identifies and that this plan set now guards against. A freeze taken over an undecided base is not a weaker freeze; it is the defect wearing a freeze's clothes.",
+    "last_valid_freeze": "d464319",
+    "last_valid_freeze_plan_bytes": "4d18eba",
+    "last_valid_freeze_note": "d464319 froze the plan set at 4d18eba, the state carrying the preamble declaration (Alex finding 1, option C). It remains the most recent freeze anyone should cite. Plan bytes have moved past it -- see plans[].sha256 below -- so d464319 describes an earlier state, not the current tree.",
+    "withdrawn_freeze": {
+      "commit": "2cc3b42e4671213c0f47d0923a44f86a886c4403",
+      "short": "2cc3b42",
+      "taken_at": "1ec4f04",
+      "withdrawn_at": "1ec4f04",
+      "superseded_value": "d464319",
+      "why_withdrawn": "Taken at 1ec4f04 in the same turn as the guard it was meant to record, before the operator ruled on the base. It asserted a validated plan set anchored at 2cc3b42 while phase_base_approval.status two fields below read `awaiting_approval`. 1ec4f04 is deliberately NOT rewritten: the record of a freeze that should not have been taken is worth more than a clean history, and this milestone is about not hiding that class of thing.",
+      "superseded_note_preserved": "d464319 froze the plan set at 4d18eba -- the state carrying the preamble declaration (Alex finding 1, option C). This freeze supersedes it with the base-substitution guard (Alex finding 2). Full chain: 940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/d92a8c9 -> 19209e1/39021b3 -> 4d18eba/d464319 -> 2cc3b42/this. d90b10d remains the review-of-record freeze that both Alex and Codex cycle 1 reviewed. Every earlier freeze is an unaltered record of what was reviewed at that point. Do not delete or edit any of them."
+    },
+    "chain_so_far": "940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/d92a8c9 -> 19209e1/39021b3 -> 4d18eba/d464319 -> (2cc3b42/1ec4f04, withdrawn) -> current tree UNFROZEN. d90b10d remains the review-of-record freeze that both Alex and Codex cycle 1 reviewed. Every earlier freeze is an unaltered record of what was reviewed at that point. Do not delete or edit any of them.",
+    "unblocks": "Set phase_base_approval.status to `approved` with approved_by and approved_on filled, or name a different base and record the substitution in phase_base_approval.substitution_history. Then re-freeze, superseding d464319 and noting that 1ec4f04's freeze was withdrawn.",
+    "plans_hashes_note": "plans[].sha256, bytes and lines below are accurate measurements of the current tree at 1ec4f04. They are measurements, NOT a freeze: nothing has certified this plan set, and no supersedes pointer claims it has."
   }
 }

@@ -1,33 +1,76 @@
 {
   "manifest_version": 1,
   "purpose": "Freeze record for the Phase 1 PLAN set. Hashes are SHA-256 over the exact committed bytes. Any edit to a plan invalidates this manifest and requires a re-freeze.",
-  "supersedes": "d90b10d",
-  "supersedes_note": "d90b10d froze the plan set at 940727c — the exact byte state Alex and Codex reviewed, recorded in 01-REVIEWS.md. That freeze is deliberately left unannotated so it remains an unaltered record of what was reviewed. This manifest carries the supersession instead. Do not delete or edit d90b10d.",
+  "supersedes": "dd69e0e",
+  "supersedes_note": "dd69e0e froze the plan set at 09a88c9 - the exact byte state Codex reviewed in cycle 2, recorded in 01-REVIEWS.md. That freeze is deliberately left unannotated so it remains an unaltered record of what was reviewed; this manifest carries the supersession instead. dd69e0e in turn superseded d90b10d, which froze the cycle-1 review state at 940727c. The chain is 940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/this. Do not delete or edit any earlier freeze.",
   "phase": {
     "number": "1",
     "name": "Escalation Mechanism and Fixture Invariant",
     "dir": ".planning/phases/01-escalation-mechanism-and-fixture-invariant"
   },
   "freeze": {
-    "commit": "09a88c9eac2cd7cd6c62b75e1beb5c2d50639c5a",
-    "short": "09a88c9",
-    "committed_at": "2026-08-31T17:59:38+05:30",
-    "verified": "working tree byte-identical to committed blobs at freeze time; each sha256 was computed twice, once over the working-tree file and once over `git show HEAD:<path>`, and the two agreed"
+    "commit": "cdad6111e6ebbc28d6ae4527e3b7718ef0380575",
+    "short": "cdad611",
+    "committed_at": "2026-08-31T18:59:56+05:30",
+    "verified": "working tree byte-identical to committed blobs at freeze time; each sha256 was computed twice, once over the working-tree file and once over `git show HEAD:<path>`, and the two agreed for all three plans. 01-01 and 01-02 hash identically to the 09a88c9 freeze, which is the mechanical confirmation that cycle 3 did not touch them."
   },
   "review_cycle": {
-    "cycle": 1,
+    "cycle": 2,
     "reviews_file": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-REVIEWS.md",
     "reviewers": [
       "codex"
     ],
-    "reviewed_plan_freeze": "d90b10d",
-    "high_concerns": 4,
-    "high_concerns_resolved": 4,
-    "actionable_non_high": 14,
-    "actionable_non_high_incorporated": 13,
-    "actionable_non_high_rejected_with_rationale": 1,
-    "rejection_note": "The suggestion to dismiss probe edges E1/E2/E4 as noise was rejected: the spec-less fallback protocol forbids planner-side dismissal. Addressed in substance instead — E2, E3 and E4 were each given the referent they actually have in this phase and authored as explicit criteria in 01-01's must_haves.truths; only E1, which the probe returned with no category, remains flagged."
+    "reviewed_plan_freeze": "dd69e0e",
+    "reviewed_plan_bytes": "09a88c9",
+    "high_concerns": 1,
+    "high_concerns_resolved": 1,
+    "actionable_non_high": 2,
+    "actionable_non_high_incorporated": 2,
+    "actionable_non_high_rejected_with_rationale": 0,
+    "plans_edited": [
+      "01-03"
+    ],
+    "plans_unchanged": [
+      "01-01",
+      "01-02"
+    ],
+    "scope_note": "Cycle 2 raised no concern against 01-01 and only a non-actionable, explicitly deferred LOW against 01-02, so both were left byte-identical. All three findings landed in 01-03 and were resolved there.",
+    "findings": [
+      {
+        "severity": "high",
+        "summary": "The fixture restoration was not actually unconditional. The explicit restore and the trap-clearing were `;`-separated; the script runs under `set -o pipefail` but without `set -e`, so a failed restore did not stop execution and the next statement disarmed the EXIT trap, stranding the hash-pinned fixture in the mktemp directory with the working tree corrupt in the one file every offset in expected.json depends on.",
+        "resolution": "The inbound path is now fail-closed. Four guards stand between the test run and `trap - EXIT INT TERM` - the restore mv, an existence re-check of the destination, the re-hash, and the BEFORE/AFTER comparison - each aborting with a non-zero status via an || { echo MARKER >&2; exit 1; } clause rather than falling through. The trap-clearing statement is therefore unreachable except on a proven-restored path, and any failure exits non-zero with the trap still armed, so the EXIT trap fires and retries the restore. The corrected command is written verbatim into the acceptance criterion, a recovery criterion tells the executor to stop rather than re-run when an armed-guard marker appears, and a new must_haves truth and prohibition bind the property.",
+        "verification": "Not argued - executed. The command shape was run against a stand-in sandbox with a shell function shadowing mv so that only the inbound direction fails. Three modes: (1) restore succeeds -> exit 0, FIXTURE_FAIL_OK printed, fixture present and hash-matching, temp dir removed; (2) restore fails -> exit 1, marker on stderr, and the EXIT trap fires a second restore attempt, proving it was never cleared; (3) abort inside the move/restore window -> exit 9 and the trap restores the file. The previous spelling was run through the same harness for contrast: exit 1, fixture absent from the tree, only copy stranded in the temp dir, and the EXIT trap fired zero times because it had already been cleared."
+      },
+      {
+        "severity": "medium",
+        "summary": "The escalated \"zero skips\" acceptance criterion had no corresponding command in the <automated> verify block, which asserted name-set containment and exit status only. Containment covers the 38 baseline skips but would not catch a newly introduced skip, which is what \"zero skips\" actually asserts.",
+        "resolution": "Task 2 <automated> now carries an explicit capture-form count: the escalated -json run is captured into a variable, its status taken on the next statement, and two independent conditions asserted - status equals 0, and the count of skip events carrying a \"Test\" field equals 0. The same spelling is written into the acceptance criteria, with a criterion explaining why it is not redundant with containment. No jq.",
+        "verification": "Run against stand-ins: zero skips passes; one newly introduced test-level skip fails (the case containment misses); a non-zero test status fails on the separately asserted status. Also confirmed that the inner grep exiting 1 on no matches is harmless in this form, because command substitution yields only the text and the pipeline status never reaches `test` - so the check is safe under pipefail, which was the narrowed ground the orchestrator recorded."
+      },
+      {
+        "severity": "low",
+        "summary": "must_haves.truths and the cycle-1 deferral table called the skip/pass comparison \"set equality\" while the implemented assertion, `comm -23`, is subset containment, and the acceptance criterion already said \"set containment\". The plan recorded a stronger claim than it tested, and must_haves.truths is what the verifier and summary bind to.",
+        "resolution": "Relabelled to set containment in both places, with the direction spelled out - the baseline skip set is a subset of the escalated pass set. The check itself is unchanged; containment is the correct property, because the escalated run legitimately passes tests that never skipped. The phrase \"set equality\" now survives only inside the correction records that describe what was changed."
+      }
+    ]
   },
+  "review_cycle_history": [
+    {
+      "cycle": 1,
+      "reviews_file": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-REVIEWS.md",
+      "reviewers": [
+        "codex"
+      ],
+      "reviewed_plan_freeze": "d90b10d",
+      "high_concerns": 4,
+      "high_concerns_resolved": 4,
+      "actionable_non_high": 14,
+      "actionable_non_high_incorporated": 13,
+      "actionable_non_high_rejected_with_rationale": 1,
+      "rejection_note": "The suggestion to dismiss probe edges E1/E2/E4 as noise was rejected: the spec-less fallback protocol forbids planner-side dismissal. Addressed in substance instead — E2, E3 and E4 were each given the referent they actually have in this phase and authored as explicit criteria in 01-01's must_haves.truths; only E1, which the probe returned with no category, remains flagged."
+    }
+  ],
   "phase_base_commit": "030521b1ec7c12df868445bf8d162527202d42f1",
   "phase_base_short": "030521b",
   "phase_base_correction": {
@@ -74,7 +117,11 @@
       "requirements": [
         "GATE-05"
       ],
-      "previous_sha256": "5af1bb1ca2b5e7769977e55977e3f07700f6d27b08d0b973e8b91b9c42a7d47f"
+      "previous_sha256": "5af1bb1ca2b5e7769977e55977e3f07700f6d27b08d0b973e8b91b9c42a7d47f",
+      "unchanged_since": "09a88c9",
+      "unchanged_note": "Byte-identical to the cycle-2 freeze. Cycle 2 raised no actionable finding against this plan and cycle 3 did not edit it; the matching hash is the proof, not the claim.",
+      "previous_sha256_freeze": "d90b10d",
+      "previous_sha256_note": "The pre-09a88c9 (cycle-1) hash. This plan has not changed since 09a88c9, so previous_sha256 refers to the freeze before that one."
     },
     {
       "plan": "01-02",
@@ -87,14 +134,18 @@
       "requirements": [
         "GATE-04"
       ],
-      "previous_sha256": "d414eedc81fe3cc7b7094af0a40c433d26fa7d107750c9bb0482451da6f9f76c"
+      "previous_sha256": "d414eedc81fe3cc7b7094af0a40c433d26fa7d107750c9bb0482451da6f9f76c",
+      "unchanged_since": "09a88c9",
+      "unchanged_note": "Byte-identical to the cycle-2 freeze. Cycle 2 raised no actionable finding against this plan and cycle 3 did not edit it; the matching hash is the proof, not the claim.",
+      "previous_sha256_freeze": "d90b10d",
+      "previous_sha256_note": "The pre-09a88c9 (cycle-1) hash. This plan has not changed since 09a88c9, so previous_sha256 refers to the freeze before that one."
     },
     {
       "plan": "01-03",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-03-PLAN.md",
-      "sha256": "8975731d4743e1510d25f29a95e444314f00dba61181c4b627ecd166029686bb",
-      "bytes": 57577,
-      "lines": 619,
+      "sha256": "8be496b1c5bde97208fc2e4a707a5b3d29ed7613664bfb799b363314be6f764e",
+      "bytes": 71588,
+      "lines": 721,
       "wave": 2,
       "depends_on": [
         "01-01",
@@ -104,7 +155,8 @@
         "GATE-04",
         "GATE-05"
       ],
-      "previous_sha256": "286720f554c992e205079c7733f28a52366ab284cf278d3c9814d800811268c4"
+      "previous_sha256": "8975731d4743e1510d25f29a95e444314f00dba61181c4b627ecd166029686bb",
+      "previous_sha256_freeze": "dd69e0e"
     }
   ],
   "blocking": [
@@ -112,7 +164,7 @@
       "id": "T-01-10",
       "severity": "high",
       "plan": "01-03",
-      "summary": "The hash-pinned fixture internal/core/domain/segment/testdata/demo.md is moved aside during the unreadable-fixture proof. Restoration is a `trap ... EXIT INT TERM` installed before the move, plus a SHA-256 captured before and compared after, both required to equal a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e. Corruption of this one file invalidates all 22 offsets in expected.json and every span assertion in the segment package."
+      "summary": "The hash-pinned fixture internal/core/domain/segment/testdata/demo.md is moved aside during the unreadable-fixture proof. Restoration is a `trap ... EXIT INT TERM` installed before the move, plus a fail-closed inbound path in which the restore mv, an existence re-check, the re-hash and the BEFORE/AFTER comparison each abort with a non-zero status instead of falling through - so the trap-clearing statement is unreachable except on a proven-restored path, and any failure exits with the trap still armed to retry on EXIT. Both hashes must equal a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e. Cycle 2 found the cycle-2 spelling separated the restore from the trap-clearing with a semicolon, which under pipefail without set -e cleared the guard on a failed restore; corrected at cycle 3 and all three control-flow paths executed against a stand-in. Corruption of this one file invalidates all 22 offsets in expected.json and every span assertion in the segment package."
     }
   ],
   "blocking_corrections": [
@@ -224,6 +276,8 @@
     "PROJECT.md Constraints names testify; go.mod has no assertion library. Plans mandate stdlib testing only.",
     "Cycle 1 recorded pgxpool.New as echoing the password verbatim. It does not at v5.7.2; see blocking_corrections.T-01-01.",
     "Cycle 1 anchored the phase at fcebad1. It is an ancestor of HEAD but fails both audit criteria; see phase_base_correction.",
-    "The STATE.md resume note assumed jq would be on PATH. It is not, as of this freeze; no command in the phase may depend on it."
+    "The STATE.md resume note assumed jq would be on PATH. It is not, as of this freeze; no command in the phase may depend on it.",
+    "Cycle 2 found the \"unconditional\" fixture restore in 01-03 was not unconditional: restore and trap-clearing were `;`-separated with no `set -e`. Corrected to a fail-closed inbound path; see review_cycle.findings and blocking.T-01-10.",
+    "The skip/pass comparison is set CONTAINMENT (baseline skip set is a subset of the escalated pass set), not set equality. Cycle 1 and 2 prose mislabelled it; corrected at cycle 3."
   ]
 }

@@ -1,18 +1,18 @@
 {
   "manifest_version": 1,
   "purpose": "Freeze record for the Phase 1 PLAN set. Hashes are SHA-256 over the exact committed bytes. Any edit to a plan invalidates this manifest and requires a re-freeze.",
-  "supersedes": "39021b3",
-  "supersedes_note": "39021b3 froze the plan set at 19209e1 -- the state carrying the go vet correction (Alex finding 5). This freeze supersedes it with the preamble-declaration change (Alex finding 1, option C). Full chain: 940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/d92a8c9 -> 19209e1/39021b3 -> 4d18eba/this. d90b10d remains the review-of-record freeze that both Alex and Codex cycle 1 reviewed. Every earlier freeze is an unaltered record of what was reviewed at that point. Do not delete or edit any of them.",
+  "supersedes": "d464319",
+  "supersedes_note": "d464319 froze the plan set at 4d18eba -- the state carrying the preamble declaration (Alex finding 1, option C). This freeze supersedes it with the base-substitution guard (Alex finding 2). Full chain: 940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/d92a8c9 -> 19209e1/39021b3 -> 4d18eba/d464319 -> 2cc3b42/this. d90b10d remains the review-of-record freeze that both Alex and Codex cycle 1 reviewed. Every earlier freeze is an unaltered record of what was reviewed at that point. Do not delete or edit any of them.",
   "phase": {
     "number": "1",
     "name": "Escalation Mechanism and Fixture Invariant",
     "dir": ".planning/phases/01-escalation-mechanism-and-fixture-invariant"
   },
   "freeze": {
-    "commit": "4d18eba5d2a3ca76f345a11c64158ebba3f29eff",
-    "short": "4d18eba",
-    "committed_at": "2026-09-01T00:54:23+05:30",
-    "verified": "working tree byte-identical to committed blobs at freeze time; each sha256 was computed twice, once over the working-tree file and once over `git show HEAD:<path>`, and the two agreed for all three plans. 01-02 and 01-03 changed in this freeze; 01-01 hashes identically to the 19209e1 freeze."
+    "commit": "2cc3b42e4671213c0f47d0923a44f86a886c4403",
+    "short": "2cc3b42",
+    "committed_at": "2026-09-01T00:59:10+05:30",
+    "verified": "working tree byte-identical to committed blobs at freeze time; each sha256 was computed twice, once over the working-tree file and once over `git show HEAD:<path>`, and the two agreed for all three plans. 01-01 and 01-03 changed in this freeze; 01-02 hashes identically to the 4d18eba freeze."
   },
   "review_cycle": {
     "cycle": 2,
@@ -109,19 +109,17 @@
     {
       "plan": "01-01",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-01-PLAN.md",
-      "sha256": "776afe5f6b057a1d3f651f59f6e37a15f5c003dede1d43a4e1211e13f967da77",
-      "bytes": 51227,
-      "lines": 654,
+      "sha256": "037a8d4d2883a7d28fe490bdb438fbdda6ed2fd68d4478d8492cd2f9e43709d1",
+      "bytes": 52492,
+      "lines": 674,
       "wave": 1,
       "depends_on": [],
       "requirements": [
         "GATE-05"
       ],
-      "previous_sha256": "b5bf59e04a03814339d925117d6c0ca787fe10228f29364263c2cd8fac728a4e",
-      "previous_sha256_freeze": "cdad611",
-      "previous_sha256_note": "changed by the go vet correction at 19209e1 (Alex finding 5)",
-      "unchanged_since": "19209e1",
-      "unchanged_note": "byte-identical to the 19209e1 freeze; not touched by the 4d18eba change"
+      "previous_sha256": "776afe5f6b057a1d3f651f59f6e37a15f5c003dede1d43a4e1211e13f967da77",
+      "previous_sha256_freeze": "4d18eba",
+      "previous_sha256_note": "changed by the base-substitution guard at 2cc3b42 (Alex finding 2)"
     },
     {
       "plan": "01-02",
@@ -136,14 +134,16 @@
       ],
       "previous_sha256": "9a61c8f519c2773fc042d40d05666ab6b715e5aa99bff19cac328d060647ef98",
       "previous_sha256_freeze": "19209e1",
-      "previous_sha256_note": "changed by the preamble-declaration change at 4d18eba (Alex finding 1, option C)"
+      "previous_sha256_note": "changed by the preamble-declaration change at 4d18eba (Alex finding 1, option C)",
+      "unchanged_since": "4d18eba",
+      "unchanged_note": "byte-identical to the 4d18eba freeze; not touched by the 2cc3b42 change"
     },
     {
       "plan": "01-03",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-03-PLAN.md",
-      "sha256": "db95c8185e28bd964d8c19fd306878aea7394bb5bc6d443924fbae250aa555d2",
-      "bytes": 73408,
-      "lines": 741,
+      "sha256": "47085ea837177408d71f02d6275343392c15c760dbbfe76798ca0d170538f6bd",
+      "bytes": 76497,
+      "lines": 761,
       "wave": 2,
       "depends_on": [
         "01-01",
@@ -153,9 +153,9 @@
         "GATE-04",
         "GATE-05"
       ],
-      "previous_sha256": "8be496b1c5bde97208fc2e4a707a5b3d29ed7613664bfb799b363314be6f764e",
-      "previous_sha256_freeze": "19209e1",
-      "previous_sha256_note": "changed by the preamble-declaration change at 4d18eba (Alex finding 1, option C)"
+      "previous_sha256": "db95c8185e28bd964d8c19fd306878aea7394bb5bc6d443924fbae250aa555d2",
+      "previous_sha256_freeze": "4d18eba",
+      "previous_sha256_note": "changed by the base-substitution guard at 2cc3b42 (Alex finding 2)"
     }
   ],
   "blocking": [
@@ -303,6 +303,22 @@
         "01-02-PLAN.md",
         "01-03-PLAN.md"
       ]
+    },
+    {
+      "id": "C-09",
+      "source": "Alex, independent review of 940727c/d90b10d",
+      "finding": "01-03 permitted substituting the phase base commit and merely recording it. The remedy should be halt then re-freeze, with explicit approval.",
+      "found_by_convergence": "partially -- the orchestrator's cycle-1 HIGH found the base was factually wrong, not that the substitution procedure was ungated. Codex called the range 'presently valid'.",
+      "first_correction_at": "dd69e0e",
+      "first_correction_insufficient": "That correction fixed the value and added a four-property precondition, and 01-ADJUDICATION.md recorded finding 2 as fixed. Amended at 179680e to partially fixed: the precondition catches a wrong anchor, not an ungated substitution, since a base moved forward past a real change satisfies all four properties.",
+      "note": "Closed at 2cc3b42 by two mechanisms: a fifth precondition property requiring phase_base_approval.status to be exactly `approved` (awaiting_approval halts), with substitution designated a checkpoint:decision; and base-independent git blob pins for Makefile and ci.yml, so the 'make gate is unchanged' claim no longer rests on a window whose left edge is adjustable.",
+      "corrected_at": "2cc3b42",
+      "corrected_in": [
+        "01-01-PLAN.md",
+        "01-03-PLAN.md",
+        "01-PLAN-MANIFEST.json"
+      ],
+      "open_item": "phase_base_approval.status is `awaiting_approval`. The phase halts at 01-01 Task 1 until a human approves the 030521b anchor or names a different one."
     }
   ],
   "adjudication": {
@@ -310,5 +326,41 @@
     "commit": "179680e",
     "supersedes": "8f3cb01",
     "note": "Reconciles the independent review by Alex of 940727c/d90b10d against the three Codex convergence cycles and the orchestrator measurements. Amended at 179680e to record finding 2 as partially fixed: the guard added to 01-01 Task 1 catches a wrong anchor, not an ungated substitution. Finding 5 corrected at 19209e1; finding 1 dispositioned by Alex and implemented at 4d18eba."
+  },
+  "phase_base_approval": {
+    "commit": "030521b1ec7c12df868445bf8d162527202d42f1",
+    "short": "030521b",
+    "status": "awaiting_approval",
+    "approved_by": null,
+    "approved_on": null,
+    "is_merge_base": false,
+    "merge_base": "fcebad17569568c125ca88e10d0659a3586c28dd",
+    "merge_base_short": "fcebad1",
+    "why_not_merge_base": "868d45b ('Run the store and approved tests against a real Postgres in CI') landed after the merge-base and modified .github/workflows/ci.yml, so an audit anchored at fcebad1 reports a Makefile/ci.yml change before any Phase 1 code exists. 030521b sits after 868d45b, which makes the commit-count criterion pass. That is the substitution requiring approval: the anchor was moved past a real change rather than the change being accounted for.",
+    "substitution_history": [
+      {
+        "from": "fcebad1",
+        "to": "030521b",
+        "at": "dd69e0e",
+        "when": "2026-08-31T18:01:18+05:30",
+        "driver": "cycle-1 convergence replan, orchestrator HIGH #3",
+        "recorded": true,
+        "halted": false,
+        "approved": false,
+        "note": "Recorded in detail in phase_base_correction at the time, but neither halted nor human-approved. Recording is not approving. This block exists so the distinction is enforced rather than assumed."
+      }
+    ],
+    "blocks": "01-01 Task 1's <precondition> and 01-03 Task 1's first acceptance criterion both halt while status is not exactly `approved`. To approve: set status to `approved`, fill approved_by and approved_on, and re-freeze. To reject: choose a different base, record the substitution here, and re-freeze. Neither is an executor decision.",
+    "note_on_sufficiency": "Approving this base does not by itself make the audit meaningful. The four anchor properties are satisfiable by any sufficiently late base, so 01-03 also pins the Makefile and ci.yml git blob hashes, which no base placement can affect. The approval covers the anchor; the content pins cover the claim."
+  },
+  "gate_file_pins": {
+    "method": "git rev-parse HEAD:<path>",
+    "method_note": "git blob hashes, NOT sha256sum of the working tree. Both files carry CRLF in a Windows checkout, so sha256sum disagrees with the committed bytes and would fail spuriously -- the same hazard .gitattributes already handles for the segment fixture.",
+    "measured_at": "2cc3b42",
+    "files": {
+      "Makefile": "63d55631fd47ec6f0900c8da38d5b7cb00297c4c",
+      ".github/workflows/ci.yml": "fdbf98f47f2292ea141da2dfe91604486172bf50"
+    },
+    "base_independence_evidence": "The ci.yml blob is fdbf98f4 at both 030521b and 868d45b, but 74971632 at fcebad1 -- the change 868d45b made. The pin therefore catches exactly what the commit-count criterion missed, and cannot be satisfied by moving the phase base."
   }
 }

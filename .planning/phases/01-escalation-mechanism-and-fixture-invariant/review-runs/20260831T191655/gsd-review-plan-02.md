@@ -1,0 +1,721 @@
+---
+phase: 01-escalation-mechanism-and-fixture-invariant
+plan: 03
+type: execute
+wave: 2
+depends_on: ["01-01", "01-02"]
+files_modified:
+  - .planning/phases/01-escalation-mechanism-and-fixture-invariant/01-03-SUMMARY.md
+autonomous: true
+requirements: [GATE-04, GATE-05]
+
+estimate:
+  tokens: 48000
+  raw_tokens: 48000
+  tasks: 3
+  confidence: low
+
+must_haves:
+  truths:
+    - "`make gate` exits 0 with no database present, exactly as at the phase base commit — the mechanism built in 01-01 enforces nothing"
+    - "`make gate` exits 0 with a reachable database and migrations applied"
+    - "With EPISTEMIC_OS_TEST_REQUIRE_DB set and a reachable database, the store and approved packages report 0 skipped tests and 0 failures, and the set of tests that PASS contains every test that SKIPPED in the unescalated baseline — set containment (the baseline skip set is a subset of the escalated pass set), not a count. The zero-skip half and the containment half are separate assertions with separate commands: containment covers the 38 baseline skips, and only the zero-skip count catches a newly introduced skip"
+    - "With EPISTEMIC_OS_TEST_REQUIRE_DB set, each of the three environment conditions produces a non-zero exit AND a message naming that specific cause: the variable, the host, the fixture path — status and content asserted as independent conditions"
+    - "With EPISTEMIC_OS_TEST_REQUIRE_DB unset and the database unreachable, the suite exits 0 and the database-backed tests SKIP — the branch measured at the phase base, and half of ROADMAP success criterion 3"
+    - "With EPISTEMIC_OS_TEST_REQUIRE_DB unset and the cross-package fixture unreadable, the fixture round-trip test SKIPs and the package exits 0 — the other half of ROADMAP success criterion 3"
+    - "No commit in this phase touches the Makefile or the CI workflow, measured from the corrected phase base commit 030521b"
+    - "On the unparseable-URL path, no component of the connection string reaches the output — a claim measured to be FALSE at the phase base, so the criterion proving it can actually fail"
+    - "The hash-pinned fixture is byte-identical before and after the unreadable-fixture proof, verified by SHA-256 comparison, with restoration guaranteed by a shell trap rather than by statement ordering"
+    - "The restore path is fail-closed: the trap is cleared only after the restore has been observed to succeed and the post-restore hash has been observed to match, and any failure along that path aborts with a non-zero status while leaving the trap armed to retry on EXIT"
+  artifacts:
+    - .planning/phases/01-escalation-mechanism-and-fixture-invariant/01-03-SUMMARY.md
+  key_links:
+    - "The escalated-green run is the only check that proves the helper does not fail spuriously when the database IS present — without it, a helper that always failed would satisfy every other criterion in this phase"
+    - "The unchanged-gate check is what makes this phase non-enforcing rather than merely intended to be; Phase 2 depends on inheriting a green tree"
+    - "The DSN leak control is the only criterion in the phase that is measured to fail at the phase base; if it is weakened back to a password canary it becomes unfalsifiable and the phase's security claim becomes decorative"
+  prohibitions:
+    - "This phase must not wire enforcement. No change to the Makefile and no change to the CI workflow, even though both are one line away from turning the mechanism on — and the temptation is highest here, in the plan that measures the difference."
+    - "The escalation flag must not default to on. With EPISTEMIC_OS_TEST_REQUIRE_DB unset, every test that skips at the phase base must still skip and the suite must still exit 0."
+    - "The two content-conditional skips in the segment acceptance test must not be deleted, converted into failures, or made conditional on the escalation flag. A fixture that genuinely lacks a preamble is real signal, and turning that into a gate failure is the exact conflation this milestone exists to prevent."
+    - "A failing check in this plan must not be resolved by weakening the check. If the escalated run does not reach 0 skips, the helper is wrong; the target is not."
+    - "No check in this plan may take the form of a bare pipeline from `go test` into `grep`. Such a check reports grep's exit status, not the test process's, and is satisfied by a build failure, a crash, an unexpected success or a zero-test run — the exact vacuity this milestone exists to remove."
+    - "The unreadable-fixture proof must not rely on statement ordering to restore the fixture. Restoration must be installed as a shell trap before the file is moved, and proven by a SHA-256 comparison taken before the move and after the restore."
+    - "The trap must not be cleared on a path where the restore has not been proven to have succeeded. No statement that clears the trap may be reachable by falling through a failed restore, a failed re-hash, or a hash mismatch — each of those must abort with a non-zero status while the trap is still armed. The script runs without `set -e`, so separating the restore from the trap-clearing with `;` is exactly the defect this forbids."
+---
+
+<objective>
+Measure that the escalation mechanism built in 01-01 works when the database is
+present, that each escalated condition names its own cause, that each unescalated
+condition still skips, and — the hard boundary of this phase — that `make gate`
+behaves exactly as it did before any of it landed.
+
+Purpose: this phase's whole claim is "the mechanism exists and enforces nothing".
+Both halves need evidence. Without the escalated-green run, a helper that failed
+unconditionally would satisfy every other criterion in the phase. Without the
+unchanged-gate run, "non-enforcing" is an intention rather than a measurement, and
+Phase 2 would inherit a red tree it did not cause.
+
+Output: a SUMMARY recording the measured baseline that Phase 2 will be diffed
+against and that Phase 3's proof tests will assert.
+
+**This plan writes no source file.** `files_modified` lists exactly one path, its
+own SUMMARY, which is a planning artifact rather than source. That distinction is
+stated here because cycle 1 declared `files_modified: []` while requiring the
+summary as an artifact, which was a contradiction the executor had to resolve on
+its own. If a check fails, the fix belongs in 01-01 or 01-02 and this plan re-runs.
+</objective>
+
+## Review response — cycle 1
+
+`01-REVIEWS.md` concentrated its heaviest findings on this plan, correctly: it is
+the phase's evidence-producing plan, so a weakness in its verification mechanics
+is a weakness in every claim the phase makes. Each finding and where it landed.
+
+| Finding | Severity | Resolution in this plan |
+|---|---|---|
+| Several pipelines can mask the `go test` exit status | HIGH | Every scenario now uses the capture form — combined output into a variable, `$?` on the following statement, then status and content asserted as independent conditions — or runs under `set -o pipefail`. A frontmatter prohibition forbids the bare-pipeline form. See **Execution shell**. |
+| The unreadable-fixture procedure specifies no actually unconditional restore | HIGH | Task 2 now installs a `trap … EXIT INT TERM` **before** the move, captures the fixture's SHA-256 before the move, restores explicitly after the run, clears the trap, re-hashes, and asserts the two hashes are equal. The full command is given verbatim as an acceptance criterion, not described. |
+| Phase base `fcebad1` is mis-anchored; the audit fails before any Phase 1 code exists | HIGH | Re-anchored to `030521b1ec7c12df868445bf8d162527202d42f1`, and the anchor was verified by running the two audit commands: both now return empty. `fcebad1` was measured to fail both — `868d45b` landed after it and modified `.github/workflows/ci.yml`. The guard is no longer "is it an ancestor" (which `fcebad1` satisfied while the audit failed) but the full four-part check, and it has been **moved to 01-01 Task 1's `<precondition>`** so a wrong anchor fails at phase start rather than at audit time. `01-PLAN-MANIFEST.json` is re-frozen with the corrected value. |
+| T-01-01's ground truth is false; the phase's only blocking control is unfalsifiable | HIGH | Scenario D is rebuilt. The password canary is retired — pgx v5.7.2 redacts the password on all four DSN shapes measured, so that canary passes at the phase base with zero code written. It is replaced by a **database-name** leak token, measured to appear in the phase-base output (count 1), plus an assertion that the library's parse-error text is absent, plus non-zero exit, plus the fixed message present. T-01-09 is restated and downgraded from `high` to `medium` accordingly; see `<threat_model>`. |
+| `files_modified: []` contradicts the required `01-03-SUMMARY.md` artifact | MEDIUM | The summary is now listed in `files_modified`, and the source/planning-artifact distinction is stated in the objective. |
+| The clean `git status --porcelain` criterion conflicts with writing the summary | MEDIUM | Task 3 now specifies the ordering explicitly and states both expected states — before the summary is written, and after. |
+| Scenario D's malformed-DSN canary lacks positive assertions | MEDIUM | Scenario D now asserts non-zero exit and the fixed parse-failure message text, alongside the two absence assertions. |
+| Verification commands are POSIX-only and the shell is unspecified on a Windows workspace | MEDIUM | **Execution shell** below states Git Bash explicitly, with the verified path, version, and the tool inventory — including that `jq` is absent, so no command may use it. The reviewer's runnability claim was partly overstated (every command re-ran correctly under Git Bash during review); the documentation gap was real and is now closed. |
+| No scenario covers the non-escalated skip path for an unreachable database or an unreadable fixture | MEDIUM | Added as Scenario A2 (Task 1, database-free) and Scenario A3 (Task 2, needs a live pool). ROADMAP success criterion 3 is now fully covered rather than half. |
+| "At least 38 `--- PASS` lines" is an indirect execution proof | LOW | Replaced with a `go test -json` set comparison: the set of test names that SKIP in the unescalated baseline must be a subset of the set that PASS in the escalated run, checked with `comm`. This is set containment on names — the baseline skip set is a subset of the escalated pass set — not a count, and is immune to subtest inflation. Cycle 2 corrected the label from "set equality": `comm -23` implements containment, and containment is the property actually wanted, since the escalated run legitimately passes tests that never skipped. |
+| The compose database's final state is unstated | LOW | Declared: **the compose database is left running** at the end of this plan. Task 3's last database action is `make up`, and the end state is now an explicit acceptance criterion. |
+| `EPISTEMIC_OS_TEST_REQUIRE_DB` also gates the cross-package fixture, not just the DB | LOW | Added to the contract decisions queued for the developer's disposition in Task 3. |
+| `git diff --name-only` with no revision range is vacuous | LOW | All diffs anchored to `030521b`. |
+| The four generic probe edges add noise; dismiss E1/E2/E4 and mark E3 covered | LOW | **Rejected as stated, addressed in substance.** The spec-less fallback protocol forbids planner-side dismissal of a probe edge, so they cannot simply be struck. Instead each was given the referent it actually has in this phase: E2 → the order in which simultaneous conditions are decided, E3 → the empty flag value and the empty host, E4 → independence from test execution order (pinned by `-shuffle=on`). Three are now explicit criteria in 01-01's `must_haves.truths`. Only E1, which the probe returned with no category at all, remains unresolved, and it is queued for the developer in Task 3. Accounting: 4 surfaced == 3 authored + 1 flagged. |
+
+## Review response — cycle 2
+
+Cycle 2 reviewed the rewritten plan set and reduced the outstanding set to three
+findings, all against this plan. Cycle 1's pipeline-status, anchor,
+DSN-disclosure-canary and duplicated-decision findings were confirmed resolved and
+are explicitly **not** reopened. 01-01 and 01-02 carry no outstanding finding and
+were not edited in this cycle.
+
+| Finding | Severity | Resolution in this plan |
+|---|---|---|
+| The "unconditional" fixture restore is not unconditional. The explicit restore and the trap-clearing were separated by `;` — `mv "$TMP/demo.md" "$FIX"; trap - EXIT INT TERM` — and the script runs under `set -o pipefail` but **without** `set -e`, so a failed restore did not stop execution and the very next statement disarmed the guard. | HIGH | The restore path is rebuilt fail-closed. Every step between the test run and the trap-clearing now aborts with a non-zero status on failure instead of falling through, so `trap - EXIT INT TERM` is unreachable unless the restore, an existence re-check, the re-hash and the hash comparison have all succeeded. The corrected command is given verbatim as an acceptance criterion, and its control flow was executed against a stand-in — see **Why the corrected restore path is fail-closed** below. |
+| The zero-skip acceptance criterion had no corresponding command in the `<automated>` verify block. Name-set containment covers the 38 baseline skips but would not catch a *newly introduced* skip, which is exactly what "zero skips" asserts. | MEDIUM | Task 2's `<automated>` block now carries an explicit capture-form count of escalated skip events carrying a `"Test"` field, asserted equal to `0`, alongside an independent assertion that the escalated run's own exit status is `0`. Two assertions, two conditions, one capture. No `jq` — the count is a `grep` filter chain inside a command substitution, which is the capture form this plan already mandates. |
+| `must_haves.truths` and the cycle-1 table said "set equality" while the implemented check, `comm -23`, is subset containment, and the acceptance criterion already said "set containment". | LOW | Relabelled to **set containment** in both places, so the truth the verifier binds to, the cycle-1 table and the acceptance criterion now make the same claim. The check itself is unchanged: containment is the correct property, because the escalated run legitimately passes tests that never skipped. |
+
+### Why the corrected restore path is fail-closed
+
+The reviewer's mechanism is exact and worth restating, because the corrected command
+is only defensible if the failure it closes is understood.
+
+The old form ran `mv "$TMP/demo.md" "$FIX"; trap - EXIT INT TERM`. With no `set -e`,
+a failed `mv` sets a non-zero `$?` that nothing reads, and the next statement
+disarms the EXIT trap. The remaining statements then fail — `sha256sum` cannot hash
+a file that is not there, `$AFTER` comes back empty, and the hash comparison
+returns non-zero — so the *check* reports failure, which reads like safety. It is
+not. The check failing is not the harm; the harm is that the working tree is left
+missing the one file whose bytes every offset in `expected.json` depends on, with
+the only copy stranded in a `mktemp -d` directory and the trap that would have
+recovered it already cleared. A non-zero exit with a corrupt tree is strictly worse
+than a non-zero exit with an intact one.
+
+Reproduced against a stand-in — same command shape, a shell function shadowing `mv`
+so only the inbound direction fails: the old form exits `1`, the fixture is absent
+from the tree, the copy sits in the temporary directory, and the EXIT trap fires
+**zero** times because it was already disarmed.
+
+The corrected form inverts each link. `mv` is guarded, so a failed restore aborts
+immediately and the trap is still armed when the shell exits, which fires the trap
+and retries the restore. An existence re-check follows, because a `mv` that reports
+success but leaves nothing at the destination must not be trusted. The re-hash is
+guarded, since under `pipefail` a failed `sha256sum` propagates through `cut`
+rather than yielding an empty string that silently compares unequal. The hash
+comparison is guarded and precedes the trap-clearing, so a restored-but-altered
+file also aborts. Only past all four does `trap - EXIT INT TERM` execute. The
+ordering is the control: **the trap outlives every statement that could fail.**
+
+Executed against the same stand-in, three ways:
+
+| Mode | Exit | Fixture in tree | Trap behavior |
+|---|---|---|---|
+| Restore succeeds | `0`, prints `FIXTURE_FAIL_OK` | present, hash matches | cleared after the comparison; temp dir removed |
+| Restore fails | `1` | absent, copy intact in the temp dir | **fires on EXIT and retries** — still armed |
+| Interrupted between the move and the restore | `9` | **restored by the trap** | fires on EXIT |
+
+The middle row is the finding. Under the old command that row left the trap cleared
+and the file stranded with no second chance; under the corrected command the guard
+survives and gets one.
+
+## Execution shell
+
+Every command in this plan is POSIX shell and MUST be run under Git Bash.
+Verified present on this host: `/usr/bin/bash` (Windows path
+`C:\Program Files\Git\usr\bin\bash.exe`), GNU bash 5.3.15(1)-release,
+x86_64-pc-cygwin. Also verified on PATH and used below: `env`, `grep`, `sort`,
+`comm`, `sha256sum`, `cut`, `mktemp`, `wc`, `git`, `docker`, and `go` (go1.24.13
+windows/amd64). Verified **absent**: `jq` — no command in this plan may depend on
+it, which is why the `-json` checks below use `grep` rather than a JSON parser.
+PowerShell is this workspace's interactive default; `env -u`, `test -z`, `trap`
+and `$(…)` capture will not behave there. Launch Git Bash explicitly.
+
+**Pipeline rule.** A bare `go test … 2>&1 | grep -c X` reports grep's exit status,
+not the test process's. A build failure, a panic, an unexpected success and a
+zero-test run all satisfy such a check. Every scenario below therefore uses the
+capture form: assign the combined output to a variable, capture `$?` on the *next*
+statement, and assert status and content as separate conditions. Where a pipeline
+is genuinely more readable, `set -o pipefail` must be in effect first.
+
+**Skip-counting rule.** `go test -json` emits `"Action":"skip"` for packages with
+no test files as well as for skipped tests. Measured at the phase base over
+`./...`: 49 skip events, of which **38 carry a `"Test"` field** and 11 are
+package-level. Every `-json` skip count in this plan filters for `"Test":"`. The
+`-v` method — counting lines matching `^--- SKIP` — was independently measured at
+38 and the two must agree.
+
+**Counting to zero.** When the expected count is `0`, the filter chain finds no
+matches and its final `grep` exits `1`. Inside the capture form that is harmless:
+`test "$(… | grep -c …)" = "0"` uses only the substitution's text, and the
+pipeline's status never reaches `test`, so the assertion succeeds under
+`set -o pipefail`. The form to avoid is the one the pipeline rule already forbids —
+running the pipeline as a statement and reading its status — which would report the
+success case as a failure. Verified against stand-ins at planning time: zero skips
+passes, one newly introduced test-level skip fails, and a non-zero test status fails
+on the separately asserted status.
+
+## Artifacts this phase produces
+
+This plan produces **no code symbols**. Its only artifact is its SUMMARY, which is
+listed in `files_modified`.
+
+The new symbols this phase creates belong to plans 01-01 and 01-02 — the
+`internal/platform/testenv` package with its exported `URLEnv`, `RequireEnv`,
+`Required`, `Pool` and `Fixture` and its unexported `hostFromURL` and
+`unparseableURLMsg`; the `EPISTEMIC_OS_TEST_REQUIRE_DB` environment variable; and
+in the segment domain the unexported `preambleInvariant` and the new
+`TestPreambleInvariant_Control`. See those plans' artifacts tables.
+
+`EPISTEMIC_OS_DB_URL`, `make gate`, `make up`, `make migrate`,
+`TestSaveRun_FixtureRoundTripsAllOffsets`, `TestFixtureIntegrity` and the CI
+workflow are all pre-existing and are read, never written, by this plan.
+
+## Flagged assumptions — spec-less edge probe
+
+No SPEC exists for this phase. The deterministic edge probe over GATE-04 and
+GATE-05 returned 4 applicable edges. After cycle 1, three have been given the
+referent they actually have in this phase and authored as explicit criteria in
+`01-01-PLAN.md`'s `must_haves.truths`. One remains unresolved and is reproduced
+here because this is the plan a human reviews, and it may not be silently dropped.
+
+| # | Requirement | Category | Probe | Status | Where |
+|---|---|---|---|---|---|
+| E1 | GATE-04 | unclassified | (no category was assigned, so there is no probe question to answer) | **unresolved — flagged** | queued for disposition in Task 3 |
+| E2 | GATE-05 | adjacency | When two things are exactly equal or just touch, do they merge, collide, or separate? | **resolved — explicit** | `01-01` truth: `Pool` decides in a documented order and names exactly one cause; `Fixture` runs only after `Pool` returns |
+| E3 | GATE-05 | empty | What is the result for empty, single-element, or null input? | **resolved — explicit** | `01-01` truth: empty flag value is false; empty and keyword/value DSNs yield an empty host and a fixed placeholder |
+| E4 | GATE-05 | ordering | When elements compare equal, is output order specified and stable? | **resolved — explicit** | `01-01` truth: outcome is independent of execution order; `-shuffle=on` yields the same 38 |
+
+Accounting: **4 surfaced == 3 authored into `must_haves.truths` + 1 flagged.**
+E1 is not dismissed by the planner; the executor must not dismiss it either.
+
+<execution_context>
+@C:/EpistemicOS/epistemicos-gsd-pilot/.claude/gsd-core/workflows/execute-plan.md
+@C:/EpistemicOS/epistemicos-gsd-pilot/.claude/gsd-core/templates/summary.md
+</execution_context>
+
+<context>
+@.planning/PROJECT.md
+@.planning/ROADMAP.md
+@.planning/STATE.md
+@.planning/REQUIREMENTS.md
+@.planning/phases/01-escalation-mechanism-and-fixture-invariant/01-01-SUMMARY.md
+@.planning/phases/01-escalation-mechanism-and-fixture-invariant/01-02-SUMMARY.md
+</context>
+
+## Verified ground truth
+
+Measured in this repository at commit `030521b`, by running the commands, before
+any plan in this phase ran. This is the baseline every check below is compared
+against.
+
+- **Phase base commit: `030521b1ec7c12df868445bf8d162527202d42f1`.** Verified at
+  planning time, all four properties: `git rev-parse --verify` succeeds;
+  `git merge-base --is-ancestor 030521b HEAD` exits 0;
+  `git log --format=%H 030521b..HEAD -- Makefile .github/workflows/ci.yml` prints
+  nothing; `git diff --name-only 030521b..HEAD` filtered against `^internal/` and
+  `^\.planning/` prints nothing.
+- **Why not `fcebad1`.** Cycle 1 anchored here and the anchor was wrong.
+  `868d45b` ("Run the store and approved tests against a real Postgres in CI")
+  landed after `fcebad1` and changed `.github/workflows/ci.yml`. Measured:
+  `git log --format=%H fcebad1..HEAD -- Makefile .github/workflows/ci.yml` returns
+  1 commit where the plan required 0, and the outside-paths filter returns 1 where
+  it required 0. `git merge-base --is-ancestor fcebad1 HEAD` exits 0, so the
+  ancestry guard passed while the audit it guarded failed. Ancestry is necessary
+  and not sufficient; the four-part check above is the guard, and it runs as
+  01-01 Task 1's `<precondition>`, before any Phase 1 code can make a real
+  violation indistinguishable from a mis-anchor.
+- `go test ./... -count=1` with no database: **exit 0, 38 test-level skips.**
+  Identical with `-shuffle=on`. Under `-json`, 49 skip events of which 38 carry a
+  `"Test"` field.
+- `make gate` is `vet`, then a `gofmt -l .` check, then `go build ./...`, then
+  `go test ./... -count=1`, defined at `Makefile:39-45`. Nothing in it starts
+  PostgreSQL and nothing in it sets the escalation flag.
+- The local DSN for the compose service is
+  `postgres://epistemicos:epistemicos@localhost:5432/epistemicos?sslmode=disable`.
+  `make up` starts it and waits for readiness; `make migrate` applies migrations
+  and requires `EPISTEMIC_OS_DB_URL` to be exported.
+- The store package's cross-package fixture read resolves
+  `../../../core/domain/segment/testdata/demo.md` at `segmentation_test.go:276`
+  and runs only after a pool is obtained at `:272`, so exercising either fixture
+  path — escalated failure or unescalated skip — requires a live database.
+- **Non-escalated, unreachable database: SKIP.** Measured with
+  `EPISTEMIC_OS_DB_URL='postgres://u:pw@127.0.0.1:1/nodb?sslmode=disable'` and the
+  flag unset: `TestSaveRun_FixtureRoundTripsAllOffsets` reports `--- SKIP` and the
+  package exits 0. This branch must survive; it is half of ROADMAP criterion 3.
+- **pgx v5.7.2 redacts the password and echoes everything else.** Measured on four
+  DSN shapes against the unmodified helper — URL form, keyword/value form,
+  `?password=` query, `?sslpassword=` query — the password renders as `xxxxxx` or
+  `xxxxx` every time and a distinctive token placed in the password position was
+  never present in the output. A token placed in the **database-name** position
+  *was* present, count 1, on both the URL and keyword/value forms, alongside the
+  library's parse-error text. Scenario D is built on the database-name token for
+  exactly that reason: it is measured to fail at the phase base.
+- The `Ping` error is built by the library from the parsed config, not the raw DSN:
+  ``failed to connect to `user=u database=nodb`: 127.0.0.1:1 (127.0.0.1): dial
+  error: …``. It names the host, omits the password, and discloses the user and
+  database name.
+- `.github/workflows/ci.yml` line 36 already sets `EPISTEMIC_OS_DB_URL` and the
+  workflow already provisions PostgreSQL and applies migrations, delivered at
+  `868d45b`. Neither that file nor the Makefile may be edited in this phase.
+- `sha256sum internal/core/domain/segment/testdata/demo.md` prints
+  `a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e`, matching the
+  constant pinned in `fixture_test.go`. This is the value Task 2 compares against.
+
+## Compose database end state
+
+Declared, because cycle 1 left it unstated: **the compose PostgreSQL service is
+left running when this plan finishes.** Task 3 deliberately stops it to make the
+developer-without-Docker case real rather than assumed, then brings it back up as
+its last database action, and asserts the running state as an acceptance criterion.
+If the developer wants it down, `make down` after the phase; this plan does not
+guess.
+
+<tasks>
+
+<task type="auto">
+  <name>Task 1: Database-free behavioral matrix and non-enforcement audit</name>
+  <files>none — verification only, no file is written by this task</files>
+
+  <read_first>
+    - .planning/phases/01-escalation-mechanism-and-fixture-invariant/01-01-SUMMARY.md (the exported signatures, the observed failure text and the measured leak-token counts, so this task compares against a stated baseline rather than re-deriving one)
+    - .planning/phases/01-escalation-mechanism-and-fixture-invariant/01-02-SUMMARY.md (the fixture invariant result and the AC-14 baseline)
+    - Makefile (lines 39-45 — the exact gate definition being held constant)
+    - internal/platform/testenv/testenv.go (the helper as built, to confirm the observed messages come from the branches this plan believes they do, and to read `unparseableURLMsg` so Scenario D can assert its text)
+  </read_first>
+
+  <action>
+Run the five scenarios that need no database, and the non-enforcement audit. Record
+every observed exit status and message verbatim; the summary is the artifact.
+
+Run every scenario with the capture form. Assign the combined output of the test
+command to a shell variable, capture the exit status on the following statement,
+and then assert status and content as separate conditions. Do not pipe a test
+command into `grep` and read the pipeline's status — that reports grep's status,
+so a build failure or a zero-test run satisfies it, and this whole milestone exists
+because a check that cannot fail proves nothing.
+
+Scenario A, the preserved default. With both `EPISTEMIC_OS_DB_URL` and
+`EPISTEMIC_OS_TEST_REQUIRE_DB` explicitly removed from the environment, run the
+full suite. It must exit 0 and report exactly 38 test-level skips — the count
+measured at the phase base. Use `env -u` rather than assuming the variables are
+unset, since a developer shell may export the local DSN. Run it once more with
+`-shuffle=on` and confirm the same 38, which is the ordering edge E4's criterion.
+
+Scenario A2, the preserved skip for an unreachable database. With the flag removed
+and the URL addressing `127.0.0.1` port 1, run the store package's fixture
+round-trip test by name with `-v`. It must exit 0 and report SKIP for that test.
+This is the branch measured at the phase base and it is half of ROADMAP success
+criterion 3, which cycle 1 left unverified. A failure here means the helper
+escalated without being asked to, which is Phase 2's change arriving early.
+
+Scenario B, escalated with no URL. With the flag set and the URL removed, run the
+store package and then the approved package. Each must exit non-zero, and each
+output must name both `EPISTEMIC_OS_DB_URL` and `EPISTEMIC_OS_TEST_REQUIRE_DB` —
+the second because a message that names only the missing variable does not tell the
+developer why it was fatal rather than skipped. This scenario also exercises edge
+E2: the fixture is unreachable in this configuration too, and exactly one cause must
+be named, the database one, because the fixture branch is only reached after the
+pool helper has returned.
+
+Scenario C, escalated against a closed port. With the flag set and the URL
+addressing `127.0.0.1` port 1, run the store package. It must exit non-zero and the
+output must contain that host and port, proving the message names the specific
+machine it could not reach rather than restating the variable.
+
+Scenario D, the connection-string disclosure audit. This is the phase's one
+security control and cycle 1's version of it could not fail. Run the store package
+twice with the flag set: once with a URL-form DSN and once with a keyword/value
+DSN, each malformed so the pool constructor rejects it, and each carrying the
+distinctive token named in this task's acceptance criteria in its **database-name**
+position — not its password position. Assert four conditions independently on each
+run: the exit status is non-zero; the output contains the fixed parse-failure text
+the helper emits; the token count in the output is zero; and the library's own
+parse-error phrasing is absent. Both token counts were measured as 1 at the phase
+base, so this check has teeth, whereas a password-position token is redacted by the
+library and would have passed with no code written.
+
+Then the non-enforcement audit, anchored at `030521b`. Confirm no commit in this
+phase touched the Makefile or the CI workflow, by listing commits from the phase
+base to HEAD restricted to those two paths. Confirm the full diff from the phase
+base touches nothing outside `internal/` and `.planning/`. Confirm the gate itself
+still runs green with no database.
+
+If any scenario fails, do not adjust the scenario. Report it and stop — the defect
+belongs to 01-01 or 01-02, and this plan re-runs after that fix.
+  </action>
+
+  <verify>
+    <automated>cd C:/EpistemicOS/epistemicos-gsd-pilot &amp;&amp; set -o pipefail &amp;&amp; env -u EPISTEMIC_OS_DB_URL -u EPISTEMIC_OS_TEST_REQUIRE_DB make gate &amp;&amp; test "$(env -u EPISTEMIC_OS_DB_URL -u EPISTEMIC_OS_TEST_REQUIRE_DB go test ./... -count=1 -v 2>&amp;1 | grep -c '^--- SKIP')" = "38" &amp;&amp; test "$(env -u EPISTEMIC_OS_DB_URL -u EPISTEMIC_OS_TEST_REQUIRE_DB go test ./... -count=1 -shuffle=on -json 2>&amp;1 | grep '\"Action\":\"skip\"' | grep -c '\"Test\":\"')" = "38" &amp;&amp; test -z "$(git log --format=%H 030521b1ec7c12df868445bf8d162527202d42f1..HEAD -- Makefile .github/workflows/ci.yml)" &amp;&amp; test -z "$(git diff --name-only 030521b1ec7c12df868445bf8d162527202d42f1..HEAD | grep -v '^internal/' | grep -v '^\.planning/')" &amp;&amp; echo NONENFORCING_OK</automated>
+  </verify>
+
+  <acceptance_criteria>
+    - **Scenario A.** `env -u EPISTEMIC_OS_DB_URL -u EPISTEMIC_OS_TEST_REQUIRE_DB make gate` exits 0, asserted from its status.
+    - **Scenario A.** Under `set -o pipefail`, `env -u EPISTEMIC_OS_DB_URL -u EPISTEMIC_OS_TEST_REQUIRE_DB go test ./... -count=1 -v 2>&1 | grep -c '^--- SKIP'` prints `38`; and the `-json` form, filtered to skip events carrying a `"Test"` field, also prints `38`. The two counting methods must agree — a bare `grep -c '"Action":"skip"'` prints 49 and is wrong.
+    - **Scenario A, edge E4.** The same `-json` count with `-shuffle=on` also prints `38`.
+    - **Scenario A2, the preserved unreachable-database skip.** Capture once: the combined output of `env -u EPISTEMIC_OS_TEST_REQUIRE_DB EPISTEMIC_OS_DB_URL='postgres://u:pw@127.0.0.1:1/nodb?sslmode=disable' go test ./internal/adapters/secondary/store/... -run TestSaveRun_FixtureRoundTripsAllOffsets -count=1 -v 2>&1`, with `$?` captured on the next statement. Assert independently: the status is `0`; the output contains a line matching `^--- SKIP: TestSaveRun_FixtureRoundTripsAllOffsets`. Measured at the phase base as SKIP/exit 0.
+    - **Scenario B, store.** Capture once: `env -u EPISTEMIC_OS_DB_URL EPISTEMIC_OS_TEST_REQUIRE_DB=1 go test ./internal/adapters/secondary/store/... -count=1 2>&1`. Assert independently: status non-zero; output contains `EPISTEMIC_OS_DB_URL`; output contains `EPISTEMIC_OS_TEST_REQUIRE_DB`.
+    - **Scenario B, approved.** The same three assertions against `./internal/adapters/secondary/approved/...`.
+    - **Scenario B, edge E2.** In the same captured output, exactly one cause is named: the output does **not** contain `testdata/demo.md`. The fixture is equally unavailable in this configuration, and the fixture branch must not have been reached, because it runs only after the pool helper returns.
+    - **Scenario C.** Capture once with `EPISTEMIC_OS_TEST_REQUIRE_DB=1` and `EPISTEMIC_OS_DB_URL='postgres://u:pw@127.0.0.1:1/nodb?sslmode=disable'` against the store package. Assert independently: status non-zero; output contains `127.0.0.1:1`.
+    - **Scenario D, URL form.** Capture once with `EPISTEMIC_OS_TEST_REQUIRE_DB=1` and `EPISTEMIC_OS_DB_URL='postgres://u:pw@ bad host/DSNLEAKCANARY'` against the store package. Assert four conditions independently: status is non-zero; the output contains `EPISTEMIC_OS_DB_URL`; `printf '%s' "$out" | grep -c DSNLEAKCANARY` prints `0`; `printf '%s' "$out" | grep -c 'cannot parse'` prints `0`. **Both counts were measured as `1` at the phase base**, so this criterion is falsifiable — record the post-change counts in the summary next to the phase-base counts.
+    - **Scenario D, keyword/value form.** The same four assertions with `EPISTEMIC_OS_DB_URL='host=x port=notanumber password=pw dbname=DSNLEAKCANARY'`. Also measured as `1`/`1` at the phase base.
+    - **Scenario D, negative control on the audit itself.** Before or after the two runs above, confirm the leak detector can see a leak: `printf '%s' 'cannot parse `postgres://u:xxxxxx@ bad host/DSNLEAKCANARY`' | grep -c DSNLEAKCANARY` prints `1`. An absence assertion whose detector has never been shown to detect a presence is not evidence.
+    - **Audit.** `git log --format=%H 030521b1ec7c12df868445bf8d162527202d42f1..HEAD -- Makefile .github/workflows/ci.yml` prints nothing.
+    - **Audit.** `git diff --name-only 030521b1ec7c12df868445bf8d162527202d42f1..HEAD | grep -v '^internal/' | grep -v '^\.planning/'` prints nothing. Note the anchored escaping — an unescaped `.planning` would match any character in that position.
+    - **Audit.** `git rev-parse --verify 030521b1ec7c12df868445bf8d162527202d42f1` succeeds and `git merge-base --is-ancestor 030521b1ec7c12df868445bf8d162527202d42f1 HEAD` exits 0. Both are necessary and neither is sufficient; the two audit commands above are the actual guard, which is why 01-01 Task 1 asserted all four before writing any code.
+  </acceptance_criteria>
+
+  <done>
+Every database-free claim in this phase is measured and recorded: the default run
+reproduces the phase base at 38 skips and exit 0, shuffled or not; an unreachable
+database still skips when the flag is unset; two of the three escalated conditions
+name their own cause with exit status asserted independently of message content;
+the connection string no longer reaches the output on the parse path, a claim that
+was false at the phase base; and neither the Makefile nor the CI workflow was
+touched, measured from a phase base that has itself been verified rather than
+assumed.
+  </done>
+</task>
+
+<task type="auto">
+  <name>Task 2: Escalated-green, preserved fixture skip, and the unreadable-fixture failure proof</name>
+  <files>none — verification only; the fixture is moved and restored within the task under a trap, and must end byte-identical</files>
+
+  <precondition>PostgreSQL is running and migrated: `make up` succeeds, `EPISTEMIC_OS_DB_URL` is exported as `postgres://epistemicos:epistemicos@localhost:5432/epistemicos?sslmode=disable`, and `make migrate` exits 0 — without a live database none of the three claims in this task is decidable and execution must halt rather than record an unverified pass.</precondition>
+
+  <read_first>
+    - Makefile (lines 18-23 and 47-48 — the up and migrate targets and the readiness wait, so the precondition is satisfied the same way CI does it)
+    - internal/adapters/secondary/store/segmentation_test.go (the fixture-round-trip test — the only test that exercises either fixture path, the relative path it resolves, and the fact that the read happens after the pool is obtained)
+    - internal/platform/testenv/testenv.go (the fixture branch, to confirm the observed message comes from the escalated path and to read the unescalated skip text)
+    - internal/core/domain/segment/fixture_test.go (the pinned SHA-256 and byte-length constants, which are what the post-restore integrity check re-verifies)
+  </read_first>
+
+  <action>
+Prove the three claims that require a real database.
+
+First, escalated green. With the database up, migrations applied, the DSN exported
+and the escalation flag set, run the store and approved packages. Every test must
+run: zero skipped and zero failed. This is the check that distinguishes a working
+mechanism from one that simply always fails — without it, a helper hard-coded to
+fail would satisfy every other criterion in this phase.
+
+Assert the zero-skip half with its own command rather than inferring it from the
+containment check below. Capture the escalated run's combined output once, take the
+status on the next statement, then assert two independent conditions: the status is
+zero, and the count of skip events that carry a test-name field is zero. Both
+spellings are given in this task's acceptance criteria and appear in the automated
+verify block; use them as written. Containment and zero-skips are different
+properties — containment says the 38 baseline skips now pass, and only the count
+catches a skip that the baseline never had.
+
+Prove it by name rather than by count. Run the same two packages twice under
+`-json`: once unescalated with the URL removed, collecting the sorted set of test
+names whose action is `skip` and which carry a `Test` field; once escalated against
+the live database, collecting the sorted set of test names whose action is `pass`.
+Every name in the first set must appear in the second. A count of PASS lines is an
+indirect proof that subtests inflate and that says nothing about which tests ran;
+set containment says exactly the right thing, which is that each test that declined
+without a database now executes with one.
+
+Second, the preserved fixture skip. Still with the database up but with the
+escalation flag removed, move the fixture aside under the trap procedure described
+below and run the fixture round-trip test by name. It must exit 0 and report SKIP.
+This is the second half of ROADMAP success criterion 3 and cycle 1 did not cover it:
+the unescalated fixture branch is a distinct branch of the new helper from the
+unescalated database branch, and only the latter was verified.
+
+Third, the escalated fixture failure. Same move, flag set: the test must exit
+non-zero with a message naming the fixture path.
+
+For both fixture scenarios, restoration is not a step to be sequenced — it is a
+trap installed before the move. Capture the fixture's SHA-256 first. Create a
+temporary directory. Install a trap on EXIT, INT and TERM that restores the file
+from that directory if the file is missing, so an interruption at any point between
+the move and the explicit restore still leaves the tree intact. Only then move the
+file. Run the test with the capture form.
+
+The inbound path is where cycle 2 found the defect, so run it fail-closed. Restore
+explicitly and guard that restore; re-check that the file is actually back; re-hash
+under a guard, since a failed hash must not yield an empty string that compares
+unequal by accident; compare the two hashes under a guard. Clear the trap only after
+all four have passed. Each guard aborts with a non-zero status instead of falling
+through, because this script runs with `pipefail` but without `set -e` — a bare
+semicolon after the restore lets a failure walk straight into the statement that
+disarms the guard, which is the exact shape cycle 2 rejected. The full command is
+given verbatim in this task's acceptance criteria; use it rather than
+reconstructing it, because the file being moved is the one whose corruption
+invalidates all 22 offsets in `expected.json` and every span assertion in the
+segment package.
+
+If the command prints one of its armed-guard markers, stop and follow the recovery
+criterion rather than re-running. A non-zero exit with the guard still armed is the
+designed behavior; re-running on top of it is how a recoverable state becomes an
+unrecoverable one.
+
+Scope each run to the store package alone so the segment domain package, which owns
+that fixture, is never compiled against a missing file during the window.
+
+After restoring, confirm the working tree is clean and the fixture's hash still
+matches by running the segment package's integrity test, which pins it. Do not
+proceed to Task 3 until both are confirmed.
+
+Record the exact escalated failure message for the fixture path in the summary, and
+the exact unescalated skip message alongside it. Phase 3's proof test for GATE-03
+asserts against the first, so an approximation is not good enough.
+
+If the escalated run reports any skip or any failure, stop and report. Do not
+narrow the package selection, do not add a skip exclusion, and do not lower the
+target — the target is the requirement.
+  </action>
+
+  <verify>
+    <automated>cd C:/EpistemicOS/epistemicos-gsd-pilot &amp;&amp; set -o pipefail &amp;&amp; export EPISTEMIC_OS_DB_URL='postgres://epistemicos:epistemicos@localhost:5432/epistemicos?sslmode=disable' &amp;&amp; make migrate &amp;&amp; env -u EPISTEMIC_OS_DB_URL go test ./internal/adapters/secondary/store/... ./internal/adapters/secondary/approved/... -count=1 -json 2>&amp;1 | grep '"Action":"skip"' | grep -o '"Test":"[^"]*"' | sort -u &gt; /tmp/base_skips.txt &amp;&amp; test "$(wc -l &lt; /tmp/base_skips.txt)" = "38" &amp;&amp; EPISTEMIC_OS_TEST_REQUIRE_DB=1 go test ./internal/adapters/secondary/store/... ./internal/adapters/secondary/approved/... -count=1 -json 2>&amp;1 | grep '"Action":"pass"' | grep -o '"Test":"[^"]*"' | sort -u &gt; /tmp/esc_pass.txt &amp;&amp; test -z "$(comm -23 /tmp/base_skips.txt /tmp/esc_pass.txt)" &amp;&amp; { esc=$(EPISTEMIC_OS_TEST_REQUIRE_DB=1 go test ./internal/adapters/secondary/store/... ./internal/adapters/secondary/approved/... -count=1 -json 2>&amp;1); st=$?; } &amp;&amp; test "$st" -eq 0 &amp;&amp; test "$(printf '%s\n' "$esc" | grep '"Action":"skip"' | grep -c '"Test":"')" = "0" &amp;&amp; EPISTEMIC_OS_TEST_REQUIRE_DB=1 go test ./internal/adapters/secondary/store/... ./internal/adapters/secondary/approved/... -count=1 &amp;&amp; echo ESCALATED_GREEN_OK</automated>
+  </verify>
+
+  <acceptance_criteria>
+    - `make up` exits 0 and `make migrate` exits 0 with the DSN exported. Both asserted from status.
+    - **Escalated green, zero skips — run exactly this, in this capture form.** `{ esc=$(EPISTEMIC_OS_TEST_REQUIRE_DB=1 go test ./internal/adapters/secondary/store/... ./internal/adapters/secondary/approved/... -count=1 -json 2>&1); st=$?; }` then assert two independent conditions: `test "$st" -eq 0`, and `test "$(printf '%s\n' "$esc" | grep '"Action":"skip"' | grep -c '"Test":"')" = "0"`. Both appear in this task's `<automated>` block; do not improvise a different spelling. The brace group's own status is deliberately not an assertion — it is `0` regardless, because its last statement is an assignment — which is why the captured status is asserted separately on the next statement. The plain (non-`-json`) escalated run must also exit `0`, asserted from its own status.
+    - **Why that spelling and not a bare pipeline.** The inner `grep '"Action":"skip"'` exits `1` when there are no skip events, which is the success case. Command substitution discards the pipeline's status and yields only its text, so `test "$(… | grep -c …)" = "0"` succeeds on zero skips even under `set -o pipefail`. A bare `… | grep -c … ; test $? -eq 0` would invert the result. Verified at planning time against stand-ins: zero skips passes; one newly introduced test-level skip fails; a build failure fails on the `$st` assertion.
+    - **Why the zero-skip count is not redundant with containment.** Containment asserts that the 38 baseline skips all now pass. It says nothing about a skip that did not exist in the baseline — a newly added test that skips for a new reason satisfies containment and violates "zero skips". The two criteria assert different properties and both are required.
+    - **Escalated green, set containment.** `/tmp/base_skips.txt` — the sorted unique `"Test":"…"` names from the unescalated `-json` run — has exactly `38` lines. `comm -23 /tmp/base_skips.txt /tmp/esc_pass.txt` prints nothing: the baseline skip set is a subset of the escalated pass set, so every test that skipped without a database passes with one. This is containment, not equality — the escalated run legitimately passes tests that never skipped. It replaces the cycle-1 criterion "at least 38 `--- PASS` lines", which subtests inflate and which names no test.
+    - **Preserved fixture skip, flag unset.** Using the trap procedure below with `env -u EPISTEMIC_OS_TEST_REQUIRE_DB`, running `go test ./internal/adapters/secondary/store/... -run TestSaveRun_FixtureRoundTripsAllOffsets -count=1 -v`: assert independently that the status is `0` and that the output contains a line matching `^--- SKIP: TestSaveRun_FixtureRoundTripsAllOffsets`.
+    - **Escalated fixture failure, with the fail-closed restore.** Run exactly this, under Git Bash, and assert it prints `FIXTURE_FAIL_OK`:
+      `cd C:/EpistemicOS/epistemicos-gsd-pilot && set -o pipefail && FIX=internal/core/domain/segment/testdata/demo.md && BEFORE=$(sha256sum "$FIX" | cut -d' ' -f1) && TMP=$(mktemp -d) && trap 'if [ -f "$TMP/demo.md" ] && [ ! -f "$FIX" ]; then mv "$TMP/demo.md" "$FIX"; fi' EXIT INT TERM && mv "$FIX" "$TMP/demo.md" || exit 1; out=$(EPISTEMIC_OS_TEST_REQUIRE_DB=1 go test ./internal/adapters/secondary/store/... -run TestSaveRun_FixtureRoundTripsAllOffsets -count=1 2>&1); st=$?; mv "$TMP/demo.md" "$FIX" || { echo RESTORE_FAILED_TRAP_ARMED >&2; exit 1; }; test -f "$FIX" || { echo RESTORE_MISSING_TRAP_ARMED >&2; exit 1; }; AFTER=$(sha256sum "$FIX" | cut -d' ' -f1) || { echo REHASH_FAILED_TRAP_ARMED >&2; exit 1; }; test "$BEFORE" = "$AFTER" || { echo HASH_MISMATCH_TRAP_ARMED >&2; exit 1; }; trap - EXIT INT TERM; rmdir "$TMP" 2>/dev/null; test "$st" -ne 0 && printf '%s' "$out" | grep -q 'core/domain/segment/testdata/demo.md' && echo FIXTURE_FAIL_OK`
+      Use it as written. Cycle 2 found that the previous spelling ended `mv "$TMP/demo.md" "$FIX"; trap - EXIT INT TERM` — `;`-separated under `pipefail` but with no `set -e`, so a failed restore fell straight through to the statement that disarmed the guard.
+    - **The trap is cleared only on a proven-restored path.** In the command above, four guards stand between the test run and `trap - EXIT INT TERM`, each aborting with a non-zero status rather than falling through: the restore `mv`, an existence re-check of `$FIX`, the re-hash, and the `$BEFORE`/`$AFTER` comparison. `trap - EXIT INT TERM` is unreachable unless all four passed. Assert this by reading the command, not by running it: no statement that clears the trap may be reachable from a failed restore.
+    - **A failed restore leaves the guard armed and aborts.** If any of the four guards fires, the command exits non-zero with the trap still installed, so the EXIT trap runs and retries the restore. Confirmed against a stand-in at planning time: with the inbound `mv` forced to fail, the corrected command exits `1`, prints its `*_TRAP_ARMED` marker, and the EXIT trap fires a second restore attempt; the previous spelling exited `1` with the trap already cleared, the fixture absent from the tree and the only copy stranded in the temporary directory.
+    - **If a `*_TRAP_ARMED` marker appears, stop.** Do not re-run, do not proceed to the next criterion. Confirm `git status --porcelain` shows the fixture path is not deleted and that `sha256sum internal/core/domain/segment/testdata/demo.md` matches the pinned value; if it does not, restore from `git checkout -- internal/core/domain/segment/testdata/demo.md` and report. This is the phase's one blocking threat, T-01-10.
+    - **Pre/post hash equality is asserted, not assumed.** `$BEFORE` and `$AFTER` above must both equal `a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e`, the value pinned in `fixture_test.go` and re-measured at the phase base. Record both in the summary. The comparison runs *before* the trap is cleared, so a restored-but-altered file also aborts with the guard still armed.
+    - **The trap is installed before the move.** In the command above, `trap … EXIT INT TERM` precedes `mv "$FIX" "$TMP/demo.md"`. A restore that is merely the next statement is not sufficient: an interruption between the two would leave the tree corrupt in the one file whose corruption invalidates every offset in `expected.json`. Confirmed against the stand-in: an abort inside the window exits non-zero and the trap restores the file.
+    - **Post-restore integrity.** `go test ./internal/core/domain/segment/... -run 'TestFixtureIntegrity' -count=1` exits 0 — the pinned hash and byte length still match, proving the move-and-restore was lossless. Run it after the trap is cleared.
+    - **Working tree clean after the fixture work, before any summary is written.** `git status --porcelain` prints exactly one line, `?? .planning/config.json`, the pre-existing untracked file. See Task 3 for the expected state once the summary exists.
+    - **Gate green with the database up.** `env -u EPISTEMIC_OS_TEST_REQUIRE_DB make gate` exits 0 with the database still running.
+  </acceptance_criteria>
+
+  <done>
+With a live database the escalated run executes every test that skipped without
+one — proven by name-set containment, not by a PASS count — and skips none. The
+unescalated fixture branch still skips, completing ROADMAP criterion 3. The
+escalated fixture branch fails with a message naming the path. The zero-skip half
+of "escalated green" is asserted by its own capture-form count rather than inferred
+from containment. The fixture is restored under a trap installed before the move,
+its SHA-256 is proven equal before and after, and the trap is cleared only after
+both the restore and that comparison have succeeded — a failure anywhere on the
+inbound path aborts with the guard still armed.
+  </done>
+</task>
+
+<task type="auto">
+  <name>Task 3: Consolidate the phase baseline and surface the contract decisions for sign-off</name>
+  <files>.planning/phases/01-escalation-mechanism-and-fixture-invariant/01-03-SUMMARY.md</files>
+
+  <read_first>
+    - .planning/ROADMAP.md (Phase 1 success criteria, all five — the consolidation is a judgment against these, not against the plan)
+    - .planning/phases/01-escalation-mechanism-and-fixture-invariant/01-01-SUMMARY.md (the exported names, flag semantics, and measured leak-token counts Phase 2 and Phase 3 bind to)
+    - .planning/phases/01-escalation-mechanism-and-fixture-invariant/01-02-SUMMARY.md (the fixture invariant result, the AC-14 baseline, and the deferred AC-14 empty-heading guard)
+    - Makefile (the gate target, to confirm by reading that nothing was wired)
+  </read_first>
+
+  <action>
+Run the final both-environments confirmation and assemble the baseline. Run every
+command here directly — do not ask the developer to run anything.
+
+First, `make gate` with no database reachable and no escalation flag. This is the
+developer-without-Docker case the whole skip policy exists to protect. Stop the
+compose database first, so the case is real rather than assumed.
+
+Second, bring the compose database back up, export the DSN, and run `make gate`
+again, still with no escalation flag. Both must exit 0, and that pair is the
+phase's central claim: the mechanism exists and the gate is unmoved.
+
+**Leave the compose database running.** That is this plan's declared end state and
+an acceptance criterion below; do not stop it again as a tidy-up.
+
+Then the ordering that cycle 1 left ambiguous. Run the clean-status check
+**before** writing the summary: at that point `git status --porcelain` must print
+exactly one line, the pre-existing untracked `.planning/config.json`. Only then
+write the summary. After writing it, the expected status is two lines — that one
+plus the untracked summary path — and it stays two until the summary is committed,
+at which point it returns to one. Record which of those two states was observed
+rather than asserting a clean tree that the plan's own artifact makes impossible.
+
+Then assemble the summary. Collect from Tasks 1 and 2 every exit status, the skip
+counts by both counting methods, and the verbatim escalated failure message for each
+of the three conditions. Record the unescalated skip messages too, since ROADMAP
+criterion 3 is about them. Record the phase-base and post-change leak-token counts
+side by side, so a later reader can see the control had teeth rather than taking it
+on trust. Phase 3 asserts against this text, so record it exactly rather than
+paraphrasing.
+
+Finally, write into the summary — for the developer to accept or amend at
+end-of-phase review — the contracts Phase 2 and Phase 3 will bind to, since
+changing any of them later is mechanical but no longer local to one package:
+
+- The package path `internal/platform/testenv` and the exported function names.
+- The flag name `EPISTEMIC_OS_TEST_REQUIRE_DB`, and that any non-empty value
+  enables it, so the string zero enables it too. State the rationale: a typo in the
+  value then errs toward enforcing rather than toward a vacuously green gate.
+- **The flag's scope is wider than its name.** It escalates the cross-package
+  fixture prerequisite, a filesystem condition, as well as database availability.
+  A reader will reasonably assume it affects only database setup. Ask whether the
+  name should widen in Phase 2 — `EPISTEMIC_OS_TEST_REQUIRE_ENV` was the reviewer's
+  suggestion — or whether the doc comment is sufficient. Not decided here, because
+  Phase 2's Makefile change and Phase 3's proof tests both bind to the literal.
+- That the flag is documented in the package doc comment only, with README and
+  Makefile documentation deferred to Phase 2, where the flag actually becomes part
+  of the gate.
+- **The deferred AC-14 empty-heading guard**, carried from 01-02: `acceptance_test.go`
+  indexes the first heading without an emptiness guard, so a deliberately
+  heading-free fixture would panic rather than skip. Not fixed in this phase because
+  GATE-04's contract is that the file stays byte-identical. Ask whether it becomes a
+  backlog item or a Phase 2 change.
+
+Also carry forward the unresolved probe edge E1 as an open item awaiting
+disposition, and record that E2, E3 and E4 were resolved into explicit criteria in
+01-01 rather than dismissed — with the accounting, so the no-silent-drop rule is
+auditable: 4 surfaced, 3 authored, 1 flagged. Do not dismiss E1; the planner did
+not, and neither should the executor.
+
+If either gate run exits non-zero, stop and report. The defect belongs to 01-01 or
+01-02 and this plan re-runs after it is fixed.
+  </action>
+
+  <verify>
+    <automated>cd C:/EpistemicOS/epistemicos-gsd-pilot &amp;&amp; set -o pipefail &amp;&amp; docker compose stop postgres &amp;&amp; env -u EPISTEMIC_OS_DB_URL -u EPISTEMIC_OS_TEST_REQUIRE_DB make gate &amp;&amp; make up &amp;&amp; env -u EPISTEMIC_OS_TEST_REQUIRE_DB EPISTEMIC_OS_DB_URL='postgres://epistemicos:epistemicos@localhost:5432/epistemicos?sslmode=disable' make gate &amp;&amp; test -n "$(docker compose ps --services --filter status=running | grep -x postgres)" &amp;&amp; echo GATE_UNCHANGED_BOTH_WAYS</automated>
+    <human-check>Review the recorded baseline and accept or amend the contracts Phase 2 and Phase 3 bind to: (1) the package path `internal/platform/testenv` and its exported function names; (2) the flag name `EPISTEMIC_OS_TEST_REQUIRE_DB` and its presence-based semantics, under which the string zero enables escalation because a typo in the value should err toward enforcing rather than toward a vacuously green gate; (3) the flag's scope being wider than its name — it also escalates the cross-package fixture prerequisite, a filesystem condition — and whether the name should widen in Phase 2 or the doc comment suffices; (4) documenting the flag in the package doc comment only, deferring README and Makefile documentation to Phase 2; (5) the deferred AC-14 empty-heading guard, which `acceptance_test.go` still lacks and which this phase could not add without breaking its own byte-identical guarantee. Then give a disposition for the one unresolved probe edge E1, which the probe returned with no category — whether it becomes a requirement or is dismissed as inapplicable to a test-harness refactor. E2, E3 and E4 were resolved into explicit criteria in 01-01 and need no disposition, only confirmation that the referents chosen for them are the right ones.</human-check>
+  </verify>
+
+  <acceptance_criteria>
+    - With the compose database stopped, `env -u EPISTEMIC_OS_DB_URL -u EPISTEMIC_OS_TEST_REQUIRE_DB make gate` exits 0.
+    - With the database up and the DSN exported, `env -u EPISTEMIC_OS_TEST_REQUIRE_DB make gate` exits 0.
+    - **Declared end state.** `docker compose ps --services --filter status=running` includes `postgres` when this task finishes. The database is left running deliberately; this is the plan's stated end state, not an oversight.
+    - `git log --format=%H 030521b1ec7c12df868445bf8d162527202d42f1..HEAD -- Makefile .github/workflows/ci.yml` still prints nothing after all three plans have run.
+    - `git diff --name-only 030521b1ec7c12df868445bf8d162527202d42f1..HEAD | grep -v '^internal/' | grep -v '^\.planning/'` still prints nothing.
+    - **Status ordering, before the summary.** Run `git status --porcelain` before writing the summary: it prints exactly one line, `?? .planning/config.json`. Record that it was run at this point.
+    - **Status ordering, after the summary.** After the summary is written and before it is committed, `git status --porcelain` prints exactly two lines: `?? .planning/config.json` and the untracked `01-03-SUMMARY.md` path. After it is committed, it prints one. Record which state was observed. Cycle 1 required a one-line status after creating the summary, which is unsatisfiable.
+    - The summary records an exit status and a skip count for every scenario in Tasks 1 and 2, with the skip counts stated under both the `-v` and the filtered `-json` methods.
+    - The summary contains the verbatim escalated failure text for all three conditions — unset variable, unreachable host, unreadable fixture — and the verbatim unescalated skip text for the unreachable-host and unreadable-fixture cases.
+    - The summary records the leak-token counts at the phase base (`1` and `1`) beside the post-change counts (`0` and `0`), so the control's falsifiability is on the record rather than asserted.
+    - The summary lists all five contract decisions and the unresolved probe edge E1 as items awaiting the developer's disposition, none pre-dismissed, together with the 4-surfaced/3-authored/1-flagged accounting for E1 through E4.
+    - The summary records the confirmed phase base commit `030521b1ec7c12df868445bf8d162527202d42f1` and states that the cycle-1 base `fcebad1` was measured invalid, so a later reader does not re-adopt it.
+  </acceptance_criteria>
+
+  <done>
+`make gate` is measured green in both environments with the compose database
+genuinely stopped for the first and running for the second, the database is left
+running as declared, the phase baseline is recorded in a form Phase 2 can diff
+against and Phase 3 can assert against, and the five contract decisions plus the one
+unresolved probe edge are queued for the developer's end-of-phase disposition rather
+than settled on their behalf.
+  </done>
+</task>
+
+</tasks>
+
+<threat_model>
+## Trust Boundaries
+
+| Boundary | Description |
+|----------|-------------|
+| verification process → CI log and terminal | Every scenario in this plan deliberately constructs failing connection strings; their text is printed |
+| verification process → working tree | Task 2 moves a hash-pinned fixture aside and must restore it exactly |
+| verification process → local PostgreSQL | The exported DSN carries credentials for the compose service |
+
+## STRIDE Threat Register
+
+| Threat ID | Category | Component | Severity | Disposition | Mitigation Plan |
+|-----------|----------|-----------|----------|-------------|-----------------|
+| T-01-09 | Information Disclosure | the DSNs constructed in Scenarios C and D | medium | mitigate | **Restated after cycle-1 review; severity corrected from `high` down, for the same reason as T-01-01.** Cycle 1's audit asserted that a password placed in the DSN did not appear in the output. Measured against pgx v5.7.2 on four DSN shapes, the library redacts the password itself, so that assertion passed at the phase base with zero code written and could not fail — an unfalsifiable control standing in for the phase's security claim. Scenario D is rebuilt on a token placed in the **database-name** position, which the library echoes verbatim: measured count `1` at the phase base on both DSN forms, and required to be `0` after the change, alongside a non-zero exit assertion, the fixed message text present, and the library's parse-error phrasing absent. The audit also carries its own negative control, proving the detector sees the token in a naive rendering. Impact at the pinned version is DSN-metadata disclosure rather than credential disclosure, which is `medium`; below `security_block_on: high`, so no longer phase-blocking. The DSNs used here carry throwaway values, never real credentials. |
+| T-01-10 | Tampering | `testdata/demo.md` during the Task 2 move | high | mitigate | Moving a hash-pinned fixture risks leaving the tree corrupt if the run aborts, in the one file whose corruption invalidates all 22 offsets in `expected.json` and every span assertion in the segment package. Cycle 1 required the restore to run "regardless of exit status" but named no mechanism, which is a statement of intent, not a control. Cycle 2 found the named mechanism still incomplete: the trap was installed correctly, but the explicit restore and the trap-clearing were `;`-separated in a script with `pipefail` and no `set -e`, so a failed restore disarmed the guard on the very next statement and stranded the fixture in the temporary directory — the exact outcome this entry exists to prevent, reproduced against a stand-in. Mitigated now by a concrete `trap … EXIT INT TERM` installed **before** the move and given verbatim as an acceptance criterion; by a **fail-closed inbound path** in which the restore, an existence re-check, the re-hash and the hash comparison each abort with a non-zero status rather than falling through, so the trap-clearing statement is unreachable except on a proven-restored path and a failure exits with the guard still armed to retry on EXIT; by a SHA-256 captured before the move and compared after the restore, with both required to equal the constant pinned in `fixture_test.go`; by scoping the test run to the store package so the owning package is never compiled against the gap; and by two post-conditions — a `git status --porcelain` showing only the pre-existing untracked config, and a passing integrity test that re-checks the pinned hash and byte length. All three control-flow paths — restore succeeds, restore fails, interruption inside the window — were executed against a stand-in at planning time rather than argued. Remains `high` and phase-blocking. |
+| T-01-11 | Elevation of Privilege | the local compose PostgreSQL instance | low | accept | Credentials are the published compose defaults on a loopback port, used only for tests. No production data is reachable. Out of scope at ASVS L1. |
+| T-01-12 | Repudiation | the escalated-green measurement | medium | mitigate | A recorded "0 skips" that was never actually run against a database would make the phase's central claim unfalsifiable — the exact failure mode this milestone exists to remove. Mitigated by the task precondition, which halts rather than recording an unverified pass; and by the name-set containment criterion, which requires every test that skipped without a database to appear by name among the passing tests with one. Cycle 1's PASS-line count is retired: subtests inflate it and it names no test. |
+| T-01-14 | Repudiation | the phase base commit recorded in the manifest | medium | mitigate | **New after cycle-1 review.** A mis-anchored base makes the non-enforcement audit report a violation that does not exist, or — worse in the other direction — a base chosen after a real change would hide one. Cycle 1 anchored at `fcebad1` and both audit criteria failed before any Phase 1 code existed, while the ancestry guard passed. Mitigated by re-anchoring to `030521b`, by verifying all four properties at planning time rather than asserting them, by running the same four as 01-01 Task 1's `<precondition>` so a wrong anchor halts at phase start, and by recording the corrected value in a re-frozen `01-PLAN-MANIFEST.json` carrying `supersedes: d90b10d`. |
+| T-01-SC | Tampering | dependency installation | low | accept | This plan installs nothing and writes no source. `go.mod` is unchanged across the whole phase. No package-manager install task exists, so no package-legitimacy audit table and no legitimacy checkpoint is required. |
+</threat_model>
+
+<verification>
+The phase is verified when all five ROADMAP success criteria are measured, not
+argued. Every command runs under Git Bash.
+
+1. One helper owns the decision — 01-01 Task 2 criteria: 38 call sites, 6 files,
+   0 remaining local definitions.
+2. Escalated, each of the three conditions names its cause — Scenarios B and C here
+   for the variable and the host, Task 2 here for the fixture path, each with a
+   non-zero exit status asserted independently of the message content.
+3. Flag unset, skips exactly as today — Scenario A for the unset URL (exit 0, 38
+   skips by two independent counting methods, shuffled and not), Scenario A2 for an
+   unreachable database, and Task 2 for an unreadable fixture. All three branches,
+   not one.
+4. The fixture invariant holds and the AC-14 declines stay green and silent — 01-02
+   Tasks 1 and 2, with PASS required for the pinned fixture and SKIP still legal for
+   a genuinely preamble-free one.
+5. `make gate` behaves exactly as before — Task 3 runs it with the compose database
+   genuinely stopped and again with it up, and both must exit 0.
+
+Plus the standing non-enforcement audit, anchored at `030521b`: no commit in this
+phase touches the Makefile or the CI workflow, and no path outside `internal/` and
+`.planning/` appears in the phase diff.
+
+Plus the disclosure control: the connection string does not reach the output on the
+parse path, proven by a token measured present at the phase base and required absent
+after — the one criterion in this phase that is known to be able to fail.
+</verification>
+
+<success_criteria>
+- The default run reproduces the phase base exactly: exit 0, 38 test-level skips, by two counting methods, shuffled and unshuffled.
+- All three unescalated branches still skip: unset URL, unreachable database, unreadable fixture.
+- The escalated run against a live database executes, by name, every test that skipped without one (set containment), and skips none (an independent capture-form count asserted at zero).
+- Each of the three environment conditions produces a non-zero exit and a failure naming that specific cause, with the fixture message recorded verbatim for Phase 3.
+- No component of the connection string appears in the output on the parse path — a claim measured false at the phase base, so the criterion proving it can fail.
+- The hash-pinned fixture is byte-identical before and after the move, restored under a trap installed before the move rather than by statement ordering, with the trap cleared only after the restore and the hash comparison have both succeeded.
+- The Makefile and the CI workflow are untouched relative to a phase base that has itself been verified, and `make gate` is measured green with the database genuinely stopped and again with it up.
+- The compose database is left running, as declared.
+- The five contracts Phase 2 and Phase 3 bind to, and the one unresolved probe edge, are queued for the developer's end-of-phase disposition rather than settled on their behalf.
+</success_criteria>
+
+<output>
+Create `.planning/phases/01-escalation-mechanism-and-fixture-invariant/01-03-SUMMARY.md` when done.
+
+Record in it, as the baseline Phase 2 will be diffed against and Phase 3 will assert
+against: the exit status and skip count for every scenario, with skip counts stated
+under both the `-v` and the filtered `-json` methods, including the escalated run's
+own skip count recorded as the measured `0`; the verbatim escalated failure
+message for each of the three conditions and the verbatim unescalated skip message
+for the two that have one; the phase-base and post-change leak-token counts side by
+side; the before-and-after SHA-256 of the fixture; the confirmed phase base commit
+`030521b` together with the note that `fcebad1` was measured invalid; the two
+observed `git status --porcelain` states and the point in the sequence each was
+taken; the five contract decisions awaiting the developer's acceptance or amendment;
+and the unresolved probe edge E1 with the 4-surfaced/3-authored/1-flagged accounting.
+
+The sign-off block is harvested from Task 3's `<verify><human-check>` into the phase
+UAT at end-of-phase review, so it reaches the developer in one batch rather than
+halting execution mid-flight.
+</output>

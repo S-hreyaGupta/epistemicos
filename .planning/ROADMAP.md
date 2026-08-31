@@ -37,9 +37,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Shared escalation helper: one package owns the skip-or-fail decision for all three environment conditions, and all 38 call sites across 6 test files reach it
-- [ ] 01-02-PLAN.md — Fixture invariant: TestFixtureIntegrity proves demo.md has a non-whitespace preamble, and the AC-14 content skips stay untouched, green and silent
-- [ ] 01-03-PLAN.md — Non-enforcement audit: escalated run reaches 0 skips against a live database, each condition names its cause, and `make gate` is measured unchanged
+- [ ] 01-01-PLAN.md — Shared escalation helper: one package owns every skip-or-fail decision that was an environment skip at the phase base, and all 38 call sites across 6 test files reach it
+- [ ] 01-02-PLAN.md — Fixture invariant: TestFixtureIntegrity proves demo.md has a non-whitespace preamble via a pure function that is itself exercised against violating inputs, and the AC-14 content skips stay byte-identical, green and silent
+- [ ] 01-03-PLAN.md — Non-enforcement audit: escalated run reaches 0 skips against a live database and passes every test that skipped without one, each condition names its cause with exit status asserted independently, all three unescalated branches still skip, and `make gate` is measured unchanged from the verified phase base `030521b`
 
 ### Phase 2: Enforcement and a Single Gate Definition
 **Goal**: `make gate` sets the escalation flag and fails on any environment skip in the database-backed packages, and `ci.yml` calls `make gate` instead of re-implementing vet / gofmt / build / test as inline steps — resolving the CI-only `migrate` step introduced at `868d45b`.

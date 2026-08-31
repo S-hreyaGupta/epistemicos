@@ -1,18 +1,63 @@
 {
   "manifest_version": 1,
   "purpose": "Freeze record for the Phase 1 PLAN set. Hashes are SHA-256 over the exact committed bytes. Any edit to a plan invalidates this manifest and requires a re-freeze.",
+  "supersedes": "d90b10d",
+  "supersedes_note": "d90b10d froze the plan set at 940727c — the exact byte state Alex and Codex reviewed, recorded in 01-REVIEWS.md. That freeze is deliberately left unannotated so it remains an unaltered record of what was reviewed. This manifest carries the supersession instead. Do not delete or edit d90b10d.",
   "phase": {
     "number": "1",
     "name": "Escalation Mechanism and Fixture Invariant",
     "dir": ".planning/phases/01-escalation-mechanism-and-fixture-invariant"
   },
   "freeze": {
-    "commit": "940727c5d99ff76c3db8a91fa38ee0a88f208ec3",
-    "short": "940727c",
-    "committed_at": "2026-08-31T16:04:38+05:30",
-    "verified": "working tree byte-identical to committed blobs at freeze time"
+    "commit": "09a88c9eac2cd7cd6c62b75e1beb5c2d50639c5a",
+    "short": "09a88c9",
+    "committed_at": "2026-08-31T17:59:38+05:30",
+    "verified": "working tree byte-identical to committed blobs at freeze time; each sha256 was computed twice, once over the working-tree file and once over `git show HEAD:<path>`, and the two agreed"
   },
-  "phase_base_commit": "fcebad17569568c125ca88e10d0659a3586c28dd",
+  "review_cycle": {
+    "cycle": 1,
+    "reviews_file": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-REVIEWS.md",
+    "reviewers": [
+      "codex"
+    ],
+    "reviewed_plan_freeze": "d90b10d",
+    "high_concerns": 4,
+    "high_concerns_resolved": 4,
+    "actionable_non_high": 14,
+    "actionable_non_high_incorporated": 13,
+    "actionable_non_high_rejected_with_rationale": 1,
+    "rejection_note": "The suggestion to dismiss probe edges E1/E2/E4 as noise was rejected: the spec-less fallback protocol forbids planner-side dismissal. Addressed in substance instead — E2, E3 and E4 were each given the referent they actually have in this phase and authored as explicit criteria in 01-01's must_haves.truths; only E1, which the probe returned with no category, remains flagged."
+  },
+  "phase_base_commit": "030521b1ec7c12df868445bf8d162527202d42f1",
+  "phase_base_short": "030521b",
+  "phase_base_correction": {
+    "previous": "fcebad17569568c125ca88e10d0659a3586c28dd",
+    "previous_short": "fcebad1",
+    "reason": "Mis-anchored. Commit 868d45b ('Run the store and approved tests against a real Postgres in CI') landed after fcebad1 and modified .github/workflows/ci.yml, so both of 01-03 Task 1's audit criteria failed before any Phase 1 code existed. Measured at 9a3fe7b and re-measured at 030521b: `git log --format=%H fcebad1..HEAD -- Makefile .github/workflows/ci.yml` returns 1 commit where the plan requires 0, and `git diff --name-only fcebad1..HEAD` filtered against ^internal/ and ^\\.planning/ returns 1 where the plan requires 0. The cycle-1 escape hatch did not fire because `git merge-base --is-ancestor fcebad1 HEAD` exits 0 — ancestry is necessary but not sufficient.",
+    "verification": "All four properties re-measured at planning time against 030521b: rev-parse verified; merge-base --is-ancestor exits 0; the Makefile/ci.yml commit list is empty; the outside-paths filter is empty. The same four now run as 01-01 Task 1's <precondition>, so a wrong anchor halts at phase start rather than surfacing as a false audit failure after code has landed."
+  },
+  "execution_shell": {
+    "required": "Git Bash",
+    "path": "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+    "version": "GNU bash 5.3.15(1)-release (x86_64-pc-cygwin)",
+    "verified_present": [
+      "env",
+      "grep",
+      "sort",
+      "comm",
+      "sha256sum",
+      "cut",
+      "mktemp",
+      "wc",
+      "git",
+      "docker",
+      "go (go1.24.13 windows/amd64)"
+    ],
+    "verified_absent": [
+      "jq"
+    ],
+    "note": "PowerShell is this workspace's interactive default and will fail on env -u, test -z, trap and $(...) capture. No command in the phase may depend on jq."
+  },
   "requirements_covered": [
     "GATE-04",
     "GATE-05"
@@ -21,33 +66,35 @@
     {
       "plan": "01-01",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-01-PLAN.md",
-      "sha256": "5af1bb1ca2b5e7769977e55977e3f07700f6d27b08d0b973e8b91b9c42a7d47f",
-      "bytes": 30155,
-      "lines": 479,
+      "sha256": "b5bf59e04a03814339d925117d6c0ca787fe10228f29364263c2cd8fac728a4e",
+      "bytes": 50913,
+      "lines": 650,
       "wave": 1,
       "depends_on": [],
       "requirements": [
         "GATE-05"
-      ]
+      ],
+      "previous_sha256": "5af1bb1ca2b5e7769977e55977e3f07700f6d27b08d0b973e8b91b9c42a7d47f"
     },
     {
       "plan": "01-02",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-02-PLAN.md",
-      "sha256": "d414eedc81fe3cc7b7094af0a40c433d26fa7d107750c9bb0482451da6f9f76c",
-      "bytes": 17637,
-      "lines": 295,
+      "sha256": "9a61c8f519c2773fc042d40d05666ab6b715e5aa99bff19cac328d060647ef98",
+      "bytes": 30714,
+      "lines": 419,
       "wave": 1,
       "depends_on": [],
       "requirements": [
         "GATE-04"
-      ]
+      ],
+      "previous_sha256": "d414eedc81fe3cc7b7094af0a40c433d26fa7d107750c9bb0482451da6f9f76c"
     },
     {
       "plan": "01-03",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-03-PLAN.md",
-      "sha256": "286720f554c992e205079c7733f28a52366ab284cf278d3c9814d800811268c4",
-      "bytes": 27579,
-      "lines": 402,
+      "sha256": "8975731d4743e1510d25f29a95e444314f00dba61181c4b627ecd166029686bb",
+      "bytes": 57577,
+      "lines": 619,
       "wave": 2,
       "depends_on": [
         "01-01",
@@ -56,64 +103,127 @@
       "requirements": [
         "GATE-04",
         "GATE-05"
-      ]
+      ],
+      "previous_sha256": "286720f554c992e205079c7733f28a52366ab284cf278d3c9814d800811268c4"
     }
   ],
   "blocking": [
     {
-      "id": "T-01-01",
-      "severity": "high",
-      "plan": "01-01",
-      "summary": "pgxpool.New echoes the connection string verbatim on parse failure; existing helpers pass it to t.Fatalf, so a malformed DSN carrying a password would reach CI logs. Pre-existing at HEAD."
-    },
-    {
-      "id": "T-01-09",
-      "severity": "high",
-      "plan": "01-03",
-      "summary": "Standing credential-canary audit over both the connect and parse paths; a non-zero password count blocks the phase."
-    },
-    {
       "id": "T-01-10",
       "severity": "high",
       "plan": "01-03",
-      "summary": "Hash-pinned fixture is moved aside during the unreadable-fixture proof; restore must run regardless of exit status."
+      "summary": "The hash-pinned fixture internal/core/domain/segment/testdata/demo.md is moved aside during the unreadable-fixture proof. Restoration is a `trap ... EXIT INT TERM` installed before the move, plus a SHA-256 captured before and compared after, both required to equal a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e. Corruption of this one file invalidates all 22 offsets in expected.json and every span assertion in the segment package."
+    }
+  ],
+  "blocking_corrections": [
+    {
+      "id": "T-01-01",
+      "plan": "01-01",
+      "previous_severity": "high",
+      "previous_disposition": "mitigate (blocking)",
+      "corrected_severity": "medium",
+      "corrected_disposition": "mitigate (non-blocking at security_block_on: high)",
+      "reason": "The cycle-1 entry recorded as verified ground truth that pgxpool.New 'echoes the connection string verbatim on parse failure', so a malformed DSN carrying a password would reach CI logs. Measured against the pinned pgx/v5 v5.7.2 on four DSN shapes — URL form, keyword/value form, ?password= query, ?sslpassword= query — the library redacts the password on every one, rendering it as `u:xxxxxx` or `password=xxxxx`. A distinctive token placed in the password position produced a grep count of 0 at HEAD against the UNMODIFIED helper. Every canary criterion resting on that premise therefore passed with zero code written: a high-severity, phase-blocking control that could not fail, which is the precise vacuity this milestone exists to remove, reproduced inside the milestone's own plan set.",
+      "replacement_control": "The token moves from the password position to the database-name position, which the library echoes verbatim. Measured at the phase base with the unmodified helper: count 1 on both the URL and keyword/value forms, alongside the library's parse-error text. The criterion now requires 0 for the token, 0 for the parse-error phrasing, a non-zero exit status, and the helper's fixed message present — four independent assertions, and the criterion is measured to FAIL at the phase base, so it can only pass once the branch is rewritten. A unit-level negative control in testenv_test.go first proves the containment assertion can detect the token in a naive rendering before asserting it is absent from the real message.",
+      "residual_risk": "DSN-metadata disclosure (user, host, database name, query parameters) at the pinned version, plus the possibility of a pgx version bump silently dropping the redaction. Both are covered by the same mitigation: the branch emits an argument-free constant, unparseableURLMsg, so no DSN-derived value can reach it without a type change."
+    },
+    {
+      "id": "T-01-09",
+      "plan": "01-03",
+      "previous_severity": "high",
+      "previous_disposition": "mitigate (blocking)",
+      "corrected_severity": "medium",
+      "corrected_disposition": "mitigate (non-blocking at security_block_on: high)",
+      "reason": "Same false premise as T-01-01. The standing audit asserted that a password placed in the DSN did not appear in the output; the library already guarantees that, so the audit passed at the phase base with no code written. Rebuilt on the database-name token with positive assertions on exit status and message text, and given its own negative control proving the detector sees the token in a naive rendering."
+    }
+  ],
+  "new_threats": [
+    {
+      "id": "T-01-13",
+      "severity": "low",
+      "plan": "01-02",
+      "disposition": "accept",
+      "summary": "The cycle-1 negative proof for the fixture invariant mutated tracked source and restored it. Retired: the invariant is now a pure preambleInvariant function exercised by a permanent control test against synthetic violating inputs, so no file is mutated. Recorded so the design is visibly chosen against a known alternative."
+    },
+    {
+      "id": "T-01-14",
+      "severity": "medium",
+      "plan": "01-03",
+      "disposition": "mitigate",
+      "summary": "A mis-anchored phase base makes the non-enforcement audit report a violation that does not exist, or hides one. Mitigated by re-anchoring to 030521b, by verifying all four properties at planning time, by running the same four as 01-01 Task 1's precondition, and by recording the corrected value here."
     }
   ],
   "awaiting_disposition": {
     "contract_decisions": [
       "Package path internal/platform/testenv and its exported function names",
       "Flag name EPISTEMIC_OS_TEST_REQUIRE_DB with presence-based semantics (=0 enables escalation)",
-      "Flag documented in the package doc comment only; README and Makefile deferred to Phase 2"
+      "The flag's scope is wider than its name — it also escalates the cross-package fixture prerequisite, a filesystem condition. Widen the name in Phase 2 (EPISTEMIC_OS_TEST_REQUIRE_ENV was suggested) or accept the doc comment as sufficient?",
+      "Flag documented in the package doc comment only; README and Makefile deferred to Phase 2",
+      "The deferred AC-14 empty-heading guard: acceptance_test.go indexes the first heading without an emptiness guard, so a deliberately heading-free fixture would panic rather than skip. Not fixed in Phase 1 because GATE-04's contract is that the file stays byte-identical. Backlog item or Phase 2 change?"
     ],
     "probe_edges": [
       {
         "id": "E1",
         "requirement": "GATE-04",
         "category": "unclassified",
-        "status": "unresolved"
+        "status": "unresolved",
+        "note": "The probe returned no category, so there is no question to answer. Carried for the developer's disposition; not dismissed by the planner."
       },
       {
         "id": "E2",
         "requirement": "GATE-05",
         "category": "adjacency",
-        "status": "unresolved"
+        "status": "resolved",
+        "verification": "explicit",
+        "referent": "Simultaneous unsatisfiable conditions. Pool decides in a documented order — unset URL, then unparseable URL, then unreachable host — and names exactly one cause; Fixture runs only after Pool returns, so a fixture condition can never mask a database one. Authored as a truth in 01-01; asserted by 01-03 Scenario B, where both conditions hold at once."
       },
       {
         "id": "E3",
         "requirement": "GATE-05",
         "category": "empty",
-        "status": "unresolved"
+        "status": "resolved",
+        "verification": "explicit",
+        "referent": "The empty-string flag value returns false from Required; hostFromURL returns the empty string for empty input, a malformed string and a keyword/value DSN, and the unreachable-host branch substitutes a fixed placeholder naming the variable. Authored as a truth in 01-01; pinned by unit tests in Task 1."
       },
       {
         "id": "E4",
         "requirement": "GATE-05",
         "category": "ordering",
-        "status": "unresolved"
+        "status": "resolved",
+        "verification": "explicit",
+        "referent": "Independence from test execution order. Pool and Fixture read the environment on every call and hold no package-level state. Authored as a truth in 01-01; pinned by a -shuffle=on criterion, measured at the phase base to yield the same 38 test-level skips."
       }
     ],
-    "accounting": "4 surfaced == 0 authored into must_haves.truths + 4 flagged"
+    "accounting": "4 surfaced == 3 authored into must_haves.truths + 1 flagged (was: 0 authored + 4 flagged at d90b10d)"
+  },
+  "measured_ground_truth": {
+    "note": "Every value here was produced by running the command in this repository at 030521b before the plans were written. The cycle-1 reviewer independently re-checked ~20 plan claims and found two that did not hold; these were re-measured rather than carried forward.",
+    "test_level_skips_no_db": 38,
+    "test_level_skips_no_db_shuffled": 38,
+    "json_skip_events_all_packages": 49,
+    "json_skip_events_carrying_a_test_field": 38,
+    "package_level_skip_events": 11,
+    "call_sites": 38,
+    "call_sites_per_file": {
+      "authorreturn_test.go": 9,
+      "runrejection_test.go": 7,
+      "researchunit_test.go": 6,
+      "segmentation_decision_test.go": 6,
+      "segmentation_test.go": 5,
+      "papers_test.go": 5
+    },
+    "fixture_sha256": "a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09917242e",
+    "pgx_version": "v5.7.2",
+    "pgx_redacts_password_on_parse_error": true,
+    "pgx_echoes_rest_of_dsn_on_parse_error": true,
+    "dsn_leak_token_count_at_phase_base_url_form": 1,
+    "dsn_leak_token_count_at_phase_base_kv_form": 1,
+    "unescalated_unreachable_db_behaviour": "SKIP, package exits 0"
   },
   "known_corrections": [
-    "PROJECT.md Constraints names testify; go.mod has no assertion library. Plans mandate stdlib testing only."
+    "PROJECT.md Constraints names testify; go.mod has no assertion library. Plans mandate stdlib testing only.",
+    "Cycle 1 recorded pgxpool.New as echoing the password verbatim. It does not at v5.7.2; see blocking_corrections.T-01-01.",
+    "Cycle 1 anchored the phase at fcebad1. It is an ancestor of HEAD but fails both audit criteria; see phase_base_correction.",
+    "The STATE.md resume note assumed jq would be on PATH. It is not, as of this freeze; no command in the phase may depend on it."
   ]
 }

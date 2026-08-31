@@ -65,6 +65,8 @@ None yet.
 
 - Phase 3 carries an open design question, recorded at PROJECT.md lines 91-93: a negative test asserting "the gate fails when `EPISTEMIC_OS_DB_URL` is unset" has to run inside the suite the gate governs, in an environment where that variable is set. To be solved in Phase 3's plan.
 - `.planning/config.json` is untracked. `cmdConfigNewProject` refuses to overwrite an existing config, so it is protected from regeneration only while the file stays in place.
+- **After any `/gsd-update`, re-check that `.claude/gsd-core/workflows/review.md` still contains the run-directory archive block before the `rm -rf`.** The block is hand-added instrumentation in a GSD-managed file, so an update reverts it silently — and a capture that stops happening without saying so is the same failure class the archive exists to catch. Added under GSD 1.11.0; each archive records the version that produced it in `_INSTRUMENTATION.txt`.
+- **The instrumentation itself is not in version control.** `.gitignore:29` ignores `.claude/`, so the archive block lives only on disk in this worktree. Its *output* under `.planning/phases/*/review-runs/` is tracked and survives, but the mechanism does not: recreating this worktree, or the runbook removing it, takes the block with it and later reviews would then discard their run dirs silently. Re-applying it is a manual step with no reminder attached.
 
 ## Deferred Items
 

@@ -14,8 +14,8 @@ single PROJECT.md line
 is deliberately broken and the gate is asserted to fail *and* to name that cause"
 is split into three atomic requirements (PROOF-01..03), one per condition, per the
 atomicity rule in the requirements template. No requirement was new scope **as originally
-derived on 2026-08-31**. Five have been added since, all at Phase 1 close on 2026-09-01 and
-each traceable to a disposition Alex gave there: GATE-06, GATE-07, GATE-08, SEC-01 and GOV-01.
+derived on 2026-08-31**. Six have been added since, all at Phase 1 close on 2026-09-01 and
+each traceable to a disposition Alex gave there: GATE-06, GATE-07, GATE-08, SEC-01, GOV-01 and GATE-09.
 They ARE new scope, deliberately, and are marked as such rather than left under a blanket
 claim that stopped being true the moment the first one was added.
 
@@ -29,6 +29,25 @@ claim that stopped being true the moment the first one was added.
 - [ ] **GATE-07**: The escalation flag is renamed to `EPISTEMIC_OS_TEST_REQUIRE_ENV`, because its scope is wider than `_DB` implies — it also escalates the cross-package fixture prerequisite, a filesystem condition. Decided by Alex 2026-09-01 at Phase 1 UAT: the package doc comment alone is not sufficient. Change is confined to `testenv.RequireEnv`'s value and the package doc comment (2 occurrences in Go); the exported identifier `RequireEnv` does not change, so the API surface accepted in Phase 1 UAT test 1 is unaffected. GATE-05's wording follows the rename when it lands. Phase 1's frozen plans and SUMMARYs keep the old name — they record what was built at the time and are not rewritten
 - [x] **GATE-05**: With `EPISTEMIC_OS_TEST_REQUIRE_DB` set, a single shared test helper converts each environment skip — unset URL, unreachable database, unreadable fixture — into a failure naming that cause; with it unset, those skips remain
 - [ ] **GATE-06**: When escalation causes a failure, the message names the escalation flag (`testenv.RequireEnv`, whatever its value after GATE-07) **and prints the value it is set to**, on all three escalated paths. Presence-based semantics mean the string `0` enables escalation, so a reader who set `0` intending *off* must see `EPISTEMIC_OS_TEST_REQUIRE_DB="0"` in the failure itself. Measured at Phase 1 close: the unset-URL path says only "is set" and never prints the value, and the unreachable-database and unreadable-fixture paths do not name the flag at all — so neither reveals that escalation is why the run failed rather than skipped
+
+- [ ] **GATE-09**: A heading-free fixture fails normally rather than panicking. Acceptance text as specified by Alex Zamurko, 2026-09-01, verbatim:
+
+  > A heading-free fixture MUST produce a normal test failure and MUST NOT panic.
+  > No test may index `headings[0]` before proving `len(headings) > 0`.
+
+  **Constraints on the fix, as specified:** a **length guard only** — no second declaration mechanism. `fixtureHasPreamble` already exists and must not be joined by another declared-state constant. Where `headings[0]` is used more than once in a function, the guard goes **immediately after parsing**; where it is used once, a use-site guard satisfies it.
+
+  **Measured at Phase 1 close** — three `headings[0]` index sites exist repo-wide and only one is unguarded:
+
+  | Site | State |
+  |---|---|
+  | `internal/core/domain/segment/acceptance_test.go:435` | **UNGUARDED** — the subject of this requirement; `headings[0]` appears once in the file, so a use-site guard applies |
+  | `internal/core/domain/segment/build_test.go:205` | already guarded by `len(headings) == 0` at `:199` |
+  | `internal/core/domain/segment/fixture_test.go:193` | already guarded by `len(headings) == 0` at `:185` |
+
+  The requirement is nonetheless stated repo-wide ("no test may index…"), so a fourth site added later inherits it rather than repeating the defect.
+
+  **Governance framing, as Alex specified it:** this is a **newly discovered Phase 2 hardening requirement, NOT a retroactive modification of the frozen Phase 1 acceptance basis.** Phase 1's acceptance stands exactly as verified and signed — its plans, freeze `c96ecb2`/`8edae22`, `VERIFICATION.md` (`passed`, 5/5) and `SECURITY.md` (signed, `threats_open: 0`) are untouched and remain accurate for what Phase 1 undertook. Phase 1 was contractually forbidden from editing `acceptance_test.go` (GATE-04 required it byte-identical to phase base `868d45b`), so this was never a Phase 1 defect and closing it is not a correction of Phase 1. It supersedes the AC-14 backlog item, which is now closed
 
 ### Continuous Integration
 
@@ -91,6 +110,7 @@ Which phases cover which requirements.
 | GATE-07 | Phase 2 | Pending |
 | GATE-08 | Phase 2 | Pending |
 | SEC-01 | Phase 2 | Pending |
+| GATE-09 | Phase 2 | Pending |
 | GOV-01 | Phase 2 (closure gate) | Pending |
 | CI-01 | Delivered at `868d45b` (not planned) | Complete |
 | CI-02 | Phase 2 | Pending |

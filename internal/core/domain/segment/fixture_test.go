@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -26,6 +27,16 @@ const fixtureSHA256 = "a5f1feb02d617bcc0e2314f8ad6d0df1c7bedd9631f22493c87c57b09
 // purely so a truncation reports its own size rather than an opaque hash
 // mismatch.
 const fixtureBytes = 81492
+
+// fixtureHasPreamble declares, for the exact bytes pinned above, whether the
+// fixture begins with non-whitespace content before its first heading. It is
+// a declaration about the pinned fixture, not a runtime decision: repinning
+// to a fixture without a preamble is legitimate, but it must flip this
+// constant in the same diff that changes fixtureSHA256 and fixtureBytes.
+// Flipping it alone, without repinning, silences the preamble assertion
+// below against the fixture currently pinned instead of declaring a
+// property of a new one.
+const fixtureHasPreamble = true
 
 // expectedNode is the subset of expected.json this phase can check. The
 // remaining fields — roles, content classes, classification status — are
@@ -136,6 +147,128 @@ func TestFixtureIntegrity(t *testing.T) {
 			t.Fatalf("fixture contains a carriage return at byte %d; it must be stored with LF line endings only", i)
 		}
 	}
+
+	// The preamble property AC-14 depends on is asserted here, once, against
+	// the hash-pinned bytes, rather than re-derived (and skipped) inside the
+	// acceptance test. It is decidable here because loadFixture already
+	// proved these are the exact pinned bytes: a louder failure — the hash or
+	// length mismatch above — fires first if that ever stops being true. It
+	// is deliberately NOT asserted in acceptance_test.go, where the same
+	// question has to be answered per run and a fixture that legitimately
+	// lacks a preamble would have to decline rather than fail; asserting it
+	// there would turn AC-14's two content-conditional declines into a gate
+	// failure class, which is exactly what GATE-04 forbids. A failure here
+	// means the fixture was replaced or regenerated, not that this assertion
+	// drifted — the pinning constants at the top of this file are where to
+	// look. fixtureHasPreamble is how a genuinely preamble-free fixture is
+	// admitted: declared beside the hash and length so it cannot be repinned
+	// quietly, and it is a declared value rather than a skip, so the
+	// permissive case is visible in the diff instead of absent from the run.
+	if msg := preambleInvariant(src, detectHeadings(src), fixtureHasPreamble); msg != "" {
+		t.Fatal(msg)
+	}
+}
+
+// preambleInvariant decides whether the fixture's preamble property holds,
+// gated on declaredHasPreamble, and returns the empty string when it does or
+// a one-line failure message naming the fixture otherwise. It is a pure
+// function, driven from parameters rather than reading fixtureHasPreamble
+// directly, precisely so the negative proof in TestPreambleInvariant_Control
+// can drive it against synthetic inputs without mutating any tracked file.
+//
+// Order matters: the no-headings case is checked first and unconditionally,
+// because a fixture with no headings is not a preamble-free fixture — it is
+// one where AC-14 indexes headings[0] and panics, and a panic is neither
+// green nor silent. The declaration gate only waives the two preamble checks
+// that follow it.
+func preambleInvariant(src []byte, headings []Heading, declaredHasPreamble bool) string {
+	if len(headings) == 0 {
+		return "testdata/demo.md: no headings detected"
+	}
+
+	if !declaredHasPreamble {
+		return ""
+	}
+
+	firstHeading := headings[0].ByteStart
+	if firstHeading == 0 {
+		return "testdata/demo.md: first heading starts at byte 0; AC-14 requires a non-whitespace preamble"
+	}
+
+	if len(strings.TrimSpace(string(src[:firstHeading]))) == 0 {
+		return "testdata/demo.md: bytes [0,N) are whitespace only"
+	}
+
+	return ""
+}
+
+// TestPreambleInvariant_Control is the permanent, mutation-free negative
+// proof that preambleInvariant can both fail and pass, and that its
+// declaredHasPreamble gate is real rather than decorative. It drives the
+// function directly with synthetic inputs instead of temporarily rewriting
+// testdata/demo.md and restoring it afterward.
+func TestPreambleInvariant_Control(t *testing.T) {
+	validPreamble := []byte("Some real preamble text.\n# Heading\nBody.")
+	zeroOffsetSrc := []byte("# Heading\nBody.")
+	whitespacePreamble := []byte(" \t\n\n# Heading\nBody.")
+
+	t.Run("no headings at all", func(t *testing.T) {
+		msg := preambleInvariant(validPreamble, nil, true)
+		if msg == "" {
+			t.Fatal("expected a non-empty message for a heading-less input, got empty string")
+		}
+		if !strings.Contains(msg, "testdata/demo.md") {
+			t.Fatalf("message %q does not name the fixture file", msg)
+		}
+	})
+
+	t.Run("first heading at byte 0", func(t *testing.T) {
+		headings := []Heading{{ByteStart: 0}}
+		msg := preambleInvariant(zeroOffsetSrc, headings, true)
+		if msg == "" {
+			t.Fatal("expected a non-empty message for a zero-offset first heading, got empty string")
+		}
+		if !strings.Contains(msg, "testdata/demo.md") {
+			t.Fatalf("message %q does not name the fixture file", msg)
+		}
+	})
+
+	t.Run("whitespace-only preamble", func(t *testing.T) {
+		headings := []Heading{{ByteStart: 4}}
+		msg := preambleInvariant(whitespacePreamble, headings, true)
+		if msg == "" {
+			t.Fatal("expected a non-empty message for a whitespace-only preamble, got empty string")
+		}
+		if !strings.Contains(msg, "testdata/demo.md") {
+			t.Fatalf("message %q does not name the fixture file", msg)
+		}
+	})
+
+	t.Run("valid preamble", func(t *testing.T) {
+		headings := []Heading{{ByteStart: 26}}
+		msg := preambleInvariant(validPreamble, headings, true)
+		if msg != "" {
+			t.Fatalf("expected the empty string for a valid preamble, got %q", msg)
+		}
+	})
+
+	t.Run("declared preamble-free", func(t *testing.T) {
+		headings := []Heading{{ByteStart: 0}}
+		msg := preambleInvariant(zeroOffsetSrc, headings, false)
+		if msg != "" {
+			t.Fatalf("expected the empty string when declaredHasPreamble is false, got %q", msg)
+		}
+	})
+
+	t.Run("declared preamble-free, but no headings", func(t *testing.T) {
+		msg := preambleInvariant(zeroOffsetSrc, nil, false)
+		if msg == "" {
+			t.Fatal("expected a non-empty message when there are no headings, even when declaredHasPreamble is false, got empty string")
+		}
+		if !strings.Contains(msg, "testdata/demo.md") {
+			t.Fatalf("message %q does not name the fixture file", msg)
+		}
+	})
 }
 
 // TestDetectHeadings_Fixture is the phase 1 done-condition from §15: the

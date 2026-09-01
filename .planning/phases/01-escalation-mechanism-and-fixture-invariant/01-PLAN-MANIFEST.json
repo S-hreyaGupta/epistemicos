@@ -107,41 +107,43 @@
     {
       "plan": "01-01",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-01-PLAN.md",
-      "sha256": "037a8d4d2883a7d28fe490bdb438fbdda6ed2fd68d4478d8492cd2f9e43709d1",
-      "bytes": 52492,
-      "lines": 674,
+      "sha256": "67fc0b2f9a04b9f240133a3e6d6eb620ed7ee4034522e1561600ccc80633b388",
+      "bytes": 53901,
+      "lines": 686,
       "wave": 1,
       "depends_on": [],
       "requirements": [
         "GATE-05"
       ],
-      "previous_sha256": "776afe5f6b057a1d3f651f59f6e37a15f5c003dede1d43a4e1211e13f967da77",
-      "previous_sha256_freeze": "4d18eba",
-      "previous_sha256_note": "changed by the base-substitution guard at 2cc3b42 (Alex finding 2)"
+      "previous_sha256": "037a8d4d2883a7d28fe490bdb438fbdda6ed2fd68d4478d8492cd2f9e43709d1",
+      "previous_sha256_freeze": "1ec4f04, withdrawn at 4f5f856 -- a measurement, not a valid freeze",
+      "previous_sha256_note": "changed by the re-anchor from 030521b to the approved base 868d45b at 8edae22",
+      "previous_sha256_state": "2cc3b42"
     },
     {
       "plan": "01-02",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-02-PLAN.md",
-      "sha256": "9dd75245deb93323c573b1fb98c41210875dd320fbf4627a69768af24b813bea",
-      "bytes": 39298,
-      "lines": 503,
+      "sha256": "18a30345d9830d1630df47d0bac4d963cc94508a5d1bc3418288e8499364073d",
+      "bytes": 39575,
+      "lines": 507,
       "wave": 1,
       "depends_on": [],
       "requirements": [
         "GATE-04"
       ],
-      "previous_sha256": "9a61c8f519c2773fc042d40d05666ab6b715e5aa99bff19cac328d060647ef98",
-      "previous_sha256_freeze": "19209e1",
-      "previous_sha256_note": "changed by the preamble-declaration change at 4d18eba (Alex finding 1, option C)",
+      "previous_sha256": "9dd75245deb93323c573b1fb98c41210875dd320fbf4627a69768af24b813bea",
+      "previous_sha256_freeze": "1ec4f04, withdrawn at 4f5f856 -- a measurement, not a valid freeze",
+      "previous_sha256_note": "changed by the re-anchor from 030521b to the approved base 868d45b at 8edae22",
       "unchanged_since": "4d18eba",
-      "unchanged_note": "byte-identical to the 4d18eba freeze; not touched by the 2cc3b42 change"
+      "unchanged_note": "byte-identical to the 4d18eba freeze; not touched by the 2cc3b42 change",
+      "previous_sha256_state": "2cc3b42"
     },
     {
       "plan": "01-03",
       "path": ".planning/phases/01-escalation-mechanism-and-fixture-invariant/01-03-PLAN.md",
-      "sha256": "47085ea837177408d71f02d6275343392c15c760dbbfe76798ca0d170538f6bd",
-      "bytes": 76497,
-      "lines": 761,
+      "sha256": "b6bbb639f3b235e77b3e317528850edaa8cd768774d8ce4def93a7218c736485",
+      "bytes": 79378,
+      "lines": 787,
       "wave": 2,
       "depends_on": [
         "01-01",
@@ -151,9 +153,10 @@
         "GATE-04",
         "GATE-05"
       ],
-      "previous_sha256": "db95c8185e28bd964d8c19fd306878aea7394bb5bc6d443924fbae250aa555d2",
-      "previous_sha256_freeze": "4d18eba",
-      "previous_sha256_note": "changed by the base-substitution guard at 2cc3b42 (Alex finding 2)"
+      "previous_sha256": "47085ea837177408d71f02d6275343392c15c760dbbfe76798ca0d170538f6bd",
+      "previous_sha256_freeze": "1ec4f04, withdrawn at 4f5f856 -- a measurement, not a valid freeze",
+      "previous_sha256_note": "changed by the re-anchor from 030521b to the approved base 868d45b at 8edae22",
+      "previous_sha256_state": "2cc3b42"
     }
   ],
   "blocking": [
@@ -375,8 +378,8 @@
       {
         "from": "030521b",
         "to": "868d45b",
-        "at": null,
-        "at_kind": "the commit that performs the substitution; filled by the freeze commit that follows it",
+        "at": "8edae22",
+        "at_kind": "the commit that performed the substitution",
         "when": "2026-09-01",
         "driver": "operator decision by Alex Zamurko, on review of the base-approval gate added at 2cc3b42",
         "recorded": true,
@@ -400,12 +403,22 @@
     "base_independence_evidence": "The ci.yml blob is fdbf98f4 at the phase base 868d45b and at HEAD, but 74971632 at fcebad1 -- the change 868d45b made. The pin therefore catches exactly what the commit-count criterion missed, and cannot be satisfied by moving the phase base. It is also what makes the base choice non-load-bearing for the phase's central claim: 030521b and 868d45b carry identical blobs for both gate files, so the content assertion is unchanged by the re-anchor.",
     "reverified": "Both blob hashes re-measured at 4f5f856 and at 868d45b; identical at both, and identical to the values pinned above."
   },
-  "freeze_invalidated": {
-    "state": "NOT FROZEN",
-    "reason": "The phase base anchor is undecided. phase_base_approval.status is `awaiting_approval`, so certifying a frozen plan set on top of it would assert validity resting on an unapproved anchor -- the exact pattern Alex's finding 2 identifies and that this plan set now guards against. A freeze taken over an undecided base is not a weaker freeze; it is the defect wearing a freeze's clothes.",
-    "last_valid_freeze": "d464319",
-    "last_valid_freeze_plan_bytes": "4d18eba",
-    "last_valid_freeze_note": "d464319 froze the plan set at 4d18eba, the state carrying the preamble declaration (Alex finding 1, option C). It remains the most recent freeze anyone should cite. Plan bytes have moved past it -- see plans[].sha256 below -- so d464319 describes an earlier state, not the current tree.",
+  "freeze": {
+    "state": "FROZEN",
+    "commit": "8edae22efa6617164a6b1355baaaee4cbb5c7a0c",
+    "short": "8edae22",
+    "committed_at": "2026-09-01T12:42:46+05:30",
+    "verified": "Working tree byte-identical to the committed blobs at freeze time. Each sha256 was computed twice, once over the working-tree file and once over `git cat-file blob HEAD:<path>`, and the two agreed for all three plans. This check is not ceremonial here: core.autocrlf is `true` in this checkout, and git warned on commit that LF will become CRLF the next time it touches these files -- the same hazard gate_file_pins documents. The hashes above are over the committed bytes; a later sha256sum of the working tree may disagree after a re-checkout, and the committed bytes are authoritative.",
+    "base": {
+      "commit": "868d45bf873c9e147f18a099171b99afa348f4a3",
+      "short": "868d45b",
+      "status": "approved",
+      "approved_by": "Alex Zamurko",
+      "approved_on": "2026-09-01",
+      "gate": "PASSES -- all five of 01-01 Task 1's precondition assertions and both of 01-03 Task 1's base-independent content pins were re-run at 8edae22 and returned the required results. The approval-status detector was checked in both directions: it reads `approved` from this manifest, and reads `awaiting_approval` from a tampered copy, so the halt path is live rather than assumed."
+    },
+    "supersedes": "d464319",
+    "supersedes_note": "d464319 froze the plan set at 4d18eba, the state carrying the preamble declaration (Alex finding 1, option C). This freeze supersedes it with the base-substitution guard (Alex finding 2) and with the base decision that guard was waiting on. It does NOT supersede d90b10d, which remains the review-of-record.",
     "withdrawn_freeze": {
       "commit": "2cc3b42e4671213c0f47d0923a44f86a886c4403",
       "short": "2cc3b42",
@@ -415,8 +428,8 @@
       "why_withdrawn": "Taken at 1ec4f04 in the same turn as the guard it was meant to record, before the operator ruled on the base. It asserted a validated plan set anchored at 2cc3b42 while phase_base_approval.status two fields below read `awaiting_approval`. 1ec4f04 is deliberately NOT rewritten: the record of a freeze that should not have been taken is worth more than a clean history, and this milestone is about not hiding that class of thing.",
       "superseded_note_preserved": "d464319 froze the plan set at 4d18eba -- the state carrying the preamble declaration (Alex finding 1, option C). This freeze supersedes it with the base-substitution guard (Alex finding 2). Full chain: 940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/d92a8c9 -> 19209e1/39021b3 -> 4d18eba/d464319 -> 2cc3b42/this. d90b10d remains the review-of-record freeze that both Alex and Codex cycle 1 reviewed. Every earlier freeze is an unaltered record of what was reviewed at that point. Do not delete or edit any of them."
     },
-    "chain_so_far": "940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/d92a8c9 -> 19209e1/39021b3 -> 4d18eba/d464319 -> (2cc3b42/1ec4f04, withdrawn) -> current tree UNFROZEN. d90b10d remains the review-of-record freeze that both Alex and Codex cycle 1 reviewed. Every earlier freeze is an unaltered record of what was reviewed at that point. Do not delete or edit any of them.",
-    "unblocks": "Set phase_base_approval.status to `approved` with approved_by and approved_on filled, or name a different base and record the substitution in phase_base_approval.substitution_history. Then re-freeze, superseding d464319 and noting that 1ec4f04's freeze was withdrawn.",
-    "plans_hashes_note": "plans[].sha256, bytes and lines below are accurate measurements of the current tree at 1ec4f04. They are measurements, NOT a freeze: nothing has certified this plan set, and no supersedes pointer claims it has."
+    "withdrawn_freeze_note": "The freeze taken at 1ec4f04 was withdrawn at 4f5f856 because it certified a plan set over a base nobody had ruled on. It stays in the record. This freeze is the first one taken over an approved base, which is the difference between the two and the reason the withdrawal was worth making.",
+    "chain": "940727c/d90b10d -> 09a88c9/dd69e0e -> cdad611/d92a8c9 -> 19209e1/39021b3 -> 4d18eba/d464319 -> (2cc3b42/1ec4f04, withdrawn at 4f5f856) -> 8edae22/this. d90b10d remains the review-of-record freeze that both Alex and Codex cycle 1 reviewed. Every earlier freeze is an unaltered record of what was reviewed at that point. Do not delete or edit any of them.",
+    "invalidated_by": "Any edit to a plan file. Re-measure all three hashes and re-freeze."
   }
 }

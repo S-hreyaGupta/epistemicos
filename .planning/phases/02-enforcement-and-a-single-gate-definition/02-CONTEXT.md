@@ -34,7 +34,8 @@ preflight and D-05's `make test` banner) cannot be verified without it. See D-07
   the milestone's central claim.
   — **Reversibility:** reversible — a prerequisite could be added later; nothing binds to its absence.
 
-- **D-02:** The gate recipe becomes **vet → gofmt → build → `$(MAKE) migrate` → preflight → `$(MAKE) test`**.
+- **D-02:** The gate recipe becomes **vet → gofmt → build → preflight → `$(MAKE) migrate` → `$(MAKE) test`**.
+  *(Corrected 2026-09-01, confirmed by Alex. This line originally read `… → build → $(MAKE) migrate → preflight → …`, which contradicted D-03 — where the preflight's whole purpose is to speak before migrate does. D-03 governs because it states its reason; this line did not. Caught at the planning gate by reading the two decisions against each other, before any plan was written against the wrong order. Recorded rather than silently fixed: this is a GOV-01-class instance in a document nobody had edited, and it is inside D-14's derived sweep set because it names the phase number and its requirement IDs.)*
   `migrate` is invoked through the existing target, not by pasting `go run ./cmd/epistemicos-cli migrate up`
   into gate — a copied body is a second definition of `migrate`, the exact defect CI-02 closes one
   level up. The vet/gofmt/build/migrate/test order matches what `ci.yml` runs today, so the

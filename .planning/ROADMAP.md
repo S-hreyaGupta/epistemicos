@@ -44,7 +44,7 @@ Plans:
 **Wave 1**
 
 - [ ] 01-01-PLAN.md — Shared escalation helper: one package owns every skip-or-fail decision that was an environment skip at the phase base, and all 38 call sites across 6 test files reach it
-- [ ] 01-02-PLAN.md — Fixture invariant: TestFixtureIntegrity proves demo.md has a non-whitespace preamble via a pure function that is itself exercised against violating inputs, and the AC-14 content skips stay byte-identical, green and silent
+- [x] 01-02-PLAN.md — Fixture invariant: TestFixtureIntegrity proves demo.md has a non-whitespace preamble via a pure function that is itself exercised against violating inputs, and the AC-14 content skips stay byte-identical, green and silent
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

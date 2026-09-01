@@ -176,3 +176,10 @@ None - no external service configuration required.
 ---
 *Phase: 01-escalation-mechanism-and-fixture-invariant*
 *Completed: 2026-09-01*
+
+## Self-Check: PASSED
+
+- FOUND: internal/core/domain/segment/fixture_test.go
+- FOUND: .planning/phases/01-escalation-mechanism-and-fixture-invariant/01-02-SUMMARY.md
+- FOUND: bdf7ddd (Task 1 commit)
+- FOUND: 53019b1 (SUMMARY commit)

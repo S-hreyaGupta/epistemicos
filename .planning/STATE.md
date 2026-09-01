@@ -1,18 +1,18 @@
 ---
 gsd_state_version: 1.0
 current_phase: 01
-current_phase_name: escalation-mechanism-and-fixture-invariant
-status: planning
-stopped_at: Phase 1 base approved as `868d45b`; plans re-anchored at `8edae22` and frozen at `c96ecb2`. The base-approval gate passes.
-last_updated: "2026-09-01T12:45:00.000Z"
+current_phase_name: Escalation Mechanism and Fixture Invariant
+status: executing
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-09-01T08:21:17.149Z"
 last_activity: 2026-09-01
-last_activity_desc: Phase 1 base approved as 868d45b by Alex; plans re-anchored (8edae22) and re-frozen (c96ecb2)
-state_head: c96ecb264475cce163494f69050331a56f4a10b6
+last_activity_desc: Phase 01 execution started
+state_head: 53019b18a707b49a37c80de040838f138030aae1
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -23,17 +23,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-30)
 
 **Core value:** `make gate` must be able to distinguish "tested and passed" from "tested nothing".
-**Current focus:** Phase 1 — Escalation Mechanism
+**Current focus:** Phase 01 — Escalation Mechanism and Fixture Invariant
 
 ## Current Position
 
-Phase: 01 (escalation-mechanism-and-fixture-invariant) — READY TO EXECUTE
-Plan: 0 of 3 in current phase
-Status: Ready to execute — the base-approval gate passes
+Phase: 01 (Escalation Mechanism and Fixture Invariant) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Total Plans in Phase: 3
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
 Plan bytes: `8edae22` — freeze: `c96ecb2`
-Last activity: 2026-09-01 — Phase 1 base approved as `868d45b`; plans re-anchored (8edae22) and re-frozen (c96ecb2)
+Last activity: 2026-09-01 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -57,6 +57,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 01 P02 | 15 min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -70,6 +75,8 @@ Recent decisions affecting current work:
 - Pre-phase: CI provisions Postgres inside this milestone rather than after it, because a hard-failing gate turns CI red immediately.
 - Phase 1 (2026-09-01): the phase base is `868d45b`, approved by Alex Zamurko. It is the commit that modified `.github/workflows/ci.yml` and the last commit on this branch to touch either gate file, so the change sits *at* the anchor rather than behind it, and every commit after it is a `.planning/` commit from this phase's own planning loop. `030521b` — the base cycle-1 convergence substituted in without approval — was **rejected**: all four anchor properties hold at it and its source tree is byte-identical to `868d45b`'s, but it is a commit the review process wrote 23 seconds after the review that demanded the re-anchor, so anchoring the phase to it would be circular. The `fcebad1` → `030521b` substitution stays recorded as it happened: recorded, not halted, not approved.
 - Phase 1: `d90b10d` (`01-PLAN-MANIFEST.json`, pinning the three plans at `940727c`) is the **review-of-record** — the exact byte state Alex reviewed, with findings written and recorded outside this repository. Convergence will rewrite the plans, superseding it. **Do not delete or edit it.** It is deliberately left unannotated: retroactively marking it would alter the artifact whose value is being an unaltered record of what was reviewed. The post-convergence manifest carries the supersession instead, via a `supersedes: d90b10d` field pointing back.
+- [Phase 01]: The preamble property is asserted once in TestFixtureIntegrity against the hash-pinned fixture (via a pure preambleInvariant function), not re-derived per-run in acceptance_test.go, keeping AC-14's two content-conditional t.Skip calls green and silent instead of a gate failure class.
+- [Phase 01]: fixtureHasPreamble is a pinned constant (declared true), not a runtime skip, so a genuinely preamble-free fixture must be declared in the same diff that repins the hash and length; the negative proof (TestPreambleInvariant_Control) drives the function with synthetic inputs, retiring the mutate-and-restore pattern flagged in cycle-1 review.
 
 ### Pending Todos
 
@@ -81,6 +88,7 @@ None yet.
 - `.planning/config.json` is untracked. `cmdConfigNewProject` refuses to overwrite an existing config, so it is protected from regeneration only while the file stays in place.
 - **After any `/gsd-update`, re-check that `.claude/gsd-core/workflows/review.md` still contains the run-directory archive block before the `rm -rf`.** The block is hand-added instrumentation in a GSD-managed file, so an update reverts it silently — and a capture that stops happening without saying so is the same failure class the archive exists to catch. Added under GSD 1.11.0; each archive records the version that produced it in `_INSTRUMENTATION.txt`.
 - **The instrumentation itself is not in version control.** `.gitignore:29` ignores `.claude/`, so the archive block lives only on disk in this worktree. Its *output* under `.planning/phases/*/review-runs/` is tracked and survives, but the mechanism does not: recreating this worktree, or the runbook removing it, takes the block with it and later reviews would then discard their run dirs silently. Re-applying it is a manual step with no reminder attached.
+- 01-02's whole-tree git-diff acceptance criteria (unrestricted 'git diff --name-only 868d45b --') print 47 files, not the expected single fixture_test.go, because ~29 pre-existing .planning/-only commits (base re-anchor, plan re-freeze, review-run archives) already sit between the phase base and execution start. The internal/-scoped form of the same check still confirms exactly one source file changed. Likely affects 01-01 and 01-03's identical whole-tree-diff criteria too — flag before running them.
 
 ## Deferred Items
 
@@ -92,8 +100,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-01
-Stopped at: Phase 1 base decided. Alex named `868d45b`; the plans were re-anchored to it (`8edae22`) and the set re-frozen (`c96ecb2`, superseding `d464319`). The base-approval gate that halted execution now passes — verified by re-running all five of 01-01 Task 1's precondition assertions, both of 01-03 Task 1's base-independent blob pins, and the approval-status detector in both directions.
+Last session: 2026-09-01T08:21:17.123Z
+Stopped at: Completed 01-02-PLAN.md
 Resume with: `/gsd-execute-phase 1`
 Before executing: 01-01 Task 1's `<precondition>` re-runs the same five assertions. It should pass. If it halts, the tree moved — do not re-anchor to make it pass; that is the failure this phase exists to catch.
 Resume file: None

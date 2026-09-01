@@ -13,7 +13,11 @@ single PROJECT.md line
 "Automated negative tests prove the gate: each of the three environment conditions
 is deliberately broken and the gate is asserted to fail *and* to name that cause"
 is split into three atomic requirements (PROOF-01..03), one per condition, per the
-atomicity rule in the requirements template. No requirement here is new scope.
+atomicity rule in the requirements template. No requirement was new scope **as originally
+derived on 2026-08-31**. Four have been added since, all at Phase 1 UAT on 2026-09-01 and
+each traceable to a disposition Alex gave there: GATE-06, GATE-07, GATE-08 and SEC-01.
+They ARE new scope, deliberately, and are marked as such rather than left under a blanket
+claim that stopped being true the moment the first one was added.
 
 ### Gate Behavior
 
@@ -30,6 +34,10 @@ atomicity rule in the requirements template. No requirement here is new scope.
 
 - [x] **CI-01**: CI provisions PostgreSQL and applies migrations so the database-backed tests actually execute on every push and pull request — **done at `868d45b`**
 - [ ] **CI-02**: `ci.yml` calls `make gate` rather than re-implementing it, so the gate has exactly one definition
+
+### Security
+
+- [ ] **SEC-01**: The compose PostgreSQL binds loopback only — `docker-compose.yml:9` reads `"127.0.0.1:5432:5432"`, not `"5432:5432"`. As written, Docker publishes the service on all interfaces (`0.0.0.0:5432->5432/tcp`, `[::]:5432->5432/tcp`), so an instance with guessable defaults (`epistemicos`/`epistemicos`) is reachable from the local network. Registered by Alex 2026-09-01 at Phase 1 security sign-off, converting accepted risk AR-02 into a scheduled fix on the grounds that a one-character-class change against real exposure should not sit as an indefinite acceptance. Out of Phase 1's scope: the file is byte-unchanged since phase base `868d45b`, and editing it would have failed Phase 1's own "nothing outside `internal/` and `.planning/`" audit — which is why this is Phase 2 work and not a Phase 1 defect. Closes AR-02; T-01-11 stays open until it lands
 
 ### Gate Proof
 
@@ -69,6 +77,7 @@ Which phases cover which requirements.
 | GATE-06 | Phase 2 | Pending |
 | GATE-07 | Phase 2 | Pending |
 | GATE-08 | Phase 2 | Pending |
+| SEC-01 | Phase 2 | Pending |
 | CI-01 | Delivered at `868d45b` (not planned) | Complete |
 | CI-02 | Phase 2 | Pending |
 | PROOF-01 | Phase 3 | Pending |

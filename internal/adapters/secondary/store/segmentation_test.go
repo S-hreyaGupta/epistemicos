@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -242,10 +241,7 @@ func TestSaveRun_FixtureRoundTripsAllOffsets(t *testing.T) {
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
-	md, err := os.ReadFile("../../../core/domain/segment/testdata/demo.md")
-	if err != nil {
-		t.Skipf("fixture not readable from here: %v", err)
-	}
+	md := testenv.Fixture(t, "../../../core/domain/segment/testdata/demo.md")
 
 	doc, err := segment.Build(md)
 	if err != nil {

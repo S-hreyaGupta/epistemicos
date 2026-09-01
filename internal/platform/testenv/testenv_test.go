@@ -3,6 +3,7 @@ package testenv
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -135,5 +136,25 @@ func TestRequired(t *testing.T) {
 				t.Fatalf("Required() = %v, want %v", got, c.want)
 			}
 		})
+	}
+}
+
+// TestFixture_SuccessPath covers only the non-escalated success case:
+// reading a file that exists returns its exact bytes. The skip and fail
+// branches are not asserted from inside a test — driving a testing.T from
+// outside to observe a skip or fail decision is the gate proof, and that is
+// PROOF-03 in Phase 3.
+func TestFixture_SuccessPath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fixture.txt")
+	want := []byte("fixture contents\n")
+
+	if err := os.WriteFile(path, want, 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	got := Fixture(t, path)
+	if string(got) != string(want) {
+		t.Fatalf("Fixture(%q) = %q, want %q", path, got, want)
 	}
 }

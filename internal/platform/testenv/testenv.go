@@ -131,3 +131,27 @@ func Pool(t *testing.T) *pgxpool.Pool {
 	t.Cleanup(pool.Close)
 	return pool
 }
+
+// Fixture reads path and returns its bytes, or skips or fails the calling
+// test depending on Required(). It is for fixtures read across a package
+// boundary, where a relative path is a real environment risk — for a
+// fixture a package owns and pins itself, the stricter idiom is the
+// in-package loadFixture in internal/core/domain/segment, which hard-fails
+// on a read error unconditionally, because that failure is never a
+// legitimate environment skip for a fixture the package controls.
+//
+// Fixture is called only after Pool has already returned in every test that
+// uses both, so a fixture condition can never mask a database condition —
+// Pool decides first, in the order documented on Pool.
+func Fixture(t *testing.T, path string) []byte {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if Required() {
+			t.Fatalf("fixture not readable at %s: %v", path, err)
+		}
+		t.Skipf("fixture not readable at %s: %v", path, err)
+	}
+	return data
+}

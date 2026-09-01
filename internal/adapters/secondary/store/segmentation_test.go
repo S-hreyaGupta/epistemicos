@@ -4,44 +4,18 @@ import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/EpistemicOS/epistemicos/internal/core/domain/segment"
 	"github.com/EpistemicOS/epistemicos/internal/core/ports"
+	"github.com/EpistemicOS/epistemicos/internal/platform/testenv"
 )
 
-// testPool connects to the database named by EPISTEMIC_OS_DB_URL, or skips.
-//
-// Skipping rather than failing is the right posture for a store test: a
-// developer without Docker running should not see a red build for a reason
-// unrelated to their change. CI sets the variable, so the tests do run where it
-// matters — and a skip that is silent in CI would be worse than no test, which
-// is why the skip message names the variable.
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-
-	url := os.Getenv("EPISTEMIC_OS_DB_URL")
-	if url == "" {
-		t.Skip("EPISTEMIC_OS_DB_URL is not set; start postgres and export it to run the store tests")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	pool, err := pgxpool.New(ctx, url)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		t.Skipf("cannot reach postgres at EPISTEMIC_OS_DB_URL: %v", err)
-	}
-
-	t.Cleanup(pool.Close)
-	return pool
+	return testenv.Pool(t)
 }
 
 // fixtureRun builds a small but structurally complete run: a title, a resolved

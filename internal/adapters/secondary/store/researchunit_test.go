@@ -11,6 +11,7 @@ import (
 	"github.com/EpistemicOS/epistemicos/internal/core/domain/paper"
 	"github.com/EpistemicOS/epistemicos/internal/core/domain/researchunit"
 	"github.com/EpistemicOS/epistemicos/internal/core/ports"
+	"github.com/EpistemicOS/epistemicos/internal/platform/testenv"
 )
 
 // These are integration tests because what can go wrong here is SQL: an UPSERT
@@ -63,7 +64,7 @@ func frontiersGate() researchunit.Gate {
 }
 
 func TestSaveAndGetResearchUnitGate(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresResearchUnitStore(pool)
 	ctx := context.Background()
 
@@ -111,7 +112,7 @@ func TestSaveAndGetResearchUnitGate(t *testing.T) {
 // record a change that did not happen, and would double the evidence a reviewer
 // is shown.
 func TestSaveGate_IsIdempotent(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresResearchUnitStore(pool)
 	ctx := context.Background()
 
@@ -150,7 +151,7 @@ func TestSaveGate_IsIdempotent(t *testing.T) {
 // is the one case where two rows about one paper are correct, and it is why the
 // version is part of the key rather than a column beside it.
 func TestSaveGate_ADifferentRuleVersionIsADifferentRow(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresResearchUnitStore(pool)
 	ctx := context.Background()
 
@@ -198,7 +199,7 @@ func TestSaveGate_ADifferentRuleVersionIsADifferentRow(t *testing.T) {
 // the same: the evidence rows quote headings, and headings from a previous
 // extraction may simply not be there any more.
 func TestCurrentGate_ScopedToTheMarkdown(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresResearchUnitStore(pool)
 	ctx := context.Background()
 
@@ -221,7 +222,7 @@ func TestCurrentGate_ScopedToTheMarkdown(t *testing.T) {
 // is worse than a missing one: the first is trusted and wrong, the second is
 // merely absent.
 func TestSaveGate_RefusesAVerdictWithNoRuleVersion(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresResearchUnitStore(pool)
 	ctx := context.Background()
 
@@ -242,7 +243,7 @@ func TestSaveGate_RefusesAVerdictWithNoRuleVersion(t *testing.T) {
 // would make "this paper was never checked" and "this paper passed" the same
 // absence.
 func TestSaveGate_SingleStudyPaperIsStoredToo(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresResearchUnitStore(pool)
 	ctx := context.Background()
 

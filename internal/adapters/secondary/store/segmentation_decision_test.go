@@ -9,6 +9,7 @@ import (
 
 	"github.com/EpistemicOS/epistemicos/internal/core/domain/segment"
 	"github.com/EpistemicOS/epistemicos/internal/core/ports"
+	"github.com/EpistemicOS/epistemicos/internal/platform/testenv"
 )
 
 // decisionFixture is deliberately NOT fixtureRun.
@@ -71,7 +72,7 @@ func savedRunWithTask(t *testing.T, s *PostgresSegmentationStore) (segment.Run, 
 // TestSaveAndGetDecision is the round trip. Until this passed, Step 3 could ask
 // sixty-five questions about one manuscript and store no answers at all.
 func TestSaveAndGetDecision(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -122,7 +123,7 @@ func TestSaveAndGetDecision(t *testing.T) {
 // TestSaveDecision_ResolvesItsTask. A decision stored against a task still marked
 // open is a question that has been answered and will be asked again.
 func TestSaveDecision_ResolvesItsTask(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -164,7 +165,7 @@ func TestSaveDecision_ResolvesItsTask(t *testing.T) {
 // IDENTITY: the second call's id is discarded and the original returned, so a
 // caller is never left holding an id for a row that does not exist.
 func TestSaveDecision_CorrectionUpdatesInPlace(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -226,7 +227,7 @@ func TestSaveDecision_CorrectionUpdatesInPlace(t *testing.T) {
 
 // TestSaveDecision_UnknownTask must not create anything.
 func TestSaveDecision_UnknownTask(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -248,7 +249,7 @@ func TestSaveDecision_UnknownTask(t *testing.T) {
 // TestGetDecisions_NoneYet returns an empty map rather than an error. A run
 // nobody has reviewed is the ordinary case, not a failure.
 func TestGetDecisions_NoneYet(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -266,7 +267,7 @@ func TestGetDecisions_NoneYet(t *testing.T) {
 // TestGetDecisions_ScopedToTheRun. The join runs through review_tasks, and a
 // decision on another paper's task must not leak into this run's overlay.
 func TestGetDecisions_ScopedToTheRun(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 

@@ -13,11 +13,6 @@ import (
 	"github.com/EpistemicOS/epistemicos/internal/platform/testenv"
 )
 
-func testPool(t *testing.T) *pgxpool.Pool {
-	t.Helper()
-	return testenv.Pool(t)
-}
-
 // fixtureRun builds a small but structurally complete run: a title, a resolved
 // section, an unresolved section with its task, and a parent-child link.
 func fixtureRun(t *testing.T) segment.Run {
@@ -56,7 +51,7 @@ func cleanup(t *testing.T, pool *pgxpool.Pool, runID string) {
 // identical, including the nullable fields whose NULL-versus-empty distinction
 // carries meaning.
 func TestSaveAndGetRun(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -148,7 +143,7 @@ func TestSaveAndGetRun(t *testing.T) {
 // TestGetRun_NotFound checks the sentinel, so callers can errors.Is rather than
 // string-match.
 func TestGetRun_NotFound(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 
 	_, err := s.GetRun(context.Background(), uuid.NewString())
@@ -169,7 +164,7 @@ func TestGetRun_NotFound(t *testing.T) {
 // indistinguishable from a real answer. Enforcing it in the schema means a
 // future writer cannot forget, which a code path cannot promise.
 func TestSaveRun_UnresolvedNodeCannotCarryARole(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -201,7 +196,7 @@ func TestSaveRun_UnresolvedNodeCannotCarryARole(t *testing.T) {
 // sections, which is exactly the silent loss §10 exists to prevent — and §10
 // runs in the domain, before the store, so it cannot catch this.
 func TestSaveRun_IsAtomic(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -243,7 +238,7 @@ func TestSaveRun_IsAtomic(t *testing.T) {
 // they survive a round trip through Postgres — that nothing is truncated by a
 // column type, and that parent links reconstruct from ids back into ordinals.
 func TestSaveRun_FixtureRoundTripsAllOffsets(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 

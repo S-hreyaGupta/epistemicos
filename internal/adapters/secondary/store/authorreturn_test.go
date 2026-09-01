@@ -9,6 +9,7 @@ import (
 
 	"github.com/EpistemicOS/epistemicos/internal/core/domain/segment"
 	"github.com/EpistemicOS/epistemicos/internal/core/ports"
+	"github.com/EpistemicOS/epistemicos/internal/platform/testenv"
 )
 
 // The two terminal acts of the review gate, tested against a real database.
@@ -28,7 +29,7 @@ func rejectedDecision(taskID, comment string) segment.ReviewDecision {
 // TestSaveAuthorReturn_RoundTripAndFreeze is the whole path: reject, return,
 // and find the run frozen afterwards.
 func TestSaveAuthorReturn_RoundTripAndFreeze(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -106,7 +107,7 @@ func TestSaveAuthorReturn_RoundTripAndFreeze(t *testing.T) {
 // The freeze has to bite at the WRITE, not merely be recorded. A frozen run that
 // still accepts decisions is a timestamp, not a rule.
 func TestSaveDecision_RefusedAfterConsumption(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -149,7 +150,7 @@ func TestSaveDecision_RefusedAfterConsumption(t *testing.T) {
 // moment the decisions stopped being editable, and refreshing it on every read
 // would make a correction slipped between two reads look legitimate.
 func TestMarkConsumed_IsIdempotentAndKeepsTheFirstTimestamp(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -185,7 +186,7 @@ func TestMarkConsumed_IsIdempotentAndKeepsTheFirstTimestamp(t *testing.T) {
 
 // TestMarkConsumed_UnknownRun must say so rather than silently succeeding.
 func TestMarkConsumed_UnknownRun(t *testing.T) {
-	s := NewPostgresSegmentationStore(testPool(t))
+	s := NewPostgresSegmentationStore(testenv.Pool(t))
 
 	err := s.MarkConsumed(context.Background(), uuid.NewString(), "step4")
 	if !errors.Is(err, ports.ErrNotFound) {
@@ -199,7 +200,7 @@ func TestMarkConsumed_UnknownRun(t *testing.T) {
 // nothing to say which the author received, so the UNIQUE constraint is load
 // bearing and this checks the error is legible rather than a raw SQLSTATE.
 func TestSaveAuthorReturn_OncePerRun(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -239,7 +240,7 @@ func TestSaveAuthorReturn_OncePerRun(t *testing.T) {
 // sits on the whole-document node and title_ambiguity has no node at all. So the
 // paper most in need of going back to its author was the one that could not.
 func TestSaveAuthorReturn_TopLevelNodeHasNoAncestors(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -285,7 +286,7 @@ func TestSaveAuthorReturn_TopLevelNodeHasNoAncestors(t *testing.T) {
 // caller computed the state wrongly. Writing it anyway would send an author a
 // message naming nothing at all.
 func TestSaveAuthorReturn_RefusesAnEmptyReport(t *testing.T) {
-	s := NewPostgresSegmentationStore(testPool(t))
+	s := NewPostgresSegmentationStore(testenv.Pool(t))
 
 	if err := s.SaveAuthorReturn(context.Background(), uuid.NewString(), uuid.NewString(), "shreya", nil); err == nil {
 		t.Error("accepted an author return with no items")
@@ -296,7 +297,7 @@ func TestSaveAuthorReturn_RefusesAnEmptyReport(t *testing.T) {
 // domain constructor. The constructor can be bypassed by an import script; this
 // cannot.
 func TestSaveDecision_RejectionNeedsAComment(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -322,7 +323,7 @@ func TestSaveDecision_RejectionNeedsAComment(t *testing.T) {
 // empty resolve, the task would close as answered, and the run would pass
 // instead of going back to its author.
 func TestSaveDecision_RefusesADecisionWithNoVerb(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 

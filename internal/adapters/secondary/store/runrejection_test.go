@@ -9,6 +9,7 @@ import (
 
 	"github.com/EpistemicOS/epistemicos/internal/core/domain/segment"
 	"github.com/EpistemicOS/epistemicos/internal/core/ports"
+	"github.com/EpistemicOS/epistemicos/internal/platform/testenv"
 )
 
 // Run-level rejection against a real database.
@@ -63,7 +64,7 @@ func savedCleanRun(t *testing.T, s *PostgresSegmentationStore) segment.Run {
 
 // TestSaveRunRejection_RoundTripAndSupersede.
 func TestSaveRunRejection_RoundTripAndSupersede(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -118,7 +119,7 @@ func TestSaveRunRejection_RoundTripAndSupersede(t *testing.T) {
 // downstream touched it — which is precisely when a structural error becomes
 // likely to be noticed.
 func TestSaveRunRejection_AllowedAfterConsumption(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -143,7 +144,7 @@ func TestSaveRunRejection_AllowedAfterConsumption(t *testing.T) {
 // The comment is what the author received. A second rejection overwriting it
 // would change a message already sent.
 func TestSaveRunRejection_FirstObjectionStands(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -168,7 +169,7 @@ func TestSaveRunRejection_FirstObjectionStands(t *testing.T) {
 }
 
 func TestSaveRunRejection_UnknownRun(t *testing.T) {
-	s := NewPostgresSegmentationStore(testPool(t))
+	s := NewPostgresSegmentationStore(testenv.Pool(t))
 
 	err := s.SaveRunRejection(context.Background(), uuid.NewString(), "shreya", "why")
 	if !errors.Is(err, ports.ErrNotFound) {
@@ -180,7 +181,7 @@ func TestSaveRunRejection_UnknownRun(t *testing.T) {
 // service constructs these, but an import script can bypass the service and the
 // database cannot be bypassed.
 func TestSaveRunRejection_RequiresReviewerAndComment(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -204,7 +205,7 @@ func TestSaveRunRejection_RequiresReviewerAndComment(t *testing.T) {
 // cover. The run-level path is not an edge case — it is the whole reason the
 // feature exists.
 func TestSaveAuthorReturn_RunLevelItemHasNoTask(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 
@@ -255,7 +256,7 @@ func TestSaveAuthorReturn_RunLevelItemHasNoTask(t *testing.T) {
 // follows. A reader who meets it after four heading complaints has already
 // formed the wrong idea of what is wrong with their paper.
 func TestBuildAuthorReturn_RunRejectionComesFirst(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	s := NewPostgresSegmentationStore(pool)
 	ctx := context.Background()
 

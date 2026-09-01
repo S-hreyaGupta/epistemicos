@@ -5,45 +5,15 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/EpistemicOS/epistemicos/internal/core/ports"
+	"github.com/EpistemicOS/epistemicos/internal/platform/testenv"
 )
-
-// testPool connects to EPISTEMIC_OS_DB_URL, or skips.
-//
-// Skipping rather than failing keeps a developer without Docker from seeing a
-// red build for a reason unrelated to their change. The skip message names the
-// variable so a silent skip in CI is not mistaken for a pass.
-func testPool(t *testing.T) *pgxpool.Pool {
-	t.Helper()
-
-	url := os.Getenv("EPISTEMIC_OS_DB_URL")
-	if url == "" {
-		t.Skip("EPISTEMIC_OS_DB_URL is not set; start postgres and export it to run these tests")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	pool, err := pgxpool.New(ctx, url)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		t.Skipf("cannot reach postgres: %v", err)
-	}
-
-	t.Cleanup(pool.Close)
-	return pool
-}
 
 // insertPaper writes a papers row directly, so a test can construct states the
 // ingest service would never produce — including the corrupt one AC-13 is
@@ -90,7 +60,7 @@ func hashOf(s string) string {
 // SHA-256 over text just read from a database; the failure it prevents is a
 // confident, wrong quote three phases downstream.
 func TestAC13_HashMismatchIsRefused(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	src := NewPapersSource(pool)
 
 	const markdown = "# A Study Of Things\n\nBody text.\n"
@@ -112,7 +82,7 @@ func TestAC13_HashMismatchIsRefused(t *testing.T) {
 // TestAC13_MatchingHashIsAccepted is the other half. A check that refuses
 // everything satisfies the test above and is useless.
 func TestAC13_MatchingHashIsAccepted(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	src := NewPapersSource(pool)
 
 	const markdown = "# A Study Of Things\n\nBody text.\n"
@@ -141,7 +111,7 @@ func TestAC13_MatchingHashIsAccepted(t *testing.T) {
 // means, a paper that has NOT reached it must not be segmented, and this is
 // what makes that a check rather than an assumption.
 func TestAC13_UnconvertedPaperIsRefused(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	src := NewPapersSource(pool)
 
 	const markdown = "# A Study Of Things\n\nBody text.\n"
@@ -165,7 +135,7 @@ func TestAC13_UnconvertedPaperIsRefused(t *testing.T) {
 // looks identical to a paper that genuinely had no headings, and is exactly the
 // kind of quiet nonsense §10 exists to prevent.
 func TestAC13_EmptyMarkdownIsRefused(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	src := NewPapersSource(pool)
 
 	id := insertPaper(t, pool, "ready", "", "")
@@ -178,7 +148,7 @@ func TestAC13_EmptyMarkdownIsRefused(t *testing.T) {
 // TestGet_NotFound checks the sentinel so callers can errors.Is rather than
 // string-match.
 func TestGet_NotFound(t *testing.T) {
-	pool := testPool(t)
+	pool := testenv.Pool(t)
 	src := NewPapersSource(pool)
 
 	_, _, err := src.Get(context.Background(), uuid.NewString())

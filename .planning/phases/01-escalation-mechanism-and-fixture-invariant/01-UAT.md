@@ -8,12 +8,12 @@ updated: 2026-09-01T16:00:00Z
 
 ## Current Test
 
-number: 3
-name: Contract: the flag's scope is wider than its name
+number: 4
+name: Contract: documentation placement
 expected: |
-  The flag also escalates the cross-package fixture prerequisite — a filesystem condition — not just database availability.
-  A reader would reasonably assume it affects only database setup.
-  Either the name widens in Phase 2 (reviewer suggested `EPISTEMIC_OS_TEST_REQUIRE_ENV`) or the package doc comment is deemed sufficient.
+  The flag is documented ONLY in the package doc comment.
+  README and Makefile documentation are deferred to Phase 2, where the flag actually becomes part of the gate.
+  Confirm the deferral is acceptable.
 awaiting: user response
 
 ## Tests
@@ -37,7 +37,9 @@ note: "Accepted 2026-09-01 by Alex — presence-based is right, a typo should fa
 
 ### 3. Contract: the flag's scope is wider than its name
 expected: The flag also escalates the cross-package fixture prerequisite — a filesystem condition — not just database availability. A reader would reasonably assume it affects only database setup. Either the name widens in Phase 2 (reviewer suggested `EPISTEMIC_OS_TEST_REQUIRE_ENV`) or the package doc comment is deemed sufficient.
-result: [pending]
+result: pass
+disposition: "WIDEN. Alex 2026-09-01: the doc comment is not enough. Registered as GATE-07 (Phase 2) — rename to EPISTEMIC_OS_TEST_REQUIRE_ENV. Measured blast radius: 2 occurrences in Go (const value + doc comment), 0 in Makefile/ci.yml. The exported identifier RequireEnv is unchanged, so the API surface accepted in test 1 stands. GATE-06 was amended in the same commit to name the flag via testenv.RequireEnv rather than the literal old string, so it survives the rename."
+
 
 ### 4. Contract: documentation placement
 expected: The flag is documented ONLY in the package doc comment. README and Makefile documentation are deferred to Phase 2, where the flag actually becomes part of the gate. Confirm the deferral is acceptable.
@@ -206,9 +208,9 @@ verified_by: docker compose stop postgres && make gate (exit 0) && make up && ma
 ## Summary
 
 total: 27
-passed: 23
+passed: 24
 issues: 0
-pending: 4
+pending: 3
 skipped: 0
 blocked: 0
 

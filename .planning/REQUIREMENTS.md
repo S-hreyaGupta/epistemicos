@@ -21,6 +21,7 @@ atomicity rule in the requirements template. No requirement here is new scope.
 - [ ] **GATE-02**: `make gate` fails and names the cause when the database is unreachable
 - [ ] **GATE-03**: `make gate` fails and names the cause when a fixture is unreadable
 - [x] **GATE-04**: Content-conditional skips stay green and silent — a fixture that genuinely lacks a preamble is legitimate signal, not a gate failure
+- [ ] **GATE-08**: The escalation flag is documented where a developer will meet it, not only in the package doc comment: (a) `README.md` states the flag, its presence-based semantics (any non-empty value, including `"0"`, enables escalation) and what it changes; (b) the `Makefile` `help` target describes `make gate` accurately once it is strict — its current text, "Full static gate: vet + gofmt + build + test", becomes FALSE in Phase 2 when the gate requires a live database, so this is a correction, not an addition. Both use the post-GATE-07 name. Deferred from Phase 1 by Alex 2026-09-01 on the grounds that documenting the flag before it does anything would describe behaviour that does not exist; registered here so the obligation travels with Phase 2 if Phase 2 is moved or rescoped, rather than living as a promise in a UAT file
 - [ ] **GATE-07**: The escalation flag is renamed to `EPISTEMIC_OS_TEST_REQUIRE_ENV`, because its scope is wider than `_DB` implies — it also escalates the cross-package fixture prerequisite, a filesystem condition. Decided by Alex 2026-09-01 at Phase 1 UAT: the package doc comment alone is not sufficient. Change is confined to `testenv.RequireEnv`'s value and the package doc comment (2 occurrences in Go); the exported identifier `RequireEnv` does not change, so the API surface accepted in Phase 1 UAT test 1 is unaffected. GATE-05's wording follows the rename when it lands. Phase 1's frozen plans and SUMMARYs keep the old name — they record what was built at the time and are not rewritten
 - [x] **GATE-05**: With `EPISTEMIC_OS_TEST_REQUIRE_DB` set, a single shared test helper converts each environment skip — unset URL, unreachable database, unreadable fixture — into a failure naming that cause; with it unset, those skips remain
 - [ ] **GATE-06**: When escalation causes a failure, the message names the escalation flag (`testenv.RequireEnv`, whatever its value after GATE-07) **and prints the value it is set to**, on all three escalated paths. Presence-based semantics mean the string `0` enables escalation, so a reader who set `0` intending *off* must see `EPISTEMIC_OS_TEST_REQUIRE_DB="0"` in the failure itself. Measured at Phase 1 close: the unset-URL path says only "is set" and never prints the value, and the unreachable-database and unreadable-fixture paths do not name the flag at all — so neither reveals that escalation is why the run failed rather than skipped
@@ -67,6 +68,7 @@ Which phases cover which requirements.
 | GATE-03 | Phase 2 | Pending |
 | GATE-06 | Phase 2 | Pending |
 | GATE-07 | Phase 2 | Pending |
+| GATE-08 | Phase 2 | Pending |
 | CI-01 | Delivered at `868d45b` (not planned) | Complete |
 | CI-02 | Phase 2 | Pending |
 | PROOF-01 | Phase 3 | Pending |

@@ -8,12 +8,12 @@ updated: 2026-09-01T16:00:00Z
 
 ## Current Test
 
-number: 4
-name: Contract: documentation placement
+number: 5
+name: Contract: the deferred AC-14 empty-heading guard
 expected: |
-  The flag is documented ONLY in the package doc comment.
-  README and Makefile documentation are deferred to Phase 2, where the flag actually becomes part of the gate.
-  Confirm the deferral is acceptable.
+  `acceptance_test.go` indexes `headings[0]` with no emptiness guard, so a deliberately heading-free fixture would PANIC rather than skip cleanly.
+  Not fixed in Phase 1 because GATE-04 requires that file to stay byte-identical to the phase base.
+  Decide: backlog item, or a Phase 2 change?
 awaiting: user response
 
 ## Tests
@@ -43,7 +43,9 @@ disposition: "WIDEN. Alex 2026-09-01: the doc comment is not enough. Registered 
 
 ### 4. Contract: documentation placement
 expected: The flag is documented ONLY in the package doc comment. README and Makefile documentation are deferred to Phase 2, where the flag actually becomes part of the gate. Confirm the deferral is acceptable.
-result: [pending]
+result: pass
+disposition: "Deferral ACCEPTED by Alex 2026-09-01 — documenting the flag before it does anything would describe behaviour that does not exist. Registered as GATE-08 (Phase 2) at Alex's instruction so the obligation travels with the phase rather than remaining a promise in a UAT file. Surfaces confirmed present: README.md at repo root, and the Makefile help target — whose current text 'Full static gate: vet + gofmt + build + test' becomes FALSE once Phase 2 makes the gate require a live database, so GATE-08 is a correction as well as an addition. Nothing outside .planning/ and the Go doc comment mentions the flag today."
+
 
 ### 5. Contract: the deferred AC-14 empty-heading guard
 expected: `acceptance_test.go` indexes `headings[0]` with no emptiness guard, so a deliberately heading-free fixture would PANIC rather than skip cleanly. Not fixed in Phase 1 because GATE-04 requires that file to stay byte-identical to the phase base. Decide: backlog item, or a Phase 2 change?
@@ -208,9 +210,9 @@ verified_by: docker compose stop postgres && make gate (exit 0) && make up && ma
 ## Summary
 
 total: 27
-passed: 24
+passed: 25
 issues: 0
-pending: 3
+pending: 2
 skipped: 0
 blocked: 0
 

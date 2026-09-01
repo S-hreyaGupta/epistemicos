@@ -80,14 +80,23 @@ mitigation would have held under failure, which is what "closed" is supposed to 
 
 | Risk ID | Threat Ref | Rationale | Accepted By | Date |
 |---------|------------|-----------|-------------|------|
-| AR-01 | T-01-02 | **DSN user and database name are disclosed in test output on the unreachable-database path, in BOTH modes.** Measured with a meaningful DSN: escalated (`Fatalf`) status 1, and non-escalated (`Skipf`) **status 0** — the exit-0 path an ordinary developer or CI run takes — each printing `user=` and `database=` 33 times. The password is redacted by pgx (count 0) on every shape tested. Accepted because impact at pgx v5.7.2 is DSN metadata, not credentials, and the error carries the dial diagnosis Phase 3's PROOF-02 asserts against; removing it was raised in cross-AI planning review and rejected with rationale. **Scope is NOT enforced by code** — nothing in `testenv.Pool` restricts which DSN it prints from. **Phase 2 must re-weigh this before enforcement makes this helper decide whether CI goes red.** | Pending operator sign-off | 2026-09-01 |
+| AR-01 | T-01-02 | **DSN user and database name are disclosed in test output on the unreachable-database path, in BOTH modes.** Measured with a meaningful DSN: escalated (`Fatalf`) status 1, and non-escalated (`Skipf`) **status 0** — the exit-0 path an ordinary developer or CI run takes — each printing `user=` and `database=` 33 times. The password is redacted by pgx (count 0) on every shape tested. Accepted because impact at pgx v5.7.2 is DSN metadata, not credentials, and the error carries the dial diagnosis Phase 3's PROOF-02 asserts against; removing it was raised in cross-AI planning review and rejected with rationale. **The scope this was originally accepted under is FALSE, not merely unenforced.** T-01-02's frozen rationale accepts the disclosure *"at `medium` for a test-only helper against a **loopback compose service**"* — and that compose service binds `0.0.0.0:5432`, not loopback, as measured and recorded in **AR-02**. The auditor flagged this directly: *"the same false premise is load-bearing for two acceptances."* So two things are wrong with the original boundary, not one: nothing in `testenv.Pool` restricts which DSN it prints from (unenforced), AND the service the acceptance named as its containment is reachable from the local network (untrue). The residual is accepted anyway — impact at pgx v5.7.2 is DSN metadata, not credentials, and no production data is reachable — but it is accepted on the measured facts, not on the original rationale, which no longer holds. **Phase 2 must re-weigh this before enforcement makes this helper decide whether CI goes red**, and must not inherit the loopback assumption. See AR-02. | Pending operator sign-off | 2026-09-01 |
 | AR-02 | T-01-11 | **The compose PostgreSQL binds `0.0.0.0:5432`, not loopback.** `docker-compose.yml:9` declares `"5432:5432"`, which Docker publishes on all interfaces; live: `0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp`. With guessable defaults (`epistemicos`/`epistemicos`) the instance is reachable from the local network. The original acceptance said "loopback port" — that premise is false. Accepted as a local development service holding only test fixtures, with **no production data reachable**, and **not a regression of this phase**: `docker-compose.yml` is byte-unchanged since the phase base. Loopback-only would be `"127.0.0.1:5432:5432"`. | Pending operator sign-off | 2026-09-01 |
 | AR-03 | T-01-SC | **A package-manager install ran mid-phase and produced the phase's central evidence.** `go.mod`/`go.sum` are byte-unchanged since the base, so the original rationale holds for Go dependencies — but GNU Make 4.4.1 (`ezwinports.make`) was installed via winget during 01-03 and placed at `C:/Users/gupta/bin/make.exe`, and that binary executed every `make gate` run behind this phase's central claim. Operator approval was obtained and recorded before installing (a real control, and the executor correctly halted rather than self-approving). Provenance now on record: winget `ezwinports.make` 4.4.1, publisher ezwinports (Eli Zaretskii, sourceforge.net/projects/ezwinports), GPL-3.0, installer hash verified by winget at install time; on-disk `make.exe` sha256 `cc6dc291113dcbcc7735835acbfc23c52ed037e4e124ff2d7a0aeae6df563a9f`. Accepted; no legitimacy audit was performed beyond winget's own hash verification. | Pending operator sign-off | 2026-09-01 |
 
-**These three are open, not closed.** They are recorded here so they do not resurface
-as undiscovered findings, but two of them exist because a written rationale was
-contradicted by measurement. That is worth more attention than a clean register would
-have been.
+**These three are open, not closed.** They are recorded here so they do not resurface as
+undiscovered findings. **All three** exist because a written rationale was contradicted by
+measurement — AR-02 on the loopback binding, AR-03 on "no package-manager install task
+exists", and AR-01 on the same loopback premise AR-02 falsifies. That is worth more
+attention than a clean register would have been.
+
+**Amendment, 2026-09-01, at the operator's instruction before signing.** AR-01 originally
+said only that the scope was *not enforced by code*. It did not say that the scope as
+originally stated was *factually false*, so it read as a residual with a loose boundary
+rather than one whose stated boundary had been measured wrong — and it would have been
+signed still leaning on loopback. Alex asked for the three entries to be quoted in full
+before signing, which is how the omission was found. The count in the audit trail below
+was "two rationales contradicted"; it is three.
 
 ---
 

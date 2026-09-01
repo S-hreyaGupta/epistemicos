@@ -8,12 +8,12 @@ updated: 2026-09-01T16:00:00Z
 
 ## Current Test
 
-number: 5
-name: Contract: the deferred AC-14 empty-heading guard
+number: 6
+name: Probe edge E1 — disposition required
 expected: |
-  `acceptance_test.go` indexes `headings[0]` with no emptiness guard, so a deliberately heading-free fixture would PANIC rather than skip cleanly.
-  Not fixed in Phase 1 because GATE-04 requires that file to stay byte-identical to the phase base.
-  Decide: backlog item, or a Phase 2 change?
+  E1 (GATE-04) came back from the deterministic edge probe with NO category, so it carries no probe question.
+  Does it need a requirement of its own, or is it inapplicable to a test-harness refactor?
+  Accounting: 4 edges surfaced == 3 authored into 01-01's must_haves (E2, E3, E4) + 1 flagged here (E1). It is NOT dismissed — a disposition is required.
 awaiting: user response
 
 ## Tests
@@ -49,7 +49,11 @@ disposition: "Deferral ACCEPTED by Alex 2026-09-01 — documenting the flag befo
 
 ### 5. Contract: the deferred AC-14 empty-heading guard
 expected: `acceptance_test.go` indexes `headings[0]` with no emptiness guard, so a deliberately heading-free fixture would PANIC rather than skip cleanly. Not fixed in Phase 1 because GATE-04 requires that file to stay byte-identical to the phase base. Decide: backlog item, or a Phase 2 change?
-result: [pending]
+result: pass
+disposition: "BACKLOG, not a Phase 2 change — with a hard gate: must close before Phase 3. Alex 2026-09-01. Recorded in STATE.md Deferred Items as 'Open — blocks Phase 3'."
+scope_finding: "Alex asked whether GATE-04's byte-identical constraint binds only Phase 1 or persists. CONFIRMED Phase 1 only: GATE-04 in REQUIREMENTS.md contains no byte-identical language, and the phrase appears in no requirement — only in the Phase 1 plans, anchored to phase base 868d45b. The 01-02 reviewer rationale scopes it explicitly ('in this phase', 'the plan's own central claim'). So Phase 2 IS PERMITTED to fix this; the backlog entry says permitted, not forbidden."
+premise_correction: "Alex's stated reason — that Phase 3's negative tests break fixtures in a way that hits headings[0] — does not hold as Phase 3 is currently specified. PROOF-03 breaks the fixture by making it UNREADABLE, which fails in testenv.Fixture before any parsing and never reaches acceptance_test.go:435. The disposition still stands for a different reason: Phase 3's plan is TBD, and a plan that breaks fixtures by content substitution rather than permissions would hit it immediately. Additionally, a heading-free fixture does not merely fail one test — TestFixtureIntegrity fails cleanly (fixture_test.go:185 returns 'no headings detected') while TestAC14 panics, and a panic aborts the whole test binary. Go guarantees no ordering between tests, so the clean failure cannot be relied on to pre-empt the panic."
+
 
 ### 6. Probe edge E1 — disposition required
 expected: E1 (GATE-04) came back from the deterministic edge probe with NO category, so it carries no probe question. Does it need a requirement of its own, or is it inapplicable to a test-harness refactor? Accounting: 4 edges surfaced == 3 authored into 01-01's must_haves (E2, E3, E4) + 1 flagged here (E1). It is NOT dismissed — a disposition is required.
@@ -210,9 +214,9 @@ verified_by: docker compose stop postgres && make gate (exit 0) && make up && ma
 ## Summary
 
 total: 27
-passed: 25
+passed: 26
 issues: 0
-pending: 2
+pending: 1
 skipped: 0
 blocked: 0
 

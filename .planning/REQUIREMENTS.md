@@ -14,8 +14,8 @@ single PROJECT.md line
 is deliberately broken and the gate is asserted to fail *and* to name that cause"
 is split into three atomic requirements (PROOF-01..03), one per condition, per the
 atomicity rule in the requirements template. No requirement was new scope **as originally
-derived on 2026-08-31**. Four have been added since, all at Phase 1 UAT on 2026-09-01 and
-each traceable to a disposition Alex gave there: GATE-06, GATE-07, GATE-08 and SEC-01.
+derived on 2026-08-31**. Five have been added since, all at Phase 1 close on 2026-09-01 and
+each traceable to a disposition Alex gave there: GATE-06, GATE-07, GATE-08, SEC-01 and GOV-01.
 They ARE new scope, deliberately, and are marked as such rather than left under a blanket
 claim that stopped being true the moment the first one was added.
 
@@ -38,6 +38,19 @@ claim that stopped being true the moment the first one was added.
 ### Security
 
 - [ ] **SEC-01**: The compose PostgreSQL binds loopback only — `docker-compose.yml:9` reads `"127.0.0.1:5432:5432"`, not `"5432:5432"`. As written, Docker publishes the service on all interfaces (`0.0.0.0:5432->5432/tcp`, `[::]:5432->5432/tcp`), so an instance with guessable defaults (`epistemicos`/`epistemicos`) is reachable from the local network. Registered by Alex 2026-09-01 at Phase 1 security sign-off, converting accepted risk AR-02 into a scheduled fix on the grounds that a one-character-class change against real exposure should not sit as an indefinite acceptance. Out of Phase 1's scope: the file is byte-unchanged since phase base `868d45b`, and editing it would have failed Phase 1's own "nothing outside `internal/` and `.planning/`" audit — which is why this is Phase 2 work and not a Phase 1 defect. Closes AR-02; T-01-11 stays open until it lands
+
+### Governance
+
+- [ ] **GOV-01**: Phase 2 does not close until a **post-checkpoint stale-artifact sweep** has revalidated `ROADMAP.md`, the phase adjudication documents, `*-VERIFICATION.md` and `REQUIREMENTS.md` against the phase's **final** requirement set, evidence set, commit/base anchors, and recorded dispositions — and each is either confirmed current or corrected, with the correction recorded rather than made silently. The finding this closes, in Alex's framing from Phase 1 close: **checkpoint-derived state can invalidate previously accurate governance artifacts without changing their files.** Every instance below was accurate when written; none was edited; each was falsified by a decision taken afterward, and each was found by accident rather than by a step that looks for them:
+
+  | Artifact | Claim that went stale | Falsified by |
+  |---|---|---|
+  | `ROADMAP.md` | `030521b` called "the verified phase base" | the base decision naming `868d45b` |
+  | `01-REVIEW-ADJUDICATION.md` | cited T-01-01/T-01-09, missed T-01-02; credited an already-rejected fix | reading the frozen threat model while building the security register |
+  | `01-VERIFICATION.md` | cited the superseded adjudication; "queued for Phase 2" | that adjudication being amended mid-run |
+  | `REQUIREMENTS.md` | "No requirement here is new scope" | GATE-06/07/08 and SEC-01 being added at UAT |
+
+  Treated as **one process finding, not four clerical errors** (Alex, 2026-09-01). A phase whose checkpoints change requirements, anchors or dispositions must assume its own governance artifacts have drifted, and check, rather than assume they are current because nobody edited them
 
 ### Gate Proof
 
@@ -78,6 +91,7 @@ Which phases cover which requirements.
 | GATE-07 | Phase 2 | Pending |
 | GATE-08 | Phase 2 | Pending |
 | SEC-01 | Phase 2 | Pending |
+| GOV-01 | Phase 2 (closure gate) | Pending |
 | CI-01 | Delivered at `868d45b` (not planned) | Complete |
 | CI-02 | Phase 2 | Pending |
 | PROOF-01 | Phase 3 | Pending |

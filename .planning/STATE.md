@@ -105,7 +105,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
-| Test-harness robustness | **AC-14 empty-heading guard.** `internal/core/domain/segment/acceptance_test.go:435` does `headings[0].ByteStart` with no emptiness check, so a heading-free fixture PANICS rather than skipping cleanly. **Backlog, not Phase 2 — but MUST close before Phase 3 begins.** | Open — **blocks Phase 3** | 2026-09-01 (Alex, Phase 1 UAT test 5) | Gate milestone |
+| Test-harness robustness | **AC-14 empty-heading guard.** The remaining half of the heading-free-fixture edge is `internal/core/domain/segment/acceptance_test.go:435`, which does `headings[0].ByteStart` with no emptiness check, so a heading-free fixture **PANICS** rather than skipping cleanly — and a panic aborts the whole test binary, with no ordering guarantee that the clean failure lands first. **This is NOT the preamble declaration.** That half is already closed: Alex proposed the declaration fix (option C), it landed in 01-02 as the pinned `fixtureHasPreamble` constant, and it is covered by control subtests 1 ("no headings at all") and 6 ("declared preamble-free, but no headings"). The two are easily confused because both concern a heading-free fixture and both trace to GATE-04 — hence this note. What is open is the unguarded index in `acceptance_test.go`, nothing else. **Backlog, not Phase 2 — but MUST close before Phase 3 begins.** Phase 2 IS permitted to fix it: GATE-04's byte-identical constraint was Phase 1 scope only. | Open — **blocks Phase 3** | 2026-09-01 (Alex, Phase 1 UAT test 5; scope note added at Alex's request) | Gate milestone |
 
 ## Session Continuity
 

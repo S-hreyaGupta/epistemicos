@@ -71,11 +71,22 @@ Plans:
   10. `docker-compose.yml` binds PostgreSQL to loopback only — `"127.0.0.1:5432:5432"`, not `"5432:5432"` (SEC-01)
   11. Before this phase closes, a post-checkpoint stale-artifact sweep has revalidated ROADMAP, the adjudications, VERIFICATION and REQUIREMENTS against the phase's final requirement set, evidence, anchors and dispositions — each confirmed current or corrected on the record (GOV-01)
 
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
+**Wave 1**
 
-- [ ] 02-01: TBD at planning
+- [ ] 02-01-PLAN.md — Enforcement core: rename the escalation flag to `EPISTEMIC_OS_TEST_REQUIRE_ENV`, give all three escalated paths one shared preamble naming the flag and printing its value, arm the permanent rename tripwire, and reshape `make gate` into a strict gate whose voiceless preflight reports before migrate can
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — The shell-out-to-make harness, built as Phase 3's harness: a bounded-recursion subprocess runner that asserts the preflight is voiceless and `make test` prints the lenient-run banner, plus the roadmap note recording the slice taken from PROOF-01/02/03's design question
+- [ ] 02-03-PLAN.md — Collapse the CI `go` job onto `make gate`, bind the compose PostgreSQL to loopback in the file and in the running container, guard the one unguarded heading index, and document the gate and the flag in README
+- [ ] 02-04-PLAN.md — GOV-01 mechanism: a standalone phase-argument-taking parity check with a Make target, requirement-ID tags on PROJECT.md, and GOV-01's own obligations written into GOV-01's text
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 02-05-PLAN.md — GOV-01 close sweep, code-free and last: derive the artifact list mechanically, revalidate every derived artifact with a per-artifact confirmed-current or corrected verdict, re-arm until a pass produces zero corrections, and halt rather than add a requirement
 
 ### Phase 3: Automated Proof
 
@@ -104,5 +115,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Escalation Mechanism and Fixture Invariant | 3/3 | Complete    | 2026-09-01 |
-| 2. Enforcement and a Single Gate Definition | 0/TBD | Not started | - |
+| 2. Enforcement and a Single Gate Definition | 0/5 | Not started | - |
 | 3. Automated Proof | 0/TBD | Not started | - |

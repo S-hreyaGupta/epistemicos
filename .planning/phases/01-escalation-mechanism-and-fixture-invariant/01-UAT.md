@@ -8,12 +8,12 @@ updated: 2026-09-01T16:00:00Z
 
 ## Current Test
 
-number: 2
-name: Contract: flag name and presence-based semantics
+number: 3
+name: Contract: the flag's scope is wider than its name
 expected: |
-  `EPISTEMIC_OS_TEST_REQUIRE_DB` is presence-based — ANY non-empty value enables escalation, including the string "0".
-  Rationale: a typo in the value should err toward enforcing rather than toward a vacuously green gate.
-  Confirm before Phase 2 wires it into the Makefile.
+  The flag also escalates the cross-package fixture prerequisite — a filesystem condition — not just database availability.
+  A reader would reasonably assume it affects only database setup.
+  Either the name widens in Phase 2 (reviewer suggested `EPISTEMIC_OS_TEST_REQUIRE_ENV`) or the package doc comment is deemed sufficient.
 awaiting: user response
 
 ## Tests
@@ -31,7 +31,9 @@ note: "Accepted 2026-09-01 by Alex. Provenance, so it is not re-raised: the name
 
 ### 2. Contract: flag name and presence-based semantics
 expected: `EPISTEMIC_OS_TEST_REQUIRE_DB` is presence-based — ANY non-empty value enables escalation, including the string "0". Rationale: a typo in the value should err toward enforcing rather than toward a vacuously green gate. Confirm before Phase 2 wires it into the Makefile.
-result: [pending]
+result: pass
+note: "Accepted 2026-09-01 by Alex — presence-based is right, a typo should fail toward enforcing. Accepted WITH a new requirement, raised by Alex and registered as GATE-06 (Phase 2): when escalation causes a failure the message must name the flag AND print its value. Measured at Phase 1 close and confirmed as a real gap: testenv.go:93 says only `EPISTEMIC_OS_TEST_REQUIRE_DB is set` without the value, and :126 (unreachable) and :152 (fixture) never name the flag at all. Someone who set `0` meaning off currently sees a failure that looks like a bug in a variable they believe they disabled."
+
 
 ### 3. Contract: the flag's scope is wider than its name
 expected: The flag also escalates the cross-package fixture prerequisite — a filesystem condition — not just database availability. A reader would reasonably assume it affects only database setup. Either the name widens in Phase 2 (reviewer suggested `EPISTEMIC_OS_TEST_REQUIRE_ENV`) or the package doc comment is deemed sufficient.
@@ -204,9 +206,9 @@ verified_by: docker compose stop postgres && make gate (exit 0) && make up && ma
 ## Summary
 
 total: 27
-passed: 22
+passed: 23
 issues: 0
-pending: 5
+pending: 4
 skipped: 0
 blocked: 0
 

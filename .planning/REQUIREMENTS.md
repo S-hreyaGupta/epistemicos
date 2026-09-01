@@ -22,6 +22,7 @@ atomicity rule in the requirements template. No requirement here is new scope.
 - [ ] **GATE-03**: `make gate` fails and names the cause when a fixture is unreadable
 - [x] **GATE-04**: Content-conditional skips stay green and silent — a fixture that genuinely lacks a preamble is legitimate signal, not a gate failure
 - [x] **GATE-05**: With `EPISTEMIC_OS_TEST_REQUIRE_DB` set, a single shared test helper converts each environment skip — unset URL, unreachable database, unreadable fixture — into a failure naming that cause; with it unset, those skips remain
+- [ ] **GATE-06**: When escalation causes a failure, the message names `EPISTEMIC_OS_TEST_REQUIRE_DB` **and prints its value**, on all three escalated paths. Presence-based semantics mean the string `0` enables escalation, so a reader who set `0` intending *off* must see `EPISTEMIC_OS_TEST_REQUIRE_DB="0"` in the failure itself. Measured at Phase 1 close: the unset-URL path says only "is set" and never prints the value, and the unreachable-database and unreadable-fixture paths do not name the flag at all — so neither reveals that escalation is why the run failed rather than skipped
 
 ### Continuous Integration
 
@@ -63,6 +64,7 @@ Which phases cover which requirements.
 | GATE-01 | Phase 2 | Pending |
 | GATE-02 | Phase 2 | Pending |
 | GATE-03 | Phase 2 | Pending |
+| GATE-06 | Phase 2 | Pending |
 | CI-01 | Delivered at `868d45b` (not planned) | Complete |
 | CI-02 | Phase 2 | Pending |
 | PROOF-01 | Phase 3 | Pending |

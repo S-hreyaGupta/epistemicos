@@ -54,7 +54,8 @@ Plans:
 
 **Goal**: `make gate` sets the escalation flag and fails on any environment skip in the database-backed packages, and `ci.yml` calls `make gate` instead of re-implementing vet / gofmt / build / test as inline steps — resolving the CI-only `migrate` step introduced at `868d45b`.
 **Depends on**: Phase 1
-**Requirements**: GATE-01, GATE-02, GATE-03, CI-02
+**Requirements**: GATE-01, GATE-02, GATE-03, CI-02, GATE-06, GATE-07, GATE-08, GATE-09, SEC-01, GOV-01
+**Requirements note**: six of these ten were added on 2026-09-01 at Phase 1 close, each from a disposition Alex gave at UAT or security sign-off. This line read only the original four until then, while REQUIREMENTS.md already carried all ten — the two disagreed, and a planner reading this line would have silently dropped six. Corrected 2026-09-01. This is the sixth instance of the GOV-01 finding and the first with real consequence.
 **Preserves**: CI-01, already satisfied at `868d45b` — not re-delivered here, but the collapse to `make gate` must not regress it
 **Success Criteria** (what must be TRUE):
 
@@ -63,6 +64,12 @@ Plans:
   3. `make gate` with an unreadable fixture fails and the message names the fixture path
   4. The `go` job in `ci.yml` runs `make gate`; vet, gofmt, build and test are no longer separate inline steps
   5. Migrations are applied by one definition that CI and a local run share — no step exists in CI that `make gate` does not have
+  6. When escalation causes a failure, the message names the escalation flag **and prints the value it is set to**, on all three escalated paths — so someone who set `0` intending *off* sees why the run failed (GATE-06)
+  7. The escalation flag is named `EPISTEMIC_OS_TEST_REQUIRE_ENV`, not `..._REQUIRE_DB` — its scope includes the cross-package fixture prerequisite, which is a filesystem condition (GATE-07)
+  8. `README.md` documents the flag and its presence-based semantics, and the `Makefile` `help` target describes `make gate` accurately — its current text, "Full static gate", becomes false once the gate requires a live database (GATE-08)
+  9. A heading-free fixture produces a normal test failure and does not panic; no test indexes `headings[0]` before proving `len(headings) > 0` (GATE-09)
+  10. `docker-compose.yml` binds PostgreSQL to loopback only — `"127.0.0.1:5432:5432"`, not `"5432:5432"` (SEC-01)
+  11. Before this phase closes, a post-checkpoint stale-artifact sweep has revalidated ROADMAP, the adjudications, VERIFICATION and REQUIREMENTS against the phase's final requirement set, evidence, anchors and dispositions — each confirmed current or corrected on the record (GOV-01)
 
 **Plans**: TBD
 

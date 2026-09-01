@@ -48,7 +48,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [x] 01-03-PLAN.md — Non-enforcement audit: escalated run reaches 0 skips against a live database and passes every test that skipped without one, each condition names its cause with exit status asserted independently, all three unescalated branches still skip, and `make gate` is measured unchanged from the verified phase base `030521b`
+- [x] 01-03-PLAN.md — Non-enforcement audit: escalated run reaches 0 skips against a live database and passes every test that skipped without one, each condition names its cause with exit status asserted independently, all three unescalated branches still skip, and `make gate` is measured unchanged from the approved phase base `868d45b`
 
 ### Phase 2: Enforcement and a Single Gate Definition
 

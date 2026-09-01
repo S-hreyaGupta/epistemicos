@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 current_phase: 01
 current_phase_name: Escalation Mechanism and Fixture Invariant
-status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-09-01T08:55:05.820Z"
+status: verifying
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-09-01T09:27:24.323Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 01 execution started
-state_head: b27e5eff08722833044af8617e4456ff27bd7b2c
+state_head: 75977d5c840d4645704887d9ac1a2ab6ad4446ed
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 
 Phase: 01 (Escalation Mechanism and Fixture Invariant) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Total Plans in Phase: 3
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
 Plan bytes: `8edae22` — freeze: `c96ecb2`
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 |------|----------|-------|-------|
 | Phase 01 P02 | 15 min | 2 tasks | 1 files |
 | Phase 01 P01 | 48min | 3 tasks | 8 files |
+| Phase 01 P03 | 62min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Recent decisions affecting current work:
 - [Phase 01]: fixtureHasPreamble is a pinned constant (declared true), not a runtime skip, so a genuinely preamble-free fixture must be declared in the same diff that repins the hash and length; the negative proof (TestPreambleInvariant_Control) drives the function with synthetic inputs, retiring the mutate-and-restore pattern flagged in cycle-1 review.
 - [Phase 01]: 01-01: internal/platform/testenv replaces both duplicated pool helpers; all 38 call sites across 6 files now call testenv.Pool(t) directly, and the cross-package fixture read goes through testenv.Fixture(t, path). Escalation via EPISTEMIC_OS_TEST_REQUIRE_DB is opt-in and unwired in this plan; escalation off reproduces the phase-base baseline exactly (exit 0, 38 skips, unchanged under -shuffle=on).
 - [Phase 01]: 01-01: unparseableURLMsg is an argument-free string constant (built by compile-time concatenation, not Sprintf), so no DSN-derived value can reach the parse-failure branch; verified against the phase base to fail (leak-token count 1) and after this change to pass (count 0) on both a URL-form and a keyword/value-form malformed DSN.
+- [Phase 01]: Phase 1 (01-03): make gate is measured green with the compose database genuinely stopped and again with it running, database left running as declared; escalated run executes all 38 baseline-skipping tests by name (set containment) and skips zero (independent count); a DSN leak token measured present (count 1) at the phase base is absent (count 0) after the escalation mechanism. — This is the phase's central claim, measured rather than argued, and the baseline Phase 2 and Phase 3 will diff/assert against.
+- [Phase 01]: 01-03: make was not installed on this host and the plan's own execution_shell.verified_present list never checked for it, despite 29+ commands depending on it. Execution halted; operator Alex approved and performed the install (GNU Make 4.4.1 / ezwinports.make); execution resumed with no plan/manifest edits. — Recorded for end-of-phase disposition as a planning-process gap, not fixed by editing the frozen plan.
 
 ### Pending Todos
 
@@ -92,6 +95,7 @@ None yet.
 - **After any `/gsd-update`, re-check that `.claude/gsd-core/workflows/review.md` still contains the run-directory archive block before the `rm -rf`.** The block is hand-added instrumentation in a GSD-managed file, so an update reverts it silently — and a capture that stops happening without saying so is the same failure class the archive exists to catch. Added under GSD 1.11.0; each archive records the version that produced it in `_INSTRUMENTATION.txt`.
 - **The instrumentation itself is not in version control.** `.gitignore:29` ignores `.claude/`, so the archive block lives only on disk in this worktree. Its *output* under `.planning/phases/*/review-runs/` is tracked and survives, but the mechanism does not: recreating this worktree, or the runbook removing it, takes the block with it and later reviews would then discard their run dirs silently. Re-applying it is a manual step with no reminder attached.
 - 01-02's whole-tree git-diff acceptance criteria (unrestricted 'git diff --name-only 868d45b --') print 47 files, not the expected single fixture_test.go, because ~29 pre-existing .planning/-only commits (base re-anchor, plan re-freeze, review-run archives) already sit between the phase base and execution start. The internal/-scoped form of the same check still confirms exactly one source file changed. Likely affects 01-01 and 01-03's identical whole-tree-diff criteria too — flag before running them.
+- 01-03: five contract decisions (testenv package path/API, EPISTEMIC_OS_TEST_REQUIRE_DB semantics, the flag's wider-than-its-name scope, README/Makefile documentation deferral, the deferred AC-14 empty-heading guard) plus unresolved probe edge E1 are queued for the developer's end-of-phase disposition. The preamble policy (option C) is already RESOLVED 2026-09-01 by Alex and is not among these five.
 
 ## Deferred Items
 
@@ -103,8 +107,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-01T08:55:05.800Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-09-01T09:27:24.304Z
+Stopped at: Completed 01-03-PLAN.md
 Resume with: `/gsd-execute-phase 1`
 Before executing: 01-01 Task 1's `<precondition>` re-runs the same five assertions. It should pass. If it halts, the tree moved — do not re-anchor to make it pass; that is the failure this phase exists to catch.
 Resume file: None

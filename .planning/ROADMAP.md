@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. `TestFixtureIntegrity` asserts `demo.md` has a non-whitespace preamble, and `acceptance_test.go:438,451` stay green and silent
   5. `make gate` behaves exactly as before this phase — the tree is green with and without a database
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
 **Wave 1**
@@ -48,7 +48,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-03-PLAN.md — Non-enforcement audit: escalated run reaches 0 skips against a live database and passes every test that skipped without one, each condition names its cause with exit status asserted independently, all three unescalated branches still skip, and `make gate` is measured unchanged from the verified phase base `030521b`
+- [x] 01-03-PLAN.md — Non-enforcement audit: escalated run reaches 0 skips against a live database and passes every test that skipped without one, each condition names its cause with exit status asserted independently, all three unescalated branches still skip, and `make gate` is measured unchanged from the verified phase base `030521b`
 
 ### Phase 2: Enforcement and a Single Gate Definition
 
@@ -96,6 +96,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Escalation Mechanism and Fixture Invariant | 2/3 | In Progress|  |
+| 1. Escalation Mechanism and Fixture Invariant | 3/3 | In Progress|  |
 | 2. Enforcement and a Single Gate Definition | 0/TBD | Not started | - |
 | 3. Automated Proof | 0/TBD | Not started | - |

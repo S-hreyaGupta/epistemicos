@@ -1,20 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 01-escalation-mechanism-and-fixture-invariant
 source: [01-01-SUMMARY.md, 01-02-SUMMARY.md, 01-03-SUMMARY.md]
 started: 2026-09-01T16:00:00Z
-updated: 2026-09-01T16:00:00Z
+updated: 2026-09-01T17:20:00Z
 ---
 
 ## Current Test
 
-number: 6
-name: Probe edge E1 — disposition required
-expected: |
-  E1 (GATE-04) came back from the deterministic edge probe with NO category, so it carries no probe question.
-  Does it need a requirement of its own, or is it inapplicable to a test-harness refactor?
-  Accounting: 4 edges surfaced == 3 authored into 01-01's must_haves (E2, E3, E4) + 1 flagged here (E1). It is NOT dismissed — a disposition is required.
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -57,7 +51,9 @@ premise_correction: "Alex's stated reason — that Phase 3's negative tests brea
 
 ### 6. Probe edge E1 — disposition required
 expected: E1 (GATE-04) came back from the deterministic edge probe with NO category, so it carries no probe question. Does it need a requirement of its own, or is it inapplicable to a test-harness refactor? Accounting: 4 edges surfaced == 3 authored into 01-01's must_haves (E2, E3, E4) + 1 flagged here (E1). It is NOT dismissed — a disposition is required.
-result: [pending]
+result: pass
+disposition: "COVERED BY GATE-04, residue already tracked. Alex 2026-09-01. Neither framing in the question fitted: E1 is not inapplicable to a test-harness refactor, and it does not need a requirement of its own. E1 is the ONLY probe edge belonging to GATE-04 (E2-E4 are all GATE-05) and the only one the probe returned without a category — but GATE-04's edge space was worked through a different mechanism: six TestPreambleInvariant_Control subtests and ten authored must_have truths in 01-02, which is more explicit edge coverage than GATE-05's three resolved edges combined. E1 was an empty probe SLOT, not an unexamined edge. Closed by pointer, not independently: the one genuinely open GATE-04 edge is the heading-free fixture, whose preambleInvariant half is closed (control subtests 1 and 6) and whose acceptance_test.go half is open (unguarded headings[0] at :435) and already tracked as the AC-14 backlog item at commit b1ea386, status 'Open — blocks Phase 3'. Manifest awaiting_disposition updated: E1 status resolved, accounting corrected to covered-and-pointed, at-freeze wording preserved as accounting_at_freeze. Plan hashes and freeze c96ecb2/8edae22 verified unchanged."
+
 
 <!-- Tests 7+ are deterministically covered by passing automated verification
      (uat.classify-coverage mode: coverage, auto_passed). Recorded pre-resolved,
@@ -214,9 +210,9 @@ verified_by: docker compose stop postgres && make gate (exit 0) && make up && ma
 ## Summary
 
 total: 27
-passed: 26
+passed: 27
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 

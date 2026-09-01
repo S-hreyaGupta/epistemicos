@@ -217,9 +217,14 @@
       {
         "id": "E1",
         "requirement": "GATE-04",
-        "category": "unclassified",
-        "status": "unresolved",
-        "note": "The probe returned no category, so there is no question to answer. Carried for the developer's disposition; not dismissed by the planner."
+        "category": "unclassified (probe returned none) — resolved by coverage, not by classification",
+        "status": "resolved",
+        "note": "The probe returned no category, so there is no question to answer. Carried for the developer's disposition; not dismissed by the planner.",
+        "disposition": "Covered by GATE-04; residue tracked. Alex Zamurko, 2026-09-01, Phase 1 UAT test 6.",
+        "rationale": "E1 is the only probe edge belonging to GATE-04; E2-E4 all belong to GATE-05. The probe returned no category for it, but GATE-04's edge space was not left unexamined — it was worked through a different mechanism. TestPreambleInvariant_Control pins six GATE-04 edge cases (no headings at all; first heading at byte 0; whitespace-only preamble; valid preamble; declared preamble-free; declared preamble-free but no headings), and 01-02 authored ten GATE-04 must_have truths. That is more explicit edge coverage than GATE-05's three resolved edges combined. E1 was an empty probe SLOT, not an unexamined edge.",
+        "open_residue": "One GATE-04 edge remains genuinely open, and it is the heading-free-fixture case split across two halves. The preambleInvariant half is CLOSED, pinned by control subtests 1 (\"no headings at all\") and 6 (\"declared preamble-free, but no headings\"). The acceptance_test.go half is OPEN: acceptance_test.go:435 indexes headings[0] with no emptiness guard and would panic. If E1 has any real referent, this is it.",
+        "pointer": "Open residue is tracked as the AC-14 empty-heading guard, recorded in STATE.md Deferred Items at commit b1ea386 with status \"Open — blocks Phase 3\". E1 is closed BY that pointer, not independently of it.",
+        "not_dismissed": "This is a close-as-covered, not a dismissal. The spec-less fallback protocol forbids planner-side dismissal of a probe edge, and nothing here dismisses one: the edge is accounted for by GATE-04 coverage and its residue is tracked with a hard gate on Phase 3."
       },
       {
         "id": "E2",
@@ -246,7 +251,9 @@
         "referent": "Independence from test execution order. Pool and Fixture read the environment on every call and hold no package-level state. Authored as a truth in 01-01; pinned by a -shuffle=on criterion, measured at the phase base to yield the same 38 test-level skips."
       }
     ],
-    "accounting": "4 surfaced == 3 authored into must_haves.truths + 1 flagged (was: 0 authored + 4 flagged at d90b10d)"
+    "accounting": "4 surfaced == 3 authored into must_haves.truths (E2, E3, E4 — all GATE-05) + 1 (E1 — GATE-04) COVERED BY GATE-04 with its open residue pointed at the AC-14 backlog item (b1ea386, blocks Phase 3). Zero dismissed, zero outstanding without a tracked owner. The at-freeze wording \"1 flagged\" is preserved above; it was accurate at freeze time, when no disposition had been given, but read as though GATE-04 had an unexamined edge. It did not — GATE-04 carries six test-pinned control subtests and ten authored truths.",
+    "accounting_at_freeze": "4 surfaced == 3 authored into must_haves.truths + 1 flagged (was: 0 authored + 4 flagged at d90b10d)",
+    "disposition_note": "Dispositions recorded here after execution, at Phase 1 UAT. This block is the queue that was explicitly awaiting them, so leaving it reading \"unresolved\" after resolution would be the stale-record failure this phase exists to remove. The plan hashes and the freeze are untouched: freeze c96ecb2 at plan bytes 8edae22 still describes the exact PLAN.md bytes all three plans executed against. No PLAN.md was edited."
   },
   "measured_ground_truth": {
     "note": "Every value here was produced by running the command in this repository at 030521b before the plans were written. The cycle-1 reviewer independently re-checked ~20 plan claims and found two that did not hold; these were re-measured rather than carried forward. The base was subsequently re-anchored from 030521b to 868d45b; these values are unaffected, because git diff --name-only 868d45b 030521b lists nothing outside .planning/ and the two commits present an identical source tree.",

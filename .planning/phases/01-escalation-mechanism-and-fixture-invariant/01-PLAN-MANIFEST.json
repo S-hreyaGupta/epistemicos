@@ -63,13 +63,19 @@
       "rejection_note": "The suggestion to dismiss probe edges E1/E2/E4 as noise was rejected: the spec-less fallback protocol forbids planner-side dismissal. Addressed in substance instead — E2, E3 and E4 were each given the referent they actually have in this phase and authored as explicit criteria in 01-01's must_haves.truths; only E1, which the probe returned with no category, remains flagged."
     }
   ],
-  "phase_base_commit": "030521b1ec7c12df868445bf8d162527202d42f1",
-  "phase_base_short": "030521b",
+  "phase_base_commit": "868d45bf873c9e147f18a099171b99afa348f4a3",
+  "phase_base_short": "868d45b",
   "phase_base_correction": {
     "previous": "fcebad17569568c125ca88e10d0659a3586c28dd",
     "previous_short": "fcebad1",
     "reason": "Mis-anchored. Commit 868d45b ('Run the store and approved tests against a real Postgres in CI') landed after fcebad1 and modified .github/workflows/ci.yml, so both of 01-03 Task 1's audit criteria failed before any Phase 1 code existed. Measured at 9a3fe7b and re-measured at 030521b: `git log --format=%H fcebad1..HEAD -- Makefile .github/workflows/ci.yml` returns 1 commit where the plan requires 0, and `git diff --name-only fcebad1..HEAD` filtered against ^internal/ and ^\\.planning/ returns 1 where the plan requires 0. The cycle-1 escape hatch did not fire because `git merge-base --is-ancestor fcebad1 HEAD` exits 0 — ancestry is necessary but not sufficient.",
-    "verification": "All four properties re-measured at planning time against 030521b: rev-parse verified; merge-base --is-ancestor exits 0; the Makefile/ci.yml commit list is empty; the outside-paths filter is empty. The same four now run as 01-01 Task 1's <precondition>, so a wrong anchor halts at phase start rather than surfacing as a false audit failure after code has landed."
+    "verification": "All four properties re-measured at planning time against 030521b: rev-parse verified; merge-base --is-ancestor exits 0; the Makefile/ci.yml commit list is empty; the outside-paths filter is empty. The same four now run as 01-01 Task 1's <precondition>, so a wrong anchor halts at phase start rather than surfacing as a false audit failure after code has landed.",
+    "installed": "030521b1ec7c12df868445bf8d162527202d42f1",
+    "installed_short": "030521b",
+    "status": "superseded",
+    "superseded_by": "868d45bf873c9e147f18a099171b99afa348f4a3",
+    "superseded_on": "2026-09-01",
+    "superseded_reason": "The diagnosis in `reason` was correct and stands: fcebad1 is mis-anchored. The remedy was not. It installed 030521b, which is `docs: archive the phase 1 review run directory` -- a commit this phase's own review process wrote 23 seconds after 2041093 `docs: cross-AI review for phase 1`, the review that demanded the re-anchor. Anchoring the phase to it makes the audit circular: the base against which 'nothing changed' is measured would itself be an artifact of the loop doing the measuring. Alex named 868d45b instead on 2026-09-01. This block is left otherwise unaltered; it is the record of what was done at the time."
   },
   "execution_shell": {
     "required": "Git Bash",
@@ -240,7 +246,7 @@
     "accounting": "4 surfaced == 3 authored into must_haves.truths + 1 flagged (was: 0 authored + 4 flagged at d90b10d)"
   },
   "measured_ground_truth": {
-    "note": "Every value here was produced by running the command in this repository at 030521b before the plans were written. The cycle-1 reviewer independently re-checked ~20 plan claims and found two that did not hold; these were re-measured rather than carried forward.",
+    "note": "Every value here was produced by running the command in this repository at 030521b before the plans were written. The cycle-1 reviewer independently re-checked ~20 plan claims and found two that did not hold; these were re-measured rather than carried forward. The base was subsequently re-anchored from 030521b to 868d45b; these values are unaffected, because git diff --name-only 868d45b 030521b lists nothing outside .planning/ and the two commits present an identical source tree.",
     "test_level_skips_no_db": 38,
     "test_level_skips_no_db_shuffled": 38,
     "json_skip_events_all_packages": 49,
@@ -320,15 +326,40 @@
     "note": "Reconciles the independent review by Alex of 940727c/d90b10d against the three Codex convergence cycles and the orchestrator measurements. Amended at 179680e to record finding 2 as partially fixed: the guard added to 01-01 Task 1 catches a wrong anchor, not an ungated substitution. Finding 5 corrected at 19209e1; finding 1 dispositioned by Alex and implemented at 4d18eba."
   },
   "phase_base_approval": {
-    "commit": "030521b1ec7c12df868445bf8d162527202d42f1",
-    "short": "030521b",
-    "status": "awaiting_approval",
-    "approved_by": null,
-    "approved_on": null,
+    "commit": "868d45bf873c9e147f18a099171b99afa348f4a3",
+    "short": "868d45b",
+    "status": "approved",
+    "approved_by": "Alex Zamurko",
+    "approved_on": "2026-09-01",
+    "approval_note": "Alex named 868d45b directly. This is NOT an approval of 030521b: he chose a different base, and the reason 030521b was not approved is recorded in rejected_candidates below. An approval of the anchor the process had already installed and the naming of a different anchor are different events, and only the second one happened.",
     "is_merge_base": false,
     "merge_base": "fcebad17569568c125ca88e10d0659a3586c28dd",
     "merge_base_short": "fcebad1",
     "why_not_merge_base": "868d45b ('Run the store and approved tests against a real Postgres in CI') landed after the merge-base and modified .github/workflows/ci.yml, so an audit anchored at fcebad1 reports a Makefile/ci.yml change before any Phase 1 code exists. 030521b sits after 868d45b, which makes the commit-count criterion pass. That is the substitution requiring approval: the anchor was moved past a real change rather than the change being accounted for.",
+    "why_this_base": "868d45b IS the commit that modified .github/workflows/ci.yml, and it is the last commit on this branch to touch either gate file. Anchoring here places that change AT the anchor rather than behind it, so the commit-count criterion passes because the anchor is tight, not because the anchor is late. Every commit after 868d45b on this branch is a .planning/ commit written by this phase's own planning and review loop, so 868d45b is also the last pre-phase state of the repository -- which is what a phase base is supposed to name.",
+    "verified_at_approval": {
+      "measured_at": "4f5f856",
+      "rev_parse_verify": "succeeds",
+      "merge_base_is_ancestor_head": "exit 0",
+      "gate_file_commits_since_base": "git log --format=%H 868d45b..HEAD -- Makefile .github/workflows/ci.yml -> 0 commits",
+      "outside_paths_diff": "git diff --name-only 868d45b..HEAD | grep -v '^internal/' | grep -v '^\\.planning/' -> empty",
+      "gate_file_blobs_at_base": "Makefile 63d55631fd47ec6f0900c8da38d5b7cb00297c4c, ci.yml fdbf98f47f2292ea141da2dfe91604486172bf50 -- identical to the pins in gate_file_pins and to HEAD",
+      "source_tree_equivalence": "git diff --name-only 868d45b 030521b lists nothing outside .planning/, and git rev-parse 868d45b:internal equals git rev-parse 030521b:internal. Every measurement in measured_ground_truth, taken at 030521b, therefore holds unchanged at 868d45b without re-running it."
+    },
+    "rejected_candidates": [
+      {
+        "commit": "030521b1ec7c12df868445bf8d162527202d42f1",
+        "short": "030521b",
+        "subject": "docs: archive the phase 1 review run directory",
+        "committed_at": "2026-08-31T17:33:43+05:30",
+        "proposed_at": "dd69e0e",
+        "rejected_by": "Alex Zamurko",
+        "rejected_on": "2026-09-01",
+        "status": "NOT APPROVED",
+        "reason": "Circular. 030521b is a commit this phase's own review process made 23 seconds after 2041093 (`docs: cross-AI review for phase 1`, 2026-08-31T17:33:20+05:30) -- the review that demanded the re-anchor. It archives that review's run directory. Anchoring the phase to it would measure 'the gate files did not change since the base' against a base produced by the loop doing the measuring, and would satisfy the commit-count criterion by having moved the left edge past 868d45b rather than by accounting for what 868d45b did.",
+        "note": "030521b is not a wrong anchor in the way fcebad1 is: all four anchor properties hold at it, and its source tree is identical to 868d45b's. It was rejected on provenance, not on measurement. That is the point -- the four properties cannot distinguish these two, which is why the fifth check exists."
+      }
+    ],
     "substitution_history": [
       {
         "from": "fcebad1",
@@ -340,8 +371,21 @@
         "halted": false,
         "approved": false,
         "note": "Recorded in detail in phase_base_correction at the time, but neither halted nor human-approved. Recording is not approving. This block exists so the distinction is enforced rather than assumed."
+      },
+      {
+        "from": "030521b",
+        "to": "868d45b",
+        "at": null,
+        "at_kind": "the commit that performs the substitution; filled by the freeze commit that follows it",
+        "when": "2026-09-01",
+        "driver": "operator decision by Alex Zamurko, on review of the base-approval gate added at 2cc3b42",
+        "recorded": true,
+        "halted": true,
+        "approved": true,
+        "note": "The gate worked as designed: 2cc3b42 made phase_base_approval.status load-bearing, 1ec4f04's freeze over an undecided base was withdrawn at 4f5f856, and execution stayed halted until a human named a base. Alex named 868d45b, not 030521b."
       }
     ],
+    "substitution_history_note": "The `at` field is not uniform across these entries, deliberately. The cycle-1 entry was authored retroactively at 1ec4f04 and names dd69e0e, that cycle's freeze commit. The cycle-2 entry was authored as the substitution happened and names the commit that performed it, since a commit cannot name itself and the freeze that follows names this one in `freeze.commit`.",
     "blocks": "01-01 Task 1's <precondition> and 01-03 Task 1's first acceptance criterion both halt while status is not exactly `approved`. To approve: set status to `approved`, fill approved_by and approved_on, and re-freeze. To reject: choose a different base, record the substitution here, and re-freeze. Neither is an executor decision.",
     "note_on_sufficiency": "Approving this base does not by itself make the audit meaningful. The four anchor properties are satisfiable by any sufficiently late base, so 01-03 also pins the Makefile and ci.yml git blob hashes, which no base placement can affect. The approval covers the anchor; the content pins cover the claim."
   },
@@ -353,7 +397,8 @@
       "Makefile": "63d55631fd47ec6f0900c8da38d5b7cb00297c4c",
       ".github/workflows/ci.yml": "fdbf98f47f2292ea141da2dfe91604486172bf50"
     },
-    "base_independence_evidence": "The ci.yml blob is fdbf98f4 at both 030521b and 868d45b, but 74971632 at fcebad1 -- the change 868d45b made. The pin therefore catches exactly what the commit-count criterion missed, and cannot be satisfied by moving the phase base."
+    "base_independence_evidence": "The ci.yml blob is fdbf98f4 at the phase base 868d45b and at HEAD, but 74971632 at fcebad1 -- the change 868d45b made. The pin therefore catches exactly what the commit-count criterion missed, and cannot be satisfied by moving the phase base. It is also what makes the base choice non-load-bearing for the phase's central claim: 030521b and 868d45b carry identical blobs for both gate files, so the content assertion is unchanged by the re-anchor.",
+    "reverified": "Both blob hashes re-measured at 4f5f856 and at 868d45b; identical at both, and identical to the values pinned above."
   },
   "freeze_invalidated": {
     "state": "NOT FROZEN",

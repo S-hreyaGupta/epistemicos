@@ -21,7 +21,7 @@ atomicity rule in the requirements template. No requirement here is new scope.
 - [ ] **GATE-02**: `make gate` fails and names the cause when the database is unreachable
 - [ ] **GATE-03**: `make gate` fails and names the cause when a fixture is unreadable
 - [ ] **GATE-04**: Content-conditional skips stay green and silent — a fixture that genuinely lacks a preamble is legitimate signal, not a gate failure
-- [ ] **GATE-05**: With `EPISTEMIC_OS_TEST_REQUIRE_DB` set, a single shared test helper converts each environment skip — unset URL, unreachable database, unreadable fixture — into a failure naming that cause; with it unset, those skips remain
+- [x] **GATE-05**: With `EPISTEMIC_OS_TEST_REQUIRE_DB` set, a single shared test helper converts each environment skip — unset URL, unreachable database, unreadable fixture — into a failure naming that cause; with it unset, those skips remain
 
 ### Continuous Integration
 
@@ -59,7 +59,7 @@ Which phases cover which requirements.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | GATE-04 | Phase 1 | Pending |
-| GATE-05 | Phase 1 | Pending |
+| GATE-05 | Phase 1 | Complete |
 | GATE-01 | Phase 2 | Pending |
 | GATE-02 | Phase 2 | Pending |
 | GATE-03 | Phase 2 | Pending |
@@ -70,6 +70,7 @@ Which phases cover which requirements.
 | PROOF-03 | Phase 3 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 10 total
 - Already satisfied: 1 (CI-01)
 - Mapped to phases: 9

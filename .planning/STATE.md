@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 01
 current_phase_name: Escalation Mechanism and Fixture Invariant
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-09-01T08:21:17.149Z"
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-09-01T08:55:05.820Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 01 execution started
-state_head: 53019b18a707b49a37c80de040838f138030aae1
+state_head: b27e5eff08722833044af8617e4456ff27bd7b2c
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 ## Current Position
 
 Phase: 01 (Escalation Mechanism and Fixture Invariant) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Total Plans in Phase: 3
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P02 | 15 min | 2 tasks | 1 files |
+| Phase 01 P01 | 48min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,8 @@ Recent decisions affecting current work:
 - Phase 1: `d90b10d` (`01-PLAN-MANIFEST.json`, pinning the three plans at `940727c`) is the **review-of-record** — the exact byte state Alex reviewed, with findings written and recorded outside this repository. Convergence will rewrite the plans, superseding it. **Do not delete or edit it.** It is deliberately left unannotated: retroactively marking it would alter the artifact whose value is being an unaltered record of what was reviewed. The post-convergence manifest carries the supersession instead, via a `supersedes: d90b10d` field pointing back.
 - [Phase 01]: The preamble property is asserted once in TestFixtureIntegrity against the hash-pinned fixture (via a pure preambleInvariant function), not re-derived per-run in acceptance_test.go, keeping AC-14's two content-conditional t.Skip calls green and silent instead of a gate failure class.
 - [Phase 01]: fixtureHasPreamble is a pinned constant (declared true), not a runtime skip, so a genuinely preamble-free fixture must be declared in the same diff that repins the hash and length; the negative proof (TestPreambleInvariant_Control) drives the function with synthetic inputs, retiring the mutate-and-restore pattern flagged in cycle-1 review.
+- [Phase 01]: 01-01: internal/platform/testenv replaces both duplicated pool helpers; all 38 call sites across 6 files now call testenv.Pool(t) directly, and the cross-package fixture read goes through testenv.Fixture(t, path). Escalation via EPISTEMIC_OS_TEST_REQUIRE_DB is opt-in and unwired in this plan; escalation off reproduces the phase-base baseline exactly (exit 0, 38 skips, unchanged under -shuffle=on).
+- [Phase 01]: 01-01: unparseableURLMsg is an argument-free string constant (built by compile-time concatenation, not Sprintf), so no DSN-derived value can reach the parse-failure branch; verified against the phase base to fail (leak-token count 1) and after this change to pass (count 0) on both a URL-form and a keyword/value-form malformed DSN.
 
 ### Pending Todos
 
@@ -100,8 +103,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-01T08:21:17.123Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-09-01T08:55:05.800Z
+Stopped at: Completed 01-01-PLAN.md
 Resume with: `/gsd-execute-phase 1`
 Before executing: 01-01 Task 1's `<precondition>` re-runs the same five assertions. It should pass. If it halts, the tree moved — do not re-anchor to make it pass; that is the failure this phase exists to catch.
 Resume file: None

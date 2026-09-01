@@ -38,12 +38,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. `TestFixtureIntegrity` asserts `demo.md` has a non-whitespace preamble, and `acceptance_test.go:438,451` stay green and silent
   5. `make gate` behaves exactly as before this phase — the tree is green with and without a database
 
-**Plans**: 3 plans
+**Plans**: 2/3 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Shared escalation helper: one package owns every skip-or-fail decision that was an environment skip at the phase base, and all 38 call sites across 6 test files reach it
+- [x] 01-01-PLAN.md — Shared escalation helper: one package owns every skip-or-fail decision that was an environment skip at the phase base, and all 38 call sites across 6 test files reach it
 - [x] 01-02-PLAN.md — Fixture invariant: TestFixtureIntegrity proves demo.md has a non-whitespace preamble via a pure function that is itself exercised against violating inputs, and the AC-14 content skips stay byte-identical, green and silent
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -96,6 +96,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Escalation Mechanism and Fixture Invariant | 0/3 | Planned | - |
+| 1. Escalation Mechanism and Fixture Invariant | 2/3 | In Progress|  |
 | 2. Enforcement and a Single Gate Definition | 0/TBD | Not started | - |
 | 3. Automated Proof | 0/TBD | Not started | - |

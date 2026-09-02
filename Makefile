@@ -1,4 +1,4 @@
-.PHONY: help up down build build-api build-cli test fmt vet gate env-preflight migrate clean
+.PHONY: help up down build build-api build-cli test fmt vet gate env-preflight migrate planning-parity clean
 
 help:
 	@echo "EpistemicOS — common targets"
@@ -13,6 +13,9 @@ help:
 	@echo "                   REQUIRES a running database and will not start one"
 	@echo "  make env-preflight  Fast check that the database and fixture prerequisites are met"
 	@echo "  make migrate     Apply DB migrations"
+	@echo "  make planning-parity PHASE=N"
+	@echo "                   Compare ROADMAP.md and REQUIREMENTS.md for phase N."
+	@echo "                   Deliberately NOT part of the gate — run it by hand"
 	@echo "  make fmt         Format code"
 	@echo "  make vet         Run go vet"
 	@echo "  make clean       Remove build artifacts"
@@ -79,6 +82,18 @@ gate: vet
 
 migrate:
 	go run ./cmd/epistemicos-cli migrate up
+
+# planning-parity is deliberately NOT a prerequisite of `gate`, is not invoked
+# from `gate`'s recipe, and is not reachable from it through any sub-make (D-13).
+# Wiring a documentation check into the gate would make the gate go red on
+# documentation drift — changing what a red gate MEANS, in the one milestone whose
+# entire purpose is that a red gate means exactly one thing. Run it by hand.
+#
+# PHASE has no default, for the same reason the script takes no default: a default
+# would report agreement about a phase nobody asked about.
+planning-parity:
+	@if [ -z "$(PHASE)" ]; then 		echo "PHASE is required — this target has no default."; 		echo "usage: make planning-parity PHASE=<phase-number>"; 		exit 1; 	fi
+	@bash scripts/planning-parity.sh $(PHASE)
 
 fmt:
 	go fmt ./...

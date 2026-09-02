@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
-current_phase: 2
-current_phase_name: Enforcement and a Single Gate Definition
-status: executing
-stopped_at: All 4 wave plans complete (02-01, 02-02, 02-03, 02-04). Phase checkpoints NOT run: verification, UAT, security sign-off still outstanding, then the GOV-01 sweep by path.
-last_updated: "2026-09-02T07:44:58.612Z"
+current_phase: 3
+current_phase_name: Automated Proof
+status: planning
+stopped_at: Phase 2 CLOSED. GOV-01 close sweep (02-GOV-SWEEP.md) ran two passes and terminated with zero corrections on the second. All ten Phase 2 requirements complete. Phase 3 not yet planned.
+last_updated: "2026-09-02T12:21:19.000Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 2 wave execution complete — 02-04 finished inline after two executor stalls
-state_head: 46d587e78c355818a4cf1abd89151b655449cead
+last_activity_desc: GOV-01 close sweep terminated — Phase 2 complete, ready to plan Phase 3
+state_head: 15f795c4008248b015a9dca6c528e1514c4507d5
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 6
-  percent: 33
+  completed_plans: 7
+  percent: 67
 ---
 
 # Project State
@@ -23,21 +23,37 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-30)
 
 **Core value:** `make gate` must be able to distinguish "tested and passed" from "tested nothing".
-**Current focus:** Phase 01 — Escalation Mechanism and Fixture Invariant
+**Current focus:** Phase 03 — Automated Proof (not yet planned)
 
 ## Current Position
 
-Phase: 2 (Enforcement and a Single Gate Definition) — WAVES COMPLETE, CHECKPOINTS NOT RUN
-Plan: 4 of 4 wave plans complete — 02-01 (`8a23cb6`), 02-03 (`9917290`), 02-02 (`2d52a1e`), 02-04 (`46d587e`). All four SUMMARYs committed.
-Status: Executing — wave execution finished; verification, UAT and security sign-off have NOT run, and the post-checkpoint GOV-01 sweep is not yet eligible. The phase is NOT complete.
-Total Plans in Phase: 4 wave plans + 1 post-checkpoint runbook
+Phase: 2 (Enforcement and a Single Gate Definition) — **COMPLETE**. All ten
+requirements (GATE-01, GATE-02, GATE-03, CI-02, GATE-06, GATE-07, GATE-08, GATE-09,
+SEC-01, GOV-01) closed in REQUIREMENTS.md. GOV-01 was the last: its close sweep
+(`.planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP.md`) ran
+two passes and terminated on the second producing zero corrections — see that
+document for the derivation, the per-artifact evidence table, and the re-arm log.
+Plan: 4 of 4 wave plans complete — 02-01 (`8a23cb6`), 02-03 (`9917290`), 02-02
+(`2d52a1e`), 02-04 (`46d587e`) — plus the post-checkpoint GOV-01 close sweep
+(logical id 02-05, `02-GOV-SWEEP-RUNBOOK.md`). All checkpoints landed: verification
+`status: passed` (10/11, criterion 11 deferred-by-design until this sweep), UAT
+`status: complete` (18 passed, 2 issues both dispositioned), security `status:
+verified, threats_open: 0`.
+Total Plans in Phase: 4 wave plans + 1 post-checkpoint runbook, all complete.
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
 Plan bytes: `8edae22` — freeze: `c96ecb2`
-Last activity: 2026-09-02 — 02-04 completed inline (3 tasks: `a44b040`, `18c94f6`, `18453ce`; SUMMARY `46d587e`) after two executor subagents were killed by the stall watchdog. Compose postgres up and healthy, bound to `127.0.0.1:5432` only.
+Last activity: 2026-09-02 — GOV-01 close sweep executed by path (not by
+`/gsd-execute-phase`, per its own structural design — see
+`02-GOV-SWEEP-RUNBOOK.md`'s header). Compose postgres up and healthy, bound to
+`127.0.0.1:5432` only.
 
-**This file's accuracy has a known expiry — see `02-FINDING-01-state-authority.md`.** It has many writers and no owner: it was hand-corrected at `20bd4ce`, then rewritten by the 02-01, 02-03 and 02-02 executors, and was stale again by `2d52a1e` (`status: planning` with three plans executed; a body whose count and list contradicted each other). This correction carries the same expiry. GOV-01's close sweep cannot fix it durably, because the next executor write supersedes the sweep's correction.
+**Next:** Phase 3 (Automated Proof) is not yet planned. Its Note on the harness
+(`internal/platform/gate`, built by 02-02) and the design-tension entry below are
+its starting context.
 
-Progress: [███░░░░░░░] 33%
+**This file's accuracy has a known expiry — see `02-FINDING-01-state-authority.md`.** It has many writers and no owner: it was hand-corrected at `20bd4ce`, then rewritten by the 02-01, 02-03 and 02-02 executors, and was stale again by `2d52a1e` (`status: planning` with three plans executed; a body whose count and list contradicted each other). It was stale a further time after this correction: `stopped_at`/`Current Position` narrated all three checkpoints as outstanding after all three had already landed and been committed — found and corrected by this sweep (`02-GOV-SWEEP.md`, evidence row 4). This correction carries the same expiry. FINDING-01's own mechanism fix (the executor's `state.sync` call) closes the frontmatter-vs-body desync path; it does not close the class this file's own edit history keeps demonstrating.
+
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -100,11 +116,31 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+Added by the GOV-01 close sweep (`02-GOV-SWEEP.md` Task 3), so these travel rather
+than living only inside a closed phase's plans:
+
+- **Two still-open contract decisions from 01-03** (of the original five queued):
+  the `internal/platform/testenv` package path/API, and
+  `EPISTEMIC_OS_TEST_REQUIRE_DB`'s presence-based semantics — both **unchanged by
+  Phase 2** and carried forward with no disposition needed beyond "still true as
+  designed." (The other three — the flag's wider-than-its-name scope, the
+  README/Makefile documentation deferral, and the AC-14 empty-heading guard — are
+  RESOLVED, by GATE-07, GATE-08 and GATE-09 respectively; see `02-GOV-SWEEP.md`
+  Task 3 for the full disposition.)
+- **Three unclassified probe-edge rows**, none dismissed because no agent in this
+  pipeline has authority to dismiss a probe row that returned no category:
+  - **E1** (Phase 1, GATE-04) — queued in `01-03` Task 3, still open; covered by
+    pointer per `01-UAT.md` test 5's disposition (six `TestPreambleInvariant_Control`
+    subtests plus ten authored must-haves), not independently resolved.
+  - **E11** (Phase 2, GATE-07) — unclassified; GATE-07's substance is covered by
+    `02-01`'s authored must-haves and `02-VERIFICATION.md` Criterion 7.
+  - **E12** (Phase 2, CI-02) — unclassified; CI-02's substance is covered by
+    `02-03`'s authored must-haves and `02-VERIFICATION.md` Criteria 4/5.
+  See `02-GOV-SWEEP.md` Task 3 for the full disposition record.
 
 ### Blockers/Concerns
 
-- Phase 3 carries an open design question, recorded at PROJECT.md lines 91-93: a negative test asserting "the gate fails when `EPISTEMIC_OS_DB_URL` is unset" has to run inside the suite the gate governs, in an environment where that variable is set. To be solved in Phase 3's plan.
+- Phase 3 carries an open design question, recorded at PROJECT.md lines 91-93: a negative test asserting "the gate fails when `EPISTEMIC_OS_DB_URL` is unset" has to run inside the suite the gate governs, in an environment where that variable is set. **Amended by the GOV-01 close sweep, 2026-09-02 (not deleted — Phase 3's success criterion 4 still requires the tension to be solved *in Phase 3's plan*):** Phase 2's 02-02 supplied a slice of the answer rather than the whole one. It built `internal/platform/gate` (`Run`/`Make`/`RunOptions`/`RunResult`/`SkipIfNested`/`RepoRoot`/`DepthEnv`/`DefaultTimeout`) as a shell-out-to-`make` harness, confirmed at a human checkpoint as Phase 3's PROOF-01/02/03 contract, with a bounded recursion guard (`EPISTEMIC_OS_TEST_MAKE_DEPTH`, incremented last so `Unset`/`Env` cannot defeat it) so a proof that shells out to `make gate` from inside the suite `make gate` governs does not loop. ROADMAP.md §Phase 3 carries a "Note on the harness" recording this slice and pointing at the three `RunOptions` shapes PROOF-01/02/03 map onto. **What Phase 3 still has to solve:** the harness makes the recursive shell-out *safe*; it does not by itself decide how each proof arranges an environment where `EPISTEMIC_OS_DB_URL` IS set for the outer suite while being unset/unreachable/fixture-broken for the inner `make gate` call — that composition is Phase 3's own plan's job, per its Note on the harness and success criterion 4.
 - `.planning/config.json` is untracked. `cmdConfigNewProject` refuses to overwrite an existing config, so it is protected from regeneration only while the file stays in place.
 - **After any `/gsd-update`, re-check that `.claude/gsd-core/workflows/review.md` still contains the run-directory archive block before the `rm -rf`.** The block is hand-added instrumentation in a GSD-managed file, so an update reverts it silently — and a capture that stops happening without saying so is the same failure class the archive exists to catch. Added under GSD 1.11.0; each archive records the version that produced it in `_INSTRUMENTATION.txt`.
 - **The instrumentation itself is not in version control.** `.gitignore:29` ignores `.claude/`, so the archive block lives only on disk in this worktree. Its *output* under `.planning/phases/*/review-runs/` is tracked and survives, but the mechanism does not: recreating this worktree, or the runbook removing it, takes the block with it and later reviews would then discard their run dirs silently. Re-applying it is a manual step with no reminder attached.

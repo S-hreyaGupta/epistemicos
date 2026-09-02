@@ -60,7 +60,7 @@ claim that stopped being true the moment the first one was added.
 
 ### Governance
 
-- [ ] **GOV-01**: Phase 2 does not close until a **post-checkpoint stale-artifact sweep** has revalidated `ROADMAP.md`, the phase adjudication documents, `*-VERIFICATION.md` and `REQUIREMENTS.md` against the phase's **final** requirement set, evidence set, commit/base anchors, and recorded dispositions — and each is either confirmed current or corrected, with the correction recorded rather than made silently. The finding this closes, in Alex's framing from Phase 1 close: **checkpoint-derived state can invalidate previously accurate governance artifacts without changing their files.** Every instance below was accurate when written; none was edited; each was falsified by a decision taken afterward, and each was found by accident rather than by a step that looks for them:
+- [x] **GOV-01**: Phase 2 does not close until a **post-checkpoint stale-artifact sweep** has revalidated `ROADMAP.md`, the phase adjudication documents, `*-VERIFICATION.md` and `REQUIREMENTS.md` against the phase's **final** requirement set, evidence set, commit/base anchors, and recorded dispositions — and each is either confirmed current or corrected, with the correction recorded rather than made silently. The finding this closes, in Alex's framing from Phase 1 close: **checkpoint-derived state can invalidate previously accurate governance artifacts without changing their files.** Every instance below was accurate when written; none was edited; each was falsified by a decision taken afterward, and each was found by accident rather than by a step that looks for them:
 
   | Artifact | Claim that went stale | Falsified by |
   |---|---|---|
@@ -179,7 +179,7 @@ Which phases cover which requirements.
 | GATE-08 | Phase 2 | Complete (Makefile half at 02-01; README half at 02-03) |
 | SEC-01 | Phase 2 | Complete |
 | GATE-09 | Phase 2 | Complete |
-| GOV-01 | Phase 2 (closure gate) | Pending (start check passed at 02-01 precondition; closure sweep is 02-GOV-SWEEP-RUNBOOK.md) |
+| GOV-01 | Phase 2 (closure gate) | Complete (start check passed at 02-01 precondition; closure sweep 02-GOV-SWEEP.md ran two passes, terminated 2026-09-02 with zero corrections on the second) |
 | CI-01 | Delivered at `868d45b` (not planned) | Complete |
 | CI-02 | Phase 2 | Complete |
 | PROOF-01 | Phase 3 | Pending |

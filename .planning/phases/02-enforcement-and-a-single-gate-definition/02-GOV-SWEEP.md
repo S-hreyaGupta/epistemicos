@@ -290,4 +290,140 @@ Of the 5 corrections: 4 classified **wording** (PROJECT.md, ROADMAP.md, 02-CONTE
 — re-run nothing) and 2 classified **disposition** (STATE.md, 01-SECURITY.md — re-arm
 the sweep per D-18). No correction adds a requirement; none is classified **addition**.
 
-<!-- rearm-log-placeholder -->
+## Task 3 — Re-arm Log, Halt Case, and Disposition of Carried Assumptions
+
+### D-18's recursion, applied
+
+**Pass 1 (Task 2).** Derivation: 52 artifacts (Task 1). Evidence table: 47 confirmed
+current, 5 corrected. Classification of the 5 corrections:
+
+| Artifact | Classification | Reasoning |
+|---|---|---|
+| `.planning/PROJECT.md` | wording | Status-label correction (`Outcome` cell text) only; the decision's rationale and requirement mapping are unchanged |
+| `.planning/ROADMAP.md` | wording | Execution-status tracking (a plan checkbox, a plan-count cell); the 10-ID requirement set and 11 success criteria are unchanged |
+| `.planning/phases/02-enforcement-and-a-single-gate-definition/02-CONTEXT.md` | wording | A header status flag ("Ready for planning" → superseded); none of the 18 decisions' substance changed |
+| `.planning/STATE.md` | **disposition** | The checkpoint-completion narrative ("verification, UAT, security sign-off still outstanding") is a claim about the phase's governance state — GOV-01's own founding shape, falsified by events (the checkpoints running) without anyone editing the file until now |
+| `.planning/phases/01-escalation-mechanism-and-fixture-invariant/01-SECURITY.md` | **disposition** | AR-02/T-01-11's accepted-risk disposition flips from open-pending-a-scheduled-fix to closed; AR-01's stated containment premise flips from false-when-signed to true |
+
+**Per D-18:** "A correction that changes a requirement set, an anchor, or a
+disposition re-arms the sweep." Two of the five corrections are classified
+**disposition**. The sweep **re-arms**.
+
+**Pass 2 (Task 3).**
+
+1. STATE.md's correction, deferred from Pass 1 to this task per its own `<files>`
+   declaration, is now applied (`current_phase`, `progress` block, `Current
+   Position`, `stopped_at`, `last_activity_desc` all corrected; Blockers/Concerns'
+   Phase 3 design-tension entry amended, not deleted, recording what 02-02 supplied
+   toward it; Pending Todos populated with the still-open contract decisions and
+   probe rows).
+2. **Re-run Task 1's derivation** (the list may have grown, since a corrected
+   artifact may now name an ID it did not before):
+
+   ```
+   $ derive > pass2.txt
+   $ wc -l pass2.txt
+   53
+   $ diff pass1.txt pass2.txt
+   48a49
+   > .planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP.md
+   ```
+
+   Exactly one artifact added: this document itself, becoming visible to its own
+   derivation the moment it was tracked — anticipated and pre-addressed in Task 2's
+   evidence table, row 53, not a new finding. **No artifact outside this document
+   was added by any of the five corrections** — none of the corrected text
+   introduced a new requirement-ID or phase-number mention in a file that did not
+   already match.
+3. **Re-validate every row against final state.** The four `wording`-classified
+   corrections (PROJECT.md, ROADMAP.md, 02-CONTEXT.md) and re-read: each now
+   correctly states the landed/current status it previously misstated —
+   reclassified **confirmed current**. `01-SECURITY.md`'s disposition correction:
+   re-read, the appended section accurately states AR-02/T-01-11 closed and AR-01's
+   premise now true, consistent with `02-SECURITY.md`'s own Accepted Risks Log —
+   reclassified **confirmed current**. `STATE.md`: re-read after this task's own
+   edit, `Current Position` and `stopped_at` now correctly state Phase 2 complete
+   and all three checkpoints landed — **confirmed current**. Row 53 (this document's
+   self-reference): still accurate — **confirmed current**.
+4. **Pass 2 produces zero corrections.**
+
+**Termination.** This is the terminating pass: every one of the 53 rows carries a
+**confirmed current** verdict, none **corrected**. Per D-18, the recursion
+terminates here rather than because the sweep ran out of steam — the same
+distinction Task 3's own acceptance criteria require stated: **each pass removes a
+false claim from the finite artifact set the derivation defines** (5 false claims
+removed in Pass 1, 0 remained to find in Pass 2), so the sequence is monotonically
+decreasing over a bounded set and cannot run forever; it terminates the moment a
+pass finds nothing left to correct, which is what Pass 2 measured.
+
+### The halt case (D-18)
+
+**Stated explicitly, whether or not it fired — it did not fire.** D-18: "If any pass
+would ADD a requirement, HALT for a human. Do not re-arm, do not add it, and do not
+proceed to close the phase." Neither pass in this sweep proposed adding a
+requirement. Every correction in Pass 1 corrected what a document said about the
+existing 16-requirement set (10 for this milestone's Phase 2, plus GATE-04/GATE-05
+Phase 1, plus PROOF-01/02/03 Phase 3) — never the set itself. This is not
+hypothetical caution: the halt case **has already fired once in this project**
+(registering GOV-01 itself added a requirement, which is why REQUIREMENTS.md's
+header carries the "no requirement was new scope, as originally derived... six have
+been added since... they ARE new scope" language rather than a blanket claim). This
+sweep did not repeat that. Measured, not merely asserted:
+
+```
+$ T=$(awk '/^\| Requirement \| Phase \| Status \|/,/^$/' .planning/REQUIREMENTS.md | grep -cE '^\| [A-Z]+-[0-9]{2} \|')
+$ N=$(grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]{2}\*\*' .planning/REQUIREMENTS.md)
+$ echo "N=$N T=$T"
+N=16 T=16
+```
+
+Both representations of the requirement set agree with each other, and with the
+pinned count, before and after every correction this sweep made. No requirement was
+added, removed, or rescoped.
+
+### Disposition of the three carried flagged assumptions
+
+None dismissed — the planner and the executor both lack authority to dismiss a probe
+row that returned no category, per this plan's own text. Each is recorded here with
+what is known, in front of the developer for disposition:
+
+| Probe row | Requirement | Category | What is known | Disposition |
+|---|---|---|---|---|
+| **E1** | GATE-04 (Phase 1) | unclassified | Queued in `01-03` Task 3, still open. `01-UAT.md` test 5's disposition (Alex, 2026-09-01) found E1 "COVERED BY GATE-04, residue already tracked" — not independently resolved, but pointed at six `TestPreambleInvariant_Control` subtests and ten authored must-have truths in `01-02` as more explicit edge coverage than a dedicated E1 resolution would add. The one genuinely open GATE-04 edge (the heading-free-fixture panic) is tracked separately and was closed by GATE-09 in this phase | **Carried to the developer, still open** — travels via STATE.md Pending Todos (this sweep) |
+| **E11** | GATE-07 (Phase 2) | unclassified | The probe returned no category, so no probe question exists to answer. GATE-07's substance (the rename, the tripwire, the API-surface-unchanged constraint) is covered by `02-01-PLAN.md`'s authored must-haves and independently re-verified live at `02-VERIFICATION.md` Criterion 7 | **Carried to the developer, still open** — travels via STATE.md Pending Todos (this sweep) |
+| **E12** | CI-02 (Phase 2) | unclassified | The probe returned no category, so no probe question exists to answer. CI-02's substance (single gate definition, CI-01 preservation) is covered by `02-03-PLAN.md`'s authored must-haves and independently re-verified live at `02-VERIFICATION.md` Criteria 4/5 | **Carried to the developer, still open** — travels via STATE.md Pending Todos (this sweep) |
+
+### Disposition of the five contract decisions queued from 01-03
+
+| Decision | Status |
+|---|---|
+| `internal/platform/testenv` package path and API | **Unchanged** by Phase 2 — carried forward, no action needed |
+| `EPISTEMIC_OS_TEST_REQUIRE_DB`'s presence-based semantics | **Unchanged** by Phase 2 — the renamed flag (`EPISTEMIC_OS_TEST_REQUIRE_ENV`) keeps the same semantics; carried forward |
+| The flag's wider-than-its-name scope | **RESOLVED** — GATE-07 renamed `RequireEnv`'s value to `EPISTEMIC_OS_TEST_REQUIRE_ENV`, which no longer implies database-only scope |
+| README/Makefile documentation deferral | **RESOLVED** — GATE-08 delivered both halves: Makefile `help` text at `02-01`, README's `## The gate` section at `02-03` |
+| The deferred AC-14 empty-heading guard | **RESOLVED** — GATE-09 landed the length guard at `02-03`, proven load-bearing by a genuinely-executed negative control (re-measured independently by `02-VERIFICATION.md` Criterion 9 after the frozen plan's own control was found to pass vacuously on Windows) |
+
+Two remain open (the first two rows) and are named as such, travelling via
+STATE.md's Pending Todos per this task's own action.
+
+### Closing actions taken by this sweep's termination
+
+Distinct from the correction-cycle above — these are the sweep's **deliverable**,
+applied once Pass 2 confirmed zero corrections, not corrections found during
+re-validation:
+
+- `.planning/REQUIREMENTS.md`: `GOV-01` checkbox flipped `[ ]` → `[x]`; its
+  traceability row changed from `Pending (...)` to `Complete (...)`, citing this
+  sweep's two-pass termination.
+- `.planning/ROADMAP.md`: Phase 2's top-level checkbox flipped `[ ]` → `[x]`,
+  dated; the post-checkpoint runbook's own checkbox flipped `[ ]` → `[x]`; the
+  Progress table's Phase 2 row changed to `Complete`, dated.
+- `.planning/STATE.md`: `current_phase` advanced to 3, `status` set to `planning`
+  (ready to plan Phase 3, not yet planned), `Current Position` rewritten to record
+  Phase 2 as complete with a pointer to this sweep artifact.
+
+### Verification
+
+- `bash scripts/planning-parity.sh 2` — run below.
+- `make gate` — run below.
+- No file outside `.planning/` was modified by this plan (checked below).

@@ -20,7 +20,7 @@ enforcing exists.
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Escalation Mechanism and Fixture Invariant** - One helper owns the skip/fail decision; an opt-in flag turns environment skips into named failures; the preamble property becomes a fixture invariant; nothing enforces yet (completed 2026-09-01)
-- [ ] **Phase 2: Enforcement and a Single Gate Definition** - `make gate` turns strict and `ci.yml` calls it instead of re-implementing it
+- [x] **Phase 2: Enforcement and a Single Gate Definition** - `make gate` turns strict and `ci.yml` calls it instead of re-implementing it (completed 2026-09-02)
 - [ ] **Phase 3: Automated Proof** - Negative tests break each condition and assert the gate fails and names that cause
 
 ## Phase Details
@@ -91,7 +91,7 @@ Plans:
 
 **Post-checkpoint** *(NOT a wave — runs after verification, UAT and security sign-off)*
 
-- [ ] 02-GOV-SWEEP-RUNBOOK.md (logical id 02-05) — GOV-01 close sweep, code-free and last: derive the artifact list mechanically, revalidate every derived artifact with a per-artifact confirmed-current or corrected verdict, re-arm until a pass produces zero corrections, and halt rather than add a requirement
+- [x] 02-GOV-SWEEP-RUNBOOK.md (logical id 02-05) — GOV-01 close sweep, code-free and last: derive the artifact list mechanically, revalidate every derived artifact with a per-artifact confirmed-current or corrected verdict, re-arm until a pass produces zero corrections, and halt rather than add a requirement. **Completed 2026-09-02** — ran two passes, terminated on the second with zero corrections; see `02-GOV-SWEEP.md`.
 
   **Why it is not Wave 3.** GOV-01 requires the sweep to run *after* UAT and security sign-off, but `/gsd-execute-phase` runs every wave to completion *before* those checkpoints happen — so as a Wave 3 plan its precondition could never be satisfied, and it would halt on every run or be quietly weakened to proceed. The second outcome is GOV-01's own failure reproduced inside GOV-01's mechanism. Removing `wave:`/`depends_on:` would not have helped: the effective wave is computed from the `depends_on` DAG and a disagreeing `wave:` is only a warning. What actually removes a file from the wave graph is its **name** — every file ending `-PLAN.md` is scheduled — hence the rename. Measured after the change: the phase's wave graph is `{1: [02-01], 2: [02-02, 02-03, 02-04]}`, with no warnings.
 
@@ -127,5 +127,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Escalation Mechanism and Fixture Invariant | 3/3 | Complete    | 2026-09-01 |
-| 2. Enforcement and a Single Gate Definition | 4/4 wave plans | Waves complete; closure sweep in progress |  |
+| 2. Enforcement and a Single Gate Definition | 4/4 wave plans + close sweep | Complete    | 2026-09-02 |
 | 3. Automated Proof | 0/TBD | Not started | - |

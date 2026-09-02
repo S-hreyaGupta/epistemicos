@@ -1,5 +1,5 @@
 ---
-status: testing
+status: complete
 phase: 02-enforcement-and-a-single-gate-definition
 source: [02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md, 02-04-SUMMARY.md]
 started: 2026-09-02T00:00:00Z
@@ -8,9 +8,7 @@ updated: 2026-09-02T00:00:00Z
 
 ## Current Test
 
-number: 18
-name: DISPOSITION — FINDING-01, where STATE.md's authority sits
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -63,12 +61,30 @@ result: pass
 measured: "exit=2; 'cannot reach postgres at 127.0.0.1:1 (from EPISTEMIC_OS_DB_URL) — run make up: ... target machine actively refused it'; 'new migrator' absent (0)."
 
 ### 5. GATE-03 — unreadable fixture
-expected: With `internal/core/domain/segment/testdata/demo.md` moved aside and the database up, `make gate` exits non-zero and the message names the fixture path.
-result: issue
-reported: "Run exactly as written (fixture moved aside, container up, no export stated): exit=2 but the fixture path is NEVER NAMED — it fails on GATE-01 instead."
-severity: major
+expected: **In Git Bash, with the database up AND the compose DSN exported** (`export EPISTEMIC_OS_DB_URL='postgres://epistemicos:epistemicos@127.0.0.1:5432/epistemicos?sslmode=disable'`), move `internal/core/domain/segment/testdata/demo.md` aside and run `make gate`. It exits non-zero AND the output contains `fixture not readable at` AND names the fixture path. Restore the fixture afterwards and confirm `git diff --quiet` on it. **Asserting a non-zero exit alone is NOT sufficient** — see the before/after below.
+result: pass
+procedure_corrected: 2026-09-02 (Alex)
+measured_before: |
+  Procedure as originally written (database up, NO export stated):
+    exit=2
+    names fixture path:            0
+    says 'fixture not readable':   0
+    actual message: testenv_test.go:158 ... "EPISTEMIC_OS_DB_URL is not set"
+  It failed on GATE-01 and never reached GATE-03. A working GATE-03 and a broken one
+  are indistinguishable by exit code, so a reader checking only the exit status would
+  tick this either way.
+measured_after: |
+  Corrected procedure (database up AND compose DSN exported):
+    exit=2
+    names fixture path:            1
+    says 'fixture not readable':   1
+    carries the escalation preamble: 1
+    actual message: segmentation_test.go:244 ... "fixture not readable at
+      ../../../core/domain/segment/testdata/demo.md: open ... The system cannot find
+      the file specified."
+  The message comes from segmentation_test.go:244 — the escalated Fixture branch,
+  which is the code path GATE-03 is about. Fixture restored byte-identical.
 gap_ref: G-02-5
-orchestrator_note: "With the omitted export supplied, GATE-03 is correct: exit=2, 'fixture not readable at ../../../core/domain/segment/testdata/demo.md', carrying the escalation preamble, from segmentation_test.go:244 — the escalated Fixture branch. Fixture restored byte-identical after both runs."
 
 ### 6. `make test` alone stays lenient
 expected: `make test` with no escalation flag exits 0 and reports skips rather than failures.
@@ -127,6 +143,17 @@ actioned: |
   loudly naming the cause under cmd.exe. New scope, not a defect — it changes recipe
   semantics on every target and platform, and GOV-01's rule is that adding a
   requirement halts for a human.
+rechecked: |
+  Re-verified 2026-09-02 at HEAD dfc122f, after all later commits, from a shell with
+  no EPISTEMIC_OS_* variables preset:
+    README carries the DSN (postgres:// count 1) and the shell requirement (Git Bash count 1)
+    make up prints the export line it just made valid
+    make help states: "(run these in a POSIX shell - Git Bash or WSL on Windows)"
+    the documented sequence followed literally: make up exit=0, make gate exit=0
+  Note: a first attempt used `env -i`, which stripped GOMODCACHE/GOPATH and made
+  `go vet` fail before any gate logic ran. That was a harness artifact, not a
+  regression — "clean shell" means no EPISTEMIC_OS_* preset, not no environment.
+  Re-run correctly, the sequence passes.
 
 ### 15. DISPOSITION — GATE-03 proven at the gate, not just at package level
 expected: You directed this as an explicit decision rather than inheriting the checker's defence of the asymmetry. Confirm it stands: GATE-01, GATE-02 and GATE-03 are each proven through `make gate`, so the family has one rule.
@@ -148,7 +175,23 @@ note: "Four verify-expression defects, none found by reading: the `-eq 12` count
 
 ### 18. DISPOSITION — FINDING-01, where STATE.md's authority sits
 expected: STATE.md has many writers and no owner, so a hand-correction survives only until the next executor. Recorded with four options and NO disposition taken, because it would be a new requirement. Your call, or defer.
-result: [pending]
+result: pass
+disposition: "Option 3 now -> WITHDRAWN on the evidence; option 2 escalated to Alex. Operator, 2026-09-02."
+note: |
+  Option 3 was selected, implemented, and then reverted UNAPPLIED when the trace
+  falsified its premise: normalizeStateStatus passes an unrecognised non-empty line
+  through verbatim ('unknown' needs a MISSING Status line), and the preserve branch
+  was unreachable anyway because the executor path never re-derives frontmatter. The
+  stale value was the orchestrator's own, written at 20bd4ce and left untouched by
+  three executor commits. FINDING-01's mechanism section is corrected in place.
+  LANDED: the executor contract now calls `state.sync` after its STATE.md write,
+  shipped with a tracked counterpart per FINDING-02.
+  ESCALATED: option 2 (derive anything reconstructible from disk and git) to Alex as
+  a design decision.
+  STATED PLAINLY: neither fix stops STATE.md going stale — they close one path.
+  FINDING-01 remains OPEN.
+  ALSO REGISTERED: FINDING-02, the gitignored-instrumentation class that constrains
+  every fix touching .claude/.
 
 ### 19. DISPOSITION — two executor stalls, and 02-04 finished inline
 expected: 02-02's first dispatch and both 02-04 dispatches were killed by the stall watchdog. 02-04 was completed inline by the orchestrator rather than by a subagent — a deviation from how every other plan in this phase ran. Confirm, or direct a re-run.
@@ -165,9 +208,9 @@ note: "The absence assertion now rests on two checks that fail for different rea
 ## Summary
 
 total: 20
-passed: 16
-issues: 3
-pending: 1
+passed: 18
+issues: 2
+pending: 0
 skipped: 0
 blocked: 0
 

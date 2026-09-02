@@ -40,17 +40,19 @@ vacuously makes all of them unfalsifiable.
 
 <!-- This milestone. Hypotheses until shipped and validated. -->
 
-- [ ] `make gate` fails loudly and names the cause when `EPISTEMIC_OS_DB_URL` is unset
-- [ ] `make gate` fails loudly and names the cause when the database is unreachable
-- [ ] `make gate` fails loudly and names the cause when a fixture is unreadable
+- [ ] `make gate` fails loudly and names the cause when `EPISTEMIC_OS_DB_URL` is unset (GATE-01)
+- [ ] `make gate` fails loudly and names the cause when the database is unreachable (GATE-02)
+- [ ] `make gate` fails loudly and names the cause when a fixture is unreadable (GATE-03)
 - [ ] Content-conditional skips stay green and silent — a fixture that genuinely lacks
-      a preamble is legitimate signal, not a gate failure
+      a preamble is legitimate signal, not a gate failure (GATE-04)
 - [ ] CI provisions PostgreSQL and applies migrations so the database-backed tests
-      actually execute on every push and pull request
+      actually execute on every push and pull request (CI-01)
 - [ ] `ci.yml` calls `make gate` rather than re-implementing it, so the gate has exactly
-      one definition
+      one definition (CI-02)
 - [ ] Automated negative tests prove the gate: each of the three environment conditions
       is deliberately broken and the gate is asserted to fail *and* to name that cause
+      (PROOF-01, PROOF-02, PROOF-03 — REQUIREMENTS.md's header records that this single
+      line was split into three atomic requirements under the template's atomicity rule)
 
 ### Out of Scope
 
@@ -104,14 +106,14 @@ environment where that variable is set. How that is arranged is an open design q
 
 ## Key Decisions
 
-| Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| Only environment skips fail the gate | A test declining because the fixture has no preamble is real signal; conflating it with "no database" would make the gate noisy and teach people to ignore it | — Pending |
-| Hard fail with no exception | An opt-out target would recreate the ambiguity between "tested and passed" and "tested nothing" under a different name | — Pending |
-| CI provisions Postgres in this milestone | A hard-failing gate turns CI red immediately; the change cannot land without it | — Pending |
-| `ci.yml` calls `make gate` | One definition of the gate cannot drift from itself | — Pending |
-| Prove the gate with automated negative tests | A manual checklist decays as the code changes; the gate's own behavior should be covered by the suite | — Pending |
-| Scope limited to the gate | Ingest, section map, and citation are verified *through* the gate, so the gate has to be trustworthy first | — Pending |
+| Decision | Rationale | Outcome | Requirements |
+|----------|-----------|---------|--------------|
+| Only environment skips fail the gate | A test declining because the fixture has no preamble is real signal; conflating it with "no database" would make the gate noisy and teach people to ignore it | — Pending | GATE-04 |
+| Hard fail with no exception | An opt-out target would recreate the ambiguity between "tested and passed" and "tested nothing" under a different name | — Pending | GATE-01, GATE-02, GATE-03 |
+| CI provisions Postgres in this milestone | A hard-failing gate turns CI red immediately; the change cannot land without it | — Pending | CI-01 |
+| `ci.yml` calls `make gate` | One definition of the gate cannot drift from itself | — Pending | CI-02 |
+| Prove the gate with automated negative tests | A manual checklist decays as the code changes; the gate's own behavior should be covered by the suite | — Pending | PROOF-01, PROOF-02, PROOF-03 |
+| Scope limited to the gate | Ingest, section map, and citation are verified *through* the gate, so the gate has to be trustworthy first | — Pending | no requirement — milestone-scope statement, not a requirement |
 
 ## Evolution
 

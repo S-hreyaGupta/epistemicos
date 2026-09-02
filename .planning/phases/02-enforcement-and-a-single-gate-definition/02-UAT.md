@@ -8,8 +8,8 @@ updated: 2026-09-02T00:00:00Z
 
 ## Current Test
 
-number: 14
-name: DISPOSITION — the documented happy path does not work
+number: 15
+name: DISPOSITION — GATE-03 proven at the gate
 awaiting: user response
 
 ## Tests
@@ -115,7 +115,18 @@ measured: "PHASE=2 -> exit 0, 'OK: phase 2 — 10 requirement IDs compared ... a
 
 ### 14. DISPOSITION — the documented happy path does not work (raised by tests 1, 2, 5)
 expected: `make gate` in PowerShell errors with 'unformatted' is not recognized, naming neither the gate nor the cause; and README instructs "Run make up first" but never gives the DSN or the export step (postgres:// appears nowhere in README). Orchestrator's scope call, for approval or override — (a) IN SCOPE as a GATE-08 documentation gap covering both, since GATE-08 requires the gate documented "where a developer will meet it"; (b) NEW SCOPE, backlog: pinning SHELL := /bin/sh or adding a cmd.exe guard changes Makefile semantics on every target and platform, and GOV-01's rule is that adding a requirement halts for a human.
-result: [pending]
+result: pass
+disposition: "(a) — GATE-08 documentation gap, SHELL pin to backlog. Operator, 2026-09-02."
+actioned: |
+  IN SCOPE, closed at b877d9b: README's gate block is now the full up / export / gate
+  sequence with the compose DSN spelled out; `make up` prints the export line it just
+  made valid; `make help` points at it and states the POSIX-shell requirement; README
+  records the PowerShell symptom. Verified: the documented sequence, followed literally
+  from a clean shell, now exits 0 — the thing that was false before.
+  BACKLOG, registered in STATE.md Deferred Items: pin SHELL in the Makefile, or fail
+  loudly naming the cause under cmd.exe. New scope, not a defect — it changes recipe
+  semantics on every target and platform, and GOV-01's rule is that adding a
+  requirement halts for a human.
 
 ### 15. DISPOSITION — GATE-03 proven at the gate, not just at package level
 expected: You directed this as an explicit decision rather than inheriting the checker's defence of the asymmetry. Confirm it stands: GATE-01, GATE-02 and GATE-03 are each proven through `make gate`, so the family has one rule.
@@ -144,9 +155,9 @@ result: [pending]
 ## Summary
 
 total: 20
-passed: 10
+passed: 11
 issues: 3
-pending: 7
+pending: 6
 skipped: 0
 blocked: 0
 

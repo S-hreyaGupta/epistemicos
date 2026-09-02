@@ -55,6 +55,35 @@ func escalationPreamble() string {
 	return fmt.Sprintf("escalation is on (%s=%q), so this test cannot be skipped", RequireEnv, os.Getenv(RequireEnv))
 }
 
+// renameTripwireMsg returns the empty string unless legacyValue is set while
+// currentValue is unset — the one combination where a stale
+// EPISTEMIC_OS_TEST_REQUIRE_DB export would otherwise silently downgrade a
+// run the caller believes is strict to a lenient one (D-08). The parameters
+// decide only which branch fires; neither is interpolated into the returned
+// message, and the message contains no fmt verbs — it is built by
+// compile-time concatenation of legacyRequireEnv, RequireEnv and fixed
+// sentences, the same discipline unparseableURLMsg uses. A later edit that
+// wants to interpolate a value has to change this construction, which is
+// visible in review.
+//
+// The message carries its own reasoning (D-10), not only a code comment: why
+// the rename happened, that the old name is not honored, why the check is
+// permanent, and what to do about it — so that reasoning cannot be dropped
+// without TestRenameTripwireMsg noticing.
+func renameTripwireMsg(legacyValue, currentValue string) string {
+	if legacyValue == "" || currentValue != "" {
+		return ""
+	}
+	return legacyRequireEnv + " is set, but " + RequireEnv + " is not. " +
+		"The flag was renamed in Phase 2 because its scope now includes the " +
+		"cross-package fixture prerequisite, a filesystem condition, not only " +
+		"a database one. The old name is not honored — this run would have " +
+		"been lenient while you believed it was strict. Phase 1's frozen " +
+		"plans and summaries still teach " + legacyRequireEnv + ", which is " +
+		"why this check is permanent rather than temporary: those documents " +
+		"are permanent too. Export " + RequireEnv + " instead."
+}
+
 // unparseableURLMsg is the entire message emitted when URLEnv is set but its
 // value cannot be parsed as a PostgreSQL connection string. It takes no
 // arguments and no format verbs: the value and the underlying library error
@@ -94,16 +123,25 @@ func hostFromURL(raw string) string {
 // matters, because it is what makes the answer well-defined when more than
 // one condition is unsatisfiable at once:
 //
-//  1. URLEnv unset — fail if Required(), else skip.
-//  2. URLEnv set but unparseable — always fail, in both modes. This matches
+//  1. The rename tripwire — legacyRequireEnv set while RequireEnv is unset —
+//     always fails, in both modes, and is checked first. Checked after the
+//     unset-URL branch instead, a stale old name plus an unset URL would
+//     skip leniently rather than naming the rename — the exact silent
+//     downgrade this check exists to close.
+//  2. URLEnv unset — fail if Required(), else skip.
+//  3. URLEnv set but unparseable — always fail, in both modes. This matches
 //     the phase-base classification, where a malformed URL already failed
 //     rather than skipped.
-//  3. Database unreachable — fail if Required(), else skip.
+//  4. Database unreachable — fail if Required(), else skip.
 //
 // Fixture, below, is called only after Pool has already returned, so a
 // fixture condition can never mask a database condition.
 func Pool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
+
+	if msg := renameTripwireMsg(os.Getenv(legacyRequireEnv), os.Getenv(RequireEnv)); msg != "" {
+		t.Fatal(msg)
+	}
 
 	dsn := os.Getenv(URLEnv)
 	if dsn == "" {
@@ -141,7 +179,7 @@ func Pool(t *testing.T) *pgxpool.Pool {
 		// dial diagnosis the unreachable-host proof asserts against; the
 		// connection string itself is still never interpolated here.
 		if Required() {
-			t.Fatalf("cannot reach postgres at %s (from %s): %v", host, URLEnv, err)
+			t.Fatalf("%s: cannot reach postgres at %s (from %s) — run make up: %v", escalationPreamble(), host, URLEnv, err)
 		}
 		t.Skipf("cannot reach postgres at %s (from %s): %v", host, URLEnv, err)
 	}
@@ -164,10 +202,14 @@ func Pool(t *testing.T) *pgxpool.Pool {
 func Fixture(t *testing.T, path string) []byte {
 	t.Helper()
 
+	if msg := renameTripwireMsg(os.Getenv(legacyRequireEnv), os.Getenv(RequireEnv)); msg != "" {
+		t.Fatal(msg)
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if Required() {
-			t.Fatalf("fixture not readable at %s: %v", path, err)
+			t.Fatalf("%s: fixture not readable at %s: %v", escalationPreamble(), path, err)
 		}
 		t.Skipf("fixture not readable at %s: %v", path, err)
 	}

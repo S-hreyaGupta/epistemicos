@@ -211,3 +211,78 @@ All four declared files (`docker-compose.yml`, `.github/workflows/ci.yml`,
 `internal/core/domain/segment/acceptance_test.go`, `README.md`) and this
 SUMMARY.md exist on disk. All five commit hashes (`a527644`, `fa74fae`,
 `919efec`, `4710c2e`, `ec16fa8`) are present in `git log --oneline --all`.
+
+---
+
+## Post-execution correction (orchestrator, 2026-09-02)
+
+Appended after this SUMMARY was committed. Not a rewrite — the record of what the
+executor did stands; this adds what a later measurement found.
+
+**The GATE-09 negative control passed vacuously. The conclusion it reached is
+nonetheless correct, but it did not earn it.**
+
+This SUMMARY states "negative control confirmed the guard is load-bearing". The
+control, as written in 02-03-PLAN.md Task 2 verify step 5, is:
+
+```bash
+TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+git archive HEAD | tar -x -C "$TMP"
+cp $F "$TMP/$F"
+perl -0pi -e 's/if len\(headings\) == 0 \{/if false \{/' "$TMP/$F"
+if ( cd "$TMP" && go test ./internal/core/domain/segment/ -count=1 -run '...' >/dev/null 2>&1 ); then
+  echo "FAIL: the control still passes with the guard defeated"; exit 1
+fi
+```
+
+On Windows, `TMP` is an already-exported environment variable. Assigning it
+changes what Go sees as the system temp root, so Go **ignores the `go.mod`** in
+that directory and `go test` exits non-zero with:
+
+```
+go: warning: ignoring go.mod in system temp root <dir>
+go: go.mod file not found in current directory or any parent directory
+```
+
+The `if` therefore takes the false branch and the check passes — while the mutated
+test never ran. A module-resolution error and a genuinely failing control are
+indistinguishable to this assertion. That is the vacuous pass this milestone exists
+to remove, sitting inside the negative control written to prevent it.
+
+**The substantive claim is true, and was measured separately.** Re-running the same
+mutation with the scratch directory bound to a variable that is NOT an exported
+temp name (`NEGDIR`), the control fails as designed:
+
+```
+--- FAIL: TestGATE09_HeadingGuard_Control/empty_document
+    acceptance_test.go:468: expected the guard to fire for heading-free input "empty document", got empty message
+--- FAIL: .../prose_with_no_hash_at_all
+--- FAIL: .../whitespace_only
+--- FAIL: .../hash_not_at_line_start
+--- FAIL: .../fenced_code_block_with_a_hash
+exit=1
+```
+
+All five heading-free subtests fail with the guard defeated. GATE-09's guard IS
+load-bearing. No code change is required and none was made.
+
+**Two defects, not one.** The exported-name collision is the proximate cause and is
+host-specific. The design defect is general and is the one worth carrying: the
+control had a single assertion, `go test` exited non-zero, with nothing
+distinguishing "the control failed because the guard is gone" from "the run never
+happened". 02-04 Task 1's parity control does not have this defect — it asserts the
+failing output NAMES `GOV-01`, so a failure for an unrelated reason does not pass.
+
+**Corrected pattern**, for the phase's verification disposition and for Phase 3,
+which inherits this harness idiom:
+
+1. Bind the scratch directory to a name that is not an exported temp variable
+   (`TMP`, `TEMP`, `TMPDIR` are all exported on Windows).
+2. Run the control in the throwaway tree UNMUTATED first and require it to PASS.
+   A setup, module or copy error then fails loudly instead of masquerading as a
+   successful negative result. The mutated run is only trustworthy if the clean run
+   in the same directory passed.
+
+The frozen plan is deliberately NOT edited — same disposition as 01-03's `make`
+finding: recorded as a planning-process gap for end-of-phase disposition, not
+repaired by rewriting the artifact that recorded it.

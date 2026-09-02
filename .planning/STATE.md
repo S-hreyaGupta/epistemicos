@@ -4,10 +4,10 @@ current_phase: 3
 current_phase_name: Automated Proof
 status: planning
 stopped_at: Phase 2 CLOSED. GOV-01 close sweep (02-GOV-SWEEP.md) ran two passes and terminated with zero corrections on the second. All ten Phase 2 requirements complete. Phase 3 not yet planned.
-last_updated: "2026-09-02T12:21:19.000Z"
+last_updated: "2026-09-02T12:28:51.756Z"
 last_activity: 2026-09-02
 last_activity_desc: GOV-01 close sweep terminated — Phase 2 complete, ready to plan Phase 3
-state_head: 15f795c4008248b015a9dca6c528e1514c4507d5
+state_head: 8696e7b6f0400dabd74fb337df175dfabd0fa88c
 progress:
   total_phases: 3
   completed_phases: 2
@@ -127,13 +127,17 @@ than living only inside a closed phase's plans:
   README/Makefile documentation deferral, and the AC-14 empty-heading guard — are
   RESOLVED, by GATE-07, GATE-08 and GATE-09 respectively; see `02-GOV-SWEEP.md`
   Task 3 for the full disposition.)
+
 - **Three unclassified probe-edge rows**, none dismissed because no agent in this
   pipeline has authority to dismiss a probe row that returned no category:
+
   - **E1** (Phase 1, GATE-04) — queued in `01-03` Task 3, still open; covered by
     pointer per `01-UAT.md` test 5's disposition (six `TestPreambleInvariant_Control`
     subtests plus ten authored must-haves), not independently resolved.
+
   - **E11** (Phase 2, GATE-07) — unclassified; GATE-07's substance is covered by
     `02-01`'s authored must-haves and `02-VERIFICATION.md` Criterion 7.
+
   - **E12** (Phase 2, CI-02) — unclassified; CI-02's substance is covered by
     `02-03`'s authored must-haves and `02-VERIFICATION.md` Criteria 4/5.
   See `02-GOV-SWEEP.md` Task 3 for the full disposition record.
@@ -168,6 +172,7 @@ Items acknowledged and deferred at milestone close, most recent first:
   `state.sync`), but it closes one path, not the class: STATE.md still has many
   writers, and a writer that forgets the call still leaves the frontmatter stale.
   **FINDING-01 stays OPEN until this is decided.**
+
 - **FINDING-02 — instrumentation in gitignored `.claude/` is unversioned and reverts
   silently.** A class with three known instances (the review-run archive block, any
   `state.cjs` guard, the executor contract). It CONSTRAINS every fix that touches
@@ -176,6 +181,7 @@ Items acknowledged and deferred at milestone close, most recent first:
   `.planning/codebase/CONCERNS.md`. The tracked-counterparts register in that finding
   carries a detection command per instance; run them after any `/gsd-update`.
   **This supersedes the standalone review.md note below**, which is instance 1.
+
 - **CORRECTION 2026-09-02:** FINDING-01 originally recorded a normalizer bug as the
   cause of the stale `status:` field. That was false and asserted rather than measured
   — traced to the orchestrator's own value at `20bd4ce`, left untouched by three
@@ -192,12 +198,14 @@ Items acknowledged and deferred at milestone close, most recent first:
   would put it under a mechanism structurally unable to close it. **Disposition is
   a human decision and has not been taken** — it would be a new requirement, and
   GOV-01's own rule is that a pass which would add a requirement halts for a human.
+
 - **A normalizer that cannot parse keeps the previous value, silently.**
   `normalizeStateStatus` (`state-document.cjs:387`) maps the body `Status:` line by
   substring; a line matching none of its keywords yields `unknown`, and
   `state.cjs:2359-2361` then preserves the old frontmatter value with no warning.
   That is how `status: planning` survived three executed plans. Same shape as the
   other defects this week: a check that cannot come back false.
+
 - **Two executor subagents were killed by the stall watchdog during this phase**
   (02-02's first dispatch, and 02-04 twice). 02-04 was finished inline. If this
   recurs, the likely cause is a long output-silent command — the nested-suite tests

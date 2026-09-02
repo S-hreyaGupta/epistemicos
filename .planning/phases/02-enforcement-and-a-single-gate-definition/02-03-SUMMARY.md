@@ -204,3 +204,10 @@ None — no external service configuration required. `make up` was already runni
 ---
 *Phase: 02-enforcement-and-a-single-gate-definition*
 *Completed: 2026-09-02*
+
+## Self-Check: PASSED
+
+All four declared files (`docker-compose.yml`, `.github/workflows/ci.yml`,
+`internal/core/domain/segment/acceptance_test.go`, `README.md`) and this
+SUMMARY.md exist on disk. All five commit hashes (`a527644`, `fa74fae`,
+`919efec`, `4710c2e`, `ec16fa8`) are present in `git log --oneline --all`.

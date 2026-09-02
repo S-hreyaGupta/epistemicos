@@ -183,6 +183,9 @@ Mathpix credentials are required to convert. Without them the service still
 starts and serves reads, but ingest fails at step 7 and
 `/api/v1/capabilities` reports `mathpix_enabled: false`.
 
+`make gate` needs that same `make up` database running too — see
+[The gate](#the-gate).
+
 ### If you have a database from before 24 August 2026
 
 The environment prefix was renamed `PAPERLY_` → `EPISTEMIC_OS_`, and the Postgres
@@ -269,10 +272,56 @@ empty string as *absent*, never as a match.
 ## The gate
 
 ```bash
-make gate     # go vet + gofmt + go build + go test
+make gate     # vet -> gofmt -> build -> env-preflight -> migrate -> test
 ```
 
-CI runs the same four, and `gofmt` is enforced rather than advisory.
+`gofmt` is enforced rather than advisory. `ci.yml`'s `go` job runs `make gate`
+itself, rather than re-implementing its steps, so this is the single
+definition of the gate — local and CI always run the same recipe.
+
+**`make gate` requires a running database and will not start one.** Run
+`make up` first. A gate that starts its own database can never fail for an
+unreachable one, which would defeat the whole point of a gate that can
+distinguish "tested and passed" from "tested nothing".
+
+**`make gate` applies migrations** to whatever `EPISTEMIC_OS_DB_URL` addresses,
+via its own `migrate` step — this is new as of this phase; earlier, `make gate`
+never touched the database. If you have a production DSN exported in your
+shell, know that before running `make gate`, not after.
+
+**The escalation flag: `EPISTEMIC_OS_TEST_REQUIRE_ENV`.** By default, the 38
+database-backed tests silently skip when the database is unreachable or the
+fixture is unreadable, and the suite still reports `ok`. Setting this flag
+turns each of those skips into a failure that names its specific cause — an
+unset `EPISTEMIC_OS_DB_URL`, an unreachable database naming the host with the
+remedy in the same sentence, or an unreadable cross-package fixture naming its
+path.
+
+The semantics are presence-based, in both directions:
+
+- **Any non-empty value — including the string `"0"` — enables escalation.**
+  A typo in the value then errs toward enforcing rather than toward a silently
+  vacuous pass.
+- **Unset or empty leaves the run lenient** — the default behavior described
+  above.
+
+`make gate` sets the flag to the value `make-gate`, not `1`:
+
+```
+EPISTEMIC_OS_TEST_REQUIRE_ENV="make-gate"   the Makefile turned it on
+EPISTEMIC_OS_TEST_REQUIRE_ENV="1"           your own export, go test direct
+```
+
+so a failure says *who* turned escalation on. **Stated limit, so nobody reads
+more into it than is there:** because `gate: export EPISTEMIC_OS_TEST_REQUIRE_ENV
+= make-gate` is a target-scoped Make export, it overrides any conflicting
+value already in your shell — a stale `EPISTEMIC_OS_TEST_REQUIRE_ENV=1` export
+still shows `"make-gate"` inside `make gate`. The value distinguishes **paths,
+not precedence**.
+
+(This flag was named `EPISTEMIC_OS_TEST_REQUIRE_DB` before Phase 2 renamed it.
+The old name is not honored; a stale export of it fails loudly, naming the
+rename, rather than silently downgrading you to a lenient run.)
 
 `.gitattributes` pins `*.go`, `go.mod` and `go.sum` to LF. Without the first the
 format gate fires on `core.autocrlf` noise instead of real drift; without the

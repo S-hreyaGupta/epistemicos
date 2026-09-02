@@ -8,8 +8,8 @@ updated: 2026-09-02T00:00:00Z
 
 ## Current Test
 
-number: 15
-name: DISPOSITION — GATE-03 proven at the gate
+number: 18
+name: DISPOSITION — FINDING-01, where STATE.md's authority sits
 awaiting: user response
 
 ## Tests
@@ -130,15 +130,21 @@ actioned: |
 
 ### 15. DISPOSITION — GATE-03 proven at the gate, not just at package level
 expected: You directed this as an explicit decision rather than inheriting the checker's defence of the asymmetry. Confirm it stands: GATE-01, GATE-02 and GATE-03 are each proven through `make gate`, so the family has one rule.
-result: [pending]
+result: pass
+disposition: "Stands. Operator, 2026-09-02."
+note: "GATE-01, GATE-02 and GATE-03 are each proven through `make gate`. The family has one rule, and the asymmetry the checker was willing to defend is not inherited by silence." 
 
 ### 16. DISPOSITION — the GATE-09 negative control passed vacuously
 expected: The guard IS load-bearing (defeating it fails all five heading-free subtests), but the control that claimed to prove it never ran — TMP reassigns an exported Windows env var, Go ignored the go.mod, and a module error was read as success. Recorded as an appended correction to 02-03-SUMMARY.md; the frozen plan was NOT edited. Confirm, or direct that the plan be corrected.
-result: [pending]
+result: pass
+disposition: "Confirmed — recorded, plan not edited. Operator, 2026-09-02."
+note: "The guard is load-bearing on re-measurement; the frozen plan keeps its defective control as executed, with the correction appended to 02-03-SUMMARY.md. Same disposition as 01-03's `make` finding: a planning-process gap is recorded, not repaired by rewriting the artifact that recorded it. The corrected pattern (non-exported scratch var; require the UNMUTATED control to pass in the same tree first) is written into that note for Phase 3, which inherits the harness idiom." 
 
 ### 17. DISPOSITION — verify-expression defects found only by running
 expected: Four now — the -eq 12 count that could not hold on a correct tree; the SHA-256 false positive; 02-04 Task 2's header row counted as data (7 vs 6, could never pass); and T-02-09's plan text claiming the banner test prints no subprocess output when makefile_test.go:89,92 do. All recorded as deviations with no content bent to suit them. Confirm.
-result: [pending]
+result: pass
+disposition: "Confirmed. Operator, 2026-09-02."
+note: "Four verify-expression defects, none found by reading: the `-eq 12` count that could not hold on a correct tree; the `SHA-256` false positive; 02-04 Task 2's header row counted as data (7 vs 6, could never pass); and T-02-09's plan text claiming the banner test prints no subprocess output when makefile_test.go:89,92 do. A fifth was introduced by the repair of the second (literal backspace bytes for ``) and found only because the check was re-run rather than assumed fixed. All recorded as deviations; no content was altered to suit a check." 
 
 ### 18. DISPOSITION — FINDING-01, where STATE.md's authority sits
 expected: STATE.md has many writers and no owner, so a hand-correction survives only until the next executor. Recorded with four options and NO disposition taken, because it would be a new requirement. Your call, or defer.
@@ -146,18 +152,22 @@ result: [pending]
 
 ### 19. DISPOSITION — two executor stalls, and 02-04 finished inline
 expected: 02-02's first dispatch and both 02-04 dispatches were killed by the stall watchdog. 02-04 was completed inline by the orchestrator rather than by a subagent — a deviation from how every other plan in this phase ran. Confirm, or direct a re-run.
-result: [pending]
+result: pass
+disposition: "Accepted — no re-run. Operator, 2026-09-02."
+note: "02-02's first dispatch and both 02-04 dispatches were killed by the stall watchdog; 02-04 was completed inline. The inline path is a documented mode (execute-phase --interactive) and produced a stricter result than the subagent path would have: every check was run for the first time by the orchestrator, and two of them failed on first run. Recorded as a process deviation in 02-04-SUMMARY.md, including that the script was authored by a subagent that never executed it." 
 
 ### 20. DISPOSITION — the `new migrator` absence assertion
 expected: The D-03 ordering is asserted by the ABSENCE of `new migrator`, a string owned by store/migrate.go and by no plan. Now guarded — each site first asserts the wrap still exists, plus a structural check on the gate recipe's ordering. Confirm sufficient, or direct a stronger pin.
-result: [pending]
+result: pass
+disposition: "Sufficient. Operator, 2026-09-02."
+note: "The absence assertion now rests on two checks that fail for different reasons: a guard asserting `new migrator: %w` still EXISTS in store/migrate.go (so a reword fails the task loudly instead of leaving a permanently-passing absence check), plus a structural assertion that the gate recipe orders env-preflight strictly before $(MAKE) migrate. Message-level and recipe-level, independently falsifiable." 
 
 ## Summary
 
 total: 20
-passed: 11
+passed: 16
 issues: 3
-pending: 6
+pending: 1
 skipped: 0
 blocked: 0
 

@@ -121,18 +121,23 @@ claim that stopped being true the moment the first one was added.
 
   **The bound, demonstrated live (2026-09-02, Phase 2 UAT test 12).** The first
   instance found OUTSIDE the sweep set, and the reason obligation 4 is written down
-  rather than left as an observation. `.github/workflows/ci.yml`'s `go` job is still
-  named `vet + test + fmt`. That name was accurate until CI-02 collapsed the job onto
-  a single `run: make gate` step — it stopped being true when the thing it describes
+  rather than left as an observation. `.github/workflows/ci.yml`'s `go` job was named
+  `vet + test + fmt`. That name was accurate until CI-02 collapsed the job onto a
+  single `run: make gate` step — it stopped being true when the thing it describes
   changed, and nobody edited it. That is precisely GOV-01's finding, reproduced in a
   file the derivation **does not cover**: `ci.yml` is not under `.planning/`, and it
-  names neither the phase number nor a requirement ID, so no sweep pass will ever
-  surface it.
+  names neither the phase number nor a requirement ID, so no sweep pass would ever
+  have surfaced it.
 
-  This is the accepted bound behaving exactly as declared, not a defect in it. It was
-  found by a human running an acceptance test, which is the residual channel the bound
-  leaves open. It is recorded here so that the next reader learns the mechanism has an
-  edge from the register rather than from the next escape.
+  **Fixed at `d256c4c`** (renamed to `make gate`). The defect is not left standing as
+  its own exhibit: a wrong name on the CI page misleads everyone who reads it, and the
+  evidence survives in git history either way. This entry is the record; the commit is
+  the citation.
+
+  This is the accepted bound behaving exactly as declared, not a defect in it. The
+  instance was found by a human running an acceptance test, which is the residual
+  channel the bound leaves open. It is recorded here so the next reader learns the
+  mechanism has an edge from the register rather than from the next escape.
 
 ### Gate Proof
 

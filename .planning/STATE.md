@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 current_phase: 2
 current_phase_name: Enforcement and a Single Gate Definition
 status: planning
-stopped_at: Phase 2 plan-checker RAN 2026-09-02 over the 5 plans at b5d2410 — ISSUES FOUND, 5 blockers + 4 warnings. Plans must be revised before execution.
+stopped_at: Phase 2 plan gate PASSED 2026-09-02 (iteration 2, at 4af5143): 0 blockers, 5 warnings. All 5 blockers from iteration 1 closed. Cleared to execute.
 last_updated: "2026-09-01T17:59:18.884Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 01 complete, transitioned to Phase 2
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 
 ## Current Position
 
-Phase: 2 (Enforcement and a Single Gate Definition) — PLANNED, NOT VERIFIED
+Phase: 2 (Enforcement and a Single Gate Definition) — PLANNED AND VERIFIED, NOT EXECUTED
 Plan: Not started — nothing in Phase 2 has executed
-Status: Planning — plan-checker returned ISSUES FOUND (5 blockers, 4 warnings); plans need revision before execution
-Total Plans in Phase: 5
+Status: Ready to execute — plan gate passed on iteration 2 (0 blockers, 5 non-blocking warnings)
+Total Plans in Phase: 4 wave plans + 1 post-checkpoint runbook
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
 Plan bytes: `8edae22` — freeze: `c96ecb2`
 Last activity: 2026-09-01 — Phase 01 complete, transitioned to Phase 2
@@ -110,17 +110,29 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-01T17:59:18.618Z
-Stopped at: Phase 2 plan-checker ran 2026-09-02 over the 5 plans at `b5d2410` (the run that died on three API failures on 2026-09-01). Verdict: **ISSUES FOUND — 5 blockers, 4 warnings.** Not executed.
+Stopped at: Phase 2 plan gate PASSED on iteration 2. Checker run 1 (plans at `b5d2410`): ISSUES FOUND, 5 blockers + 4 warnings. Revision pass at `4af5143`. Checker run 2: **0 blockers, 5 warnings — all five blockers CLOSED**, each confirmed by the checker re-deriving the fix rather than reading its description.
 
-Checker blockers, in the order they must be fixed:
-1. **GATE-03 / criterion 3 has no executable acceptance in any of the five plans.** Nothing ever makes a fixture unreadable. The criterion rests on a grep for `escalationPreamble` in `testenv.go` — a grep for a string the same task just wrote.
-2. **GATE-06 / criterion 6 ("all three escalated paths") is behavioral on two, textual on the third.** Direct consequence of 1.
-3. **GATE-02 / criterion 2 is never run through `make gate`** — only `go test ./internal/adapters/secondary/approved/`, which bypasses the D-03 env-preflight-before-migrate ordering that owns the message in exactly the unreachable case.
-4. **Hard-coded requirement count is wrong: plans assert 12, the file has 16.** `02-04-PLAN.md:627` and `02-05-PLAN.md:641`. Independently re-measured 2026-09-02: 16. Both tasks fail on a correct tree, including 02-05's own scope-change halt guard.
-5. **02-05's precondition cannot be satisfied where it is scheduled.** It requires phase-02 VERIFICATION/UAT/signed-SECURITY, which are produced AFTER all plans execute; 02-05 is Wave 3 *within* the phase. Criterion 11 is unachievable as scheduled — the sweep halts, or an executor quietly weakens the precondition, which is the GOV-01 failure itself. The plan is faithful to D-16; the scheduling is wrong.
+What changed, and the evidence that closed it:
+1. **GATE-03 (was: no executable acceptance)** — 02-01 T2 step 5 moves the fixture aside against a live database and observes the failure. Reachability confirmed: `segmentation_test.go:240` calls `Pool(t)`, `:244` calls `Fixture(...)` — the repo's only `testenv.Fixture` call — so with a live DB the Pool branch cannot mask it.
+2. **GATE-06 third path (was: grep-proven)** — the same step asserts the flag+value in the real failure output; the three-`escalationPreamble` grep is now explicitly demoted to a structural check that does not on its own satisfy GATE-06.
+3. **GATE-02 at the gate (was: package-only)** — step 3b runs `make gate` against the closed-port DSN and asserts the absence of `new migrator`.
+4. **Requirement count (was: 12 vs an actual 16)** — all three count sites now assert entry-count == traceability-row-count before the pinned 16.
+5. **GOV-01 sweep (was: unachievable as scheduled)** — see below.
+6. **Criterion 9** — the guard is now run, not located; negative control confirmed sound (`git archive HEAD` + `cp` of the one declared file makes the throwaway tree byte-equivalent for that package).
 
-Warnings: 02-02 T3 verify step 3 is a bare `echo` presented as an assertion; every phase DSN still says `localhost` after the loopback rebind removes the `[::]` mapping (may resolve ::1 and fail to connect); `DefaultTimeout`/`TimedOut` never exercised; criterion 9's heading-free branch never executed.
+**The sweep is out of the wave graph — structurally, not procedurally.** `02-05-PLAN.md` is now `02-GOV-SWEEP-RUNBOOK.md`. The rename is the mechanism: `plan-scan.cjs:141` schedules every file ending `-PLAN.md`, and `phase.cjs:797-801` computes the effective wave from the `depends_on` DAG while downgrading a disagreeing `wave:` to a warning — so clearing the frontmatter would have changed nothing. Measured: waves went from `{1,2,3}` to `{1:[02-01], 2:[02-02,02-03,02-04]}`, 0 warnings. Its logical id stays `02-05`; the sibling plans' references remain valid.
 
-Both mandated checks PASSED: SEC-01 recreates the container and asserts the live PORTS cell including the negative half; 02-02's recursion guard is a depth counter set last in child-env construction so `Unset` cannot defeat it, with depth-1 and malformed-marker negative proofs.
-Resume with: revise the five plans against the 5 blockers above, then re-run the checker. Do NOT run `/gsd-execute-phase 2` — the gate returned ISSUES FOUND, not PASSED. Blocker 5 is a scheduling decision, not an edit: it needs a human call on whether the GOV-01 sweep moves out of the wave graph or becomes a checkpoint:decision.
+**Invoke it explicitly, after verification + UAT + security sign-off:**
+`/gsd-execute-plan .planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP-RUNBOOK.md`
+
+Its precondition proves the checkpoints COMPLETED rather than asking: each artifact's own frontmatter verdict (`passed` / `complete` / `verified` + `threats_open: 0`), each committed, and each one's latest commit a descendant of the final plan SUMMARY's commit. Checker confirmed no assertion can pass vacuously (all four expectations are non-empty, so a missing key fails) and that the `LAST_SUMMARY` loop lands on the latest of the four on linear history.
+
+**5 warnings carried, none blocking:**
+- Criterion 3 is executed but at package level, never through `make gate` as the criterion is worded. (The asymmetry with the GATE-02 fix is defensible — migrate cannot be first reporter for a filesystem condition against a live DB — but it is an asymmetry.)
+- `grep -q 'new migrator'` pins the D-03 ordering to a message string this phase does not own; a reword makes it silently vacuous.
+- Undeclared runtime coupling: 02-03 T1 recreates the shared compose container; 02-02 T3 and 02-04 read it via `make gate`. Same wave, no declared edge — safe only because `parallelization: false`.
+- `localhost` DSNs survive the loopback rebind in 02-02, 02-03 T1 and the runbook; 02-01 T2 already switched to `127.0.0.1` and the others did not follow.
+- 02-02: verify step 3 is still a bare `echo` in an assertion slot, and `DefaultTimeout`'s kill path is never exercised despite being a control on a high-rated threat.
+
+Resume with: `/gsd-execute-phase 2` — the plan gate has passed. It will run the 4 wave plans and CANNOT reach the GOV-01 sweep; run that separately by path after verification, UAT and security sign-off. Optionally clear the 5 warnings first (none blocks execution).
 Resume file: .planning/phases/02-enforcement-and-a-single-gate-definition/02-01-PLAN.md

@@ -584,7 +584,12 @@ grep -qE '^- \[x\] \*\*CI-02\*\*' .planning/REQUIREMENTS.md || { echo "FAIL: CI-
 if git diff --name-only | grep -vE '^\.planning/' | grep -q .; then echo "FAIL: a file outside .planning/ was modified"; exit 1; fi
 
 # 8. No requirement was added — that is the halt case, not the work. Counts unchanged.
+# Same rule as Task 3 and 02-04 Task 3: assert the two independent representations
+# of the set agree BEFORE asserting the pinned number, so the count is a scope
+# tripwire on top of an invariant rather than a typed constant on its own.
 T=$(awk '/^\| Requirement \| Phase \| Status \|/,/^$/' .planning/REQUIREMENTS.md | grep -cE '^\| [A-Z]+-[0-9]{2} \|')
+N=$(grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]{2}\*\*' .planning/REQUIREMENTS.md)
+[ "$N" -eq "$T" ] || { echo "FAIL: $N requirement entries but $T traceability rows — the two representations disagree"; exit 1; }
 [ "$T" -eq 16 ] || { echo "FAIL: traceability row count is $T, expected 16 — the requirement SET changed, which is a halt, not a sweep"; exit 1; }
 
 # 9. The parity check still passes after the corrections.

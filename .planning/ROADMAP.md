@@ -84,7 +84,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-02-PLAN.md — The shell-out-to-make harness, built as Phase 3's harness: a bounded-recursion subprocess runner that asserts the preflight is voiceless and `make test` prints the lenient-run banner, plus the roadmap note recording the slice taken from PROOF-01/02/03's design question
+- [x] 02-02-PLAN.md — The shell-out-to-make harness, built as Phase 3's harness: a bounded-recursion subprocess runner that asserts the preflight is voiceless and `make test` prints the lenient-run banner, plus the roadmap note recording the slice taken from PROOF-01/02/03's design question
 - [ ] 02-04-PLAN.md — GOV-01 mechanism: a standalone phase-argument-taking parity check with a Make target, requirement-ID tags on PROJECT.md, and GOV-01's own obligations written into GOV-01's text
 
   **Why 02-02 and 02-04 moved out of Wave 2.** 02-03 Task 1 destroys and recreates the shared compose `postgres` container; 02-02 Task 3 and 02-04 both run `make gate` against it. No `files_modified` overlap, so the coupling was invisible to both the dependency DAG and the wave guard — it was safe only because `parallelization: false`, which is a trap for whoever flips that flag later. Declaring `depends_on: 02-03` makes the ordering enforced rather than incidental.
@@ -127,5 +127,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Escalation Mechanism and Fixture Invariant | 3/3 | Complete    | 2026-09-01 |
-| 2. Enforcement and a Single Gate Definition | 2/4 | In Progress|  |
+| 2. Enforcement and a Single Gate Definition | 3/4 | In Progress|  |
 | 3. Automated Proof | 0/TBD | Not started | - |

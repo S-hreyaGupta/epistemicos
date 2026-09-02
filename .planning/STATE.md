@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 2
 current_phase_name: Enforcement and a Single Gate Definition
 status: planning
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-09-02T07:09:58.259Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-09-02T07:44:58.612Z"
 last_activity: 2026-09-02
 last_activity_desc: Phase 01 complete, transitioned to Phase 2
-state_head: 9a1b85207c8b053bdbd3b803f03cdcc39ff051d0
+state_head: bf4e0c37c122f99943e71efc4652e1653662b638
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 7
-  completed_plans: 5
+  completed_plans: 6
   percent: 33
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 ## Current Position
 
 Phase: 2 (Enforcement and a Single Gate Definition) — IN PROGRESS
-Plan: 2 of 4 wave plans complete (02-01, 02-03 done; 02-02, 02-04 remaining; post-checkpoint 02-GOV-SWEEP-RUNBOOK not yet eligible)
+Plan: 3 of 4 wave plans complete (02-01, 02-03 done; 02-02, 02-04 remaining; post-checkpoint 02-GOV-SWEEP-RUNBOOK not yet eligible)
 Status: 02-03 (CI collapse, SEC-01 loopback bind, GATE-09 heading guard, GATE-08 README) executed and committed — ready for the remaining wave-2 plans (02-02, 02-04)
 Total Plans in Phase: 4 wave plans + 1 post-checkpoint runbook
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
@@ -66,6 +66,7 @@ Progress: [███░░░░░░░] 33%
 | Phase 01 P03 | 62min | 3 tasks | 1 files |
 | Phase 02 P01 | 21 min | 3 tasks | 3 files |
 | Phase 02 P03 | 7 min | 3 tasks | 4 files |
+| Phase 02 P02 | 8min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,8 @@ Recent decisions affecting current work:
 - [Phase 2]: [Phase 02] 02-03: docker-compose.yml postgres bound to 127.0.0.1:5432:5432 (declared and live, container recreated) closing AR-02/T-01-11; ci.yml go job collapsed to a single make gate step, preserving services: postgres and job-level EPISTEMIC_OS_DB_URL (CI-01).
 - [Phase 2]: [Phase 02] 02-03: headingGuardMessage(headings, fixturePath) added as GATE-09's length guard, wired at acceptance_test.go's one unguarded headings[0] index; TestGATE09_HeadingGuard_Control proves the branch executes (11 subtests) with a negative control that defeats the guard in a throwaway git-archive copy and requires the control to then fail. fixtureHasPreamble remains the package's only declaration mechanism.
 - [Phase 2]: [Phase 02] 02-03: plan verify-script literal corrected — the fixtureHasPreamble declaration-count regex did not account for the const keyword prefix (const fixtureHasPreamble = true); corrected to ^[[:space:]]*(const|var)[[:space:]]+fixtureHasPreamble[[:space:]]*= , same substance, no code change.
+- [Phase 2]: [Phase 2] 02-02: internal/platform/gate shell-out-to-make harness (Run/Make/RunOptions/RunResult/SkipIfNested/RepoRoot) built and confirmed at a human checkpoint (proceed) as Phase 3's PROOF-01/02/03 contract; depth marker recursion guard set last in buildChildEnv so Unset/Env cannot defeat it.
+- [Phase 2]: [Phase 2] 02-02: TestEnvPreflightIsVoiceless (D-03) and TestMakeTestPrintsLenientBanner (D-05) assert against real subprocess output via extraLines' differential comparison, not Makefile text; ROADMAP.md Phase 3 gains a Note on the harness (D-07 binding condition 2) with Goal/Depends on/Requirements/Success Criteria byte-unchanged.
 
 ### Pending Todos
 
@@ -116,8 +119,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-02T07:09:58.145Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-09-02T07:44:58.481Z
+Stopped at: Completed 02-02-PLAN.md
 
 What changed, and the evidence that closed it:
 

@@ -104,6 +104,7 @@ Plans:
 **Goal**: Automated negative tests deliberately break each of the three environment conditions and assert that the gate fails and names that cause, so the gate's own behavior is covered by the suite rather than by a manual checklist that decays.
 **Depends on**: Phase 2
 **Requirements**: PROOF-01, PROOF-02, PROOF-03
+**Note on the harness**: Phase 2 (02-02) built the shell-out-to-`make` harness at `internal/platform/gate`, because D-03's voiceless-preflight constraint and D-05's `make test` banner constraint both required asserting a Make target's behavior from inside the suite Make governs. This is a slice of the design question recorded at `PROJECT.md` lines 91-93, which success criterion 4 below charters this phase to solve; this phase's plan should start from applying `gate.Make` / `gate.RunOptions` rather than rediscovering the tension. The recursion guard (`EPISTEMIC_OS_TEST_MAKE_DEPTH`, `gate.SkipIfNested`) is part of the contract — every proof in this phase must call `SkipIfNested` first. The three `RunOptions` shapes this phase's proofs map onto: PROOF-01 `Make(t, "gate", RunOptions{Unset: ["EPISTEMIC_OS_DB_URL"]})`; PROOF-02 `Make(t, "gate", RunOptions{Env: [...closed-port DSN...]})`; PROOF-03 the same with fixture setup around it.
 **Success Criteria** (what must be TRUE):
 
   1. A test proves the gate fails and names `EPISTEMIC_OS_DB_URL` when that variable is unset

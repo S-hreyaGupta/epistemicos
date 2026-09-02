@@ -4,23 +4,26 @@
 // By default, an unmet condition — EPISTEMIC_OS_DB_URL unset, the database
 // unreachable, a cross-package fixture unreadable — skips: a developer
 // without Docker running still gets a green build for a reason unrelated to
-// their change. Setting EPISTEMIC_OS_TEST_REQUIRE_DB to any non-empty value,
-// including the string "0", turns each of those skips into a failure that
-// names its specific cause. Any non-empty value enables escalation
+// their change. Setting EPISTEMIC_OS_TEST_REQUIRE_ENV to any non-empty
+// value, including the string "0", turns each of those skips into a failure
+// that names its specific cause. Any non-empty value enables escalation
 // deliberately: a typo in the value then errs toward enforcing rather than
 // toward a silently vacuous pass, which is the failure direction this
 // package exists to remove.
 //
-// The flag's name is narrower than its reach. It also escalates the
-// cross-package fixture prerequisite in Fixture, which is a filesystem
-// condition, not a database one. That asymmetry is deliberate for this
-// milestone and is queued for review rather than resolved by a rename here,
-// because renaming it after Phase 2 and Phase 3 bind to the literal name is
-// no longer local to this package.
+// The flag is named EPISTEMIC_OS_TEST_REQUIRE_ENV, not ..._REQUIRE_DB,
+// because its scope is wider than a database check: it also escalates the
+// cross-package fixture prerequisite in Fixture, a filesystem condition, not
+// a database one. The old name is not honored — a run that still sets
+// EPISTEMIC_OS_TEST_REQUIRE_DB while EPISTEMIC_OS_TEST_REQUIRE_ENV is unset
+// fails naming the rename (see legacyRequireEnv and renameTripwireMsg),
+// rather than silently downgrading to a lenient run the caller believes is
+// strict.
 package testenv
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"testing"
@@ -35,7 +38,22 @@ const URLEnv = "EPISTEMIC_OS_DB_URL"
 
 // RequireEnv names the environment variable that, when set to any non-empty
 // value, escalates every environment skip in this package to a failure.
-const RequireEnv = "EPISTEMIC_OS_TEST_REQUIRE_DB"
+const RequireEnv = "EPISTEMIC_OS_TEST_REQUIRE_ENV"
+
+// legacyRequireEnv is the pre-rename name of RequireEnv,
+// EPISTEMIC_OS_TEST_REQUIRE_DB. It exists only so renameTripwireMsg can name
+// it in a failure message; it is never itself read as an escalation source.
+const legacyRequireEnv = "EPISTEMIC_OS_TEST_REQUIRE_DB"
+
+// escalationPreamble is the one message builder shared by every escalated
+// failure in this package (GATE-06). It takes no parameters and reads
+// exactly one value — RequireEnv's own current setting — so no
+// connection-string-derived value can reach it: there is no argument
+// position for one to occupy, extending the same discipline
+// unparseableURLMsg uses for the parse-failure branch.
+func escalationPreamble() string {
+	return fmt.Sprintf("escalation is on (%s=%q), so this test cannot be skipped", RequireEnv, os.Getenv(RequireEnv))
+}
 
 // unparseableURLMsg is the entire message emitted when URLEnv is set but its
 // value cannot be parsed as a PostgreSQL connection string. It takes no
@@ -90,7 +108,7 @@ func Pool(t *testing.T) *pgxpool.Pool {
 	dsn := os.Getenv(URLEnv)
 	if dsn == "" {
 		if Required() {
-			t.Fatalf("%s is not set, and %s is set: escalation is on, so this test cannot be skipped for a missing database URL", URLEnv, RequireEnv)
+			t.Fatalf("%s: %s is not set — export it, or run make up and export the compose DSN", escalationPreamble(), URLEnv)
 		}
 		t.Skipf("%s is not set; start postgres and export it to run these tests", URLEnv)
 	}

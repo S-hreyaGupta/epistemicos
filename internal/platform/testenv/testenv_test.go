@@ -1,11 +1,17 @@
+// This file's own tests now touch a database via TestPoolReachesDatabase —
+// D-04's accepted cost (a): testenv is the database helper, so its tests
+// exercising the thing every other package's tests skip or fail against is
+// honest rather than circular.
 package testenv
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestHostFromURL covers the pure host-extraction cases: a full DSN, a DSN
@@ -134,6 +140,55 @@ func TestRequired(t *testing.T) {
 
 			if got := Required(); got != c.want {
 				t.Fatalf("Required() = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+// TestPoolReachesDatabase is the reachability assertion env-preflight exists
+// to run: it calls Pool and then queries through the returned pool, so a
+// discarded-but-successful connection cannot pass this test — only a query
+// that actually returns a row can. This is D-04's reachability assertion:
+// the thing env-preflight runs so that testenv, not migrate, is the first to
+// speak when the database is unreachable. It skips when escalation is off
+// and no database is reachable, and fails naming the cause when escalation
+// is on and it is not — both inherited from Pool's own skip-or-fail
+// decision, exercised here rather than reimplemented.
+func TestPoolReachesDatabase(t *testing.T) {
+	pool := Pool(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var got int
+	if err := pool.QueryRow(ctx, "SELECT 1").Scan(&got); err != nil {
+		t.Fatalf("SELECT 1 through the pool Pool(t) returned: %v", err)
+	}
+	if got != 1 {
+		t.Fatalf("SELECT 1 through the pool Pool(t) returned = %d, want 1", got)
+	}
+}
+
+// TestEscalationPreamble pins escalationPreamble's rendering across the
+// three flag values this plan's failure messages are measured against:
+// make-gate (the caller identity make gate sets), "0" (a value a developer
+// might mistake for "off"), and "1" (a bare manual export). Every case must
+// contain both RequireEnv itself and the value rendered with Go's %q, so a
+// reader can distinguish 0 from "0" from " 0".
+func TestEscalationPreamble(t *testing.T) {
+	cases := []string{"make-gate", "0", "1"}
+
+	for _, value := range cases {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv(RequireEnv, value)
+
+			got := escalationPreamble()
+			if !strings.Contains(got, RequireEnv) {
+				t.Fatalf("escalationPreamble() = %q, want it to contain %s", got, RequireEnv)
+			}
+			want := fmt.Sprintf("%s=%q", RequireEnv, value)
+			if !strings.Contains(got, want) {
+				t.Fatalf("escalationPreamble() = %q, want it to contain %s", got, want)
 			}
 		})
 	}

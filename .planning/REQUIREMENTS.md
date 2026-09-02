@@ -71,6 +71,54 @@ claim that stopped being true the moment the first one was added.
 
   Treated as **one process finding, not four clerical errors** (Alex, 2026-09-01). A phase whose checkpoints change requirements, anchors or dispositions must assume its own governance artifacts have drifted, and check, rather than assume they are current because nobody edited them
 
+  **The four obligations below are part of GOV-01, not of any one phase's plans.**
+  Each currently lives only in a phase `CONTEXT.md`, which means it would not
+  travel if this phase were moved or rescoped — the same way the requirement set
+  itself failed to travel and produced this finding.
+
+  **1. The sweep runs TWICE per phase, not once (D-12).** A **start check** that
+  ROADMAP's requirement set for the phase equals REQUIREMENTS.md's traceability
+  table for that phase, run *before any planner is spawned*; and the **close
+  sweep** over derived artifacts. The first run is non-negotiable, and this
+  milestone is why: ROADMAP listed four Phase 2 requirements while this file
+  already carried ten. That damage lands at phase START — a planner plans against
+  four and silently drops six, GOV-01 itself among them. A closure-only sweep
+  catches it only after the plan is written against the wrong set. This phase's
+  start check was run manually and its correction committed as `788136f`.
+
+  **2. Every phase's first plan carries the start check as a plan precondition
+  (D-13).** The comparison lives in a standalone target — `make planning-parity
+  PHASE=<n>`, backed by `scripts/planning-parity.sh` — because a target travels
+  across phases and a human can run it at any time. The phase's first plan opens
+  with a precondition that invokes it and halts on disagreement, because a target
+  nobody is forced to run is an intention, not a check. The residual cost, stated
+  plainly because it is the part that will be forgotten: **every** phase's first
+  plan must carry it, so Phase 3 repeating it is a template obligation and not
+  something it inherits automatically. This belongs in the requirement precisely
+  because it would otherwise live in whichever plan happened to be first.
+
+  **3. The close sweep's artifact list is DERIVED, not typed (D-14).** The rule:
+  every tracked file under `.planning/` that names this phase number or one of its
+  requirement IDs. Three properties make it the right rule — it is **bounded**, it
+  is **reproducible** (run it twice and get the same list, which is checkable in a
+  way a judgement call is not), and it is **self-extending**, so a new artifact
+  type is covered the day it is created rather than the day someone remembers it.
+  The derivation is also the evidence table's row list: scope and evidence are the
+  same object, so an under-scoped sweep cannot present itself as a thorough one.
+
+  **4. The derivation's coverage bound (D-14, D-15).** Coverage is artifacts that
+  explicitly name the phase or a requirement ID. **Anything else is out of scope by
+  design, not assumed covered.** The bound has to be written down rather than
+  merely observed: tagging `PROJECT.md` closes the instance that was found, but a
+  derivation with an unstated limit lets the ninth untagged artifact escape exactly
+  as `PROJECT.md` did, and nobody learns the mechanism has an edge until it happens
+  again. The measurement that produced this: `PROJECT.md` contained **0** requirement
+  IDs and **0** phase-number mentions, so the derivation would not have caught it —
+  and it is the first instance in this milestone found by a mechanism rather than by
+  accident. Every ID tagged in `PROJECT.md` must exist in the traceability table;
+  `scripts/planning-parity.sh` enforces that, so a typo fails the derivation instead
+  of producing a phantom row that reads exactly like coverage.
+
 ### Gate Proof
 
 - [ ] **PROOF-01**: An automated test proves the gate fails and names `EPISTEMIC_OS_DB_URL` when that variable is unset

@@ -8,7 +8,7 @@ on:
 
 jobs:
   go:
-    name: vet + test + fmt
+    name: make gate
     runs-on: ubuntu-latest
 
     # The 38 store and approved tests connect to a real Postgres. Without this

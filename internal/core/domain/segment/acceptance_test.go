@@ -421,6 +421,18 @@ func TestAC10_ReviewOverlay(t *testing.T) {
 	})
 }
 
+// headingGuardMessage is GATE-09's length guard as a value: the fatal message
+// a test must emit when detectHeadings found nothing, or "" when the slice is
+// safe to index. GATE-09 is a repo-wide rule — no test may index the first
+// heading before proving the slice is non-empty — so a fourth index site
+// added later calls this rather than repeating the check.
+func headingGuardMessage(headings []Heading, fixturePath string) string {
+	if len(headings) == 0 {
+		return fixturePath + ": no headings detected, so the first heading cannot be indexed — the fixture is malformed"
+	}
+	return ""
+}
+
 // TestGATE09_HeadingGuard_Control is the permanent, mutation-free negative
 // proof that headingGuardMessage's branch actually runs against a heading-free
 // input, rather than merely being locatable in the source by line number.
@@ -502,6 +514,9 @@ func TestAC14_PreHeadingContentHasNoNode(t *testing.T) {
 	}
 
 	headings := detectHeadings(md)
+	if msg := headingGuardMessage(headings, "testdata/demo.md"); msg != "" {
+		t.Fatalf("%s", msg)
+	}
 	firstHeading := headings[0].ByteStart
 
 	if firstHeading == 0 {

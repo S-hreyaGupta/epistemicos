@@ -272,17 +272,31 @@ empty string as *absent*, never as a match.
 ## The gate
 
 ```bash
-make gate     # vet -> gofmt -> build -> env-preflight -> migrate -> test
+make up                                                                    # start postgres
+export EPISTEMIC_OS_DB_URL='postgres://epistemicos:epistemicos@127.0.0.1:5432/epistemicos?sslmode=disable'
+make gate                  # vet -> gofmt -> build -> env-preflight -> migrate -> test
 ```
+
+**All three steps are required, in that order.** `make up` starts the database;
+`make gate` requires `EPISTEMIC_OS_DB_URL` and does not infer it from a running
+container. Skipping the export is not a silent failure — the gate stops at
+`env-preflight` and names the variable — but it is the step people miss, because
+`make up` succeeds and gives no hint that anything further is needed.
+
+**Run these in a POSIX shell — Git Bash or WSL on Windows.** GNU Make executes
+recipes through `cmd.exe` on Windows unless `SHELL` is set, and the gate recipe
+uses POSIX shell constructs. In PowerShell or `cmd`, `make gate` fails with
+`'unformatted' is not recognized as an internal or external command` — an error
+that names neither the gate nor the cause. `make up` fails there too.
 
 `gofmt` is enforced rather than advisory. `ci.yml`'s `go` job runs `make gate`
 itself, rather than re-implementing its steps, so this is the single
 definition of the gate — local and CI always run the same recipe.
 
 **`make gate` requires a running database and will not start one.** Run
-`make up` first. A gate that starts its own database can never fail for an
-unreachable one, which would defeat the whole point of a gate that can
-distinguish "tested and passed" from "tested nothing".
+`make up` first, then export the DSN above. A gate that starts its own database
+can never fail for an unreachable one, which would defeat the whole point of a
+gate that can distinguish "tested and passed" from "tested nothing".
 
 **`make gate` applies migrations** to whatever `EPISTEMIC_OS_DB_URL` addresses,
 via its own `migrate` step — this is new as of this phase; earlier, `make gate`

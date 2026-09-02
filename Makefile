@@ -2,8 +2,10 @@
 
 help:
 	@echo "EpistemicOS — common targets"
+	@echo "  (run these in a POSIX shell - Git Bash or WSL on Windows)"
 	@echo ""
 	@echo "  make up          Start postgres via docker-compose"
+	@echo "                   then: export EPISTEMIC_OS_DB_URL=<compose DSN> (see README)"
 	@echo "  make down        Stop docker-compose services"
 	@echo "  make build       Build both binaries"
 	@echo "  make build-api   Build only the API binary"
@@ -25,6 +27,9 @@ up:
 	@echo "Waiting for postgres..."
 	@until docker compose exec -T postgres pg_isready -U epistemicos -d epistemicos > /dev/null 2>&1; do sleep 1; done
 	@echo "Postgres ready"
+	@echo ""
+	@echo "make gate needs the DSN exported - it does not infer it from a running container:"
+	@echo "  export EPISTEMIC_OS_DB_URL='postgres://epistemicos:epistemicos@127.0.0.1:5432/epistemicos?sslmode=disable'"
 
 down:
 	docker compose down

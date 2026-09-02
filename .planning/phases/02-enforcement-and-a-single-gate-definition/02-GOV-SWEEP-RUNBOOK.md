@@ -752,7 +752,7 @@ grep -qE '^- \[x\] \*\*GOV-01\*\*' .planning/REQUIREMENTS.md || { echo "FAIL: GO
 
 # 8. The parity check passes, and the gate is still green.
 bash scripts/planning-parity.sh 2 > /dev/null 2>&1 || { echo "FAIL: parity check fails at phase close"; exit 1; }
-EPISTEMIC_OS_DB_URL='postgres://epistemicos:epistemicos@localhost:5432/epistemicos?sslmode=disable' \
+EPISTEMIC_OS_DB_URL='postgres://epistemicos:epistemicos@127.0.0.1:5432/epistemicos?sslmode=disable' \
   env -u EPISTEMIC_OS_TEST_REQUIRE_DB -u EPISTEMIC_OS_TEST_MAKE_DEPTH make gate > /tmp/02-05-gate.txt 2>&1 \
   || { echo "FAIL: make gate is not green at phase close"; tail -30 /tmp/02-05-gate.txt; exit 1; }
 

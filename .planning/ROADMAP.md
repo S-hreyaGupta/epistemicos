@@ -80,9 +80,14 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — The shell-out-to-make harness, built as Phase 3's harness: a bounded-recursion subprocess runner that asserts the preflight is voiceless and `make test` prints the lenient-run banner, plus the roadmap note recording the slice taken from PROOF-01/02/03's design question
 - [ ] 02-03-PLAN.md — Collapse the CI `go` job onto `make gate`, bind the compose PostgreSQL to loopback in the file and in the running container, guard the one unguarded heading index, and document the gate and the flag in README
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 02-02-PLAN.md — The shell-out-to-make harness, built as Phase 3's harness: a bounded-recursion subprocess runner that asserts the preflight is voiceless and `make test` prints the lenient-run banner, plus the roadmap note recording the slice taken from PROOF-01/02/03's design question
 - [ ] 02-04-PLAN.md — GOV-01 mechanism: a standalone phase-argument-taking parity check with a Make target, requirement-ID tags on PROJECT.md, and GOV-01's own obligations written into GOV-01's text
+
+  **Why 02-02 and 02-04 moved out of Wave 2.** 02-03 Task 1 destroys and recreates the shared compose `postgres` container; 02-02 Task 3 and 02-04 both run `make gate` against it. No `files_modified` overlap, so the coupling was invisible to both the dependency DAG and the wave guard — it was safe only because `parallelization: false`, which is a trap for whoever flips that flag later. Declaring `depends_on: 02-03` makes the ordering enforced rather than incidental.
 
 **Post-checkpoint** *(NOT a wave — runs after verification, UAT and security sign-off)*
 

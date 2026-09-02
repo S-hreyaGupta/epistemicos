@@ -1,9 +1,31 @@
 ---
 phase: 02-enforcement-and-a-single-gate-definition
-plan: 05
-type: execute
-wave: 3
-depends_on: ["02-01", "02-02", "02-03", "02-04"]
+plan: 05  # logical id unchanged — the sibling plans reference it as 02-05
+type: post-checkpoint
+# NOT a wave plan, and deliberately not named `*-PLAN.md`.
+#
+# GOV-01 requires this sweep to run after UAT and security sign-off. As a Wave 3
+# plan it could not: `/gsd-execute-phase` runs every wave to completion BEFORE
+# verification, UAT and security sign-off happen, so the precondition below could
+# never be satisfied and the sweep would halt on every run — or an executor would
+# quietly weaken it to proceed, which is GOV-01's own failure reproduced inside
+# GOV-01's mechanism.
+#
+# `wave:` and `depends_on:` are removed rather than adjusted, because they would
+# not have helped: phase.cjs:798 computes the effective wave from the depends_on
+# DAG and treats a declared `wave:` that disagrees as a warning, not an override.
+# The only thing that actually removes a file from the wave graph is its name —
+# plan-scan.cjs:141 schedules every file ending `-PLAN.md`. Hence the rename.
+#
+# Position is the mechanism. A `checkpoint:decision` was considered and rejected:
+# it would make the ordering depend on a human confirming the checkpoints ran,
+# which is an assertion that can be given without checking. Being unreachable
+# until the artifacts exist is structural; being asked is not.
+#
+# Run it explicitly, after verification, UAT and security sign-off:
+#   /gsd-execute-plan .planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP-RUNBOOK.md
+runs_after: [verification, uat, security-signoff]
+supersedes: 02-05-PLAN.md
 files_modified:
   - .planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP.md
   - .planning/ROADMAP.md
@@ -242,7 +264,69 @@ The full six-item accounting and its Stage 1 / Stage 2 arithmetic are in
 <task type="auto">
   <name>Task 1: Derive the artifact list mechanically, and prove the derivation reproduces</name>
 
-  <precondition>Every other plan in this phase has landed and the phase's closing checkpoints have run. Assert, before deriving anything: `02-01-SUMMARY.md`, `02-02-SUMMARY.md`, `02-03-SUMMARY.md` and `02-04-SUMMARY.md` all exist in the phase directory; a `*-VERIFICATION.md` for phase 02 exists; a `*-UAT.md` for phase 02 exists; and a `*-SECURITY.md` for phase 02 exists and is signed. If any is missing, HALT — D-16 places this sweep after UAT and security sign-off precisely because three of GOV-01's four instances were created at those checkpoints, and a sweep run before them checks the wrong state and reports current what is about to go stale.</precondition>
+  <precondition>
+The checkpoints must be verified to have **completed**, mechanically, from the
+artifacts they leave behind — not from anyone saying they ran, and not from a file
+merely existing. An empty or in-progress `02-UAT.md` satisfies "a UAT file exists";
+it does not satisfy "UAT completed". Run this block and HALT on the first failure:
+
+```bash
+set -o pipefail
+cd "$(git rev-parse --show-toplevel)"
+D=.planning/phases/02-enforcement-and-a-single-gate-definition
+
+fm() { awk 'NR==1&&/^---/{f=1;next} f&&/^---/{exit} f' "$1" | grep -E "^$2:" | head -1 | sed "s/^$2:[[:space:]]*//" | tr -d '"'"'"'\r'; }
+
+# 1. All four wave plans landed. A SUMMARY is the completion record.
+for n in 01 02 03 04; do
+  [ -f "$D/02-$n-SUMMARY.md" ] || { echo "HALT: 02-$n has no SUMMARY — the phase has not finished executing"; exit 1; }
+done
+
+# 2. Each checkpoint artifact exists, is COMMITTED (not a hand-made working-tree
+#    file), and its own frontmatter records a completed state. The status value is
+#    the checkpoint's own machine-readable verdict; it is what distinguishes
+#    "ran and passed" from "opened and abandoned".
+V="$D/02-VERIFICATION.md"; U="$D/02-UAT.md"; S="$D/02-SECURITY.md"
+for f in "$V" "$U" "$S"; do
+  [ -f "$f" ] || { echo "HALT: missing $f — a closing checkpoint has not run"; exit 1; }
+  git ls-files --error-unmatch "$f" >/dev/null 2>&1 || { echo "HALT: $f is untracked — an uncommitted checkpoint artifact is not a checkpoint"; exit 1; }
+done
+
+[ "$(fm "$V" status)" = "passed" ]   || { echo "HALT: verification status is '$(fm "$V" status)', expected 'passed'"; exit 1; }
+[ "$(fm "$U" status)" = "complete" ] || { echo "HALT: UAT status is '$(fm "$U" status)', expected 'complete'"; exit 1; }
+[ "$(fm "$S" status)" = "verified" ] || { echo "HALT: security status is '$(fm "$S" status)', expected 'verified'"; exit 1; }
+[ "$(fm "$S" threats_open)" = "0" ]  || { echo "HALT: security sign-off reports $(fm "$S" threats_open) open threats at or above the blocking threshold"; exit 1; }
+
+# 3. ORDERING, proven from git ancestry rather than assumed from position on disk.
+#    Each checkpoint artifact's latest commit must be a descendant of the commit
+#    that landed the last plan SUMMARY. This is what makes "after execution" a
+#    measured fact: a checkpoint file written before the plans landed, or restored
+#    from an earlier branch, fails here even though it exists and says 'passed'.
+LAST_SUMMARY=""
+for n in 01 02 03 04; do
+  C=$(git log -1 --format=%H -- "$D/02-$n-SUMMARY.md")
+  [ -n "$C" ] || { echo "HALT: 02-$n-SUMMARY.md is not committed"; exit 1; }
+  if [ -z "$LAST_SUMMARY" ] || git merge-base --is-ancestor "$LAST_SUMMARY" "$C"; then LAST_SUMMARY="$C"; fi
+done
+for f in "$V" "$U" "$S"; do
+  C=$(git log -1 --format=%H -- "$f")
+  git merge-base --is-ancestor "$LAST_SUMMARY" "$C" || { echo "HALT: $f was last written at $C, which is not a descendant of the final plan SUMMARY at $LAST_SUMMARY — this checkpoint did not run after the phase executed, so it checked a state that no longer exists"; exit 1; }
+done
+
+echo "PRECONDITION OK: four SUMMARYs landed; verification passed, UAT complete, security verified with 0 open threats; all three checkpoints commit-after the final SUMMARY."
+```
+
+D-16 places this sweep after UAT and security sign-off precisely because three of
+GOV-01's four instances were created *at* those checkpoints. A sweep run before
+them checks the wrong state and reports current what is about to go stale — which
+is the finding, not a scheduling detail.
+
+Note what this block does **not** do: it does not ask whether the checkpoints ran.
+Every assertion above is derived from an artifact's own frontmatter or from git
+ancestry. That is deliberate. The reason this runbook was lifted out of the wave
+graph is that its ordering must not rest on a claim; a precondition that accepted
+one would have put the claim back.
+  </precondition>
 
   <files>.planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP.md</files>
 
@@ -635,10 +719,13 @@ grep -qi 'terminat' "$S" || { echo "FAIL: the termination argument is not stated
 grep -qi 'halt' "$S" || { echo "FAIL: D-18's halt case is not addressed"; exit 1; }
 
 # 3. No requirement was added. This is the halt case asserted, not assumed.
+# The set is 16, counted two independent ways. Assert the two agree before
+# asserting the pinned number: they must agree by construction, and an earlier
+# draft asserted 16 here and 12 one line below for the same set.
 T=$(awk '/^\| Requirement \| Phase \| Status \|/,/^$/' .planning/REQUIREMENTS.md | grep -cE '^\| [A-Z]+-[0-9]{2} \|')
-[ "$T" -eq 16 ] || { echo "FAIL: traceability row count is $T, expected 16 — a requirement was added; that is a HALT, not a completed sweep"; exit 1; }
 N=$(grep -cE '^- \[[ x]\] \*\*[A-Z]+-[0-9]{2}\*\*' .planning/REQUIREMENTS.md)
-[ "$N" -eq 12 ] || { echo "FAIL: requirement entry count is $N, expected 12"; exit 1; }
+[ "$N" -eq "$T" ] || { echo "FAIL: $N requirement entries but $T traceability rows — the two representations disagree"; exit 1; }
+[ "$T" -eq 16 ] || { echo "FAIL: requirement count is $T, expected 16 — a requirement was added; that is a HALT, not a completed sweep"; exit 1; }
 
 # 4. All three carried probe rows are disposed, none silently dropped.
 for e in E1 E11 E12; do
@@ -741,7 +828,7 @@ ASVS L1; `security_block_on: high`. Severity is impact × likelihood.
 - The confirmed-current rows are present and are the proof the sweep covered what it did not change (D-17).
 - The sweep re-armed where a correction changed a set, anchor or disposition, and terminated on a pass producing zero corrections, with the termination argument recorded (D-18).
 - The halt case is addressed, and the requirement set is asserted unchanged by counting entries and traceability rows (D-18).
-- The sweep ran after every other plan and after UAT and security sign-off, enforced by this plan's precondition (D-16).
+- The sweep ran after every other plan and after UAT and security sign-off, enforced structurally (it is outside the wave graph, so `/gsd-execute-phase` cannot run it early) and confirmed mechanically by this runbook's precondition, which reads the checkpoints' own frontmatter verdicts and their git ancestry rather than accepting that they ran (D-16).
 - This plan wrote no code (D-16).
 - All three carried probe rows and all five queued contract decisions are dispositioned, none dropped.
 </verification>

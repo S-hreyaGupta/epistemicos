@@ -71,7 +71,7 @@ Plans:
   10. `docker-compose.yml` binds PostgreSQL to loopback only — `"127.0.0.1:5432:5432"`, not `"5432:5432"` (SEC-01)
   11. Before this phase closes, a post-checkpoint stale-artifact sweep has revalidated ROADMAP, the adjudications, VERIFICATION and REQUIREMENTS against the phase's final requirement set, evidence, anchors and dispositions — each confirmed current or corrected on the record (GOV-01)
 
-**Plans**: 5 plans
+**Plans**: 4 wave plans + 1 post-checkpoint runbook
 
 Plans:
 **Wave 1**
@@ -84,9 +84,15 @@ Plans:
 - [ ] 02-03-PLAN.md — Collapse the CI `go` job onto `make gate`, bind the compose PostgreSQL to loopback in the file and in the running container, guard the one unguarded heading index, and document the gate and the flag in README
 - [ ] 02-04-PLAN.md — GOV-01 mechanism: a standalone phase-argument-taking parity check with a Make target, requirement-ID tags on PROJECT.md, and GOV-01's own obligations written into GOV-01's text
 
-**Wave 3** *(blocked on Wave 2 completion)*
+**Post-checkpoint** *(NOT a wave — runs after verification, UAT and security sign-off)*
 
-- [ ] 02-05-PLAN.md — GOV-01 close sweep, code-free and last: derive the artifact list mechanically, revalidate every derived artifact with a per-artifact confirmed-current or corrected verdict, re-arm until a pass produces zero corrections, and halt rather than add a requirement
+- [ ] 02-GOV-SWEEP-RUNBOOK.md (logical id 02-05) — GOV-01 close sweep, code-free and last: derive the artifact list mechanically, revalidate every derived artifact with a per-artifact confirmed-current or corrected verdict, re-arm until a pass produces zero corrections, and halt rather than add a requirement
+
+  **Why it is not Wave 3.** GOV-01 requires the sweep to run *after* UAT and security sign-off, but `/gsd-execute-phase` runs every wave to completion *before* those checkpoints happen — so as a Wave 3 plan its precondition could never be satisfied, and it would halt on every run or be quietly weakened to proceed. The second outcome is GOV-01's own failure reproduced inside GOV-01's mechanism. Removing `wave:`/`depends_on:` would not have helped: the effective wave is computed from the `depends_on` DAG and a disagreeing `wave:` is only a warning. What actually removes a file from the wave graph is its **name** — every file ending `-PLAN.md` is scheduled — hence the rename. Measured after the change: the phase's wave graph is `{1: [02-01], 2: [02-02, 02-03, 02-04]}`, with no warnings.
+
+  **Invoke explicitly** once the checkpoints have landed:
+  `/gsd-execute-plan .planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP-RUNBOOK.md`
+  Its precondition verifies the checkpoints **completed** mechanically — each artifact's own frontmatter verdict (`verification: passed`, `uat: complete`, `security: verified` with `threats_open: 0`) plus git ancestry proving each was written after the final plan SUMMARY. It never asks whether they ran.
 
 ### Phase 3: Automated Proof
 

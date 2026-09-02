@@ -217,3 +217,10 @@ None — no external service configuration required.
 ---
 *Phase: 02-enforcement-and-a-single-gate-definition*
 *Completed: 2026-09-02*
+
+## Self-Check: PASSED
+
+All three declared files (`internal/platform/testenv/testenv.go`,
+`internal/platform/testenv/testenv_test.go`, `Makefile`) and this SUMMARY.md
+exist on disk. All six commit hashes (`18624fc`, `65fb8c0`, `e8faa6a`,
+`190c125`, `faad2ef`, `54924bc`) are present in `git log --oneline --all`.

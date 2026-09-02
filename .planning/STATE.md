@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 2
 current_phase_name: Enforcement and a Single Gate Definition
 status: planning
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-09-02T06:50:58.380Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-09-02T07:09:58.259Z"
 last_activity: 2026-09-02
 last_activity_desc: Phase 01 complete, transitioned to Phase 2
-state_head: a122d3e44b42048ae5424afb4ea8980d8e0587af
+state_head: 9a1b85207c8b053bdbd3b803f03cdcc39ff051d0
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 7
-  completed_plans: 4
+  completed_plans: 5
   percent: 33
 ---
 
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 ## Current Position
 
 Phase: 2 (Enforcement and a Single Gate Definition) — IN PROGRESS
-Plan: 1 of 4 wave plans complete (02-01 done; 02-02, 02-03, 02-04 remaining; post-checkpoint 02-GOV-SWEEP-RUNBOOK not yet eligible)
-Status: 02-01 (Enforcement core) executed and committed — ready for wave 2 (02-03), then wave 3 (02-02, 02-04)
+Plan: 2 of 4 wave plans complete (02-01, 02-03 done; 02-02, 02-04 remaining; post-checkpoint 02-GOV-SWEEP-RUNBOOK not yet eligible)
+Status: 02-03 (CI collapse, SEC-01 loopback bind, GATE-09 heading guard, GATE-08 README) executed and committed — ready for the remaining wave-2 plans (02-02, 02-04)
 Total Plans in Phase: 4 wave plans + 1 post-checkpoint runbook
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
 Plan bytes: `8edae22` — freeze: `c96ecb2`
-Last activity: 2026-09-02 — 02-01-PLAN.md executed (3 tasks, 6 commits, SUMMARY committed at `a122d3e`)
+Last activity: 2026-09-02 — 02-03-PLAN.md executed (3 tasks, 5 commits, SUMMARY committed at `9a1b852`); compose postgres left up and healthy on 127.0.0.1:5432
 
 Progress: [███░░░░░░░] 33%
 
@@ -65,6 +65,7 @@ Progress: [███░░░░░░░] 33%
 | Phase 01 P01 | 48min | 3 tasks | 8 files |
 | Phase 01 P03 | 62min | 3 tasks | 1 files |
 | Phase 02 P01 | 21 min | 3 tasks | 3 files |
+| Phase 02 P03 | 7 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,9 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-03: make was not installed on this host and the plan's own execution_shell.verified_present list never checked for it, despite 29+ commands depending on it. Execution halted; operator Alex approved and performed the install (GNU Make 4.4.1 / ezwinports.make); execution resumed with no plan/manifest edits. — Recorded for end-of-phase disposition as a planning-process gap, not fixed by editing the frozen plan.
 - [Phase 2]: [Phase 02] 02-01: testenv.RequireEnv renamed to EPISTEMIC_OS_TEST_REQUIRE_ENV (identifier unchanged); escalationPreamble() is the one message builder all three escalated t.Fatalf sites use; renameTripwireMsg() permanently guards the old EPISTEMIC_OS_TEST_REQUIRE_DB name, checked first in both Pool and Fixture.
 - [Phase 2]: [Phase 02] 02-01: make gate reshaped to vet -> gofmt -> build -> $(MAKE) env-preflight -> $(MAKE) migrate -> $(MAKE) test, target-scoped export EPISTEMIC_OS_TEST_REQUIRE_ENV=make-gate on the gate target (D-11) — measured to override a conflicting caller-set value, which corrected Task 2 step 5a's verify-script literal from gate03 to make-gate (see 02-01-SUMMARY.md Deviations).
+- [Phase 2]: [Phase 02] 02-03: docker-compose.yml postgres bound to 127.0.0.1:5432:5432 (declared and live, container recreated) closing AR-02/T-01-11; ci.yml go job collapsed to a single make gate step, preserving services: postgres and job-level EPISTEMIC_OS_DB_URL (CI-01).
+- [Phase 2]: [Phase 02] 02-03: headingGuardMessage(headings, fixturePath) added as GATE-09's length guard, wired at acceptance_test.go's one unguarded headings[0] index; TestGATE09_HeadingGuard_Control proves the branch executes (11 subtests) with a negative control that defeats the guard in a throwaway git-archive copy and requires the control to then fail. fixtureHasPreamble remains the package's only declaration mechanism.
+- [Phase 2]: [Phase 02] 02-03: plan verify-script literal corrected — the fixtureHasPreamble declaration-count regex did not account for the const keyword prefix (const fixtureHasPreamble = true); corrected to ^[[:space:]]*(const|var)[[:space:]]+fixtureHasPreamble[[:space:]]*= , same substance, no code change.
 
 ### Pending Todos
 
@@ -112,8 +116,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-02T06:50:44.762Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-09-02T07:09:58.145Z
+Stopped at: Completed 02-03-PLAN.md
 
 What changed, and the evidence that closed it:
 

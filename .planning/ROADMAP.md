@@ -80,7 +80,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-03-PLAN.md — Collapse the CI `go` job onto `make gate`, bind the compose PostgreSQL to loopback in the file and in the running container, guard the one unguarded heading index, and document the gate and the flag in README
+- [x] 02-03-PLAN.md — Collapse the CI `go` job onto `make gate`, bind the compose PostgreSQL to loopback in the file and in the running container, guard the one unguarded heading index, and document the gate and the flag in README
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -126,5 +126,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Escalation Mechanism and Fixture Invariant | 3/3 | Complete    | 2026-09-01 |
-| 2. Enforcement and a Single Gate Definition | 1/4 | In Progress|  |
+| 2. Enforcement and a Single Gate Definition | 2/4 | In Progress|  |
 | 3. Automated Proof | 0/TBD | Not started | - |

@@ -421,6 +421,76 @@ func TestAC10_ReviewOverlay(t *testing.T) {
 	})
 }
 
+// TestGATE09_HeadingGuard_Control is the permanent, mutation-free negative
+// proof that headingGuardMessage's branch actually runs against a heading-free
+// input, rather than merely being locatable in the source by line number.
+// Modelled on TestPreambleInvariant_Control's pattern (fixture_test.go): drive
+// the real function with synthetic inputs, never mutate a tracked file.
+//
+// Part A proves each synthetic input really does reach the dangerous
+// zero-heading state before trusting anything the guard says about it. Part B
+// runs the exact detectHeadings -> headingGuardMessage -> index sequence AC-14
+// runs, under recover(), so a removed guard is caught as a failure rather than
+// aborting the test binary. Part C is a positive case, so the guard is proven
+// not to refuse everything.
+func TestGATE09_HeadingGuard_Control(t *testing.T) {
+	headingFreeInputs := map[string][]byte{
+		"empty document":                []byte(""),
+		"prose with no hash at all":     []byte("Just some prose. No markers here.\nMore prose.\n"),
+		"whitespace only":               []byte("   \n\t\n  \n"),
+		"hash not at line start":        []byte("text # not a heading\nmore text\n"),
+		"fenced code block with a hash": []byte("```\n# looks like a heading but is inside a fence\n```\n"),
+	}
+
+	for name, input := range headingFreeInputs {
+		input := input
+		t.Run(name, func(t *testing.T) {
+			// Part A — the input really does reach the dangerous state.
+			headings := detectHeadings(input)
+			if len(headings) != 0 {
+				t.Fatalf("test input %q produced %d headings, want 0 — this input does not exercise the guard", name, len(headings))
+			}
+
+			msg := headingGuardMessage(headings, "testdata/demo.md")
+			if msg == "" {
+				t.Fatalf("expected the guard to fire for heading-free input %q, got empty message", name)
+			}
+			if !strings.Contains(msg, "testdata/demo.md") {
+				t.Fatalf("guard message %q does not name the fixture", msg)
+			}
+
+			// Part B — the exact guarded sequence AC-14 runs does not panic.
+			t.Run("does not panic", func(t *testing.T) {
+				defer func() {
+					if r := recover(); r != nil {
+						t.Fatalf("guarded sequence panicked on a heading-free input: %v", r)
+					}
+				}()
+
+				headings := detectHeadings(input)
+				if msg := headingGuardMessage(headings, "testdata/demo.md"); msg != "" {
+					return
+				}
+				_ = headings[0].ByteStart
+			})
+		})
+	}
+
+	t.Run("positive case: a real heading", func(t *testing.T) {
+		input := []byte("preamble text\n# A Real Heading\nbody\n")
+		headings := detectHeadings(input)
+		if len(headings) == 0 {
+			t.Fatal("test input has a real heading but detectHeadings found none")
+		}
+		msg := headingGuardMessage(headings, "testdata/demo.md")
+		if msg != "" {
+			t.Fatalf("expected the empty string for input with a real heading, got %q", msg)
+		}
+		// Indexing succeeds — the guard did not refuse everything.
+		_ = headings[0].ByteStart
+	})
+}
+
 // AC-14 — pre-heading content produces no node, and no node's span reaches back
 // into it.
 func TestAC14_PreHeadingContentHasNoNode(t *testing.T) {

@@ -108,12 +108,12 @@ environment where that variable is set. How that is arranged is an open design q
 
 | Decision | Rationale | Outcome | Requirements |
 |----------|-----------|---------|--------------|
-| Only environment skips fail the gate | A test declining because the fixture has no preamble is real signal; conflating it with "no database" would make the gate noisy and teach people to ignore it | — Pending | GATE-04 |
-| Hard fail with no exception | An opt-out target would recreate the ambiguity between "tested and passed" and "tested nothing" under a different name | — Pending | GATE-01, GATE-02, GATE-03 |
-| CI provisions Postgres in this milestone | A hard-failing gate turns CI red immediately; the change cannot land without it | — Pending | CI-01 |
-| `ci.yml` calls `make gate` | One definition of the gate cannot drift from itself | — Pending | CI-02 |
-| Prove the gate with automated negative tests | A manual checklist decays as the code changes; the gate's own behavior should be covered by the suite | — Pending | PROOF-01, PROOF-02, PROOF-03 |
-| Scope limited to the gate | Ingest, section map, and citation are verified *through* the gate, so the gate has to be trustworthy first | — Pending | no requirement — milestone-scope statement, not a requirement |
+| Only environment skips fail the gate | A test declining because the fixture has no preamble is real signal; conflating it with "no database" would make the gate noisy and teach people to ignore it | **Done** (Phase 1, `TestFixtureIntegrity`) | GATE-04 |
+| Hard fail with no exception | An opt-out target would recreate the ambiguity between "tested and passed" and "tested nothing" under a different name | **Done** (Phase 2 02-01, `a527644`) | GATE-01, GATE-02, GATE-03 |
+| CI provisions Postgres in this milestone | A hard-failing gate turns CI red immediately; the change cannot land without it | **Done** (`868d45b`, preserved through Phase 2's collapse) | CI-01 |
+| `ci.yml` calls `make gate` | One definition of the gate cannot drift from itself | **Done** (Phase 2 02-03, `a527644`) | CI-02 |
+| Prove the gate with automated negative tests | A manual checklist decays as the code changes; the gate's own behavior should be covered by the suite | — Pending (Phase 3) | PROOF-01, PROOF-02, PROOF-03 |
+| Scope limited to the gate | Ingest, section map, and citation are verified *through* the gate, so the gate has to be trustworthy first | — Pending (milestone-scope statement; closes with the milestone, not a phase) | no requirement — milestone-scope statement, not a requirement |
 
 ## Evolution
 

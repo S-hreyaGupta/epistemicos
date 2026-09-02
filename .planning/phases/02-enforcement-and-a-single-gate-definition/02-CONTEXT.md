@@ -1,7 +1,11 @@
 # Phase 2: Enforcement and a Single Gate Definition - Context
 
 **Gathered:** 2026-09-01
-**Status:** Ready for planning
+**Status:** Superseded by execution — this phase's four wave plans, verification, UAT
+and security sign-off all landed 2026-09-02; the requirement content below is a
+historical planning-time record, not a live "ready to plan" flag. (Corrected by the
+GOV-01 close sweep, `02-GOV-SWEEP.md` — a wording-only correction; the decisions
+below were re-checked against final execution and are unchanged.)
 
 > **`workflow.research` is `false`.** No researcher runs between this document and
 > `gsd-planner`. The decisions below are final and are the planner's only briefing.

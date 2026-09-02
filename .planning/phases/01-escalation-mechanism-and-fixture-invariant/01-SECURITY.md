@@ -163,3 +163,37 @@ of user and database name on both paths, password 0.
 gsd-security-auditor (opus, ASVS L1, `block_on: high`); all three accepted risks reviewed
 against their frozen originals and signed; AR-02 additionally carries a scheduled remedy
 (SEC-01, Phase 2) rather than standing as an indefinite acceptance.
+
+---
+
+## Post-execution correction (GOV-01 close sweep, Phase 2, 2026-09-02)
+
+Appended by `02-GOV-SWEEP.md`. Not a rewrite — this file is Phase 1's signed record and
+stands exactly as verified above; this section adds what a later measurement found. Same
+disposition pattern as `01-VERIFICATION.md`'s and `01-REVIEW-ADJUDICATION.md`'s own
+appended self-corrections: the frozen text is not edited, the correction is recorded
+alongside it.
+
+**AR-02 and T-01-11 are CLOSED.** AR-02's row above (and the Threat Register's T-01-11
+row) say the acceptance "stands only until SEC-01 lands" / "stays open until it lands."
+**SEC-01 landed at `a527644`** (Phase 2, plan 02-03), re-measured live by Phase 2's own
+security audit: `docker-compose.yml:13` declares `127.0.0.1:5432:5432`, and the running
+container reports `127.0.0.1:5432->5432/tcp` with no `0.0.0.0` and no `[::]` mapping. Both
+AR-02 and T-01-11 are recorded CLOSED in `02-SECURITY.md`'s own Accepted Risks Log
+("RESOLVED — retired, not carried forward") and Verification Notes ("T-01-11 is CLOSED as
+of this audit — the same evidence that resolves AR-02 closes it"). This file's AR-02 row
+and T-01-11 threat-register row are therefore stale as written above; this note is their
+correction of record.
+
+**AR-01's stated containment boundary is now true, not false.** AR-01's frozen rationale
+accepted the disclosure "for a test-only helper against a **loopback compose service**" —
+a premise measured FALSE at the time this file was signed (the service bound `0.0.0.0`).
+SEC-01 makes that premise TRUE: the compose PostgreSQL is now loopback-only, measured live.
+The residual disclosure AR-01 accepts (DSN user and database name on the unreachable-`Ping`
+path) is unchanged and remains accepted on its own terms — this correction is about the
+premise the acceptance was reasoned from becoming true, which is still a change of state
+requiring its own verdict rather than a silent non-event.
+
+**Classification (D-18):** disposition — this changes what is asserted about two accepted
+risks' current status, not their rationale or their requirement mapping. Re-arms the sweep
+per D-18; see `02-GOV-SWEEP.md`'s re-arm log.

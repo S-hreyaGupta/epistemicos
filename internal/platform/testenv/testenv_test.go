@@ -194,6 +194,79 @@ func TestEscalationPreamble(t *testing.T) {
 	}
 }
 
+// TestRenameTripwireMsg drives renameTripwireMsg directly with synthetic
+// arguments rather than through the environment — the preambleInvariant
+// pattern Phase 1 established — over all four combinations of {legacy set,
+// legacy unset} x {current set, current unset}. Only the legacy-set,
+// current-unset combination is non-empty. The final row proves the
+// no-interpolation property behaviorally: a distinctive token placed in the
+// legacyValue position must not appear in the returned message.
+func TestRenameTripwireMsg(t *testing.T) {
+	cases := []struct {
+		name        string
+		legacy      string
+		current     string
+		wantEmpty   bool
+		wantContain []string
+		wantAbsent  string
+	}{
+		{name: "both unset", legacy: "", current: "", wantEmpty: true},
+		{name: "legacy unset, current set", legacy: "", current: "make-gate", wantEmpty: true},
+		{name: "both set", legacy: "1", current: "make-gate", wantEmpty: true},
+		{
+			name:        "legacy set, current unset",
+			legacy:      "1",
+			current:     "",
+			wantEmpty:   false,
+			wantContain: []string{legacyRequireEnv, RequireEnv},
+		},
+		{
+			name:       "legacy set, current unset: legacyValue is never interpolated",
+			legacy:     "DSNLEAKCANARY",
+			current:    "",
+			wantEmpty:  false,
+			wantAbsent: "DSNLEAKCANARY",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := renameTripwireMsg(c.legacy, c.current)
+			if c.wantEmpty {
+				if got != "" {
+					t.Fatalf("renameTripwireMsg(%q, %q) = %q, want empty", c.legacy, c.current, got)
+				}
+				return
+			}
+			if got == "" {
+				t.Fatalf("renameTripwireMsg(%q, %q) = %q, want non-empty", c.legacy, c.current, got)
+			}
+			for _, want := range c.wantContain {
+				if !strings.Contains(got, want) {
+					t.Fatalf("renameTripwireMsg(%q, %q) = %q, want it to contain %q", c.legacy, c.current, got, want)
+				}
+			}
+			if c.wantAbsent != "" && strings.Contains(got, c.wantAbsent) {
+				t.Fatalf("renameTripwireMsg(%q, %q) = %q leaked its legacyValue argument %q", c.legacy, c.current, got, c.wantAbsent)
+			}
+		})
+	}
+}
+
+// TestRenameTripwireMsg_Control_DetectsTheTripwireCase is the two-step
+// negative control this file already uses twice: first assert the empty
+// result for a combination that must not trip, then assert the non-empty
+// result for the combination that must — so the assertion is demonstrated
+// able to distinguish the two rather than merely never failing.
+func TestRenameTripwireMsg_Control_DetectsTheTripwireCase(t *testing.T) {
+	if got := renameTripwireMsg("1", "make-gate"); got != "" {
+		t.Fatalf("negative control broken: renameTripwireMsg(%q, %q) = %q, want empty (both set must not trip)", "1", "make-gate", got)
+	}
+	if got := renameTripwireMsg("1", ""); got == "" {
+		t.Fatalf("negative control broken: renameTripwireMsg(%q, %q) = empty, want non-empty (legacy set/current unset must trip)", "1", "")
+	}
+}
+
 // TestFixture_SuccessPath covers only the non-escalated success case:
 // reading a file that exists returns its exact bytes. The skip and fail
 // branches are not asserted from inside a test — driving a testing.T from

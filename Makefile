@@ -8,8 +8,10 @@ help:
 	@echo "  make build       Build both binaries"
 	@echo "  make build-api   Build only the API binary"
 	@echo "  make build-cli   Build only the CLI binary"
-	@echo "  make test        Go tests"
-	@echo "  make gate        Full static gate: vet + gofmt + build + test"
+	@echo "  make test        Go tests (lenient: an environment skip stays a skip)"
+	@echo "  make gate        vet + gofmt + build + env-preflight + migrate + test;"
+	@echo "                   REQUIRES a running database and will not start one"
+	@echo "  make env-preflight  Fast check that the database and fixture prerequisites are met"
 	@echo "  make migrate     Apply DB migrations"
 	@echo "  make fmt         Format code"
 	@echo "  make vet         Run go vet"
@@ -32,7 +34,11 @@ build-api:
 build-cli:
 	go build -o bin/epistemicos-cli ./cmd/epistemicos-cli
 
+# The banner is asserted from internal/platform/gate (built in 02-02) so it
+# cannot be quietly dropped when someone tidies the Makefile — a banner
+# nobody checks is a claim that cannot come back false (D-05).
 test:
+	@echo "make test is the lenient run: an environment skip stays a skip, so a suite that tested nothing still reports ok. make gate is the run that proves anything."
 	go test ./... -count=1
 
 # env-preflight reaches testenv.Pool's escalated path before migrate can run,

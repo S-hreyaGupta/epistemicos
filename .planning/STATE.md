@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 current_phase: 2
 current_phase_name: Enforcement and a Single Gate Definition
-status: planning
-stopped_at: Completed 02-02-PLAN.md
+status: executing
+stopped_at: All 4 wave plans complete (02-01, 02-02, 02-03, 02-04). Phase checkpoints NOT run: verification, UAT, security sign-off still outstanding, then the GOV-01 sweep by path.
 last_updated: "2026-09-02T07:44:58.612Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 01 complete, transitioned to Phase 2
-state_head: bf4e0c37c122f99943e71efc4652e1653662b638
+last_activity_desc: Phase 2 wave execution complete — 02-04 finished inline after two executor stalls
+state_head: 46d587e78c355818a4cf1abd89151b655449cead
 progress:
   total_phases: 3
   completed_phases: 1
@@ -27,13 +27,15 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 
 ## Current Position
 
-Phase: 2 (Enforcement and a Single Gate Definition) — IN PROGRESS
-Plan: 3 of 4 wave plans complete (02-01, 02-03 done; 02-02, 02-04 remaining; post-checkpoint 02-GOV-SWEEP-RUNBOOK not yet eligible)
-Status: 02-03 (CI collapse, SEC-01 loopback bind, GATE-09 heading guard, GATE-08 README) executed and committed — ready for the remaining wave-2 plans (02-02, 02-04)
+Phase: 2 (Enforcement and a Single Gate Definition) — WAVES COMPLETE, CHECKPOINTS NOT RUN
+Plan: 4 of 4 wave plans complete — 02-01 (`8a23cb6`), 02-03 (`9917290`), 02-02 (`2d52a1e`), 02-04 (`46d587e`). All four SUMMARYs committed.
+Status: Executing — wave execution finished; verification, UAT and security sign-off have NOT run, and the post-checkpoint GOV-01 sweep is not yet eligible. The phase is NOT complete.
 Total Plans in Phase: 4 wave plans + 1 post-checkpoint runbook
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
 Plan bytes: `8edae22` — freeze: `c96ecb2`
-Last activity: 2026-09-02 — 02-03-PLAN.md executed (3 tasks, 5 commits, SUMMARY committed at `9a1b852`); compose postgres left up and healthy on 127.0.0.1:5432
+Last activity: 2026-09-02 — 02-04 completed inline (3 tasks: `a44b040`, `18c94f6`, `18453ce`; SUMMARY `46d587e`) after two executor subagents were killed by the stall watchdog. Compose postgres up and healthy, bound to `127.0.0.1:5432` only.
+
+**This file's accuracy has a known expiry — see `02-FINDING-01-state-authority.md`.** It has many writers and no owner: it was hand-corrected at `20bd4ce`, then rewritten by the 02-01, 02-03 and 02-02 executors, and was stale again by `2d52a1e` (`status: planning` with three plans executed; a body whose count and list contradicted each other). This correction carries the same expiry. GOV-01's close sweep cannot fix it durably, because the next executor write supersedes the sweep's correction.
 
 Progress: [███░░░░░░░] 33%
 
@@ -116,6 +118,28 @@ Items acknowledged and deferred at milestone close, most recent first:
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
 | Test-harness robustness | **AC-14 empty-heading guard — CLOSED 2026-09-01 by Alex.** The entry covered two halves of the heading-free-fixture edge and both now have homes, so it is closed as a backlog item rather than carried. **Half 1, the preamble declaration — closed in Phase 1:** Alex proposed the declaration fix (option C); it landed in 01-02 as the pinned `fixtureHasPreamble` constant, covered by control subtests 1 ("no headings at all") and 6 ("declared preamble-free, but no headings"). **Half 2, the unguarded index — specified as GATE-09 (Phase 2):** `acceptance_test.go:435` indexes `headings[0]` with no emptiness check and panics on a heading-free fixture, aborting the test binary. Alex's acceptance text: *a heading-free fixture MUST produce a normal test failure and MUST NOT panic; no test may index `headings[0]` before proving `len(headings) > 0`.* Length guard only, no second declaration mechanism. **The former "blocks Phase 3" gate is discharged, not dropped:** GATE-09 is a Phase 2 requirement and Phase 2 precedes Phase 3, so the ordering that gate enforced is now structural. GATE-09 is a newly discovered Phase 2 hardening requirement, NOT a retroactive modification of Phase 1's frozen acceptance basis — Phase 1 was contractually forbidden from touching `acceptance_test.go`. | **Closed** — superseded by GATE-09 (Phase 2) | 2026-09-01 (Alex, Phase 1 UAT test 5; closed same day) | Gate milestone |
+
+### Blockers/Concerns — added 2026-09-02
+
+- **FINDING-01: `STATE.md` has many writers and no owner.** Recorded in
+  `.planning/phases/02-enforcement-and-a-single-gate-definition/02-FINDING-01-state-authority.md`.
+  Executors write this file mid-phase, so a hand-correction survives only until the
+  next executor runs. It is NOT an instance of GOV-01 — GOV-01's instances are
+  documents nobody edited that a later decision falsified; this is a document
+  several agents edit and each one only partially. Registering it under GOV-01
+  would put it under a mechanism structurally unable to close it. **Disposition is
+  a human decision and has not been taken** — it would be a new requirement, and
+  GOV-01's own rule is that a pass which would add a requirement halts for a human.
+- **A normalizer that cannot parse keeps the previous value, silently.**
+  `normalizeStateStatus` (`state-document.cjs:387`) maps the body `Status:` line by
+  substring; a line matching none of its keywords yields `unknown`, and
+  `state.cjs:2359-2361` then preserves the old frontmatter value with no warning.
+  That is how `status: planning` survived three executed plans. Same shape as the
+  other defects this week: a check that cannot come back false.
+- **Two executor subagents were killed by the stall watchdog during this phase**
+  (02-02's first dispatch, and 02-04 twice). 02-04 was finished inline. If this
+  recurs, the likely cause is a long output-silent command — the nested-suite tests
+  legitimately take minutes.
 
 ## Session Continuity
 

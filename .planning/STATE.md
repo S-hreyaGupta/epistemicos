@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 current_phase: 2
 current_phase_name: Enforcement and a Single Gate Definition
-status: executing
+status: planning
 stopped_at: Phase 2 planned (5 plans, b5d2410); plan-checker NOT run — three consecutive API failures, deferred to a fresh session
 last_updated: "2026-09-01T17:59:18.884Z"
 last_activity: 2026-09-01
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 
 ## Current Position
 
-Phase: 2 (Enforcement and a Single Gate Definition) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
+Phase: 2 (Enforcement and a Single Gate Definition) — PLANNED, NOT VERIFIED
+Plan: Not started — nothing in Phase 2 has executed
+Status: Planning — the plan-checker gate has not run; the 5 plans are unverified
 Total Plans in Phase: 5
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
 Plan bytes: `8edae22` — freeze: `c96ecb2`
@@ -111,6 +111,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 Last session: 2026-09-01T17:59:18.618Z
 Stopped at: Phase 2 planned (5 plans, b5d2410); plan-checker NOT run — three consecutive API failures, deferred to a fresh session
-Resume with: `/gsd-execute-phase 1`
-Before executing: 01-01 Task 1's `<precondition>` re-runs the same five assertions. It should pass. If it halts, the tree moved — do not re-anchor to make it pass; that is the failure this phase exists to catch.
+Resume with: run the gsd-plan-checker over the five Phase 2 plans at `b5d2410`. Execution is gated on that verdict — do NOT run `/gsd-execute-phase 2` until it returns. There is no standalone checker command: `/gsd-plan-phase 2` sees the existing plans and offers Add / View / Replan, none of which is "verify these", so spawn the checker directly.
 Resume file: .planning/phases/02-enforcement-and-a-single-gate-definition/02-01-PLAN.md

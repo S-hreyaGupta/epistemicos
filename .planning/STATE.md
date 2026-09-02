@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 current_phase: 2
 current_phase_name: Enforcement and a Single Gate Definition
 status: planning
-stopped_at: Phase 2 planned (5 plans, b5d2410); plan-checker NOT run — three consecutive API failures, deferred to a fresh session
+stopped_at: Phase 2 plan-checker RAN 2026-09-02 over the 5 plans at b5d2410 — ISSUES FOUND, 5 blockers + 4 warnings. Plans must be revised before execution.
 last_updated: "2026-09-01T17:59:18.884Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 01 complete, transitioned to Phase 2
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 
 Phase: 2 (Enforcement and a Single Gate Definition) — PLANNED, NOT VERIFIED
 Plan: Not started — nothing in Phase 2 has executed
-Status: Planning — the plan-checker gate has not run; the 5 plans are unverified
+Status: Planning — plan-checker returned ISSUES FOUND (5 blockers, 4 warnings); plans need revision before execution
 Total Plans in Phase: 5
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
 Plan bytes: `8edae22` — freeze: `c96ecb2`
@@ -110,6 +110,17 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-01T17:59:18.618Z
-Stopped at: Phase 2 planned (5 plans, b5d2410); plan-checker NOT run — three consecutive API failures, deferred to a fresh session
-Resume with: run the gsd-plan-checker over the five Phase 2 plans at `b5d2410`. Execution is gated on that verdict — do NOT run `/gsd-execute-phase 2` until it returns. There is no standalone checker command: `/gsd-plan-phase 2` sees the existing plans and offers Add / View / Replan, none of which is "verify these", so spawn the checker directly.
+Stopped at: Phase 2 plan-checker ran 2026-09-02 over the 5 plans at `b5d2410` (the run that died on three API failures on 2026-09-01). Verdict: **ISSUES FOUND — 5 blockers, 4 warnings.** Not executed.
+
+Checker blockers, in the order they must be fixed:
+1. **GATE-03 / criterion 3 has no executable acceptance in any of the five plans.** Nothing ever makes a fixture unreadable. The criterion rests on a grep for `escalationPreamble` in `testenv.go` — a grep for a string the same task just wrote.
+2. **GATE-06 / criterion 6 ("all three escalated paths") is behavioral on two, textual on the third.** Direct consequence of 1.
+3. **GATE-02 / criterion 2 is never run through `make gate`** — only `go test ./internal/adapters/secondary/approved/`, which bypasses the D-03 env-preflight-before-migrate ordering that owns the message in exactly the unreachable case.
+4. **Hard-coded requirement count is wrong: plans assert 12, the file has 16.** `02-04-PLAN.md:627` and `02-05-PLAN.md:641`. Independently re-measured 2026-09-02: 16. Both tasks fail on a correct tree, including 02-05's own scope-change halt guard.
+5. **02-05's precondition cannot be satisfied where it is scheduled.** It requires phase-02 VERIFICATION/UAT/signed-SECURITY, which are produced AFTER all plans execute; 02-05 is Wave 3 *within* the phase. Criterion 11 is unachievable as scheduled — the sweep halts, or an executor quietly weakens the precondition, which is the GOV-01 failure itself. The plan is faithful to D-16; the scheduling is wrong.
+
+Warnings: 02-02 T3 verify step 3 is a bare `echo` presented as an assertion; every phase DSN still says `localhost` after the loopback rebind removes the `[::]` mapping (may resolve ::1 and fail to connect); `DefaultTimeout`/`TimedOut` never exercised; criterion 9's heading-free branch never executed.
+
+Both mandated checks PASSED: SEC-01 recreates the container and asserts the live PORTS cell including the negative half; 02-02's recursion guard is a depth counter set last in child-env construction so `Unset` cannot defeat it, with depth-1 and malformed-marker negative proofs.
+Resume with: revise the five plans against the 5 blockers above, then re-run the checker. Do NOT run `/gsd-execute-phase 2` — the gate returned ISSUES FOUND, not PASSED. Blocker 5 is a scheduling decision, not an edit: it needs a human call on whether the GOV-01 sweep moves out of the wave graph or becomes a checkpoint:decision.
 Resume file: .planning/phases/02-enforcement-and-a-single-gate-definition/02-01-PLAN.md

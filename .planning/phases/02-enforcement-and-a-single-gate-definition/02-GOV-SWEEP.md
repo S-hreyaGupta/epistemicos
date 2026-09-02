@@ -3,7 +3,8 @@ phase: 02-enforcement-and-a-single-gate-definition
 plan: 05
 type: post-checkpoint-sweep
 runbook: 02-GOV-SWEEP-RUNBOOK.md
-status: in-progress
+status: complete
+terminated: 2026-09-02, pass 2, zero corrections
 ---
 
 # GOV-01 Close Sweep

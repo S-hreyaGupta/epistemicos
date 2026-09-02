@@ -82,6 +82,13 @@
 
 ## Fragile Areas
 
+**Agent instrumentation in `.claude/` is unversioned and reverts silently (FINDING-02):**
+- Files: `.claude/gsd-core/workflows/review.md` (review-run archive block), `.claude/gsd-core/bin/lib/state.cjs` (any local guard), `.claude/agents/gsd-executor.md` (the executor contract, incl. the `state.sync` call that fixes FINDING-01)
+- Why fragile: `.gitignore:29` ignores `.claude/`, so every behavioural modification to the agent tooling lives only on disk in one worktree. It is not reviewable, does not survive recreating the worktree, and **`/gsd-update` reverts it silently** — leaving no trace it existed. Three known instances; this is a class, not coincidences.
+- **READ THIS BEFORE CHOOSING A FIX THAT TOUCHES `.claude/`.** It decides the fix's shape, not just its durability: a guard that itself vanishes silently is a fix-shaped object with an undisclosed expiry. FINDING-01's disposition turned on this twice — and there is no fix for FINDING-01 that avoids `.claude/` entirely.
+- Safe modification: any `.claude/` change ships with a durable instruction in the TRACKED planning docs **in the same commit**, stating what changed, where, why, and **how to detect it is gone**. Detection matters more than the instruction — an instruction with no detection assumes the next reader notices something invisible.
+- Full record: `.planning/phases/02-enforcement-and-a-single-gate-definition/02-FINDING-02-gitignored-instrumentation.md`
+
 **Byte Offset Contracts Without Runtime Validation:**
 - Files: `internal/core/domain/segment/node.go:5-27`, all usages in `classify.go` and `overlay.go`
 - Why fragile: Every span computation assumes markdown content matches stored hash, but hash is only verified on read, not on every use. A corrupted or mismatched markdown file causes panics deep in processing

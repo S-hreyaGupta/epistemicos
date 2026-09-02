@@ -122,6 +122,31 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ### Blockers/Concerns — added 2026-09-02
 
+- **ESCALATED TO ALEX — FINDING-01 option 2, a design decision, not a disposition.**
+  Make STATE.md's frontmatter DERIVED rather than authored: anything reconstructible
+  from disk and git (plan/summary pairs, HEAD, counts, phase position) is generated,
+  so a partial writer cannot leave a stale field. The case is sharper than when first
+  proposed — the frontmatter is **already meant to be derived**; the executor path
+  simply never invoked the derivation. Option 2 makes that intent true rather than
+  aspirational. An instance fix landed 2026-09-02 (the executor now calls
+  `state.sync`), but it closes one path, not the class: STATE.md still has many
+  writers, and a writer that forgets the call still leaves the frontmatter stale.
+  **FINDING-01 stays OPEN until this is decided.**
+- **FINDING-02 — instrumentation in gitignored `.claude/` is unversioned and reverts
+  silently.** A class with three known instances (the review-run archive block, any
+  `state.cjs` guard, the executor contract). It CONSTRAINS every fix that touches
+  `.claude/` and must be read before choosing one, not after — see
+  `02-FINDING-02-gitignored-instrumentation.md` and the pointer under Fragile Areas in
+  `.planning/codebase/CONCERNS.md`. The tracked-counterparts register in that finding
+  carries a detection command per instance; run them after any `/gsd-update`.
+  **This supersedes the standalone review.md note below**, which is instance 1.
+- **CORRECTION 2026-09-02:** FINDING-01 originally recorded a normalizer bug as the
+  cause of the stale `status:` field. That was false and asserted rather than measured
+  — traced to the orchestrator's own value at `20bd4ce`, left untouched by three
+  executor commits. The false claim also went into `d17051a`'s commit message.
+  Corrected in place in the finding, with the original claim restated so the
+  correction is legible.
+
 - **FINDING-01: `STATE.md` has many writers and no owner.** Recorded in
   `.planning/phases/02-enforcement-and-a-single-gate-definition/02-FINDING-01-state-authority.md`.
   Executors write this file mid-phase, so a hand-correction survives only until the

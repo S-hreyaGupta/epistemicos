@@ -5,8 +5,12 @@ services:
       POSTGRES_DB: epistemicos
       POSTGRES_USER: epistemicos
       POSTGRES_PASSWORD: epistemicos
+    # Bound to loopback only: the compose defaults (epistemicos db/user/password)
+    # are reachable from the local network on an all-interfaces publication,
+    # measured and accepted only until this change at Phase 1 security sign-off
+    # as AR-02. This closes AR-02 and T-01-11 (SEC-01).
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:

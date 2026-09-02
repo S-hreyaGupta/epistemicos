@@ -47,7 +47,11 @@ patterns-established:
   - "Pattern 1: every escalated t.Fatalf in testenv speaks through escalationPreamble() first, so a future fourth escalated path has an obvious, enforced place to plug into (GATE-06 message contract)"
   - "Pattern 2: rename tripwires are permanent and self-explaining in the failure text, not just a code comment, following internal/platform/config/config.go's precedent"
 
-requirements-completed: [GATE-01, GATE-02, GATE-03, GATE-06, GATE-07, GATE-08, GOV-01]
+requirements-completed: [GATE-01, GATE-02, GATE-03, GATE-06, GATE-07]
+# GATE-08 and GOV-01 are listed in this plan's own frontmatter `requirements:`
+# field but are each only PARTIALLY satisfied here — see the "Requirements
+# marked complete, then corrected" note under Deviations. Not included above
+# because REQUIREMENTS.md's traceability table tracks them as still Pending.
 
 coverage:
   - id: D1
@@ -104,13 +108,14 @@ coverage:
         status: pass
     human_judgment: false
   - id: D7
-    description: "Makefile help target no longer claims a static gate; states the database requirement and describes make test as lenient (GATE-08, Makefile half)"
+    description: "Makefile help target no longer claims a static gate; states the database requirement and describes make test as lenient (GATE-08, Makefile half only — README half is 02-03, not this plan)"
     requirement: "GATE-08"
     verification:
       - kind: integration
         ref: "Task 3 verify steps 1-3 (make test banner, make help text)"
         status: pass
-    human_judgment: false
+    human_judgment: true
+    rationale: "GATE-08 is a single two-part requirement ((a) README, (b) Makefile help). This plan delivers only (b); REQUIREMENTS.md keeps GATE-08 Pending until 02-03 lands (a). Not auto-passable as a requirement-level deliverable even though the Makefile half is itself fully proven."
   - id: D8
     description: "make gate never starts a database and demands one; migrate/test invoked via $(MAKE), not by re-pasting bodies (D-01, D-02, D-06)"
     verification:
@@ -126,13 +131,14 @@ coverage:
         status: pass
     human_judgment: false
   - id: D10
-    description: "GOV-01 phase-start check: ROADMAP.md Phase 2 requirement set equals REQUIREMENTS.md's Phase 2 traceability table"
+    description: "GOV-01 phase-start check (one of two required runs, D-12): ROADMAP.md Phase 2 requirement set equals REQUIREMENTS.md's Phase 2 traceability table"
     requirement: "GOV-01"
     verification:
       - kind: manual_procedural
         ref: "Task 1 precondition — both sets read and diffed: 10 IDs, identical in both directions"
         status: pass
-    human_judgment: false
+    human_judgment: true
+    rationale: "GOV-01's own requirement text states Phase 2 does not close until the post-checkpoint stale-artifact sweep (02-GOV-SWEEP-RUNBOOK.md) runs, after every plan, UAT and security sign-off. This plan satisfies only the phase-start half of D-12's two required runs. REQUIREMENTS.md keeps GOV-01 Pending until the closure sweep lands."
 
 duration: 21min
 completed: 2026-09-02
@@ -197,10 +203,18 @@ _All five task commits carry the RED-then-GREEN TDD gate. No REFACTOR commit was
 - **Verification:** Task 2's full step 5/5a/5b/5c sequence run end-to-end in one shell session (required for the fixture-restoration trap to survive across the whole sequence); tree confirmed byte-identical to HEAD afterward via `git diff --quiet`
 - **Committed in:** documented in `190c125`'s commit message; no separate commit needed since no file changed
 
+**2. [Rule 2 — governance-record correctness] Reverted premature GATE-08/GOV-01 completion marks in REQUIREMENTS.md**
+- **Found during:** post-execution `requirements mark-complete` step
+- **Issue:** This plan's own frontmatter `requirements:` field lists `GATE-08` and `GOV-01` alongside the five requirements it fully satisfies. Mechanically extracting and marking all seven complete (as the standard state-update step instructs) would have marked GATE-08 and GOV-01 "Complete" in `REQUIREMENTS.md`, but neither is actually done: GATE-08 is a two-part requirement ((a) README documentation, (b) Makefile help text) and this plan delivers only (b) — the plan's own `<verification>` section says so explicitly ("GATE-08, Makefile half — the README half is 02-03"). GOV-01's requirement text states outright that "Phase 2 does not close until a post-checkpoint stale-artifact sweep" runs (D-12's second required run, `02-GOV-SWEEP-RUNBOOK.md`) — this plan satisfies only D-12's phase-*start* check via its precondition.
+- **Fix:** Ran `requirements mark-complete` for all seven IDs (as instructed), observed both surfaces (checkbox + traceability row) flip to Complete for all seven, then manually reverted the checkbox and traceability row for `GATE-08` and `GOV-01` back to Pending, with an inline note on each traceability row recording what this plan did complete (`GATE-08`: "Makefile half complete at 02-01; README half is 02-03"; `GOV-01`: "start check passed at 02-01 precondition; closure sweep is 02-GOV-SWEEP-RUNBOOK.md"). SUMMARY.md's `requirements-completed` frontmatter list and the `D7`/`D10` coverage entries were corrected to match — both retained with `human_judgment: true` and a `rationale` explaining the partial completion, rather than silently dropped from coverage.
+- **Files modified:** `.planning/REQUIREMENTS.md`, `.planning/phases/02-enforcement-and-a-single-gate-definition/02-01-SUMMARY.md`
+- **Verification:** `grep -n 'GATE-08\|GOV-01' .planning/REQUIREMENTS.md` confirms both checkboxes are `[ ]` and both traceability rows read `Pending` with the disposition note
+- **Committed in:** separate `docs(02)` commit alongside the metadata commit
+
 ---
 
-**Total deviations:** 1 auto-fixed (1 plan verify-script literal correction, Rule 1)
-**Impact on plan:** No code or test changed as a result. The corrected literal is required by D-11, which this same plan authored and measured empirically before planning; the deviation is a paper-only correction to an inconsistency between two parts of the plan's own text.
+**Total deviations:** 2 auto-fixed (1 plan verify-script literal correction — Rule 1; 1 governance-record correction — Rule 2)
+**Impact on plan:** No production or test code changed as a result of either. The verify-script literal is required by D-11, which this same plan authored and measured empirically before planning. The GATE-08/GOV-01 reversion keeps REQUIREMENTS.md honest about what 02-01 actually delivered versus what 02-03 and the closure sweep still owe — both are documented as partially satisfied in this SUMMARY's coverage block rather than silently marked done.
 
 ## Issues Encountered
 - Bash tool calls are separate shell processes, so a `trap ... EXIT` set in one call does not survive into a subsequent call — an early attempt to run Task 2 step 5's fixture-move and step 5a's `make gate` check as separate tool calls silently let the trap restore the fixture between them, making step 5a appear to pass against a *readable* fixture. Resolved by running the entire fixture-move-verify-restore sequence (steps 5, 5a, 5b, 5c) in a single Bash invocation, matching the plan's intended one-script design.

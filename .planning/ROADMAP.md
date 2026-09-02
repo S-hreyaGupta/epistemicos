@@ -76,7 +76,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Enforcement core: rename the escalation flag to `EPISTEMIC_OS_TEST_REQUIRE_ENV`, give all three escalated paths one shared preamble naming the flag and printing its value, arm the permanent rename tripwire, and reshape `make gate` into a strict gate whose voiceless preflight reports before migrate can
+- [x] 02-01-PLAN.md — Enforcement core: rename the escalation flag to `EPISTEMIC_OS_TEST_REQUIRE_ENV`, give all three escalated paths one shared preamble naming the flag and printing its value, arm the permanent rename tripwire, and reshape `make gate` into a strict gate whose voiceless preflight reports before migrate can
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -126,5 +126,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Escalation Mechanism and Fixture Invariant | 3/3 | Complete    | 2026-09-01 |
-| 2. Enforcement and a Single Gate Definition | 0/5 | Not started | - |
+| 2. Enforcement and a Single Gate Definition | 1/4 | In Progress|  |
 | 3. Automated Proof | 0/TBD | Not started | - |

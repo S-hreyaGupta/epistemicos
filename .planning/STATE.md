@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 2
 current_phase_name: Enforcement and a Single Gate Definition
 status: planning
-stopped_at: Phase 2 plan gate PASSED 2026-09-02 (iteration 2, at 4af5143): 0 blockers, 5 warnings. All 5 blockers from iteration 1 closed. Cleared to execute.
-last_updated: "2026-09-01T17:59:18.884Z"
-last_activity: 2026-09-01
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-09-02T06:50:58.380Z"
+last_activity: 2026-09-02
 last_activity_desc: Phase 01 complete, transitioned to Phase 2
-state_head: b5d241072f1631f51fb7de23a8362fca965f0b13
+state_head: a122d3e44b42048ae5424afb4ea8980d8e0587af
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 8
-  completed_plans: 3
+  total_plans: 7
+  completed_plans: 4
   percent: 33
 ---
 
@@ -27,15 +27,15 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 
 ## Current Position
 
-Phase: 2 (Enforcement and a Single Gate Definition) — PLANNED AND VERIFIED, NOT EXECUTED
-Plan: Not started — nothing in Phase 2 has executed
-Status: Ready to execute — plan gate passed on iteration 2 (0 blockers, 5 non-blocking warnings)
+Phase: 2 (Enforcement and a Single Gate Definition) — IN PROGRESS
+Plan: 1 of 4 wave plans complete (02-01 done; 02-02, 02-03, 02-04 remaining; post-checkpoint 02-GOV-SWEEP-RUNBOOK not yet eligible)
+Status: 02-01 (Enforcement core) executed and committed — ready for wave 2 (02-03), then wave 3 (02-02, 02-04)
 Total Plans in Phase: 4 wave plans + 1 post-checkpoint runbook
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
 Plan bytes: `8edae22` — freeze: `c96ecb2`
-Last activity: 2026-09-01 — Phase 01 complete, transitioned to Phase 2
+Last activity: 2026-09-02 — 02-01-PLAN.md executed (3 tasks, 6 commits, SUMMARY committed at `a122d3e`)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P02 | 15 min | 2 tasks | 1 files |
 | Phase 01 P01 | 48min | 3 tasks | 8 files |
 | Phase 01 P03 | 62min | 3 tasks | 1 files |
+| Phase 02 P01 | 21 min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-01: unparseableURLMsg is an argument-free string constant (built by compile-time concatenation, not Sprintf), so no DSN-derived value can reach the parse-failure branch; verified against the phase base to fail (leak-token count 1) and after this change to pass (count 0) on both a URL-form and a keyword/value-form malformed DSN.
 - [Phase 01]: Phase 1 (01-03): make gate is measured green with the compose database genuinely stopped and again with it running, database left running as declared; escalated run executes all 38 baseline-skipping tests by name (set containment) and skips zero (independent count); a DSN leak token measured present (count 1) at the phase base is absent (count 0) after the escalation mechanism. — This is the phase's central claim, measured rather than argued, and the baseline Phase 2 and Phase 3 will diff/assert against.
 - [Phase 01]: 01-03: make was not installed on this host and the plan's own execution_shell.verified_present list never checked for it, despite 29+ commands depending on it. Execution halted; operator Alex approved and performed the install (GNU Make 4.4.1 / ezwinports.make); execution resumed with no plan/manifest edits. — Recorded for end-of-phase disposition as a planning-process gap, not fixed by editing the frozen plan.
+- [Phase 2]: [Phase 02] 02-01: testenv.RequireEnv renamed to EPISTEMIC_OS_TEST_REQUIRE_ENV (identifier unchanged); escalationPreamble() is the one message builder all three escalated t.Fatalf sites use; renameTripwireMsg() permanently guards the old EPISTEMIC_OS_TEST_REQUIRE_DB name, checked first in both Pool and Fixture.
+- [Phase 2]: [Phase 02] 02-01: make gate reshaped to vet -> gofmt -> build -> $(MAKE) env-preflight -> $(MAKE) migrate -> $(MAKE) test, target-scoped export EPISTEMIC_OS_TEST_REQUIRE_ENV=make-gate on the gate target (D-11) — measured to override a conflicting caller-set value, which corrected Task 2 step 5a's verify-script literal from gate03 to make-gate (see 02-01-SUMMARY.md Deviations).
 
 ### Pending Todos
 
@@ -109,10 +112,11 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-01T17:59:18.618Z
-Stopped at: Phase 2 plan gate PASSED on iteration 2. Checker run 1 (plans at `b5d2410`): ISSUES FOUND, 5 blockers + 4 warnings. Revision pass at `4af5143`. Checker run 2: **0 blockers, 5 warnings — all five blockers CLOSED**, each confirmed by the checker re-deriving the fix rather than reading its description.
+Last session: 2026-09-02T06:50:44.762Z
+Stopped at: Completed 02-01-PLAN.md
 
 What changed, and the evidence that closed it:
+
 1. **GATE-03 (was: no executable acceptance)** — 02-01 T2 step 5 moves the fixture aside against a live database and observes the failure. Reachability confirmed: `segmentation_test.go:240` calls `Pool(t)`, `:244` calls `Fixture(...)` — the repo's only `testenv.Fixture` call — so with a live DB the Pool branch cannot mask it.
 2. **GATE-06 third path (was: grep-proven)** — the same step asserts the flag+value in the real failure output; the three-`escalationPreamble` grep is now explicitly demoted to a structural check that does not on its own satisfy GATE-06.
 3. **GATE-02 at the gate (was: package-only)** — step 3b runs `make gate` against the closed-port DSN and asserts the absence of `new migrator`.
@@ -128,6 +132,7 @@ What changed, and the evidence that closed it:
 Its precondition proves the checkpoints COMPLETED rather than asking: each artifact's own frontmatter verdict (`passed` / `complete` / `verified` + `threats_open: 0`), each committed, and each one's latest commit a descendant of the final plan SUMMARY's commit. Checker confirmed no assertion can pass vacuously (all four expectations are non-empty, so a missing key fails) and that the `LAST_SUMMARY` loop lands on the latest of the four on linear history.
 
 **5 warnings carried, none blocking:**
+
 - Criterion 3 is executed but at package level, never through `make gate` as the criterion is worded. (The asymmetry with the GATE-02 fix is defensible — migrate cannot be first reporter for a filesystem condition against a live DB — but it is an asymmetry.)
 - `grep -q 'new migrator'` pins the D-03 ordering to a message string this phase does not own; a reword makes it silently vacuous.
 - Undeclared runtime coupling: 02-03 T1 recreates the shared compose container; 02-02 T3 and 02-04 read it via `make gate`. Same wave, no declared edge — safe only because `parallelization: false`.
@@ -135,4 +140,4 @@ Its precondition proves the checkpoints COMPLETED rather than asking: each artif
 - 02-02: verify step 3 is still a bare `echo` in an assertion slot, and `DefaultTimeout`'s kill path is never exercised despite being a control on a high-rated threat.
 
 Resume with: `/gsd-execute-phase 2` — the plan gate has passed. It will run the 4 wave plans and CANNOT reach the GOV-01 sweep; run that separately by path after verification, UAT and security sign-off. Optionally clear the 5 warnings first (none blocks execution).
-Resume file: .planning/phases/02-enforcement-and-a-single-gate-definition/02-01-PLAN.md
+Resume file: None

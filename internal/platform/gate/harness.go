@@ -67,9 +67,17 @@ const DepthEnv = "EPISTEMIC_OS_TEST_MAKE_DEPTH"
 // DefaultTimeout bounds every subprocess Run spawns unless RunOptions.Timeout
 // overrides it. It sits below go test's 10-minute per-package default so a
 // hung child is reported as a hung child rather than surfacing as a hung
-// parent, and it is roughly six times the slowest plausible child measured
-// on this host: a full `go test ./... -count=1` is ~13 seconds with the
-// database up, and `make vet` alone is ~35 seconds.
+// parent. [PROOF-03] Measured cold (fresh GOCACHE, no warm parent build): the
+// worst observed child, PROOF-01's shape, took 85s — a margin of 2.8x, not
+// the 6x a warm-cache measurement would suggest. Calibrate future changes
+// against the cold case, not the warm one: on a cold CI runner the parent
+// pays ~141s doing vet and build, and the children inherit that cache,
+// running 11s / 9s / 21s — barely worse than warm.
+//
+// The [PROOF-03] tag's value is not getting this file into the close
+// sweep's derived artifact set — measured, it is already in today via its
+// "Phase 3" prose. Its value is keeping it in when someone rewords that
+// prose. A durability property, not a coverage one.
 const DefaultTimeout = 4 * time.Minute
 
 // nestingDepth parses raw — the value of DepthEnv — into a recursion depth.
@@ -142,6 +150,9 @@ type RunOptions struct {
 	Timeout time.Duration
 	// Silent adds -s on the Make path (see Make).
 	Silent bool
+	// Dir overrides the subprocess's working directory. Empty means
+	// RepoRoot(t) — the historical default every existing caller relies on.
+	Dir string
 }
 
 // RunResult is the observed outcome of a single subprocess invocation.
@@ -184,8 +195,13 @@ func Run(t *testing.T, argv []string, opts RunOptions) RunResult {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
+	dir := opts.Dir
+	if dir == "" {
+		dir = RepoRoot(t)
+	}
+
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-	cmd.Dir = RepoRoot(t)
+	cmd.Dir = dir
 	cmd.Env = env
 
 	var stdout, stderr bytes.Buffer

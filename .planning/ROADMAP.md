@@ -123,6 +123,7 @@ four-vs-ten failure reproduced.
      produces **no escalation preamble** for any of the three conditions, where the real tree
      produces one — so each proof's own assertion would fail. Proven by three differential
      controls (`03-CONTEXT.md` D-11, D-13, D-14)
+
   6. The escalation preamble and the named cause arrive in a **single message** on all three
      escalated paths, so the proofs' same-line assertion rests on a stated requirement rather
      than on an implementation detail that happens to hold (GATE-10)
@@ -150,7 +151,7 @@ use on a success criterion rather than on a status field**. Sequenced through
 Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Tracer: the `internal/platform/gateproof` package proves PROOF-01 end-to-end through every layer, plus `RunOptions.Dir`, the corrected `DefaultTimeout` rationale, Go tree materialisation, and PROOF-01's SC-5 differential control
+- [x] 03-01-PLAN.md — Tracer: the `internal/platform/gateproof` package proves PROOF-01 end-to-end through every layer, plus `RunOptions.Dir`, the corrected `DefaultTimeout` rationale, Go tree materialisation, and PROOF-01's SC-5 differential control
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -174,4 +175,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Escalation Mechanism and Fixture Invariant | 3/3 | Complete    | 2026-09-01 |
 | 2. Enforcement and a Single Gate Definition | 4/4 wave plans + close sweep | Complete    | 2026-09-02 |
-| 3. Automated Proof | 0/4 wave plans + close sweep | Planned    | - |
+| 3. Automated Proof | 1/4 | In Progress|  |

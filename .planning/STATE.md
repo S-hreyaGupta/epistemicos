@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
 current_phase: 03
-current_phase_name: automated-proof
+current_phase_name: Automated Proof
 status: planning
-stopped_at: Phase 3 context gathered — 03-CONTEXT.md written (21 decisions, 5 deferred items, all numbers measured)
-last_updated: "2026-09-03T10:06:03.754Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-09-03T10:34:51.629Z"
 last_activity: 2026-09-03
-last_activity_desc: Phase 3 context gathered — 03-CONTEXT.md written, GATE-10 declared new scope
-state_head: 18a340d2ebf9ca9452bbe55f656e9120a383d933
+state_head: 18c4df1203c1ab66e55e2b90e23b069bc6c06fed
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 1
   total_plans: 11
-  completed_plans: 7
-  percent: 64
+  completed_plans: 8
+  percent: 33
+last_activity_desc: Phase 03 execution started
 ---
 
 # Project State
@@ -23,17 +23,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-30)
 
 **Core value:** `make gate` must be able to distinguish "tested and passed" from "tested nothing".
-**Current focus:** Phase 03 — Automated Proof (not yet planned)
+**Current focus:** Phase 03 — Automated Proof
 
 ## Current Position
 
-Phase: 03 (automated-proof) — READY TO EXECUTE
+Phase: 03 (Automated Proof) — EXECUTING
 requirements (GATE-01, GATE-02, GATE-03, CI-02, GATE-06, GATE-07, GATE-08, GATE-09,
 SEC-01, GOV-01) closed in REQUIREMENTS.md. GOV-01 was the last: its close sweep
 (`.planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP.md`) ran
 two passes and terminated on the second producing zero corrections — see that
 document for the derivation, the per-artifact evidence table, and the re-arm log.
-Plan: 4 of 4 wave plans complete — 02-01 (`8a23cb6`), 02-03 (`9917290`), 02-02
+Plan: 2 of 4
 (`2d52a1e`), 02-04 (`46d587e`) — plus the post-checkpoint GOV-01 close sweep
 (logical id 02-05, `02-GOV-SWEEP-RUNBOOK.md`). All checkpoints landed: verification
 `status: passed` (10/11, criterion 11 deferred-by-design until this sweep), UAT
@@ -42,7 +42,7 @@ verified, threats_open: 0`.
 Total Plans in Phase: 4
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
 Plan bytes: `8edae22` — freeze: `c96ecb2`
-Last activity: 2026-09-02 — GOV-01 close sweep executed by path (not by
+Last activity: 2026-09-03
 `/gsd-execute-phase`, per its own structural design — see
 `02-GOV-SWEEP-RUNBOOK.md`'s header). Compose postgres up and healthy, bound to
 `127.0.0.1:5432` only.
@@ -73,7 +73,7 @@ entry below remain its starting context.
 
 **This file's accuracy has a known expiry — see `02-FINDING-01-state-authority.md`.** It has many writers and no owner: it was hand-corrected at `20bd4ce`, then rewritten by the 02-01, 02-03 and 02-02 executors, and was stale again by `2d52a1e` (`status: planning` with three plans executed; a body whose count and list contradicted each other). It was stale a further time after this correction: `stopped_at`/`Current Position` narrated all three checkpoints as outstanding after all three had already landed and been committed — found and corrected by this sweep (`02-GOV-SWEEP.md`, evidence row 4). This correction carries the same expiry. FINDING-01's own mechanism fix (the executor's `state.sync` call) closes the frontmatter-vs-body desync path; it does not close the class this file's own edit history keeps demonstrating.
 
-Progress: [██████░░░░] 64%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -105,6 +105,7 @@ Progress: [██████░░░░] 64%
 | Phase 02 P01 | 21 min | 3 tasks | 3 files |
 | Phase 02 P03 | 7 min | 3 tasks | 4 files |
 | Phase 02 P02 | 8min | 3 tasks | 4 files |
+| Phase 03 P01 | 55 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -133,6 +134,9 @@ Recent decisions affecting current work:
 - [Phase 2]: [Phase 02] 02-03: plan verify-script literal corrected — the fixtureHasPreamble declaration-count regex did not account for the const keyword prefix (const fixtureHasPreamble = true); corrected to ^[[:space:]]*(const|var)[[:space:]]+fixtureHasPreamble[[:space:]]*= , same substance, no code change.
 - [Phase 2]: [Phase 2] 02-02: internal/platform/gate shell-out-to-make harness (Run/Make/RunOptions/RunResult/SkipIfNested/RepoRoot) built and confirmed at a human checkpoint (proceed) as Phase 3's PROOF-01/02/03 contract; depth marker recursion guard set last in buildChildEnv so Unset/Env cannot defeat it.
 - [Phase 2]: [Phase 2] 02-02: TestEnvPreflightIsVoiceless (D-03) and TestMakeTestPrintsLenientBanner (D-05) assert against real subprocess output via extraLines' differential comparison, not Makefile text; ROADMAP.md Phase 3 gains a Note on the harness (D-07 binding condition 2) with Goal/Depends on/Requirements/Success Criteria byte-unchanged.
+- [Phase 03]: 03-01: Tree materialisation uses git archive --format=tar HEAD piped through Go stdlib archive/tar, not git worktree add and not an external tar binary — no build-host dependency, nothing left in .git, go.mod/go.sum byte-unchanged.
+- [Phase 03]: 03-01: Proof and SC-5 control are two subtests of one top-level test function sharing a captured RunResult in the parent scope, so ordering is guaranteed under -shuffle=on and the D-16 guard has a genuinely trippable failing path.
+- [Phase 03]: 03-01: Both intact_tree and defeated_tree_control unset testenv.RequireEnv in addition to testenv.URLEnv (deviation from literal plan text, applied identically to both sides) — found running the real make gate, where the outer gate's own target-scoped export was leaking through ambient environment inheritance and defeating the SC-5 differential.
 
 ### Pending Todos
 
@@ -287,8 +291,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-03T08:57:14.479Z
-Stopped at: Phase 3 context gathered — 03-CONTEXT.md written (21 decisions, 5 deferred items, all numbers measured)
+Last session: 2026-09-03T10:34:39.564Z
+Stopped at: Completed 03-01-PLAN.md
 
 What changed, and the evidence that closed it:
 
@@ -315,4 +319,4 @@ Its precondition proves the checkpoints COMPLETED rather than asking: each artif
 - 02-02: verify step 3 is still a bare `echo` in an assertion slot, and `DefaultTimeout`'s kill path is never exercised despite being a control on a high-rated threat.
 
 Resume with: `/gsd-execute-phase 2` — the plan gate has passed. It will run the 4 wave plans and CANNOT reach the GOV-01 sweep; run that separately by path after verification, UAT and security sign-off. Optionally clear the 5 warnings first (none blocks execution).
-Resume file: .planning/phases/03-automated-proof/03-CONTEXT.md
+Resume file: None

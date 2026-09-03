@@ -80,6 +80,25 @@ const DepthEnv = "EPISTEMIC_OS_TEST_MAKE_DEPTH"
 // prose. A durability property, not a coverage one.
 const DefaultTimeout = 4 * time.Minute
 
+// runWaitDelay bounds how long Run's cmd.Wait() blocks for I/O after the
+// child process exits or ctx is canceled. exec.CommandContext's default
+// cancellation (cmd.Process.Kill()) only reaches the direct child; on
+// Windows a `make` -> `go test` -> test-binary chain hands its stdout/stderr
+// pipe write ends down to grandchildren, so killing `make` alone can leave
+// those handles open in a still-running grandchild. Without WaitDelay,
+// cmd.Run() (which calls Wait() internally) then blocks forever waiting for
+// the pipe copier goroutines to see EOF, and the ctx.Err() ==
+// DeadlineExceeded / TimedOut branch below is never reached even though the
+// context has already expired — see 03-INCIDENT-02.
+//
+// 5s is deliberately short relative to DefaultTimeout (4m): WaitDelay's job
+// is only to bound the tail after the context is already done, not to give
+// a well-behaved child extra running time. A normally-exiting child's
+// copier goroutines see EOF within milliseconds of the process exiting, so
+// 5s is pure margin for the ordinary case and a hard stop for the wedged
+// one.
+const runWaitDelay = 5 * time.Second
+
 // nestingDepth parses raw — the value of DepthEnv — into a recursion depth.
 // The empty string is depth 0. A non-negative integer is that depth.
 // Everything else is a hard failure: treating a malformed value as depth 0
@@ -203,6 +222,7 @@ func Run(t *testing.T, argv []string, opts RunOptions) RunResult {
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = env
+	cmd.WaitDelay = runWaitDelay
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -210,6 +230,14 @@ func Run(t *testing.T, argv []string, opts RunOptions) RunResult {
 
 	runErr := cmd.Run()
 
+	// With WaitDelay set, a timed-out run can return with PARTIAL captured
+	// output: Wait forcibly closes the pipes once runWaitDelay elapses, so
+	// whatever the copier goroutines had already read is preserved here,
+	// but bytes a wedged grandchild wrote after that point are lost. This
+	// is intentional — Stdout/Stderr/Combined below always report exactly
+	// what was captured, timeout or not, so a proof's vacuity guard still
+	// sees the escalation preamble whenever the timed-out child managed to
+	// write it before the delay expired.
 	result := RunResult{
 		Stdout:   stdout.String(),
 		Stderr:   stderr.String(),

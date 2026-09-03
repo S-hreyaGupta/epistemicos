@@ -218,6 +218,12 @@ than living only inside a closed phase's plans:
   never mentions one); the "own commit and summary" wording is Phase 2's D-16, a CONTEXT
   decision — so this is a plan-shape choice, not a requirement change.
 
+  **Durable home:** this correction's full audit trail — the original claim restated, the
+  operating mechanism named and measured, what the wrong diagnosis would have caused, and
+  the connection to D-20 — now lives at `03-FINDING-01-phase-completion-diagnosis.md`,
+  because this file's accuracy has a registered expiry (see below) and a correction living
+  only here is one executor run from disappearing.
+
 - **`state.planned-phase` recomputed `percent` to 33 while leaving `completed_phases: 2`
   intact — a SECOND field falling to the mechanism corrected above, and the reason a
   `completed_phases`-only hand-fix is not sufficient.** `computeProgressPercent`

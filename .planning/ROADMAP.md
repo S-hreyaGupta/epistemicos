@@ -103,7 +103,15 @@ Plans:
 
 **Goal**: Automated negative tests deliberately break each of the three environment conditions and assert that the gate fails and names that cause, so the gate's own behavior is covered by the suite rather than by a manual checklist that decays.
 **Depends on**: Phase 2
-**Requirements**: PROOF-01, PROOF-02, PROOF-03
+**Requirements**: PROOF-01, PROOF-02, PROOF-03, GATE-10
+**Requirements note**: GATE-10 was declared during this phase's discussion on 2026-09-03
+(`03-CONTEXT.md` D-19), not at a phase-close checkpoint. It is the single-message delivery
+constraint GATE-06's design always had and never stated, which this phase's proofs then depend
+on (D-18). Declared as scope rather than filed as a GOV-01 sweep correction: GATE-06's text is
+incomplete, not false, and adding a constraint is a scope act. Recorded here **before any
+planner was spawned**, which is what GOV-01 obligation 1 exists to force — the alternative was
+a planner reading three requirements and silently dropping the fourth, which is Phase 2's
+four-vs-ten failure reproduced.
 **Note on the harness**: Phase 2 (02-02) built the shell-out-to-`make` harness at `internal/platform/gate`, because D-03's voiceless-preflight constraint and D-05's `make test` banner constraint both required asserting a Make target's behavior from inside the suite Make governs. This is a slice of the design question recorded at `PROJECT.md` lines 91-93, which success criterion 4 below charters this phase to solve; this phase's plan should start from applying `gate.Make` / `gate.RunOptions` rather than rediscovering the tension. The recursion guard (`EPISTEMIC_OS_TEST_MAKE_DEPTH`, `gate.SkipIfNested`) is part of the contract — every proof in this phase must call `SkipIfNested` first. The three `RunOptions` shapes this phase's proofs map onto: PROOF-01 `Make(t, "gate", RunOptions{Unset: ["EPISTEMIC_OS_DB_URL"]})`; PROOF-02 `Make(t, "gate", RunOptions{Env: [...closed-port DSN...]})`; PROOF-03 the same with fixture setup around it.
 **Success Criteria** (what must be TRUE):
 
@@ -111,7 +119,31 @@ Plans:
   2. A test proves the gate fails and names the host when the database is unreachable
   3. A test proves the gate fails and names the path when a fixture is unreadable
   4. These tests run inside the suite the gate governs, in an environment where `EPISTEMIC_OS_DB_URL` IS set — the tension recorded at PROJECT.md lines 91-93 is solved in this phase's plan, not deferred out of it
-  5. Removing or bypassing the escalation mechanism makes these three tests fail
+  5. With the escalation mechanism defeated in a throwaway copy of the tree, `make gate`
+     produces **no escalation preamble** for any of the three conditions, where the real tree
+     produces one — so each proof's own assertion would fail. Proven by three differential
+     controls (`03-CONTEXT.md` D-11, D-13, D-14)
+  6. The escalation preamble and the named cause arrive in a **single message** on all three
+     escalated paths, so the proofs' same-line assertion rests on a stated requirement rather
+     than on an implementation detail that happens to hold (GATE-10)
+
+**Correction to criterion 5, 2026-09-03 — GOV-01 sweep half, recorded not silent.** Criterion 5
+previously read *"Removing or bypassing the escalation mechanism makes these three tests fail."*
+That wording is **not reachable through this phase's own harness**, and the reason is a
+deliberate decision taken *after* the criterion was written: `gate.buildChildEnv` sets
+`EPISTEMIC_OS_TEST_MAKE_DEPTH` **last**, after `Unset` and `Env`, and skips any entry naming it,
+specifically so a caller cannot defeat the recursion guard. A control that spawns the proof
+package therefore hands it depth 1, every proof's `SkipIfNested` skips, and the control observes
+three skips and a green run — a vacuous pass, inside the mechanism built to remove vacuous
+passes.
+
+**This is a criterion falsified by a later deliberate decision, not one that was always wrong**,
+and the distinction is the point: 02-02 built the guard, the guard was correct, and nobody edited
+ROADMAP.md. Same shape as `ci.yml`'s `vet + test + fmt` job name and `harness.go`'s
+`DefaultTimeout` rationale. Recorded as GOV-01's **sweep half** — the requirement set is
+untouched; this corrects what a document *says* about it — and it is that distinction's **first
+use on a success criterion rather than on a status field**. Sequenced through
+`make planning-parity PHASE=3`, which ran before and after this edit.
 
 **Plans**: TBD
 

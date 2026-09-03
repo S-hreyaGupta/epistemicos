@@ -19,6 +19,14 @@ each traceable to a disposition Alex gave there: GATE-06, GATE-07, GATE-08, SEC-
 They ARE new scope, deliberately, and are marked as such rather than left under a blanket
 claim that stopped being true the moment the first one was added.
 
+A **seventh** was added on 2026-09-03, at a different moment and by a different route:
+**GATE-10**, declared during Phase 3's discussion (`03-CONTEXT.md` D-19) rather than at a
+phase-close checkpoint. It is recorded here as a declared amendment and NOT as a GOV-01 sweep
+correction, deliberately: GATE-06's text is not *false*, it is *incomplete*, and adding a
+constraint is a scope act however small the change. Recording it as a sweep would set a
+precedent that reads as licence to strengthen requirements under a sweep — a worse cost than
+one extra line in a phase's requirement set.
+
 ### Gate Behavior
 
 - [x] **GATE-01**: `make gate` fails and names the cause when `EPISTEMIC_OS_DB_URL` is unset
@@ -48,6 +56,42 @@ claim that stopped being true the moment the first one was added.
   The requirement is nonetheless stated repo-wide ("no test may index…"), so a fourth site added later inherits it rather than repeating the defect.
 
   **Governance framing, as Alex specified it:** this is a **newly discovered Phase 2 hardening requirement, NOT a retroactive modification of the frozen Phase 1 acceptance basis.** Phase 1's acceptance stands exactly as verified and signed — its plans, freeze `c96ecb2`/`8edae22`, `VERIFICATION.md` (`passed`, 5/5) and `SECURITY.md` (signed, `threats_open: 0`) are untouched and remain accurate for what Phase 1 undertook. Phase 1 was contractually forbidden from editing `acceptance_test.go` (GATE-04 required it byte-identical to phase base `868d45b`), so this was never a Phase 1 defect and closing it is not a correction of Phase 1. It supersedes the AC-14 backlog item, which is now closed
+
+- [ ] **GATE-10**: The escalation preamble and the named cause MUST be delivered in a **single
+  message** — one `t.Fatalf` call, not two — on all three escalated paths.
+
+  **This STRENGTHENS GATE-06; it does not duplicate it.** GATE-06 requires that an escalated
+  failure name the flag *and* print its value. It is silent on *delivery*: nothing in its text
+  says the preamble and the cause must arrive together. GATE-10 states the constraint GATE-06's
+  design always had and never wrote down. A reader meeting GATE-10 alone should take away that
+  the two requirements are one requirement and its delivery guarantee — not two competing
+  statements about the same message. GATE-06 remains the authority on *what* an escalated
+  failure says; GATE-10 is the authority on *how it arrives*.
+
+  **Why it became a requirement rather than staying an implementation detail.** Phase 3's
+  PROOF-01/02/03 assert that the preamble and the cause appear on **one line** (`03-CONTEXT.md`
+  D-18), because the weaker forms are measurably vacuous: `EPISTEMIC_OS_DB_URL` also appears in
+  `make help`, in `README.md`, in `config`'s own error, **and in `testenv`'s lenient *skip*
+  message**, so a bare `Contains(cause)` passes on a run that skipped; and `exit != 0` was
+  measured to hold in all six cells of the intact/defeated matrix, so it cannot come back false
+  as a conjunct. Same-line is the assertion that discriminates. Without GATE-10, someone
+  splitting a `Fatalf` in two would break three proofs **without violating any written
+  requirement**, and the failure would read as a proof defect rather than as the requirement
+  change it actually is.
+
+  **Measured at declaration time — no code change is entailed.** All three escalated paths
+  already satisfy this: `testenv.go:149` (unset URL), `:182` (unreachable database) and `:212`
+  (unreadable fixture) each format `escalationPreamble()` and the cause into one `t.Fatalf`.
+  GATE-10 makes the existing property a stated one. It is nonetheless declared as scope, not
+  filed as a sweep correction, because the requirement set is what changes.
+
+  **Recorded as a NEW ID rather than a re-listed GATE-06**, so GATE-06 stays byte-untouched and
+  accurate for what it required and when. Re-listing would have broken this file's own stated
+  one-requirement-one-phase invariant — which `scripts/planning-parity.sh` does *not* enforce,
+  so the breakage would have been silent — and would have given GATE-06 an ambiguous status,
+  `[x]` complete for Phase 2 and pending for Phase 3, while frozen Phase 2 artifacts already
+  cite its completion. This is the fourth application of one house rule: **do not edit the
+  historical record, write beside it.**
 
 ### Continuous Integration
 
@@ -185,13 +229,24 @@ Which phases cover which requirements.
 | PROOF-01 | Phase 3 | Pending |
 | PROOF-02 | Phase 3 | Pending |
 | PROOF-03 | Phase 3 | Pending |
+| GATE-10 | Phase 3 | Pending |
 
 **Coverage:**
 
-- v1 requirements: 10 total
+- v1 requirements: **17 total**
 - Already satisfied: 1 (CI-01)
-- Mapped to phases: 9
+- Mapped to phases: 16
 - Unmapped: 0 ✓
+
+**Correction, 2026-09-03.** This block read `10 total / mapped 9` immediately before GATE-10
+landed, while the traceability table already carried **16** rows. It was accurate when written
+on 2026-08-31 and was falsified by the six requirements added at Phase 1 close — nobody edited
+it, and no mechanism looked at it. That is GOV-01's shape in GOV-01's own file, and it is the
+**sweep half** (a document saying something false about a set nobody changed), recorded here
+separately from GATE-10's addition, which is the **scope half**. The two are deliberately not
+merged: one is a correction, the other is a decision, and GOV-01's own text turns on telling
+them apart. Counted mechanically rather than by hand — the count is the traceability table's
+requirement-ID row count, which is what `scripts/planning-parity.sh` reads.
 
 **Note on CI-01:** satisfied before the roadmap existed, at commit `868d45b`,
 which added a `services: postgres` block, `EPISTEMIC_OS_DB_URL`, and a `migrate`

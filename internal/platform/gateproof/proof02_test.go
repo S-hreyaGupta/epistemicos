@@ -98,4 +98,78 @@ func TestPROOF02_GateNamesUnreachableHost(t *testing.T) {
 			t.Fatalf("PROOF-02 (D-02b): make gate's output does not carry testenv.RequireEnv at all — testenv was not a voice on the unreachable-database path:\n%s", intact.Combined)
 		}
 	})
+
+	// defeated_tree_control is PROOF-02's SC-5 differential control (D-11,
+	// D-13). It proves the intact side's assertion is non-vacuous: the
+	// proofs assert the gate fails and names its cause; if the defeated tree
+	// lacked the escalation preamble that the proofs bind to, the proofs
+	// would fail. Proving the premise proves the consequent.
+	t.Run("defeated_tree_control", func(t *testing.T) {
+		// Not checking that the proof passed — checking that the proof RAN.
+		// A control comparing against a result that was never produced is
+		// the vacuous-pass shape one indirection along, and this guard
+		// exists to make that specific failure loud rather than silent
+		// (D-16).
+		requireIntact(t, intact)
+
+		root := materializeTree(t)
+		stripEscalationExport(t, root)
+
+		// The same DSN and the same Unset as the intact side, with Dir
+		// pointing at the defeated copy — the ONLY difference between the
+		// two sides is the stripped export. gate.Run rather than gate.Make
+		// because the working directory must be the copy (RunOptions.Dir,
+		// D-08). The intact side already ran once above; this adds only the
+		// defeated run (D-16).
+		//
+		// Unsetting testenv.RequireEnv here is load-bearing, not symmetry
+		// for its own sake: with the export stripped from this copy's
+		// Makefile, nothing in the copy re-declares escalation, so an
+		// ambient EPISTEMIC_OS_TEST_REQUIRE_ENV inherited from whatever
+		// process is running this test (a real outer `make gate`, in
+		// particular) would otherwise leak through and make the defeated
+		// tree escalate anyway — defeating the differential for a reason
+		// unrelated to the stripped export.
+		defeated := gate.Run(t, []string{"make", "gate"}, gate.RunOptions{
+			Dir:   root,
+			Env:   []string{testenv.URLEnv + "=" + unreachableDSN},
+			Unset: []string{testenv.RequireEnv},
+		})
+
+		// 1. Restate the intact side's positive from the captured result, so
+		// both sides of the differential appear together at the comparison.
+		if !lineContainsBoth(intact.Combined, testenv.RequireEnv, "127.0.0.1:1") {
+			t.Fatalf("PROOF-02 control: the captured intact result no longer shows both %s and 127.0.0.1:1 on one line:\n%s", testenv.RequireEnv, intact.Combined)
+		}
+
+		// 2. D-11: the differential binds to the escalation preamble, NOT to
+		// the exit code — exit 2 was measured in all six cells of the
+		// intact/defeated matrix. With the export stripped, migrate becomes
+		// the reporter and fails anyway (D-03's ordering point, measured
+		// from the other side), so an exit-code differential could not come
+		// back false. The escalation preamble discriminates cleanly in all
+		// six cells, and it is built from testenv.RequireEnv, an exported
+		// constant this project owns. Do not assert on defeated's exit code
+		// as a conjunct — it does no work.
+		if strings.Contains(defeated.Combined, testenv.RequireEnv) {
+			t.Errorf("PROOF-02 control: the defeated tree (escalation export stripped) still shows the escalation preamble — the differential does not discriminate:\n%s", defeated.Combined)
+		}
+
+		// 3. The third assertion is deliberately absent, and this comment is
+		// why (D-15): PROOF-01's control additionally asserts config's own
+		// message text in its defeated tree, because config is ours.
+		// PROOF-02's own defeated tree reports through golang-migrate's
+		// wrapper instead — a phrase this comment does not repeat as an
+		// assertion argument, only names in prose — and that text is a
+		// dependency's prose. Pinning to it is Phase 2's carried warning 2
+		// done on purpose. Naming what a dependency says is a coupling whose
+		// breakage would read as a proof defect rather than as the
+		// dependency change it actually is. The "who spoke" signal is
+		// obtained above, from the escalation preamble alone, without
+		// reintroducing a defect already paid for. This comment exists
+		// because an absent assertion is invisible, and a later reader
+		// adding a reporter-identity assertion here for symmetry with
+		// PROOF-01's control would be reintroducing exactly what was
+		// removed.
+	})
 }

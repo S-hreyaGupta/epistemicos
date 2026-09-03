@@ -57,7 +57,7 @@ one extra line in a phase's requirement set.
 
   **Governance framing, as Alex specified it:** this is a **newly discovered Phase 2 hardening requirement, NOT a retroactive modification of the frozen Phase 1 acceptance basis.** Phase 1's acceptance stands exactly as verified and signed — its plans, freeze `c96ecb2`/`8edae22`, `VERIFICATION.md` (`passed`, 5/5) and `SECURITY.md` (signed, `threats_open: 0`) are untouched and remain accurate for what Phase 1 undertook. Phase 1 was contractually forbidden from editing `acceptance_test.go` (GATE-04 required it byte-identical to phase base `868d45b`), so this was never a Phase 1 defect and closing it is not a correction of Phase 1. It supersedes the AC-14 backlog item, which is now closed
 
-- [ ] **GATE-10**: The escalation preamble and the named cause MUST be delivered in a **single
+- [x] **GATE-10**: The escalation preamble and the named cause MUST be delivered in a **single
   message** — one `t.Fatalf` call, not two — on all three escalated paths.
 
   **This STRENGTHENS GATE-06; it does not duplicate it.** GATE-06 requires that an escalated
@@ -229,7 +229,7 @@ Which phases cover which requirements.
 | PROOF-01 | Phase 3 | Complete |
 | PROOF-02 | Phase 3 | Complete |
 | PROOF-03 | Phase 3 | Complete |
-| GATE-10 | Phase 3 | Pending |
+| GATE-10 | Phase 3 | Complete |
 
 **Coverage:**
 

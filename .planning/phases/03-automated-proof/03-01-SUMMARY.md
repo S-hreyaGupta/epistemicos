@@ -245,3 +245,10 @@ None - no external service configuration required. The plan's precondition (`mak
 ---
 *Phase: 03-automated-proof*
 *Completed: 2026-09-03*
+
+## Self-Check: PASSED
+
+- All 4 created/modified source files verified present on disk with `[ -f ]`.
+- All 5 commits (`f2add33`, `e9a973f`, `2aa1990`, `2f6258e`, `176f16c`) verified present via `git log --oneline --all`.
+- Every task's `<acceptance_criteria>` re-run and passing (see per-task grep/test output in this plan's execution).
+- Plan-level `<verification>` re-run: `make gate` green end-to-end against live compose Postgres; `git status --porcelain` carries no delta introduced by this plan.

@@ -277,3 +277,111 @@ untested prose.
 See also: [[03-INCIDENT-01-orchestrator-self-contamination]] for the contaminated-timing
 half of this investigation, which is unaffected by either defect above and remains void
 for `DefaultTimeout` calibration purposes.
+
+---
+
+## ADDENDUM (2026-09-03): WR-01 and WR-02, found by this phase's own code review
+
+This addendum corrects and extends the record above rather than editing it in place — the
+original narrative above describes what was known and fixed at the time; what follows was
+found afterward, by `03-REVIEW.md`, reviewing the two fixes this document already
+describes.
+
+### WR-01 is a defect the WaitDelay fix INTRODUCED, not one it exposed or that pre-existed
+
+This is a distinct category from "another instance of the same pre-existing defect
+class," and the distinction matters: everything else this document fixes was a
+long-standing bug this milestone's own harness work made *visible* (Defect 1's race was
+always there; Defect 2's unreachable branch was always there). WR-01 is different — the
+gap it names did not exist, could not exist, before `fe052fb` (the `cmd.WaitDelay =
+runWaitDelay` fix documented as "Defect 2" above) was committed. Before that commit,
+`cmd.Wait()` had no `WaitDelay` set, so a grandchild holding the inherited pipe open would
+simply make `cmd.Wait()` hang — it could never return `exec.ErrWaitDelay`, because that
+sentinel value did not exist on this code path at all. The very fix that made `TimedOut`
+observable in Defect 2's scenario simultaneously introduced a new, adjacent return value
+(`exec.ErrWaitDelay`) that `Run`'s classification logic did not account for. Say this
+plainly: **the repair itself had a gap, not the thing it repaired.**
+
+### The exact mechanism
+
+Per Go's own documented semantics for `Cmd.WaitDelay` (Go 1.24 `os/exec`, confirmed by
+reading `exec.go`'s `watchCtx`/`awaitGoroutines` directly, not merely quoted from memory):
+
+> "If pipes are closed due to WaitDelay, no Cancel call has occurred, and the command has
+> otherwise exited with a successful status, Wait and similar methods will return
+> ErrWaitDelay instead of nil."
+
+`WaitDelay`'s timer starts as soon as `Wait` observes the child process has exited — not
+only when the driving `ctx` is canceled. So a direct child that exits successfully
+(`state.Success() == true`) while a grandchild it spawned and never waited for is still
+holding the inherited stdout/stderr pipe produces exactly this: `ctx.Err()` stays `nil`
+(the context never expired), but `cmd.Run()`'s returned error is `exec.ErrWaitDelay` —
+neither `nil` nor an `*exec.ExitError`. `gate.Run`'s classification logic
+(`internal/platform/gate/harness.go`) checked only `ctx.Err() == context.DeadlineExceeded`
+before falling through to `errors.As(runErr, &exitErr)`, so this value fell through both
+checks and hit the misleading `t.Fatalf("... could not be started: %v", runErr)` — a
+factually wrong diagnosis for a process that started, ran, and (per the doc wording above)
+may have exited 0.
+
+### Captured before/after (Task 2)
+
+**Fix (`errors.Is(runErr, exec.ErrWaitDelay)` branch) temporarily removed:**
+
+```
+=== RUN   TestGateRun_ErrWaitDelayMisclassification
+MARKER OBSERVED at 2026-09-03T23:34:05.1587586+05:30: spawner process started, wrote its marker, and exited — independent of whatever gate.Run later classifies this call as
+    harness_errwaitdelay_test.go:148: gate.Run: C:\Users\gupta\AppData\Local\Temp\go-build3588986029\b001\gate.test.exe [-test.run=TestHelperProcess_ErrWaitDelaySpawner] could not be started: exec: WaitDelay expired before I/O complete
+--- FAIL: TestGateRun_ErrWaitDelayMisclassification (5.39s)
+FAIL
+FAIL	github.com/EpistemicOS/epistemicos/internal/platform/gate	6.236s
+FAIL
+```
+
+Note the ordering: the marker file (the spawner's own side effect, written and confirmed
+present ~5 seconds *before* the `t.Fatalf` fires) proves the process genuinely started,
+ran, and exited — directly contradicting the message the unfixed code produces.
+
+**Fix restored:**
+
+```
+=== RUN   TestGateRun_ErrWaitDelayMisclassification
+MARKER OBSERVED at 2026-09-03T23:34:44.5853754+05:30: spawner process started, wrote its marker, and exited — independent of whatever gate.Run later classifies this call as
+--- PASS: TestGateRun_ErrWaitDelayMisclassification (5.43s)
+PASS
+ok  	github.com/EpistemicOS/epistemicos/internal/platform/gate	6.262s
+```
+
+Both captures used a self-exec'd helper process (`TestHelperProcess_ErrWaitDelaySpawner`,
+`internal/platform/gate/harness_errwaitdelay_test.go`) that exits successfully almost
+immediately after starting a `bash`/`sleep`-backed grandchild that outlives it and holds
+the inherited stdout pipe — the same self-exec pattern `harness_waitdelay_test.go` already
+uses — with a driving `RunOptions.Timeout` of 30s (far longer than the ~5s bound this test
+asserts against) specifically so `ctx.Err()` stays `nil` throughout, isolating this from
+Defect 2's already-covered `ctx.Err() == context.DeadlineExceeded` path. Fix commit:
+`1caa410`. No `zzz_*` scratch file was left behind — the regression test is committed
+permanently at the path above.
+
+### WR-02's correction
+
+The original fix narrative above ("Defect 1," `materializeTree`'s `WaitDelay` addition)
+also carried an imprecise claim: its inline comment stated WaitDelay "is what stops a
+wedged child (or an undrained pipe...) from holding Wait open." Found by the same code
+review that found WR-01 (`03-REVIEW.md` WR-02), and confirmed by reading `os/exec`'s
+`Cmd.Start`/`watchCtx`/`awaitGoroutines` directly: WaitDelay's forced-pipe-close mechanism
+is gated on an internal `goroutineErr` channel that is populated only when
+`Stdout`/`Stdin`/`Stderr` are handed to `exec.Cmd` as a plain `io.Writer`/`io.Reader` — the
+shape `gate.Run` uses, where the mechanism genuinely is load-bearing (this is exactly
+Defect 2's fix, unaffected by this correction). `materializeTree` instead uses
+`cmd.StdoutPipe()` with a manual, synchronous drain, so that channel is never populated and
+WaitDelay's pipe-forcing path never engages for this specific usage shape. The actual
+protection against a wedged `git archive` (or the synthetic helper in
+`tree_drain_test.go`) comes entirely from `ctx`'s own deadline plus
+`exec.CommandContext`'s default `Cancel` (`cmd.Process.Kill()`) — independent of
+`WaitDelay`'s value. This was not a live bug (nothing hangs, nothing misbehaves); only the
+comment overstated the mechanism. Corrected in place at commit `f329265`, comment-only, no
+behavior change — reconfirmed by re-running `TestMaterializeTree_Control` and
+`TestMaterializeTree_DrainsPastTarEOF` unchanged (both pass).
+
+### Cross-references
+
+Both findings: `.planning/phases/03-automated-proof/03-REVIEW.md`, WR-01 and WR-02.

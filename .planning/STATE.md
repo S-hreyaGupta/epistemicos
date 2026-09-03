@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 current_phase: 03
 current_phase_name: Automated Proof
 status: planning
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-09-03T10:34:51.629Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-09-03T14:38:32.552Z"
 last_activity: 2026-09-03
-state_head: 18c4df1203c1ab66e55e2b90e23b069bc6c06fed
+state_head: 81dc050cadfa1cb596bb461bb3286a7a215b6519
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 9
   percent: 33
 last_activity_desc: Phase 03 execution started
 ---
@@ -33,7 +33,7 @@ SEC-01, GOV-01) closed in REQUIREMENTS.md. GOV-01 was the last: its close sweep
 (`.planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP.md`) ran
 two passes and terminated on the second producing zero corrections — see that
 document for the derivation, the per-artifact evidence table, and the re-arm log.
-Plan: 2 of 4
+Plan: 3 of 4
 (`2d52a1e`), 02-04 (`46d587e`) — plus the post-checkpoint GOV-01 close sweep
 (logical id 02-05, `02-GOV-SWEEP-RUNBOOK.md`). All checkpoints landed: verification
 `status: passed` (10/11, criterion 11 deferred-by-design until this sweep), UAT
@@ -106,6 +106,7 @@ Progress: [███░░░░░░░] 33%
 | Phase 02 P03 | 7 min | 3 tasks | 4 files |
 | Phase 02 P02 | 8min | 3 tasks | 4 files |
 | Phase 03 P01 | 55 min | 3 tasks | 4 files |
+| Phase 03 P02 | 50min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -137,6 +138,8 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-01: Tree materialisation uses git archive --format=tar HEAD piped through Go stdlib archive/tar, not git worktree add and not an external tar binary — no build-host dependency, nothing left in .git, go.mod/go.sum byte-unchanged.
 - [Phase 03]: 03-01: Proof and SC-5 control are two subtests of one top-level test function sharing a captured RunResult in the parent scope, so ordering is guaranteed under -shuffle=on and the D-16 guard has a genuinely trippable failing path.
 - [Phase 03]: 03-01: Both intact_tree and defeated_tree_control unset testenv.RequireEnv in addition to testenv.URLEnv (deviation from literal plan text, applied identically to both sides) — found running the real make gate, where the outer gate's own target-scoped export was leaking through ambient environment inheritance and defeating the SC-5 differential.
+- [Phase 03]: [Phase 03]: 03-02: PROOF-02's SC-5 control deliberately asserts nothing about golang-migrate's own 'new migrator' reporter text — that is a dependency's prose, and PROOF-01's control asserting config's own message does not transfer to a condition where the reporter is not this project's code (D-15).
+- [Phase 03]: [Phase 03]: 03-02: TestGateOrdersPreflightBeforeMigrate carries D-03's ordering claim structurally against make -n gate's dry-run expansion (not the Makefile's raw text), performs no nested make gate, and is demonstrated to fail when the two recipe lines are transposed in a materializeTree copy — the other independent leg is PROOF-02's D-02b in-run observation.
 
 ### Pending Todos
 
@@ -291,8 +294,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-03T10:34:39.564Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-09-03T14:38:32.307Z
+Stopped at: Completed 03-02-PLAN.md
 
 What changed, and the evidence that closed it:
 

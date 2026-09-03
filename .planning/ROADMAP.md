@@ -155,7 +155,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-02-PLAN.md — PROOF-02 and its SC-5 control, plus the structural half of D-03's ordering claim, checked against `make -n gate`'s dry-run expansion
+- [x] 03-02-PLAN.md — PROOF-02 and its SC-5 control, plus the structural half of D-03's ordering claim, checked against `make -n gate`'s dry-run expansion
 - [ ] 03-03-PLAN.md — PROOF-03 and its SC-5 control: the fixture replaced by a directory inside a throwaway copy, asserted against the common path suffix
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -175,4 +175,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Escalation Mechanism and Fixture Invariant | 3/3 | Complete    | 2026-09-01 |
 | 2. Enforcement and a Single Gate Definition | 4/4 wave plans + close sweep | Complete    | 2026-09-02 |
-| 3. Automated Proof | 1/4 | In Progress|  |
+| 3. Automated Proof | 2/4 | In Progress|  |

@@ -2,15 +2,31 @@ package gateproof
 
 import (
 	"archive/tar"
+	"context"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/EpistemicOS/epistemicos/internal/platform/gate"
 )
+
+// materializeTreeTimeout bounds materializeTree independently of
+// gate.DefaultTimeout. DefaultTimeout does not apply here: materializeTree
+// calls exec.Command directly rather than gate.Run/gate.Make, and
+// DefaultTimeout's cold-CI rationale ([PROOF-03] in harness.go) is
+// calibrated against `make gate` children, not a bare `git archive`
+// invocation. Measured on this host: `git archive --format=tar HEAD`
+// against this repository produced 4,587,520 bytes and completed in well
+// under a second, uncontended. 30s leaves roughly two orders of magnitude
+// of margin over that measurement while still failing this test (and any
+// gate that runs it) fast if a much larger repository, a contended CI
+// runner, or a reintroduced version of the drain bug below ever wedges the
+// child — which is the exact failure mode 03-INCIDENT-02 recorded.
+const materializeTreeTimeout = 30 * time.Second
 
 // materializeTree builds a throwaway copy of HEAD from Go, using only the
 // standard library, and returns its root directory.
@@ -50,8 +66,17 @@ func materializeTree(t *testing.T) string {
 		os.RemoveAll(root)
 	})
 
-	cmd := exec.Command("git", "archive", "--format=tar", "HEAD")
+	ctx, cancel := context.WithTimeout(context.Background(), materializeTreeTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", "archive", "--format=tar", "HEAD")
 	cmd.Dir = gate.RepoRoot(t)
+	// WaitDelay bounds how long Wait blocks for the child after the process
+	// exits or ctx is canceled. CommandContext's cancellation kills the
+	// process but does not by itself bound Wait — WaitDelay is what stops a
+	// wedged child (or an undrained pipe, if the drain below is ever
+	// removed again) from holding Wait open past the context deadline.
+	cmd.WaitDelay = 5 * time.Second
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -113,6 +138,21 @@ func materializeTree(t *testing.T) string {
 			t.Fatalf("materializeTree: archive entry %q has an unsupported type flag %q — measured before planning that every tracked file is a regular file or a directory; this is a loud failure rather than a quietly different tree", hdr.Name, string(hdr.Typeflag))
 		}
 		entryCount++
+	}
+
+	// archive/tar's Next() returns io.EOF at the archive's own end-of-archive
+	// marker (two 512-byte zero blocks), but `git archive` pads its output
+	// to a full tar record boundary beyond that marker. Measured against
+	// this repository: total `git archive --format=tar HEAD` output is
+	// 4,587,520 bytes, of which 4,608 bytes remain on the pipe after
+	// tar.Reader reports io.EOF. Calling cmd.Wait() without draining those
+	// bytes deadlocks: git blocks writing them into a pipe nobody is
+	// reading, and Wait blocks forever on a process that cannot exit. This
+	// is exactly the hazard StdoutPipe's own doc names: "it is incorrect to
+	// call Wait before all reads from the pipe have completed." See
+	// 03-INCIDENT-02 for the goroutine dump that caught this.
+	if _, err := io.Copy(io.Discard, stdout); err != nil {
+		t.Fatalf("materializeTree: draining git archive stdout past tar EOF: %v", err)
 	}
 
 	if err := cmd.Wait(); err != nil {

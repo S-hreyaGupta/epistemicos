@@ -33,7 +33,18 @@ func TestPROOF01_GateNamesUnsetURL(t *testing.T) {
 	var intact gate.RunResult
 
 	t.Run("intact_tree", func(t *testing.T) {
-		intact = gate.Make(t, "gate", gate.RunOptions{Unset: []string{testenv.URLEnv}})
+		// Unset is [URLEnv, RequireEnv] rather than [URLEnv] alone (Rule 1
+		// fix, found running under a real depth-0 `make gate`): that outer
+		// gate's own target-scoped export puts EPISTEMIC_OS_TEST_REQUIRE_ENV
+		// in THIS test process's ambient environment, which buildChildEnv
+		// would otherwise pass straight through to the nested child. For
+		// the intact side this happens to be harmless — the copy's own
+		// `gate:` target re-declares that export and D-11 measured a
+		// target-scoped export to override a conflicting caller-set value —
+		// but unsetting it here makes both sides control exactly the
+		// environment the assertion is about, rather than depending on
+		// whatever ambient state the calling context happens to carry.
+		intact = gate.Make(t, "gate", gate.RunOptions{Unset: []string{testenv.URLEnv, testenv.RequireEnv}})
 
 		// Vacuity guard first, before any content assertion (the
 		// makefile_test.go:44 shape): if the child timed out or exited 0,
@@ -80,9 +91,18 @@ func TestPROOF01_GateNamesUnsetURL(t *testing.T) {
 		// gate.Make because the working directory must be the copy, which
 		// is what RunOptions.Dir (D-08) exists for. The intact side already
 		// ran once above; this adds only the defeated run (D-16).
+		//
+		// Unsetting RequireEnv here is load-bearing, not symmetry for its
+		// own sake: with the export stripped from this copy's Makefile,
+		// nothing in the copy re-declares escalation, so an ambient
+		// EPISTEMIC_OS_TEST_REQUIRE_ENV inherited from whatever process is
+		// running this test (a real outer `make gate`, in particular) would
+		// otherwise leak through and make the defeated tree escalate anyway
+		// — defeating the differential for a reason unrelated to the
+		// stripped export.
 		defeated := gate.Run(t, []string{"make", "gate"}, gate.RunOptions{
 			Dir:   root,
-			Unset: []string{testenv.URLEnv},
+			Unset: []string{testenv.URLEnv, testenv.RequireEnv},
 		})
 
 		// 1. Restate the intact side's positive from the captured result,

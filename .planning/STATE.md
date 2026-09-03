@@ -5,8 +5,8 @@ current_phase_name: Automated Proof
 status: planning
 stopped_at: Phase 3 context gathered — 03-CONTEXT.md written (21 decisions, 5 deferred items, all numbers measured)
 last_updated: "2026-09-03T08:57:14.756Z"
-last_activity: 2026-09-02
-last_activity_desc: GOV-01 close sweep terminated — Phase 2 complete, ready to plan Phase 3
+last_activity: 2026-09-03
+last_activity_desc: Phase 3 context gathered — 03-CONTEXT.md written, GATE-10 declared new scope
 state_head: fc213412a6509e501fd7545839d19f22f54dbe56
 progress:
   total_phases: 3
@@ -47,9 +47,27 @@ Last activity: 2026-09-02 — GOV-01 close sweep executed by path (not by
 `02-GOV-SWEEP-RUNBOOK.md`'s header). Compose postgres up and healthy, bound to
 `127.0.0.1:5432` only.
 
-**Next:** Phase 3 (Automated Proof) is not yet planned. Its Note on the harness
-(`internal/platform/gate`, built by 02-02) and the design-tension entry below are
-its starting context.
+**Next:** Phase 3 (Automated Proof) — **context gathered 2026-09-03** (`fc21341`),
+not yet planned. Read
+`.planning/phases/03-automated-proof/03-CONTEXT.md` before planning: 21 decisions, every
+number in it measured on this host rather than estimated. Three things the planner must not
+discover late:
+
+1. **The requirement set has changed.** D-19 declares **GATE-10** as new scope — the
+   single-message constraint GATE-06's design always had and never stated, which D-18's
+   proofs depend on. ROADMAP §Phase 3's `**Requirements**:` line and REQUIREMENTS.md's
+   traceability table both still read PROOF-01/02/03 only, so **they currently disagree**.
+   GOV-01 obligation 2 requires `make planning-parity PHASE=3` as the first plan's
+   precondition; it must be run, the two documents brought into agreement, and the check
+   green before planning proceeds.
+2. **SC-5 is corrected, not satisfied as worded** (D-10, D-12). Its literal form is
+   unreachable through the harness: `buildChildEnv` sets `DepthEnv` last and skips any entry
+   naming it, so a control spawning the proof package gets depth 1 and every proof
+   `SkipIfNested`-skips. The correction is sequenced through the same start check.
+3. **The close sweep writes no `*-SUMMARY.md`** (D-20) — see the corrected mechanism above.
+
+Its Note on the harness (`internal/platform/gate`, built by 02-02) and the design-tension
+entry below remain its starting context.
 
 **This file's accuracy has a known expiry — see `02-FINDING-01-state-authority.md`.** It has many writers and no owner: it was hand-corrected at `20bd4ce`, then rewritten by the 02-01, 02-03 and 02-02 executors, and was stale again by `2d52a1e` (`status: planning` with three plans executed; a body whose count and list contradicted each other). It was stale a further time after this correction: `stopped_at`/`Current Position` narrated all three checkpoints as outstanding after all three had already landed and been committed — found and corrected by this sweep (`02-GOV-SWEEP.md`, evidence row 4). This correction carries the same expiry. FINDING-01's own mechanism fix (the executor's `state.sync` call) closes the frontmatter-vs-body desync path; it does not close the class this file's own edit history keeps demonstrating.
 

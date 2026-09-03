@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 current_phase: 3
 current_phase_name: Automated Proof
 status: planning
-stopped_at: Phase 2 CLOSED. GOV-01 close sweep (02-GOV-SWEEP.md) ran two passes and terminated with zero corrections on the second. All ten Phase 2 requirements complete. Phase 3 not yet planned.
-last_updated: "2026-09-02T12:28:51.756Z"
+stopped_at: Phase 3 context gathered — 03-CONTEXT.md written (21 decisions, 5 deferred items, all numbers measured)
+last_updated: "2026-09-03T08:57:14.756Z"
 last_activity: 2026-09-02
 last_activity_desc: GOV-01 close sweep terminated — Phase 2 complete, ready to plan Phase 3
-state_head: 8696e7b6f0400dabd74fb337df175dfabd0fa88c
+state_head: fc213412a6509e501fd7545839d19f22f54dbe56
 progress:
   total_phases: 3
   completed_phases: 2
@@ -151,6 +151,39 @@ than living only inside a closed phase's plans:
 - 01-02's whole-tree git-diff acceptance criteria (unrestricted 'git diff --name-only 868d45b --') print 47 files, not the expected single fixture_test.go, because ~29 pre-existing .planning/-only commits (base re-anchor, plan re-freeze, review-run archives) already sit between the phase base and execution start. The internal/-scoped form of the same check still confirms exactly one source file changed. Likely affects 01-01 and 01-03's identical whole-tree-diff criteria too — flag before running them.
 - 01-03: five contract decisions (testenv package path/API, EPISTEMIC_OS_TEST_REQUIRE_DB semantics, the flag's wider-than-its-name scope, README/Makefile documentation deferral, the deferred AC-14 empty-heading guard) plus unresolved probe edge E1 are queued for the developer's end-of-phase disposition. The preamble policy (option C) is already RESOLVED 2026-09-01 by Alex and is not among these five.
 
+### Blockers/Concerns — added 2026-09-03
+
+- **`state.record-session` reverted `completed_phases` 2→1 and `percent` 67→33 again; restored
+  by hand.** Third live reproduction. **The mechanism recorded at `13071ff` is WRONG and is
+  corrected here.** That commit blamed the phase-completion heuristic for not recognising the
+  post-checkpoint runbook's SUMMARY (`02-05-SUMMARY.md`, paired with `02-GOV-SWEEP-RUNBOOK.md`
+  rather than a `*-PLAN.md`). Measured: SUMMARY-to-PLAN pairing never enters the computation —
+  `scanPhasePlans`'s counts feed `total_plans`/`completed_plans`, different fields. Phase
+  completion routes through `isPhaseComplete` (`.claude/gsd-core/bin/lib/verification.cjs:565`)
+  = `verification.status === 'passed'`, and the `#2348` staleness rule is *a `*-VERIFICATION.md`
+  is stale when a summary is newer than it*. Measured live: phase 01 → `passed`, phase 02 →
+  **`stale`**. `02-05-SUMMARY.md` is not *unrecognised*; it **is** seen, it **is** newer than
+  `02-VERIFICATION.md`, and being seen is what marks verification stale.
+
+  **What the wrong diagnosis would have caused, which is the part worth keeping:** teaching the
+  SUMMARY/PLAN pairing to recognise runbooks — the fix the recorded mechanism implies — would
+  have changed nothing. `completed_phases` would still read 1, because pairing is not what the
+  counter consults. A wrong mechanism yields a wrong fix that *appears* responsive.
+
+  **Second instance this week of a registered finding naming a mechanism that was not the one
+  operating** (FINDING-01's normalizer diagnosis was the first). Both were explanations that fit
+  the evidence, asserted rather than measured, and both were falsified by someone reading the
+  code path instead of the finding. Commits are immutable, so this entry is the correction and
+  cites `13071ff`.
+
+  **Structural, not incidental:** GOV-01 requires the close sweep to run *after* verification and
+  to commit, so any phase whose sweep writes a SUMMARY ends with stale verification and an
+  undercounted phase. Phase 3's answer is `03-CONTEXT.md` **D-20** — its sweep writes
+  `03-GOV-SWEEP.md` and **no `*-SUMMARY.md`**, so the staleness comparison has nothing newer to
+  find. Verified during discussion: the SUMMARY filename is **not** mandated by GOV-01 (its text
+  never mentions one); the "own commit and summary" wording is Phase 2's D-16, a CONTEXT
+  decision — so this is a plan-shape choice, not a requirement change.
+
 ## Deferred Items
 
 Items acknowledged and deferred at milestone close, most recent first:
@@ -213,8 +246,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-02T07:44:58.481Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-09-03T08:57:14.479Z
+Stopped at: Phase 3 context gathered — 03-CONTEXT.md written (21 decisions, 5 deferred items, all numbers measured)
 
 What changed, and the evidence that closed it:
 
@@ -241,4 +274,4 @@ Its precondition proves the checkpoints COMPLETED rather than asking: each artif
 - 02-02: verify step 3 is still a bare `echo` in an assertion slot, and `DefaultTimeout`'s kill path is never exercised despite being a control on a high-rated threat.
 
 Resume with: `/gsd-execute-phase 2` — the plan gate has passed. It will run the 4 wave plans and CANNOT reach the GOV-01 sweep; run that separately by path after verification, UAT and security sign-off. Optionally clear the 5 warnings first (none blocks execution).
-Resume file: None
+Resume file: .planning/phases/03-automated-proof/03-CONTEXT.md

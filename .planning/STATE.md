@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 current_phase: 03
 current_phase_name: Automated Proof
 status: planning
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-09-03T15:34:39.108Z"
+stopped_at: Completed 03-04-PLAN.md
+last_updated: "2026-09-03T16:23:50.924Z"
 last_activity: 2026-09-03
-state_head: 97fe596deb4741af2db837540641c08483644f7a
+state_head: 9c3db5b56136e0e136ad342270cf310350fd928f
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 11
-  completed_plans: 9
+  completed_plans: 11
   percent: 33
 last_activity_desc: Phase 03 execution started
 ---
@@ -108,6 +108,7 @@ Progress: [███░░░░░░░] 33%
 | Phase 03 P01 | 55 min | 3 tasks | 4 files |
 | Phase 03 P02 | 50min | 3 tasks | 2 files |
 | Phase 03 P03 | 55 min | 2 tasks | 1 files |
+| Phase 03 P04 | 55 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -147,6 +148,9 @@ Recent decisions affecting current work:
 - [Phase 03]: [Phase 03]: 03-03: PROOF-03 and its SC-5 control both unset testenv.RequireEnv (deviation from literal plan text, carried forward from 03-01/03-02's identical finding) — the outer make gate's own target-scoped export leaks into the ambient environment of any nested gate.Run call that does not explicitly unset it, defeating the SC-5 differential for a reason unrelated to the stripped export. Found running the real make gate, not the isolated go test.
 - [Phase 03]: [Phase 03]: 03-03: GATE-10 stays Pending after PROOF-03 lands — 03-04-PLAN.md also declares GATE-10 in its own requirements frontmatter and has not yet produced a SUMMARY, so the shared-ID gate (#2388) blocks marking it complete until the last declaring plan finishes, even though all three escalated paths (PROOF-01/02/03) are now proven.
 - [Phase 03]: OPEN, not a finding — `harness.go`'s `DefaultTimeout` cold-case rationale (85s worst-observed child, 2.8x margin under the 4-minute bound) is unverified against current reality. Warm case measured 16.59s uncontended on 2026-09-03 (`TestPROOF01_GateNamesUnsetURL/intact_tree`, isolated, real repo root, go test's own per-test line, not shell wall-clock) and is consistent with the comment's own stated warm range (11s/9s/21s). Cold case (fresh GOCACHE) not re-tested — the user declined the GOCACHE flush needed to measure it, on the reasoning that nothing observed tonight contradicts the existing number and repopulating the cache afterward costs every subsequent build. Not disproven, not reconfirmed. Revisit if a genuine cold start (fresh CI runner, fresh clone) ever produces a number inconsistent with 85s/2.8x.
+- [Phase 03]: Phase 3 (2026-09-03): GATE-10's checkbox and traceability row are marked Complete by 03-04, per the orchestrator's explicit instruction closing a scope gap between 03-03's deferral (which named 03-04 as the plan that would close it) and 03-04-PLAN.md's own narrower verification-only text -- confirmed safe by the shared-ID gate (requirements.ready-ids returning GATE-10 ready) and by re-running make gate green.
+- [Phase 03]: Phase 3 (2026-09-03): No correction was needed to GATE-10's REQUIREMENTS.md entry or ROADMAP's SC-5 correction block on verification against D-19/D-12's stated obligations; both already carried everything required.
+- [Phase 03]: Phase 3 (2026-09-03): D-21's correction of 13071ff's wrong phase-completion diagnosis was given a durable, single-writer home at 03-FINDING-01-phase-completion-diagnosis.md, with a pointer left in STATE.md, because STATE.md's own accuracy has a registered expiry (FINDING-01).
 
 ### Pending Todos
 
@@ -272,6 +276,26 @@ than living only inside a closed phase's plans:
   reads like an unrelated bug. A partial hand-correction of a derived block is not a
   correction — it moves the staleness to whichever field nobody checked.
 
+- **A third field found wrong by the same root cause, this time in `state.sync`'s body
+  write: `Total Plans in Phase` regressed 4 -> 3 during 03-04's own execution.** Running
+  `gsd-tools query state.sync` (the standard `execute-plan.md` state-update step) on a
+  disk state where every phase's plan count equals its summary count — Phase 1 (3/3),
+  Phase 2 (4 plans/5 summaries), Phase 3 (4/4, this plan's own `03-04-SUMMARY.md` just
+  landed on disk) — walked phase directories in sorted order and set `highestIncompletePhase`
+  to the FIRST phase encountered whose `summaries < plans` is false (Phase 1, `planCount: 3`),
+  then never updated it for Phase 2 or Phase 3 because `highestIncompletePhase` was already
+  truthy: `cmdStateSync`'s loop only replaces `highestIncompletePhase` inside its
+  `summaries < plans` branch (a genuinely incomplete phase) OR inside an `else if
+  (!highestIncompletePhase)` branch that only fires while it is still null. **Once every
+  phase on disk is fully summarized, no phase can ever re-trigger either branch after the
+  first one runs, so the field silently freezes on whichever phase sorts first alphabetically
+  — Phase 1's plan count, reported as "the current phase's total," regardless of which phase
+  is actually current.** Corrected by hand here (4, matching `find-phase 3`'s
+  `plan_count: 4`); not a fix to `state.cjs` — that file is gitignored `.claude/` tooling,
+  outside this plan's `files_modified`, and a code fix belongs to whoever owns that class
+  (see FINDING-02, gitignored instrumentation). Logged here so the instance is not silently
+  overwritten again the next time `state.sync` runs against an all-summarized disk state.
+
 ## Deferred Items
 
 Items acknowledged and deferred at milestone close, most recent first:
@@ -336,8 +360,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-03T15:34:38.864Z
-Stopped at: Completed 03-03-PLAN.md
+Last session: 2026-09-03T16:23:50.730Z
+Stopped at: Completed 03-04-PLAN.md
 
 What changed, and the evidence that closed it:
 

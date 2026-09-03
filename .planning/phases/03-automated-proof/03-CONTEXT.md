@@ -130,8 +130,7 @@ proceeding.
 
 ### Cost, measured cold as well as warm
 
-- **D-05: `DefaultTimeout` stays 240s; its rationale comment is corrected and tagged
-  `PROOF-03`.** The value was never wrong. The **rationale** was.
+- **D-05: `DefaultTimeout` stays 240s, and its rationale comment is corrected and tagged PROOF-03.** The value was never wrong. The **rationale** was.
 
   `harness.go` documents 240s as "roughly six times the slowest plausible child measured on
   this host: a full `go test ./... -count=1` is ~13 seconds ... `make vet` alone is ~35
@@ -162,8 +161,7 @@ proceeding.
   amendment this anticipates and why it is *not* taken here.
   — **Reversibility:** reversible.
 
-- **D-06: The shared-database coupling is declared, and isolation is registered as a deferred
-  item carrying the measurement.** Not described — **sized**.
+- **D-06: The shared-database coupling is declared, and isolation is registered as a deferred item carrying the measurement.** Not described — **sized**.
 
   Measured via per-package intervals from `go test ./... -json`:
 
@@ -249,8 +247,7 @@ proceeding.
 
 ### Proving the proofs (SC-5)
 
-- **D-10: SC-5's literal wording is unreachable through the harness — registered as a
-  finding, not absorbed.** `buildChildEnv` sets `DepthEnv` last and skips any entry naming
+- **D-10: SC-5's literal wording is unreachable through the harness, and is registered as a finding rather than absorbed.** `buildChildEnv` sets `DepthEnv` last and skips any entry naming
   it, so a control that spawns the proof package hands it depth 1 and **every proof
   `SkipIfNested`-skips**. The control would see three skips and a green run — a vacuous pass,
   inside the mechanism built to remove vacuous passes.
@@ -319,8 +316,7 @@ proceeding.
   signal without reintroducing a defect already paid for.
   — **Reversibility:** reversible.
 
-- **D-16: Each control reuses its proof's captured intact-tree `RunResult`, and asserts that
-  result is real before comparing.** The control adds only the defeated-tree run.
+- **D-16: Each control reuses its proof's captured intact-tree `RunResult`, and asserts that result is real before comparing.** The control adds only the defeated-tree run.
 
   Running both sides independently would cost ~64s on an 18s gate (**4.5×**), and
   independence bought at that price is independence someone removes in six months — leaving
@@ -334,8 +330,7 @@ proceeding.
 
 ### What the assertions bind to
 
-- **D-17: Assertions bind to exported constants where they exist, and to test-supplied values
-  elsewhere.** PROOF-01 → `testenv.URLEnv`. Every preamble check → `testenv.RequireEnv`.
+- **D-17: Assertions bind to exported constants where they exist, and to test-supplied values elsewhere.** PROOF-01 → `testenv.URLEnv`. Every preamble check → `testenv.RequireEnv`.
   PROOF-02 → the host string the test itself supplied (`127.0.0.1:1`), which couples to
   nothing. No proof quotes prose `testenv` could reword.
 
@@ -414,7 +409,7 @@ proceeding.
 
 ### Phase 3's close sweep
 
-- **D-20: Phase 3's close sweep writes NO `*-SUMMARY.md`.** It produces `03-GOV-SWEEP.md` and
+- **D-20: Phase 3's close sweep writes no SUMMARY file.** It produces `03-GOV-SWEEP.md` and
   its own commit. The name is the mechanism — the same shape as 02's rename that took the
   runbook out of the wave graph.
 

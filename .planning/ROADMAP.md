@@ -160,7 +160,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-04-PLAN.md — Governance: verify the already-landed SC-5 correction and GATE-10 amendment, give D-21's diagnosis correction a durable home outside STATE.md, and register the deferred items with their measurements
+- [x] 03-04-PLAN.md — Governance: verify the already-landed SC-5 correction and GATE-10 amendment, give D-21's diagnosis correction a durable home outside STATE.md, and register the deferred items with their measurements
 
 **Post-checkpoint** *(not a wave plan; invoked by path after verification, UAT and security sign-off)*
 
@@ -175,4 +175,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Escalation Mechanism and Fixture Invariant | 3/3 | Complete    | 2026-09-01 |
 | 2. Enforcement and a Single Gate Definition | 4/4 wave plans + close sweep | Complete    | 2026-09-02 |
-| 3. Automated Proof | 2/4 | In Progress|  |
+| 3. Automated Proof | 3/4 | In Progress|  |

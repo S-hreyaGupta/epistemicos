@@ -3,6 +3,7 @@ package gateproof
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/EpistemicOS/epistemicos/internal/platform/gate"
@@ -150,5 +151,83 @@ func TestPROOF03_GateNamesUnreadableFixture(t *testing.T) {
 		if !lineContainsBoth(intact.Combined, testenv.RequireEnv, fixturePathSuffix) {
 			t.Fatalf("PROOF-03: no single line of make gate's output contains both %s and %s (GATE-10):\n%s", testenv.RequireEnv, fixturePathSuffix, intact.Combined)
 		}
+	})
+
+	// defeated_tree_control is PROOF-03's SC-5 differential control (D-11,
+	// D-13). It proves the intact side's assertion is non-vacuous: the
+	// proofs assert the gate fails and names its cause; if the defeated
+	// tree lacked the escalation preamble the proofs bind to, the proofs
+	// would fail. Proving the premise proves the consequent.
+	//
+	// D-13: three controls, one per condition, not one shared control — the
+	// three conditions were measured to fail differently in the defeated
+	// tree (config's own message / golang-migrate's "new migrator" wrapper
+	// / segment's own hash pin). One shared control would have had to paper
+	// over that difference, and papering over is precisely how the
+	// exit-code version of this differential first looked sound before
+	// measurement caught it (D-14).
+	t.Run("defeated_tree_control", func(t *testing.T) {
+		// Not checking that the proof passed — checking that the proof
+		// RAN. A control comparing against a result that was never
+		// produced is the vacuous-pass shape one indirection along, and
+		// this guard exists to make that specific failure loud rather than
+		// silent (D-16).
+		requireIntact(t, intact)
+
+		// This control needs a DIFFERENTLY defeated tree than the proof's
+		// — per 03-01's discretion note 4, a control needing a differently
+		// defeated tree materialises its own rather than sharing. Both
+		// defeats are required: the escalation strip is the axis the
+		// differential varies, and the broken fixture is the condition
+		// being varied over — a copy with only the strip would fail for a
+		// different reason entirely (segment's own hash-pinned read) and
+		// would not be a control for PROOF-03's condition.
+		root := materializeTree(t)
+		stripEscalationExport(t, root)
+		breakFixture(t, root)
+
+		// Same absence of database overrides as the intact side, so the
+		// ONLY difference between the two copies is the stripped export.
+		//
+		// Unsetting testenv.RequireEnv here is load-bearing, not symmetry
+		// for its own sake: with the export stripped from this copy's
+		// Makefile, nothing in the copy re-declares escalation, so an
+		// ambient EPISTEMIC_OS_TEST_REQUIRE_ENV inherited from whatever
+		// process is running this test (a real outer `make gate`, in
+		// particular) would otherwise leak through and make the defeated
+		// tree escalate anyway — defeating the differential for a reason
+		// unrelated to the stripped export. Measured directly: this leak
+		// is exactly what made this control fail on its first real
+		// `make gate` run before this Unset was added.
+		defeated := gate.Run(t, []string{"make", "gate"}, gate.RunOptions{
+			Dir:   root,
+			Unset: []string{testenv.RequireEnv},
+		})
+
+		// 1. Restate the intact side's positive from the captured result,
+		// so both sides of the differential appear together at the
+		// comparison.
+		if !lineContainsBoth(intact.Combined, testenv.RequireEnv, fixturePathSuffix) {
+			t.Fatalf("PROOF-03 control: the captured intact result no longer shows both %s and %s on one line:\n%s", testenv.RequireEnv, fixturePathSuffix, intact.Combined)
+		}
+
+		// 2. D-11: the differential binds to the escalation preamble, NOT
+		// to the exit code — D-14 measured exit 2 in all six cells of the
+		// intact/defeated matrix, including this one: with the escalation
+		// export stripped, segment's own hash-pinned direct reads in
+		// fixture_test.go still fail hard against the directory-fixture,
+		// regardless of escalation, so an exit-code differential could not
+		// come back false here. That measured fact is exactly why this
+		// cell is the sharpest of the three. Do not assert on defeated's
+		// exit code as a conjunct — it does no work.
+		if strings.Contains(defeated.Combined, testenv.RequireEnv) {
+			t.Errorf("PROOF-03 control: the defeated tree (escalation export stripped, fixture broken) still shows the escalation preamble — the differential does not discriminate:\n%s", defeated.Combined)
+		}
+
+		// No reporter-identity assertion here, and no assertion on
+		// defeated's exit code: the reporter in this cell is segment's own
+		// hash pin failing, which is this project's text but is NOT the
+		// condition PROOF-03 names. Asserting it would couple the control
+		// to an incidental co-failure rather than to the requirement.
 	})
 }

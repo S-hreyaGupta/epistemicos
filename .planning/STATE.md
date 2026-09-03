@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
-current_phase: 3
-current_phase_name: Automated Proof
+current_phase: 03
+current_phase_name: automated-proof
 status: planning
 stopped_at: Phase 3 context gathered — 03-CONTEXT.md written (21 decisions, 5 deferred items, all numbers measured)
-last_updated: "2026-09-03T08:57:14.756Z"
+last_updated: "2026-09-03T10:06:03.754Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 3 context gathered — 03-CONTEXT.md written, GATE-10 declared new scope
-state_head: fc213412a6509e501fd7545839d19f22f54dbe56
+state_head: 18a340d2ebf9ca9452bbe55f656e9120a383d933
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 7
+  total_plans: 11
   completed_plans: 7
-  percent: 67
+  percent: 64
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 
 ## Current Position
 
-Phase: 2 (Enforcement and a Single Gate Definition) — **COMPLETE**. All ten
+Phase: 03 (automated-proof) — READY TO EXECUTE
 requirements (GATE-01, GATE-02, GATE-03, CI-02, GATE-06, GATE-07, GATE-08, GATE-09,
 SEC-01, GOV-01) closed in REQUIREMENTS.md. GOV-01 was the last: its close sweep
 (`.planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP.md`) ran
@@ -39,7 +39,7 @@ Plan: 4 of 4 wave plans complete — 02-01 (`8a23cb6`), 02-03 (`9917290`), 02-02
 `status: passed` (10/11, criterion 11 deferred-by-design until this sweep), UAT
 `status: complete` (18 passed, 2 issues both dispositioned), security `status:
 verified, threats_open: 0`.
-Total Plans in Phase: 4 wave plans + 1 post-checkpoint runbook, all complete.
+Total Plans in Phase: 4
 Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
 Plan bytes: `8edae22` — freeze: `c96ecb2`
 Last activity: 2026-09-02 — GOV-01 close sweep executed by path (not by
@@ -60,10 +60,12 @@ discover late:
    GOV-01 obligation 2 requires `make planning-parity PHASE=3` as the first plan's
    precondition; it must be run, the two documents brought into agreement, and the check
    green before planning proceeds.
+
 2. **SC-5 is corrected, not satisfied as worded** (D-10, D-12). Its literal form is
    unreachable through the harness: `buildChildEnv` sets `DepthEnv` last and skips any entry
    naming it, so a control spawning the proof package gets depth 1 and every proof
    `SkipIfNested`-skips. The correction is sequenced through the same start check.
+
 3. **The close sweep writes no `*-SUMMARY.md`** (D-20) — see the corrected mechanism above.
 
 Its Note on the harness (`internal/platform/gate`, built by 02-02) and the design-tension
@@ -71,7 +73,7 @@ entry below remain its starting context.
 
 **This file's accuracy has a known expiry — see `02-FINDING-01-state-authority.md`.** It has many writers and no owner: it was hand-corrected at `20bd4ce`, then rewritten by the 02-01, 02-03 and 02-02 executors, and was stale again by `2d52a1e` (`status: planning` with three plans executed; a body whose count and list contradicted each other). It was stale a further time after this correction: `stopped_at`/`Current Position` narrated all three checkpoints as outstanding after all three had already landed and been committed — found and corrected by this sweep (`02-GOV-SWEEP.md`, evidence row 4). This correction carries the same expiry. FINDING-01's own mechanism fix (the executor's `state.sync` call) closes the frontmatter-vs-body desync path; it does not close the class this file's own edit history keeps demonstrating.
 
-Progress: [███████░░░] 67%
+Progress: [██████░░░░] 64%
 
 ## Performance Metrics
 
@@ -201,6 +203,27 @@ than living only inside a closed phase's plans:
   find. Verified during discussion: the SUMMARY filename is **not** mandated by GOV-01 (its text
   never mentions one); the "own commit and summary" wording is Phase 2's D-16, a CONTEXT
   decision — so this is a plan-shape choice, not a requirement change.
+
+- **`state.planned-phase` recomputed `percent` to 33 while leaving `completed_phases: 2`
+  intact — a SECOND field falling to the mechanism corrected above, and the reason a
+  `completed_phases`-only hand-fix is not sufficient.** `computeProgressPercent`
+  (`state-document.cjs:424`) returns `min(planFraction, phaseFraction)`. It takes
+  `phaseFraction` from the **disk-derived** phase count — which reads 1, because Phase 2's
+  verification is `stale` — not from the frontmatter value a human just corrected. So the
+  write left the file internally contradictory: `completed_phases: 2` beside `percent: 33`,
+  which is 1/3.
+
+  **Corrected to 64, computed rather than assumed.** With four Phase 3 plans added,
+  `planFraction` = 7/11 = 63.6% is now the binding constraint, below `phaseFraction` = 2/3 =
+  66.7%. The intuitive "restore it to 67" would have been wrong — 67 was correct only while
+  `total_plans` was 7.
+
+  **Why this is worth recording rather than just fixing:** `13071ff` and the 2026-09-03
+  correction above both restored `completed_phases` and stopped there. Neither noticed
+  `percent` because at the time `planFraction` was 1.0 and the two happened to agree. The
+  moment plans were added they diverged, and the same root cause produced a wrong field that
+  reads like an unrelated bug. A partial hand-correction of a derived block is not a
+  correction — it moves the staleness to whichever field nobody checked.
 
 ## Deferred Items
 

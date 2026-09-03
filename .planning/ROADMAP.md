@@ -145,11 +145,25 @@ untouched; this corrects what a document *says* about it — and it is that dist
 use on a success criterion rather than on a status field**. Sequenced through
 `make planning-parity PHASE=3`, which ran before and after this edit.
 
-**Plans**: TBD
+**Plans**: 4 wave plans + 1 post-checkpoint runbook
 
 Plans:
+**Wave 1**
 
-- [ ] 03-01: TBD at planning
+- [ ] 03-01-PLAN.md — Tracer: the `internal/platform/gateproof` package proves PROOF-01 end-to-end through every layer, plus `RunOptions.Dir`, the corrected `DefaultTimeout` rationale, Go tree materialisation, and PROOF-01's SC-5 differential control
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — PROOF-02 and its SC-5 control, plus the structural half of D-03's ordering claim, checked against `make -n gate`'s dry-run expansion
+- [ ] 03-03-PLAN.md — PROOF-03 and its SC-5 control: the fixture replaced by a directory inside a throwaway copy, asserted against the common path suffix
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-04-PLAN.md — Governance: verify the already-landed SC-5 correction and GATE-10 amendment, give D-21's diagnosis correction a durable home outside STATE.md, and register the deferred items with their measurements
+
+**Post-checkpoint** *(not a wave plan; invoked by path after verification, UAT and security sign-off)*
+
+- [ ] 03-GOV-SWEEP-RUNBOOK.md — GOV-01's close sweep. Produces `03-GOV-SWEEP.md` and **no `*-SUMMARY.md`** (`03-CONTEXT.md` D-20)
 
 ## Progress
 
@@ -160,4 +174,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Escalation Mechanism and Fixture Invariant | 3/3 | Complete    | 2026-09-01 |
 | 2. Enforcement and a Single Gate Definition | 4/4 wave plans + close sweep | Complete    | 2026-09-02 |
-| 3. Automated Proof | 0/TBD | Not started | - |
+| 3. Automated Proof | 0/4 wave plans + close sweep | Planned    | - |

@@ -156,7 +156,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 03-02-PLAN.md — PROOF-02 and its SC-5 control, plus the structural half of D-03's ordering claim, checked against `make -n gate`'s dry-run expansion
-- [ ] 03-03-PLAN.md — PROOF-03 and its SC-5 control: the fixture replaced by a directory inside a throwaway copy, asserted against the common path suffix
+- [x] 03-03-PLAN.md — PROOF-03 and its SC-5 control: the fixture replaced by a directory inside a throwaway copy, asserted against the common path suffix
 
 **Wave 3** *(blocked on Wave 2 completion)*
 

@@ -187,7 +187,7 @@ one extra line in a phase's requirement set.
 
 - [x] **PROOF-01**: An automated test proves the gate fails and names `EPISTEMIC_OS_DB_URL` when that variable is unset
 - [x] **PROOF-02**: An automated test proves the gate fails and names the unreachable host when the database cannot be reached
-- [ ] **PROOF-03**: An automated test proves the gate fails and names the fixture path when a fixture is unreadable
+- [x] **PROOF-03**: An automated test proves the gate fails and names the fixture path when a fixture is unreadable
 
 ## v2 Requirements
 
@@ -228,7 +228,7 @@ Which phases cover which requirements.
 | CI-02 | Phase 2 | Complete |
 | PROOF-01 | Phase 3 | Complete |
 | PROOF-02 | Phase 3 | Complete |
-| PROOF-03 | Phase 3 | Pending |
+| PROOF-03 | Phase 3 | Complete |
 | GATE-10 | Phase 3 | Pending |
 
 **Coverage:**

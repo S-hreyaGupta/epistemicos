@@ -7,9 +7,17 @@
 // condition that gate was built as this phase's harness compiler-enforced
 // instead of a claim nobody could falsify.
 //
-// Every test in this package calls gate.SkipIfNested(t) as its first
+// Every real test in this package calls gate.SkipIfNested(t) as its first
 // statement, so a nested `make gate` invoked from inside the suite `make
-// gate` governs declines at depth 1 rather than recursing.
+// gate` governs declines at depth 1 rather than recursing. The one exception
+// is TestHelperProcess_TarWithTrailer (tree_drain_test.go), which is not
+// itself a test of anything in this package — it is a subprocess entry
+// point, invoked only via exec.Command(os.Args[0], "-test.run=...") by
+// TestMaterializeTree_DrainsPastTarEOF, and returns immediately (no `make`
+// invocation, no recursion) unless its own marker env var is set. Verified
+// by direct enumeration of every `func Test*` in this package's first
+// statement: at depth 1 (EPISTEMIC_OS_TEST_MAKE_DEPTH=1), 8 SKIP and 1 PASS
+// (TestHelperProcess_TarWithTrailer, the documented exception above).
 package gateproof
 
 import (

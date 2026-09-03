@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"testing"
 	"time"
+
+	"github.com/EpistemicOS/epistemicos/internal/platform/gate"
 )
 
 // TestHelperProcess_TarWithTrailer is not itself a test of anything in this
@@ -81,6 +83,8 @@ const tarTrailerHelperEnv = "GATEPROOF_HELPER_TAR_TRAILER"
 // hanging the suite — the same property DefaultTimeout gives make gate's
 // own children.
 func TestMaterializeTree_DrainsPastTarEOF(t *testing.T) {
+	gate.SkipIfNested(t)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

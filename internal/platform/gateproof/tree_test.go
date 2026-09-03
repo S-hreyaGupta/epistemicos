@@ -71,11 +71,21 @@ func materializeTree(t *testing.T) string {
 
 	cmd := exec.CommandContext(ctx, "git", "archive", "--format=tar", "HEAD")
 	cmd.Dir = gate.RepoRoot(t)
-	// WaitDelay bounds how long Wait blocks for the child after the process
-	// exits or ctx is canceled. CommandContext's cancellation kills the
-	// process but does not by itself bound Wait — WaitDelay is what stops a
-	// wedged child (or an undrained pipe, if the drain below is ever
-	// removed again) from holding Wait open past the context deadline.
+	// WaitDelay is set here but is NOT what protects this call (03-REVIEW.md
+	// WR-02, confirmed by reading os/exec's Cmd.Start / watchCtx /
+	// awaitGoroutines in the Go 1.24 stdlib): WaitDelay's
+	// forced-pipe-close mechanism is gated on an internal goroutineErr
+	// channel that only gets populated when Stdout/Stdin/Stderr are handed
+	// to exec.Cmd as a plain io.Writer/io.Reader (the shape gate.Run uses,
+	// where WaitDelay genuinely is load-bearing). This Cmd uses
+	// cmd.StdoutPipe() with a manual, synchronous drain instead, so that
+	// channel is never populated and WaitDelay's pipe-forcing path never
+	// engages for this specific usage shape. What actually bounds a wedged
+	// `git archive` (or the synthetic helper in tree_drain_test.go) is
+	// ctx's own deadline plus exec.CommandContext's default Cancel
+	// (cmd.Process.Kill()) — independent of WaitDelay's value. WaitDelay
+	// would need cmd.Stdout to be a plain io.Writer (not StdoutPipe()) to
+	// actually engage that mechanism, mirroring gate.Run's own usage shape.
 	cmd.WaitDelay = 5 * time.Second
 
 	stdout, err := cmd.StdoutPipe()

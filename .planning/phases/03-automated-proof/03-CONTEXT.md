@@ -199,6 +199,26 @@ proceeding.
   mechanism this milestone exists to make trustworthy.
   — **Reversibility:** reversible.
 
+  **CORRECTION, 2026-09-03 (pattern-mapper finding, verified by the orchestrator before
+  planning).** This decision and D-11 both say the copy "reuses 02-03's **established**
+  negative-control pattern." That overstates what exists. Measured: `git archive` appears in
+  **zero** Go files; `TestGATE09_HeadingGuard_Control`
+  (`internal/core/domain/segment/acceptance_test.go:448`) is explicitly *"permanent,
+  **mutation-free**"* and drives the function with synthetic inputs, never materialising a tree.
+  The throwaway copy lives in **`02-03-PLAN.md`'s bash verify script** (`mktemp -d` →
+  `git archive HEAD | tar -x -C` → `perl -0pi` defeat edit → nested `go test`), executed once at
+  plan-verification time.
+
+  **The decision stands — the shape is proven in this repo and is still the right one.** What
+  changes is the work: Phase 3 writes the **first Go implementation** of tree materialisation,
+  shared by PROOF-03 and all three SC-5 controls, and unlike the bash original it runs on **every
+  gate, in CI, on Windows and Linux**. That promotes one detail from incidental to a decision the
+  planner must make rather than inherit: the bash form shells out to `tar`, which is a build-host
+  dependency the Go form need not take on — `git archive --format=tar` into Go's `archive/tar`,
+  or `git worktree add`, are both git-native alternatives. **Planner: choose deliberately and
+  record the choice; do not port the pipe verbatim on the assumption it was already vetted for
+  this use.** It was vetted as a one-shot verification step, not as per-test infrastructure.
+
 - **D-08: `RunOptions` gains a `Dir` field.** Measured: `gate.Run` hard-sets
   `cmd.Dir = RepoRoot(t)` and `RunOptions` has no `Dir`. The throwaway copy requires one.
 

@@ -250,6 +250,30 @@ func Run(t *testing.T, argv []string, opts RunOptions) RunResult {
 		return result
 	}
 
+	// WaitDelay (runWaitDelay, above) can force cmd.Wait() to return
+	// exec.ErrWaitDelay even when ctx never expires: per the stdlib's own
+	// doc comment on Cmd.WaitDelay, "If pipes are closed due to WaitDelay,
+	// no Cancel call has occurred, and the command has otherwise exited
+	// with a successful status, Wait and similar methods will return
+	// ErrWaitDelay instead of nil." That happens whenever the direct child
+	// exits (successfully or not) while a descendant it spawned and never
+	// waited for is still holding the inherited stdout/stderr pipe open —
+	// ctx.Err() stays nil in that case, so the branch above is skipped, and
+	// without this branch runErr would fall through to the t.Fatalf below
+	// as if the process "could not be started," which is false: it
+	// started, ran, and (per WaitDelay's own doc wording) may have exited
+	// 0. This gap was found by this phase's own code review (03-REVIEW.md
+	// WR-01) and is a defect the WaitDelay fix itself introduced, not one
+	// it exposed — see 03-INCIDENT-02-harness-timeout-defects.md's WR-01
+	// addendum. Classified as TimedOut, matching the ctx.Err() branch
+	// above: both describe "gate.Run's own bound was what ended this call,"
+	// not the child's own outcome.
+	if errors.Is(runErr, exec.ErrWaitDelay) {
+		result.TimedOut = true
+		result.ExitCode = -1
+		return result
+	}
+
 	if runErr == nil {
 		result.ExitCode = 0
 		return result

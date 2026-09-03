@@ -1,6 +1,7 @@
 package gateproof
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/EpistemicOS/epistemicos/internal/platform/gate"
@@ -54,6 +55,62 @@ func TestPROOF01_GateNamesUnsetURL(t *testing.T) {
 		// run that merely skipped.
 		if !lineContainsBoth(intact.Combined, testenv.RequireEnv, testenv.URLEnv) {
 			t.Fatalf("PROOF-01: no single line of make gate's output contains both %s and %s (GATE-10):\n%s", testenv.RequireEnv, testenv.URLEnv, intact.Combined)
+		}
+	})
+
+	// defeated_tree_control is PROOF-01's SC-5 differential control (D-11,
+	// D-13). It proves the intact side's assertion is non-vacuous: the
+	// proofs assert the gate fails and names its cause; if the defeated
+	// tree lacked the escalation preamble that the proofs bind to, the
+	// proofs would fail. Proving the premise proves the consequent.
+	t.Run("defeated_tree_control", func(t *testing.T) {
+		// This is not checking that the proof passed — it is checking that
+		// the proof RAN. A control comparing against a result that was
+		// never produced is the vacuous-pass shape one indirection along,
+		// and this guard exists to make that specific failure loud rather
+		// than silent (D-16).
+		requireIntact(t, intact)
+
+		root := materializeTree(t)
+		stripEscalationExport(t, root)
+
+		// The same invocation and the same Unset as the intact side, with
+		// Dir pointing at the defeated copy — the ONLY difference between
+		// the two sides is the stripped export. gate.Run rather than
+		// gate.Make because the working directory must be the copy, which
+		// is what RunOptions.Dir (D-08) exists for. The intact side already
+		// ran once above; this adds only the defeated run (D-16).
+		defeated := gate.Run(t, []string{"make", "gate"}, gate.RunOptions{
+			Dir:   root,
+			Unset: []string{testenv.URLEnv},
+		})
+
+		// 1. Restate the intact side's positive from the captured result,
+		// so both sides of the differential appear together at the
+		// comparison.
+		if !lineContainsBoth(intact.Combined, testenv.RequireEnv, testenv.URLEnv) {
+			t.Fatalf("PROOF-01 control: the captured intact result no longer shows both %s and %s on one line:\n%s", testenv.RequireEnv, testenv.URLEnv, intact.Combined)
+		}
+
+		// 2. D-14: the differential binds to the escalation preamble, NOT
+		// to the exit code — exit 2 was measured in all six cells of the
+		// intact/defeated matrix (with escalation stripped, migrate becomes
+		// the reporter and fails anyway), so an exit-code differential
+		// could not come back false. The escalation preamble discriminates
+		// cleanly in all six cells, and it is built from testenv.RequireEnv,
+		// an exported constant this project owns. Do not assert on
+		// defeated's exit code as a conjunct — it does no work.
+		if strings.Contains(defeated.Combined, testenv.RequireEnv) {
+			t.Errorf("PROOF-01 control: the defeated tree (escalation export stripped) still shows the escalation preamble — the differential does not discriminate:\n%s", defeated.Combined)
+		}
+
+		// 3. D-15: reporter identity is asserted only where the reporter's
+		// text is ours — config's own required-variable message. This names
+		// who spoke in the defeated tree; it deliberately does not assert
+		// golang-migrate's own wrapper text, which is a foreign-prose
+		// coupling PROOF-02's control must refuse.
+		if !strings.Contains(defeated.Combined, "DB_URL is required") {
+			t.Errorf("PROOF-01 control: the defeated tree's output does not carry config's own required-variable message (\"DB_URL is required\"):\n%s", defeated.Combined)
 		}
 	})
 }

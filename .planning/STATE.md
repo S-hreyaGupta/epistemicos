@@ -31,12 +31,14 @@ complete; `is_last_phase: true` per `phase.complete`'s own output, so there is n
 
 Phase 3's four requirements (PROOF-01, PROOF-02, PROOF-03, GATE-10) are all `[x]`/Complete in
 REQUIREMENTS.md; `make planning-parity PHASE=3` agrees. Checkpoints: verification `status: passed`
-(6/6 must-haves, `03-VERIFICATION.md`), UAT — none required (`03-VERIFICATION.md`'s own
-"Human Verification Required: None"; no `03-UAT.md` was created because there was nothing to
-test), security `status: verified, threats_open: 0` (`03-SECURITY.md`, 29 threats registered, 28
-closed on first pass, 1 real live finding (T-03-14, a password-leak defect outside this phase's
-file scope, amplified by PROOF-03's design) found and fixed same night). A full regression run
-(`make test`, all packages, exit 0) confirmed no cross-phase regressions before phase close.
+(6/6 must-haves, `03-VERIFICATION.md`), UAT `status: complete` (`03-UAT.md`, 4/4 tests passed,
+35/35 deliverables auto-covered, 0 issues — run 2026-09-04, after the paragraph below was
+originally written; see the correction under "Blockers/Concerns — added 2026-09-04" for what this
+entry said before), security `status: verified, threats_open: 0` (`03-SECURITY.md`, 29 threats
+registered, 28 closed on first pass, 1 real live finding (T-03-14, a password-leak defect outside
+this phase's file scope, amplified by PROOF-03's design) found and fixed same night). A full
+regression run (`make test`, all packages, exit 0) confirmed no cross-phase regressions before
+phase close.
 
 Total Plans in Phase: 4 (03-01 through 03-04, all `[x]`). Phase base: `868d45b`, approved by Alex
 Zamurko 2026-09-01. Compose postgres up and healthy, bound to `127.0.0.1:5432` only.
@@ -49,13 +51,15 @@ Zamurko 2026-09-01. Compose postgres up and healthy, bound to `127.0.0.1:5432` o
 /gsd-execute-plan .planning/phases/03-automated-proof/03-GOV-SWEEP-RUNBOOK.md
 ```
 
-Its own precondition (`runs_after: [verification, uat, security-signoff]`) will check each
-checkpoint's frontmatter verdict itself and halt with a specific reason if anything is not
-satisfied — in particular, whether the checker accepts "no `03-UAT.md` exists because none was
-needed" as satisfying the UAT precondition, or requires a literal UAT artifact even when empty,
-was not independently confirmed before this entry was written. If it halts on that, run
-`/gsd-verify-work 3` first (it should close near-instantly, finding nothing to test) and re-invoke
-the sweep.
+Its own precondition (`runs_after: [verification, uat, security-signoff]`) checks each
+checkpoint's frontmatter verdict itself and halts with a specific reason if anything is not
+satisfied. **Correction, 2026-09-04 (03-GOV-SWEEP.md Task 2):** this paragraph originally read
+"whether the checker accepts 'no `03-UAT.md` exists because none was needed' ... was not
+independently confirmed before this entry was written. If it halts on that, run
+`/gsd-verify-work 3` first ... and re-invoke the sweep." That question is now moot: `/gsd-verify-work 3`
+was run and produced a real `03-UAT.md` (`status: complete`, 4/4 passed, 0 issues, committed
+`367761d`), so the literal-artifact question was never tested — the precondition was satisfied by
+an artifact existing, not by a leniency rule.
 
 **This file's accuracy has a known expiry — see `02-FINDING-01-state-authority.md`.** New instance
 found and corrected 2026-09-04: `phase.complete`'s own automated write left `completed_phases: 2`
@@ -430,15 +434,22 @@ What Phase 3 delivered, and the evidence that closed it:
 does not end `-PLAN.md`, so `plan-scan.cjs` never schedules it as a wave plan. Its logical id is
 `03-05`; ROADMAP.md's Phase 3 plan list already references it as the post-checkpoint step.
 
-**Invoke it explicitly, after verification + UAT + security sign-off:**
-`/gsd-execute-plan .planning/phases/03-automated-proof/03-GOV-SWEEP-RUNBOOK.md`
-
-Verification (`passed`, 6/6) and security (`verified`, `threats_open: 0`) are both satisfied.
-**UAT status is the one precondition not independently confirmed**: `03-VERIFICATION.md` found zero
+**Correction, 2026-09-04 (03-GOV-SWEEP.md Task 2):** this section originally instructed invoking the
+sweep via `/gsd-execute-plan .planning/phases/03-automated-proof/03-GOV-SWEEP-RUNBOOK.md` and stated
+"**UAT status is the one precondition not independently confirmed**: `03-VERIFICATION.md` found zero
 human-verification items needed, so no `03-UAT.md` was created — whether the sweep's own precondition
 checker accepts that as satisfying `uat`, or requires a literal UAT artifact regardless of content,
 was not checked before this entry was written. If the sweep halts on that precondition, run
-`/gsd-verify-work 3` first (should close near-instantly, nothing to test) and re-invoke.
+`/gsd-verify-work 3` first (should close near-instantly, nothing to test) and re-invoke." Both claims
+are now stale: (1) `/gsd-execute-plan` does not exist as a command (see "Blockers/Concerns — added
+2026-09-04" below — this was already caught and recorded separately); the sweep actually ran via a
+`gsd-executor` agent dispatched directly against the runbook's path. (2) `/gsd-verify-work 3` WAS run
+(after this entry was written), produced a real `03-UAT.md` (`status: complete`, 4/4 passed, 0
+issues, 35/35 deliverables auto-covered, committed `367761d`), and the sweep's four preconditions —
+verification, UAT, security, all four wave SUMMARYs — were all independently re-checked by the sweep
+itself and confirmed satisfied before it derived anything. See `03-GOV-SWEEP.md` for the sweep's own
+record.
 
-Resume with: the close-sweep command above. No wave plans remain — Phase 3's 4/4 are complete.
+Resume with: none — the close sweep (`03-GOV-SWEEP.md`) has run and terminated. Phase 3's 4/4 wave
+plans are complete and the milestone's three phases are all complete.
 Resume file: None

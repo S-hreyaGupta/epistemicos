@@ -164,7 +164,7 @@ Plans:
 
 **Post-checkpoint** *(not a wave plan; invoked by path after verification, UAT and security sign-off)*
 
-- [ ] 03-GOV-SWEEP-RUNBOOK.md — GOV-01's close sweep. Produces `03-GOV-SWEEP.md` and **no `*-SUMMARY.md`** (`03-CONTEXT.md` D-20)
+- [x] 03-GOV-SWEEP-RUNBOOK.md — GOV-01's close sweep, code-free and last: derive the artifact list mechanically, revalidate every derived artifact with a per-artifact confirmed-current or corrected verdict, re-arm until a pass produces zero corrections, and halt rather than add a requirement. **Completed 2026-09-04** — ran two passes, terminated on the second with zero corrections; see `03-GOV-SWEEP.md`. Produces `03-GOV-SWEEP.md` and **no `*-SUMMARY.md`** (`03-CONTEXT.md` D-20)
 
 ## Progress
 

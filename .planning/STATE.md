@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 current_phase: 03
 status: verified
-stopped_at: Phase 03 complete — all phases complete — close sweep pending
-last_updated: "2026-09-04T04:50:34.467Z"
-last_activity: 2026-09-04
-last_activity_desc: Phase 03 complete; corrected by hand after phase.complete wrote a contradictory frontmatter/body (see Blockers/Concerns 2026-09-04)
-state_head: b92719f34b98d33172349675786cd9a982c0f9c6
+stopped_at: Milestone complete — all three phases done, close sweep terminated, deferred item 2 decided
+last_updated: "2026-09-04T05:52:00.000Z"
+state_head: ca1cf086b2895a7440fc8d324d20ac1e4a981244
 progress:
   total_phases: 3
   completed_phases: 3
   total_plans: 11
   completed_plans: 11
   percent: 100
+last_activity: 2026-09-04
+last_activity_desc: transition.md post-processing completed by hand after a third same-night reproduction of the frontmatter-corruption class (see Blockers/Concerns 2026-09-04)
 ---
 
 # Project State
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-30)
 
 **Core value:** `make gate` must be able to distinguish "tested and passed" from "tested nothing".
-**Current focus:** All three phases complete — Phase 3's post-checkpoint close sweep is the only step left before milestone close.
+**Current focus:** Milestone complete. All three phases done, Phase 3's close sweep terminated (`03-GOV-SWEEP.md`, `0b7f6a7`), deferred item 2 decided (`ca1cf08`). Ready for `/gsd-complete-milestone`.
 
 ## Current Position
 
@@ -208,7 +208,7 @@ than living only inside a closed phase's plans:
 
 ### Blockers/Concerns
 
-- Phase 3 carries an open design question, recorded at PROJECT.md lines 91-93: a negative test asserting "the gate fails when `EPISTEMIC_OS_DB_URL` is unset" has to run inside the suite the gate governs, in an environment where that variable is set. **Amended by the GOV-01 close sweep, 2026-09-02 (not deleted — Phase 3's success criterion 4 still requires the tension to be solved *in Phase 3's plan*):** Phase 2's 02-02 supplied a slice of the answer rather than the whole one. It built `internal/platform/gate` (`Run`/`Make`/`RunOptions`/`RunResult`/`SkipIfNested`/`RepoRoot`/`DepthEnv`/`DefaultTimeout`) as a shell-out-to-`make` harness, confirmed at a human checkpoint as Phase 3's PROOF-01/02/03 contract, with a bounded recursion guard (`EPISTEMIC_OS_TEST_MAKE_DEPTH`, incremented last so `Unset`/`Env` cannot defeat it) so a proof that shells out to `make gate` from inside the suite `make gate` governs does not loop. ROADMAP.md §Phase 3 carries a "Note on the harness" recording this slice and pointing at the three `RunOptions` shapes PROOF-01/02/03 map onto. **What Phase 3 still has to solve:** the harness makes the recursive shell-out *safe*; it does not by itself decide how each proof arranges an environment where `EPISTEMIC_OS_DB_URL` IS set for the outer suite while being unset/unreachable/fixture-broken for the inner `make gate` call — that composition is Phase 3's own plan's job, per its Note on the harness and success criterion 4.
+- Phase 3 carries an open design question, recorded at PROJECT.md lines 91-93: a negative test asserting "the gate fails when `EPISTEMIC_OS_DB_URL` is unset" has to run inside the suite the gate governs, in an environment where that variable is set. **Amended by the GOV-01 close sweep, 2026-09-02 (not deleted — Phase 3's success criterion 4 still requires the tension to be solved *in Phase 3's plan*):** Phase 2's 02-02 supplied a slice of the answer rather than the whole one. It built `internal/platform/gate` (`Run`/`Make`/`RunOptions`/`RunResult`/`SkipIfNested`/`RepoRoot`/`DepthEnv`/`DefaultTimeout`) as a shell-out-to-`make` harness, confirmed at a human checkpoint as Phase 3's PROOF-01/02/03 contract, with a bounded recursion guard (`EPISTEMIC_OS_TEST_MAKE_DEPTH`, incremented last so `Unset`/`Env` cannot defeat it) so a proof that shells out to `make gate` from inside the suite `make gate` governs does not loop. ROADMAP.md §Phase 3 carries a "Note on the harness" recording this slice and pointing at the three `RunOptions` shapes PROOF-01/02/03 map onto. **What Phase 3 still has to solve:** the harness makes the recursive shell-out *safe*; it does not by itself decide how each proof arranges an environment where `EPISTEMIC_OS_DB_URL` IS set for the outer suite while being unset/unreachable/fixture-broken for the inner `make gate` call — that composition is Phase 3's own plan's job, per its Note on the harness and success criterion 4. **RESOLVED, 2026-09-04, Phase 3 close:** each proof composed its own environment via `gate.RunOptions.Unset`/`Env` per the three shapes the harness Note specified — `Unset: [EPISTEMIC_OS_DB_URL]` for PROOF-01, a closed-port DSN in `Env` for PROOF-02, a broken fixture inside a `materializeTree` copy for PROOF-03 — while the outer suite kept `EPISTEMIC_OS_DB_URL` set throughout. Verified live: all three proofs run inside `make gate`'s own governed suite (`03-VERIFICATION.md`, criterion 4). No longer a blocker.
 - `.planning/config.json` is untracked. `cmdConfigNewProject` refuses to overwrite an existing config, so it is protected from regeneration only while the file stays in place.
 - **After any `/gsd-update`, re-check that `.claude/gsd-core/workflows/review.md` still contains the run-directory archive block before the `rm -rf`.** The block is hand-added instrumentation in a GSD-managed file, so an update reverts it silently — and a capture that stops happening without saying so is the same failure class the archive exists to catch. Added under GSD 1.11.0; each archive records the version that produced it in `_INSTRUMENTATION.txt`.
 - **The instrumentation itself is not in version control.** `.gitignore:29` ignores `.claude/`, so the archive block lives only on disk in this worktree. Its *output* under `.planning/phases/*/review-runs/` is tracked and survives, but the mechanism does not: recreating this worktree, or the runbook removing it, takes the block with it and later reviews would then discard their run dirs silently. Re-applying it is a manual step with no reminder attached.
@@ -216,6 +216,8 @@ than living only inside a closed phase's plans:
 - 01-03: five contract decisions (testenv package path/API, EPISTEMIC_OS_TEST_REQUIRE_DB semantics, the flag's wider-than-its-name scope, README/Makefile documentation deferral, the deferred AC-14 empty-heading guard) plus unresolved probe edge E1 are queued for the developer's end-of-phase disposition. The preamble policy (option C) is already RESOLVED 2026-09-01 by Alex and is not among these five.
 
 ### Blockers/Concerns — added 2026-09-04
+
+- **Third same-night reproduction of the frontmatter-corruption class, this time mid-`transition.md`.** Between two `Read`s of this file during `transition.md`'s post-processing (evolve_project → the STATE.md steps), an automated write reverted `completed_phases` 3→2 and `percent` 100→67 again — the identical regression already corrected once at `d7619ca` — and additionally introduced a brand-new field, `current_phase_name: "**COMPLETE**. All three milestone phases   are now"`, a garbled fragment that reads as markdown bold syntax and a partial sentence lifted from this file's own "Current Position" body text, not a value any writer should have derived. `state_head` was the one field correctly advanced (to `ca1cf08`, the true current HEAD) — confirming *something* ran `state.sync`-shaped logic in the background, partially correctly, while corrupting the rest. Caught only because the `Edit` tool itself warned "the file had been modified on disk since you last read it" immediately after a routine edit; `git diff` against the last commit was checked before any further blind edit was made, per this session's own standing rule not to trust a STATE.md write without verifying it. Corrected by hand in the same pass: `completed_phases: 3`, `percent: 100`, `current_phase_name` removed entirely (it was never part of this file's schema before this write introduced it), `stopped_at`/Session Continuity's stale "context exhaustion" text replaced with the actual completed state. **No further `gsd_run query state.*` calls were made for the remainder of this task after this was found**, to stop feeding whatever background writer is doing this. Not diagnosed to a specific call site — unlike the prior two instances (`13071ff`'s wrong diagnosis, then `phase.complete`'s confirmed gap), this one's trigger is unknown; recorded as a third occurrence of FINDING-01's named class rather than as a fourth wrong-mechanism guess.
 
 - **`/gsd-execute-plan <path>` — the command this project's own tooling instructs an operator to run at the last step of every milestone — does not exist.** Found trying to invoke it exactly as directed: `03-GOV-SWEEP-RUNBOOK.md`'s own frontmatter comment says *"Run it explicitly, after verification, UAT and security sign-off: `/gsd-execute-plan .planning/phases/03-automated-proof/03-GOV-SWEEP-RUNBOOK.md`"*, and this file's own since-corrected Session Continuity section carried the identical invocation for `02-GOV-SWEEP-RUNBOOK.md` at Phase 2's close. Checked `.claude/commands/` (every real slash command GSD installs) and `.claude/gsd-core/workflows/` directly: no `gsd-execute-plan.md` exists in either. The only command referencing the underlying `execute-plan.md` workflow file at all is `gsd-execute-phase.md`, which loads it internally per-wave-plan — it is not a user-invokable "run one plan by path" command, and no such command exists anywhere in this installation. **This is a documented invocation that has never worked, sitting at the single most load-bearing step of every milestone's close** — the sweep this project's own GOV-01 requirement depends on to catch exactly this class of drift. Confirmed how Phase 2's sweep actually ran despite the broken instruction: `git log f2794e4` (Task 1 of that same runbook shape) shows per-task atomic commits in the executor's own commit style, with no slash-command trace — meaning it was run the same way every numbered `03-0X-PLAN.md` in this phase was run tonight: a `gsd-executor` agent dispatched directly against the file path, following `execute-plan.md`'s workflow, bypassing wave scheduling because the runbook's own filename (not ending `-PLAN.md`) already keeps `plan-scan.cjs` from touching it. The real mechanism has always been direct executor dispatch, not a documented command — and nothing in either runbook's own text, or this file's prior Session Continuity sections, ever named that mechanism; both pointed an operator at a command that 404s. Not filed as a new FINDING document — recorded here as the measurement, in this file, at the moment it was caught, so the next milestone's close doesn't rediscover it the same way.
 
@@ -395,8 +397,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T04:50:34.467Z
-Stopped at: Phase 03 complete — all three phases complete — close sweep pending
+Last session: 2026-09-04T05:52:00.000Z
+Stopped at: transition.md post-processing complete — milestone ready for /gsd-complete-milestone
 
 **Note: this section previously carried Phase 2's own closure narrative (GATE-03/06/02, requirement
 count, GOV-01 sweep mechanics for `02-GOV-SWEEP-RUNBOOK.md`) verbatim, unchanged since 2026-09-02,
@@ -413,18 +415,23 @@ What Phase 3 delivered, and the evidence that closed it:
    (unset DSN, unreachable host, unreadable fixture) fail `make gate` and name the cause, each with
    an SC-5 differential control. Independently re-run live during phase verification against the
    real compose database (`03-VERIFICATION.md`).
+
 2. **GATE-10** — the escalation preamble and named cause arrive in one `t.Fatalf` call at all three
    sites in `testenv.go`; confirmed directly in source, not by grep count.
+
 3. **Two harness defects found and fixed mid-phase** (not part of the planned scope): a
    `materializeTree` pipe-drain deadlock and `gate.Run`'s unreachable `TimedOut` branch on
    `WaitDelay` — `03-INCIDENT-01`, `03-INCIDENT-02`.
+
 4. **Code review**: 4 warnings found, 2 fixed (a real `errors.Is(exec.ErrWaitDelay)` gap the
    `WaitDelay` fix itself introduced, and a misleading comment), 2 deferred with measurements
    (`03-REVIEW.md`, `03-REVIEW-FIX-SUMMARY.md`).
+
 5. **Security audit**: 29 threats registered (including 3 test files committed outside any plan,
    which no plan's threat model could have covered), 28 closed on first pass, 1 real live password
    leak found (`store.RunMigrations`, T-01-01's un-remediated twin, amplified by PROOF-03's design)
    and fixed same night (`03-SECURITY.md`, `03-SECURITY-FIX-SUMMARY.md`).
+
 6. **Regression gate**: full `make test` (all packages) passed clean, no cross-phase regressions.
 7. **PROOF-03 timing anomaly**: an intermittent 12+ minute timeout (vs. 18-30s normal), the `api`
    compose service confirmed as a contributing factor via live A/B test, mechanism not fully

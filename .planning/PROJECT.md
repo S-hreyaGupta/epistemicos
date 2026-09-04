@@ -35,24 +35,22 @@ vacuously makes all of them unfalsifiable.
 - ✓ Expose REST API (health, capabilities, papers, metrics) and an 18-command CLI — existing
 - ✓ Apply schema migrations via golang-migrate — existing
 - ✓ Operate with CORS, per-IP rate limiting, security headers, correlation IDs — existing
+- ✓ `make gate` fails loudly and names the cause when `EPISTEMIC_OS_DB_URL` is unset — Phase 1/2 (GATE-01)
+- ✓ `make gate` fails loudly and names the cause when the database is unreachable — Phase 2 (GATE-02)
+- ✓ `make gate` fails loudly and names the cause when a fixture is unreadable — Phase 2 (GATE-03)
+- ✓ Content-conditional skips stay green and silent — Phase 1 (GATE-04)
+- ✓ CI provisions PostgreSQL and applies migrations on every push/PR — Phase 2 (CI-01)
+- ✓ `ci.yml` calls `make gate` rather than re-implementing it — Phase 2 (CI-02)
+- ✓ Automated negative tests prove each of the three environment conditions breaks
+  the gate and the gate names the cause — Phase 3 (PROOF-01, PROOF-02, PROOF-03)
+- ✓ The escalation preamble and named cause arrive in a single message on all three
+  escalated paths — Phase 3, declared mid-phase per D-19 (GATE-10)
 
 ### Active
 
 <!-- This milestone. Hypotheses until shipped and validated. -->
 
-- [ ] `make gate` fails loudly and names the cause when `EPISTEMIC_OS_DB_URL` is unset (GATE-01)
-- [ ] `make gate` fails loudly and names the cause when the database is unreachable (GATE-02)
-- [ ] `make gate` fails loudly and names the cause when a fixture is unreadable (GATE-03)
-- [ ] Content-conditional skips stay green and silent — a fixture that genuinely lacks
-      a preamble is legitimate signal, not a gate failure (GATE-04)
-- [ ] CI provisions PostgreSQL and applies migrations so the database-backed tests
-      actually execute on every push and pull request (CI-01)
-- [ ] `ci.yml` calls `make gate` rather than re-implementing it, so the gate has exactly
-      one definition (CI-02)
-- [ ] Automated negative tests prove the gate: each of the three environment conditions
-      is deliberately broken and the gate is asserted to fail *and* to name that cause
-      (PROOF-01, PROOF-02, PROOF-03 — REQUIREMENTS.md's header records that this single
-      line was split into three atomic requirements under the template's atomicity rule)
+_(none — all milestone requirements below shipped and moved to Validated at Phase 3's close, 2026-09-04)_
 
 ### Out of Scope
 
@@ -133,4 +131,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-30 after initialization*
+*Last updated: 2026-09-04 after Phase 3 (milestone complete, pending /gsd-complete-milestone)*

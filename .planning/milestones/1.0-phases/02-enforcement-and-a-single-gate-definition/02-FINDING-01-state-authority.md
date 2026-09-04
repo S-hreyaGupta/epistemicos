@@ -3,7 +3,7 @@ phase: 02-enforcement-and-a-single-gate-definition
 type: finding
 id: FINDING-01
 title: STATE.md has many writers and no owner, so a correction to it cannot be durable
-status: open — instance fixed, class open; option 2 escalated to Alex. Mechanism CORRECTED 2026-09-02.
+status: open — instance fixed, class open; option 2 ACCEPTED by Alex 2026-09-03, not yet implemented. Mechanism CORRECTED 2026-09-02.
 found: 2026-09-02
 found_by: orchestrator, while correcting STATE.md for the second time in one session
 relates_to: [GOV-01]
@@ -162,6 +162,14 @@ are reverted silently by `/gsd-update`. So each must ship with a durable instruc
 in the TRACKED planning docs, or the guard vanishes and nothing records that it ever
 existed. That constraint shaped this decision and is registered as its own class in
 `02-FINDING-02-gitignored-instrumentation.md`.
+
+**Option 2 accepted, 2026-09-03 — registered separately, not paraphrased here.**
+Alex Zamurko accepted option 2, sending its class-fix wording verbatim on 2026-09-03.
+That wording is registered in full at [[02-FINDING-01-DISPOSITION]] — a separate
+document, since it is the disposition and not the finding — rather than restated or
+paraphrased in this section. **The decision is registered, not implemented:** no
+code change accompanies either this note or that document. `FINDING-01` stays open
+until option 2 actually lands.
 
 ## What was done here
 

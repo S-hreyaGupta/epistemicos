@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Escalation Mechanism and Fixture Invariant** - One helper owns the skip/fail decision; an opt-in flag turns environment skips into named failures; the preamble property becomes a fixture invariant; nothing enforces yet (completed 2026-09-01)
 - [x] **Phase 2: Enforcement and a Single Gate Definition** - `make gate` turns strict and `ci.yml` calls it instead of re-implementing it (completed 2026-09-02)
-- [ ] **Phase 3: Automated Proof** - Negative tests break each condition and assert the gate fails and names that cause
+- [x] **Phase 3: Automated Proof** - Negative tests break each condition and assert the gate fails and names that cause (completed 2026-09-04)
 
 ## Phase Details
 
@@ -175,4 +175,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Escalation Mechanism and Fixture Invariant | 3/3 | Complete    | 2026-09-01 |
 | 2. Enforcement and a Single Gate Definition | 4/4 wave plans + close sweep | Complete    | 2026-09-02 |
-| 3. Automated Proof | 4/4 | In Progress|  |
+| 3. Automated Proof | 6/4 | Complete    | 2026-09-04 |

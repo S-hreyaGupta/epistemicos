@@ -248,6 +248,39 @@ than living only inside a closed phase's plans:
   covers this instance without needing a fourth restatement; this entry is the measurement FINDING-01
   itself asks every future instance to carry.
 
+- **Phase 2's `verification_status` reads `stale` in `init.manager`, surfaced during the v1.0
+  milestone audit's readiness check (`ALL_PHASES_VERIFIED` computed `false` on Phase 2 alone;
+  Phase 1 and Phase 3 both `passed`).** Root cause is the same `#2348` staleness rule already
+  measured in the 2026-09-03 correction above: `02-GOV-SWEEP.md`'s own close sweep wrote
+  `02-05-SUMMARY.md`, which postdates `02-VERIFICATION.md`, so `isPhaseComplete`'s
+  `status === 'passed'` check reads stale forever — not because Phase 2's verified content is
+  wrong (re-read in full during this audit: `status: passed`, 10/11 criteria verified live,
+  criterion 11 correctly deferred-by-design pending the sweep that has since run and closed with
+  zero corrections), but because a summary newer than the verification report is, by this rule's
+  own design, indistinguishable from a summary that invalidated it.
+
+  **This is the same defect `13071ff` was believed to fix, on its fourth observed occurrence.**
+  `13071ff` diagnosed the cause as SUMMARY-to-PLAN pairing and was itself corrected as WRONG by
+  the 2026-09-03 entry above, which measured the real mechanism (`isPhaseComplete` +
+  the `#2348` staleness rule) and called that correction the "third live reproduction" as of
+  2026-09-03 — this audit's `init.manager` read is the fourth: same trigger (a post-verification
+  sweep commit landing a `*-SUMMARY.md`), same symptom (a genuinely-passed phase reporting as
+  incomplete/stale), still unpatched at the mechanism level. Every occurrence so far has been
+  corrected by hand at the point of discovery (frontmatter edits, or here an override during
+  milestone close) rather than by a fix to `isPhaseComplete` or the staleness rule itself.
+
+  **Phase 3's D-20 (its own close sweep deliberately writes no `*-SUMMARY.md`) is a workaround for
+  Phase 3, not a fix for the class.** It prevents Phase 3 from re-triggering the rule, which is why
+  Phase 3 reads `passed` here and Phase 2 does not — but it does so by avoiding the trigger
+  shape for one phase, not by changing what the staleness rule does when a legitimate
+  post-verification artifact (a sweep's own summary, a GOV-01 record, anything dated after
+  `*-VERIFICATION.md`) lands on disk. Phase 2 carries the defect permanently: `02-05-SUMMARY.md`
+  already exists and will always postdate `02-VERIFICATION.md`, so this phase will read `stale`
+  in every future `init.manager`/`isPhaseComplete` call for the life of this repository unless the
+  rule itself is changed. Milestone close proceeded past this with an explicit override (see the
+  v1.0 milestone-close override record) rather than waiting on a fix that was already known, before
+  this audit, not to be in scope for this milestone.
+
 ### Blockers/Concerns — added 2026-09-03
 
 - **`state.record-session` reverted `completed_phases` 2→1 and `percent` 67→33 again; restored

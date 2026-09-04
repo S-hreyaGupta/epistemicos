@@ -8,14 +8,26 @@ integrity hashes, classifies paper type, and segments empirical papers into revi
 runs with sections, exhibits, and research units. It is built as a Go hexagonal
 architecture with an HTTP API and a CLI over the same core services.
 
-This milestone is not about adding pipeline capability. It is about making the test
-gate that verifies all of it mean something.
+v1.0 (Gate-Hardening) was not about adding pipeline capability. It was about making the
+test gate that verifies all of it mean something — and it shipped 2026-09-04.
 
 ## Core Value
 
 `make gate` must be able to distinguish "tested and passed" from "tested nothing" —
 because every downstream verification claim is made through it, and a gate that passes
-vacuously makes all of them unfalsifiable.
+vacuously makes all of them unfalsifiable. Proven, not just built: Phase 3's automated
+negative tests assert the gate actually fails and names its cause under each of the
+three environment conditions this milestone targeted.
+
+## Current State
+
+**v1.0 (Gate-Hardening) shipped 2026-09-04.** All 17 v1 requirements satisfied,
+cross-phase integration verified sound, 9 non-blocking tech-debt items registered for
+future milestones. Full detail archived at `.planning/milestones/1.0-ROADMAP.md`,
+`.planning/milestones/1.0-REQUIREMENTS.md`, and `.planning/milestones/1.0-MILESTONE-AUDIT.md`;
+summary in `.planning/MILESTONES.md`. Tagged `v1.0` in git.
+
+No next-milestone scope has been chosen yet — `/gsd-new-milestone` starts that.
 
 ## Requirements
 
@@ -131,4 +143,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-04 after Phase 3 (milestone complete, pending /gsd-complete-milestone)*
+*Last updated: 2026-09-04 after v1.0 (Gate-Hardening) milestone completion*

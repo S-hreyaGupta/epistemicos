@@ -1,18 +1,18 @@
 ---
 gsd_state_version: 1.0
-current_phase: 03
-status: verified
+status: Awaiting next milestone
 stopped_at: Milestone complete — all three phases done, close sweep terminated, deferred item 2 decided
-last_updated: "2026-09-04T05:52:00.000Z"
-state_head: ca1cf086b2895a7440fc8d324d20ac1e4a981244
+last_updated: "2026-09-04T06:51:49.736Z"
+last_activity: 2026-09-04
+last_activity_desc: Milestone 1.0 completed and archived
+state_head: 99040c2eafde8857e3cd5539da80d303fee0dc69
 progress:
   total_phases: 3
   completed_phases: 3
   total_plans: 11
   completed_plans: 11
   percent: 100
-last_activity: 2026-09-04
-last_activity_desc: transition.md post-processing completed by hand after a third same-night reproduction of the frontmatter-corruption class (see Blockers/Concerns 2026-09-04)
+current_phase: 03
 ---
 
 # Project State
@@ -22,56 +22,14 @@ last_activity_desc: transition.md post-processing completed by hand after a thir
 See: .planning/PROJECT.md (updated 2026-08-30)
 
 **Core value:** `make gate` must be able to distinguish "tested and passed" from "tested nothing".
-**Current focus:** Milestone complete. All three phases done, Phase 3's close sweep terminated (`03-GOV-SWEEP.md`, `0b7f6a7`), deferred item 2 decided (`ca1cf08`). Ready for `/gsd-complete-milestone`.
+**Current focus:** v1.0 (Gate-Hardening) shipped 2026-09-04. Awaiting `/gsd-new-milestone`.
 
 ## Current Position
 
-Phase: 03 (Automated Proof) — **COMPLETE**. All three milestone phases (01, 02, 03) are now
-complete; `is_last_phase: true` per `phase.complete`'s own output, so there is no Phase 4.
-
-Phase 3's four requirements (PROOF-01, PROOF-02, PROOF-03, GATE-10) are all `[x]`/Complete in
-REQUIREMENTS.md; `make planning-parity PHASE=3` agrees. Checkpoints: verification `status: passed`
-(6/6 must-haves, `03-VERIFICATION.md`), UAT `status: complete` (`03-UAT.md`, 4/4 tests passed,
-35/35 deliverables auto-covered, 0 issues — run 2026-09-04, after the paragraph below was
-originally written; see the correction under "Blockers/Concerns — added 2026-09-04" for what this
-entry said before), security `status: verified, threats_open: 0` (`03-SECURITY.md`, 29 threats
-registered, 28 closed on first pass, 1 real live finding (T-03-14, a password-leak defect outside
-this phase's file scope, amplified by PROOF-03's design) found and fixed same night). A full
-regression run (`make test`, all packages, exit 0) confirmed no cross-phase regressions before
-phase close.
-
-Total Plans in Phase: 4 (03-01 through 03-04, all `[x]`). Phase base: `868d45b`, approved by Alex
-Zamurko 2026-09-01. Compose postgres up and healthy, bound to `127.0.0.1:5432` only.
-
-**Next: the post-checkpoint GOV-01 close sweep, by path** — mirrors Phase 2's exact pattern
-(`02-GOV-SWEEP-RUNBOOK.md`), out of the wave graph the same way (its filename does not end
-`-PLAN.md`, so `plan-scan.cjs` never schedules it as a wave plan):
-
-```
-/gsd-execute-plan .planning/phases/03-automated-proof/03-GOV-SWEEP-RUNBOOK.md
-```
-
-Its own precondition (`runs_after: [verification, uat, security-signoff]`) checks each
-checkpoint's frontmatter verdict itself and halts with a specific reason if anything is not
-satisfied. **Correction, 2026-09-04 (03-GOV-SWEEP.md Task 2):** this paragraph originally read
-"whether the checker accepts 'no `03-UAT.md` exists because none was needed' ... was not
-independently confirmed before this entry was written. If it halts on that, run
-`/gsd-verify-work 3` first ... and re-invoke the sweep." That question is now moot: `/gsd-verify-work 3`
-was run and produced a real `03-UAT.md` (`status: complete`, 4/4 passed, 0 issues, committed
-`367761d`), so the literal-artifact question was never tested — the precondition was satisfied by
-an artifact existing, not by a leniency rule.
-
-**This file's accuracy has a known expiry — see `02-FINDING-01-state-authority.md`.** New instance
-found and corrected 2026-09-04: `phase.complete`'s own automated write left `completed_phases: 2`
-beside a body still describing Phase 3 as "not yet planned" with mid-sentence text spliced from an
-unrelated Phase-2 fragment ("Plan: Not started\n(`2d52a1e`), 02-04 (`46d587e`)...") and a frontmatter
-`percent: 67` contradicting the body's own rendered `33%`. See Blockers/Concerns 2026-09-04 for the
-full measurement. FINDING-01's own mechanism fix (the executor's `state.sync` call) closes the
-frontmatter-vs-body desync path for executor writes; it does not close the class this file's edit
-history keeps demonstrating, and this is a new instance in the orchestrator-driven `phase.complete`
-path specifically, not an executor write.
-
-Progress: [██████████] 100%
+Phase: Milestone 1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-04 — Milestone 1.0 completed and archived
 
 ## Performance Metrics
 
@@ -281,6 +239,20 @@ than living only inside a closed phase's plans:
   v1.0 milestone-close override record) rather than waiting on a fix that was already known, before
   this audit, not to be in scope for this milestone.
 
+- **Sixth occurrence of the FINDING-01 frontmatter-regression class, this time via
+  `gsd_run query milestone.complete`'s own state write.** Its JSON result reported
+  `state_updated: true` and `preservation_warnings` for exactly two fields
+  (`stopped_at`, `current_phase` — both correctly preserved over a disagreeing derived
+  value, per its own self-report). `completed_phases` (3→2) and `percent` (100→67)
+  regressed to the identical wrong values seen in every prior instance, with no
+  preservation warning for either — the same silent-regression shape, now confirmed at
+  a fifth distinct call site (`state.record-session`, `phase.complete`, the
+  unidentified mid-`transition.md` writer, and now `milestone.complete`, in addition to
+  `13071ff`'s original mis-diagnosed instance). Corrected by hand in the same pass:
+  `completed_phases: 3`, `percent: 100`. Not filed as a new FINDING document — same
+  reasoning as every prior instance this session: FINDING-01 already names the class,
+  and each occurrence's own measurement is what the finding asks to be carried forward.
+
 ### Blockers/Concerns — added 2026-09-03
 
 - **`state.record-session` reverted `completed_phases` 2→1 and `percent` 67→33 again; restored
@@ -430,8 +402,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T05:52:00.000Z
-Stopped at: transition.md post-processing complete — milestone ready for /gsd-complete-milestone
+Last session: 2026-09-04T06:51:49.736Z
+Stopped at: v1.0 (Gate-Hardening) shipped and archived — awaiting /gsd-new-milestone
 
 **Note: this section previously carried Phase 2's own closure narrative (GATE-03/06/02, requirement
 count, GOV-01 sweep mechanics for `02-GOV-SWEEP-RUNBOOK.md`) verbatim, unchanged since 2026-09-02,
@@ -494,3 +466,7 @@ record.
 Resume with: none — the close sweep (`03-GOV-SWEEP.md`) has run and terminated. Phase 3's 4/4 wave
 plans are complete and the milestone's three phases are all complete.
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

@@ -1,19 +1,18 @@
 ---
 gsd_state_version: 1.0
 current_phase: 03
-current_phase_name: Automated Proof
-status: planning
-stopped_at: Completed 03-04-PLAN.md
-last_updated: "2026-09-03T16:23:50.924Z"
-last_activity: 2026-09-03
-state_head: 9c3db5b56136e0e136ad342270cf310350fd928f
+status: verified
+stopped_at: Phase 03 complete — all phases complete — close sweep pending
+last_updated: "2026-09-04T04:50:34.467Z"
+last_activity: 2026-09-04
+last_activity_desc: Phase 03 complete; corrected by hand after phase.complete wrote a contradictory frontmatter/body (see Blockers/Concerns 2026-09-04)
+state_head: b92719f34b98d33172349675786cd9a982c0f9c6
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 3
   total_plans: 11
   completed_plans: 11
-  percent: 33
-last_activity_desc: Phase 03 execution started
+  percent: 100
 ---
 
 # Project State
@@ -23,63 +22,58 @@ last_activity_desc: Phase 03 execution started
 See: .planning/PROJECT.md (updated 2026-08-30)
 
 **Core value:** `make gate` must be able to distinguish "tested and passed" from "tested nothing".
-**Current focus:** Phase 03 — Automated Proof
+**Current focus:** All three phases complete — Phase 3's post-checkpoint close sweep is the only step left before milestone close.
 
 ## Current Position
 
-Phase: 03 (Automated Proof) — EXECUTING
-requirements (GATE-01, GATE-02, GATE-03, CI-02, GATE-06, GATE-07, GATE-08, GATE-09,
-SEC-01, GOV-01) closed in REQUIREMENTS.md. GOV-01 was the last: its close sweep
-(`.planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP.md`) ran
-two passes and terminated on the second producing zero corrections — see that
-document for the derivation, the per-artifact evidence table, and the re-arm log.
-Plan: 4 of 4
-(`2d52a1e`), 02-04 (`46d587e`) — plus the post-checkpoint GOV-01 close sweep
-(logical id 02-05, `02-GOV-SWEEP-RUNBOOK.md`). All checkpoints landed: verification
-`status: passed` (10/11, criterion 11 deferred-by-design until this sweep), UAT
-`status: complete` (18 passed, 2 issues both dispositioned), security `status:
-verified, threats_open: 0`.
-Total Plans in Phase: 4
-Phase base: `868d45b`, approved by Alex Zamurko 2026-09-01
-Plan bytes: `8edae22` — freeze: `c96ecb2`
-Last activity: 2026-09-03
-`/gsd-execute-phase`, per its own structural design — see
-`02-GOV-SWEEP-RUNBOOK.md`'s header). Compose postgres up and healthy, bound to
-`127.0.0.1:5432` only.
+Phase: 03 (Automated Proof) — **COMPLETE**. All three milestone phases (01, 02, 03) are now
+complete; `is_last_phase: true` per `phase.complete`'s own output, so there is no Phase 4.
 
-**Next:** Phase 3 (Automated Proof) — **context gathered 2026-09-03** (`fc21341`),
-not yet planned. Read
-`.planning/phases/03-automated-proof/03-CONTEXT.md` before planning: 21 decisions, every
-number in it measured on this host rather than estimated. Three things the planner must not
-discover late:
+Phase 3's four requirements (PROOF-01, PROOF-02, PROOF-03, GATE-10) are all `[x]`/Complete in
+REQUIREMENTS.md; `make planning-parity PHASE=3` agrees. Checkpoints: verification `status: passed`
+(6/6 must-haves, `03-VERIFICATION.md`), UAT — none required (`03-VERIFICATION.md`'s own
+"Human Verification Required: None"; no `03-UAT.md` was created because there was nothing to
+test), security `status: verified, threats_open: 0` (`03-SECURITY.md`, 29 threats registered, 28
+closed on first pass, 1 real live finding (T-03-14, a password-leak defect outside this phase's
+file scope, amplified by PROOF-03's design) found and fixed same night). A full regression run
+(`make test`, all packages, exit 0) confirmed no cross-phase regressions before phase close.
 
-1. **The requirement set has changed.** D-19 declares **GATE-10** as new scope — the
-   single-message constraint GATE-06's design always had and never stated, which D-18's
-   proofs depend on. ROADMAP §Phase 3's `**Requirements**:` line and REQUIREMENTS.md's
-   traceability table both still read PROOF-01/02/03 only, so **they currently disagree**.
-   GOV-01 obligation 2 requires `make planning-parity PHASE=3` as the first plan's
-   precondition; it must be run, the two documents brought into agreement, and the check
-   green before planning proceeds.
+Total Plans in Phase: 4 (03-01 through 03-04, all `[x]`). Phase base: `868d45b`, approved by Alex
+Zamurko 2026-09-01. Compose postgres up and healthy, bound to `127.0.0.1:5432` only.
 
-2. **SC-5 is corrected, not satisfied as worded** (D-10, D-12). Its literal form is
-   unreachable through the harness: `buildChildEnv` sets `DepthEnv` last and skips any entry
-   naming it, so a control spawning the proof package gets depth 1 and every proof
-   `SkipIfNested`-skips. The correction is sequenced through the same start check.
+**Next: the post-checkpoint GOV-01 close sweep, by path** — mirrors Phase 2's exact pattern
+(`02-GOV-SWEEP-RUNBOOK.md`), out of the wave graph the same way (its filename does not end
+`-PLAN.md`, so `plan-scan.cjs` never schedules it as a wave plan):
 
-3. **The close sweep writes no `*-SUMMARY.md`** (D-20) — see the corrected mechanism above.
+```
+/gsd-execute-plan .planning/phases/03-automated-proof/03-GOV-SWEEP-RUNBOOK.md
+```
 
-Its Note on the harness (`internal/platform/gate`, built by 02-02) and the design-tension
-entry below remain its starting context.
+Its own precondition (`runs_after: [verification, uat, security-signoff]`) will check each
+checkpoint's frontmatter verdict itself and halt with a specific reason if anything is not
+satisfied — in particular, whether the checker accepts "no `03-UAT.md` exists because none was
+needed" as satisfying the UAT precondition, or requires a literal UAT artifact even when empty,
+was not independently confirmed before this entry was written. If it halts on that, run
+`/gsd-verify-work 3` first (it should close near-instantly, finding nothing to test) and re-invoke
+the sweep.
 
-**This file's accuracy has a known expiry — see `02-FINDING-01-state-authority.md`.** It has many writers and no owner: it was hand-corrected at `20bd4ce`, then rewritten by the 02-01, 02-03 and 02-02 executors, and was stale again by `2d52a1e` (`status: planning` with three plans executed; a body whose count and list contradicted each other). It was stale a further time after this correction: `stopped_at`/`Current Position` narrated all three checkpoints as outstanding after all three had already landed and been committed — found and corrected by this sweep (`02-GOV-SWEEP.md`, evidence row 4). This correction carries the same expiry. FINDING-01's own mechanism fix (the executor's `state.sync` call) closes the frontmatter-vs-body desync path; it does not close the class this file's own edit history keeps demonstrating.
+**This file's accuracy has a known expiry — see `02-FINDING-01-state-authority.md`.** New instance
+found and corrected 2026-09-04: `phase.complete`'s own automated write left `completed_phases: 2`
+beside a body still describing Phase 3 as "not yet planned" with mid-sentence text spliced from an
+unrelated Phase-2 fragment ("Plan: Not started\n(`2d52a1e`), 02-04 (`46d587e`)...") and a frontmatter
+`percent: 67` contradicting the body's own rendered `33%`. See Blockers/Concerns 2026-09-04 for the
+full measurement. FINDING-01's own mechanism fix (the executor's `state.sync` call) closes the
+frontmatter-vs-body desync path for executor writes; it does not close the class this file's edit
+history keeps demonstrating, and this is a new instance in the orchestrator-driven `phase.complete`
+path specifically, not an executor write.
 
-Progress: [███░░░░░░░] 33%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 3
+- Total plans completed: 9
 - Average duration: —
 - Total execution time: —
 
@@ -88,6 +82,7 @@ Progress: [███░░░░░░░] 33%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 3 | - | - |
+| 03 | 6 | - | - |
 
 **Recent Trend:**
 
@@ -215,6 +210,35 @@ than living only inside a closed phase's plans:
 - **The instrumentation itself is not in version control.** `.gitignore:29` ignores `.claude/`, so the archive block lives only on disk in this worktree. Its *output* under `.planning/phases/*/review-runs/` is tracked and survives, but the mechanism does not: recreating this worktree, or the runbook removing it, takes the block with it and later reviews would then discard their run dirs silently. Re-applying it is a manual step with no reminder attached.
 - 01-02's whole-tree git-diff acceptance criteria (unrestricted 'git diff --name-only 868d45b --') print 47 files, not the expected single fixture_test.go, because ~29 pre-existing .planning/-only commits (base re-anchor, plan re-freeze, review-run archives) already sit between the phase base and execution start. The internal/-scoped form of the same check still confirms exactly one source file changed. Likely affects 01-01 and 01-03's identical whole-tree-diff criteria too — flag before running them.
 - 01-03: five contract decisions (testenv package path/API, EPISTEMIC_OS_TEST_REQUIRE_DB semantics, the flag's wider-than-its-name scope, README/Makefile documentation deferral, the deferred AC-14 empty-heading guard) plus unresolved probe edge E1 are queued for the developer's end-of-phase disposition. The preamble policy (option C) is already RESOLVED 2026-09-01 by Alex and is not among these five.
+
+### Blockers/Concerns — added 2026-09-04
+
+- **`phase.complete`'s automated STATE.md write produced a contradictory, partially-spliced
+  frontmatter and body at the milestone's final phase transition.** Measured directly, not
+  described: frontmatter read `completed_phases: 2` while `phase.complete`'s own JSON output for
+  this same call reported `"is_last_phase": true` — meaning all three phases (01, 02, 03) were now
+  complete and the field should have read 3. The same write set `percent: 67` in frontmatter while
+  the body's own rendered `Progress: [███░░░░░░░] 33%` bar disagreed with it internally, and both
+  were wrong regardless (should have been 100% by either the phase-fraction or plan-fraction
+  formula). The `status:` field was left at `planning` — untouched by the write entirely, even
+  though the phase it names as current had just been marked complete. Most seriously, the "Current
+  Position" body section was not regenerated to reflect the new state: it still read "Plan: Not
+  started" and a "**Next:** Phase 3 (Automated Proof) — ... not yet planned" block instructing a
+  future planner on pre-planning context for a phase that had been fully executed, reviewed,
+  secured, and verified hours earlier — and mid-paragraph, that stale Phase-3-pre-planning text was
+  spliced directly against an unrelated fragment of PHASE 2's own plan-list prose ("Plan: Not
+  started\n(`2d52a1e`), 02-04 (`46d587e`) — plus the post-checkpoint GOV-01 close sweep..."),
+  producing an incoherent sentence that read as neither phase's actual content.
+
+  **This is the same defect class FINDING-01 and the 2026-09-03 corrections already document — "a
+  normalizer that cannot parse keeps the previous value, silently" and "many writers, no owner" —
+  firing again, this time in the orchestrator-driven `phase.complete` path rather than an executor
+  write.** The executor-side fix (`state.sync`) does not cover this call path. Corrected by hand:
+  frontmatter (`completed_phases: 3`, `percent: 100`, `status: verified`), the "Current Position"
+  body section rewritten to reflect actual current state and point to the close sweep by path, and
+  the progress bar. Not filed as a new FINDING document — FINDING-01 already names the class and
+  covers this instance without needing a fourth restatement; this entry is the measurement FINDING-01
+  itself asks every future instance to carry.
 
 ### Blockers/Concerns — added 2026-09-03
 
@@ -364,32 +388,55 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-03T16:23:50.730Z
-Stopped at: Completed 03-04-PLAN.md
+Last session: 2026-09-04T04:50:34.467Z
+Stopped at: Phase 03 complete — all three phases complete — close sweep pending
 
-What changed, and the evidence that closed it:
+**Note: this section previously carried Phase 2's own closure narrative (GATE-03/06/02, requirement
+count, GOV-01 sweep mechanics for `02-GOV-SWEEP-RUNBOOK.md`) verbatim, unchanged since 2026-09-02,
+because whatever wrote this file at Phase 3's close did not regenerate it either — the same
+`phase.complete` gap recorded in Blockers/Concerns 2026-09-04. That content is preserved in this
+file's git history (see `02-VERIFICATION.md` and `02-GOV-SWEEP.md` for Phase 2's own record); it is
+replaced below with Phase 3's actual closure content, not appended beside stale content the way a
+correction normally would be, because it described a different phase's mechanics entirely and left
+in place would mislead about which phase is current.**
 
-1. **GATE-03 (was: no executable acceptance)** — 02-01 T2 step 5 moves the fixture aside against a live database and observes the failure. Reachability confirmed: `segmentation_test.go:240` calls `Pool(t)`, `:244` calls `Fixture(...)` — the repo's only `testenv.Fixture` call — so with a live DB the Pool branch cannot mask it.
-2. **GATE-06 third path (was: grep-proven)** — the same step asserts the flag+value in the real failure output; the three-`escalationPreamble` grep is now explicitly demoted to a structural check that does not on its own satisfy GATE-06.
-3. **GATE-02 at the gate (was: package-only)** — step 3b runs `make gate` against the closed-port DSN and asserts the absence of `new migrator`.
-4. **Requirement count (was: 12 vs an actual 16)** — all three count sites now assert entry-count == traceability-row-count before the pinned 16.
-5. **GOV-01 sweep (was: unachievable as scheduled)** — see below.
-6. **Criterion 9** — the guard is now run, not located; negative control confirmed sound (`git archive HEAD` + `cp` of the one declared file makes the throwaway tree byte-equivalent for that package).
+What Phase 3 delivered, and the evidence that closed it:
 
-**The sweep is out of the wave graph — structurally, not procedurally.** `02-05-PLAN.md` is now `02-GOV-SWEEP-RUNBOOK.md`. The rename is the mechanism: `plan-scan.cjs:141` schedules every file ending `-PLAN.md`, and `phase.cjs:797-801` computes the effective wave from the `depends_on` DAG while downgrading a disagreeing `wave:` to a warning — so clearing the frontmatter would have changed nothing. Measured: waves went from `{1,2,3}` to `{1:[02-01], 2:[02-02,02-03,02-04]}`, 0 warnings. Its logical id stays `02-05`; the sibling plans' references remain valid.
+1. **PROOF-01/02/03** — `internal/platform/gateproof` proves all three environment conditions
+   (unset DSN, unreachable host, unreadable fixture) fail `make gate` and name the cause, each with
+   an SC-5 differential control. Independently re-run live during phase verification against the
+   real compose database (`03-VERIFICATION.md`).
+2. **GATE-10** — the escalation preamble and named cause arrive in one `t.Fatalf` call at all three
+   sites in `testenv.go`; confirmed directly in source, not by grep count.
+3. **Two harness defects found and fixed mid-phase** (not part of the planned scope): a
+   `materializeTree` pipe-drain deadlock and `gate.Run`'s unreachable `TimedOut` branch on
+   `WaitDelay` — `03-INCIDENT-01`, `03-INCIDENT-02`.
+4. **Code review**: 4 warnings found, 2 fixed (a real `errors.Is(exec.ErrWaitDelay)` gap the
+   `WaitDelay` fix itself introduced, and a misleading comment), 2 deferred with measurements
+   (`03-REVIEW.md`, `03-REVIEW-FIX-SUMMARY.md`).
+5. **Security audit**: 29 threats registered (including 3 test files committed outside any plan,
+   which no plan's threat model could have covered), 28 closed on first pass, 1 real live password
+   leak found (`store.RunMigrations`, T-01-01's un-remediated twin, amplified by PROOF-03's design)
+   and fixed same night (`03-SECURITY.md`, `03-SECURITY-FIX-SUMMARY.md`).
+6. **Regression gate**: full `make test` (all packages) passed clean, no cross-phase regressions.
+7. **PROOF-03 timing anomaly**: an intermittent 12+ minute timeout (vs. 18-30s normal), the `api`
+   compose service confirmed as a contributing factor via live A/B test, mechanism not fully
+   understood (not postgres lock/query contention per enabled logging showing nothing) — registered
+   open, non-blocking, linked to D-06.
+
+**The close sweep is out of the wave graph, same mechanism as Phase 2's:** `03-GOV-SWEEP-RUNBOOK.md`
+does not end `-PLAN.md`, so `plan-scan.cjs` never schedules it as a wave plan. Its logical id is
+`03-05`; ROADMAP.md's Phase 3 plan list already references it as the post-checkpoint step.
 
 **Invoke it explicitly, after verification + UAT + security sign-off:**
-`/gsd-execute-plan .planning/phases/02-enforcement-and-a-single-gate-definition/02-GOV-SWEEP-RUNBOOK.md`
+`/gsd-execute-plan .planning/phases/03-automated-proof/03-GOV-SWEEP-RUNBOOK.md`
 
-Its precondition proves the checkpoints COMPLETED rather than asking: each artifact's own frontmatter verdict (`passed` / `complete` / `verified` + `threats_open: 0`), each committed, and each one's latest commit a descendant of the final plan SUMMARY's commit. Checker confirmed no assertion can pass vacuously (all four expectations are non-empty, so a missing key fails) and that the `LAST_SUMMARY` loop lands on the latest of the four on linear history.
+Verification (`passed`, 6/6) and security (`verified`, `threats_open: 0`) are both satisfied.
+**UAT status is the one precondition not independently confirmed**: `03-VERIFICATION.md` found zero
+human-verification items needed, so no `03-UAT.md` was created — whether the sweep's own precondition
+checker accepts that as satisfying `uat`, or requires a literal UAT artifact regardless of content,
+was not checked before this entry was written. If the sweep halts on that precondition, run
+`/gsd-verify-work 3` first (should close near-instantly, nothing to test) and re-invoke.
 
-**5 warnings carried, none blocking:**
-
-- Criterion 3 is executed but at package level, never through `make gate` as the criterion is worded. (The asymmetry with the GATE-02 fix is defensible — migrate cannot be first reporter for a filesystem condition against a live DB — but it is an asymmetry.)
-- `grep -q 'new migrator'` pins the D-03 ordering to a message string this phase does not own; a reword makes it silently vacuous.
-- Undeclared runtime coupling: 02-03 T1 recreates the shared compose container; 02-02 T3 and 02-04 read it via `make gate`. Same wave, no declared edge — safe only because `parallelization: false`.
-- `localhost` DSNs survive the loopback rebind in 02-02, 02-03 T1 and the runbook; 02-01 T2 already switched to `127.0.0.1` and the others did not follow.
-- 02-02: verify step 3 is still a bare `echo` in an assertion slot, and `DefaultTimeout`'s kill path is never exercised despite being a control on a high-rated threat.
-
-Resume with: `/gsd-execute-phase 2` — the plan gate has passed. It will run the 4 wave plans and CANNOT reach the GOV-01 sweep; run that separately by path after verification, UAT and security sign-off. Optionally clear the 5 warnings first (none blocks execution).
+Resume with: the close-sweep command above. No wave plans remain — Phase 3's 4/4 are complete.
 Resume file: None

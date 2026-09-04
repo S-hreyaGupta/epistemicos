@@ -183,6 +183,59 @@ one extra line in a phase's requirement set.
   channel the bound leaves open. It is recorded here so the next reader learns the
   mechanism has an edge from the register rather than from the next escape.
 
+  **Amendment to obligation 3, 2026-09-04 — milestone close decision, not a sweep
+  correction.** Obligations 3 and 4 above are UNCHANGED and stay as the historical
+  record of what GOV-01 originally specified; this amends the derivation *rule*
+  itself, which this project's own convention treats as a decision (changing the
+  set) rather than a sweep (correcting what a document says about an unchanged
+  set) — the same distinction GATE-10 was held to in Phase 3.
+
+  **The rule becomes: every tracked file, repo-wide (not `.planning/*`-scoped),
+  that names one of the phase's requirement IDs. The phase-number term is dropped
+  entirely** — no file qualifies for coverage merely by mentioning "Phase 3" or
+  similar prose; only a requirement ID tag counts.
+
+  **Why now:** the self-reference objection that refused this amendment for Phase 3
+  — *"Phase 3's own close sweep would then run against a rule the phase itself
+  changed"* — expired the moment Phase 3's close sweep terminated (`03-GOV-SWEEP.md`,
+  commit `0b7f6a7`, zero corrections on pass 2). There is no phase left whose own
+  sweep this amendment could be accused of gaming; this is milestone close, not
+  phase close.
+
+  **Why repo-wide, not `.planning/*`-scoped:** measured (03-CONTEXT.md, Phase 3
+  discussion, deferred item 2): widening from `.planning/*` to repo-wide costs 5.3s
+  over 227 tracked files and grows the derived set from 51 to 54, correctly adding
+  `internal/platform/gate/harness.go` and `internal/platform/testenv/testenv_test.go`
+  — both of which carry requirement-ID prose today and were invisible to the old
+  path-scoped rule for that reason alone.
+
+  **Why IDs-only, with no phase-number term:** the same measurement found the
+  phase-number term is the sole source of false positives — widening to repo-wide
+  *with* the phase-number disjunct incorrectly added `classify_test.go` (the
+  segmentation pipeline's own unrelated "phase 3" prose, not this milestone's).
+  Requirement IDs are globally unambiguous; phase numbers are not. Dropping the
+  phase-number term removes the false-positive source without losing coverage —
+  `harness.go` is already covered via its `[PROOF-03]` tag (see
+  `03-INCIDENT-02-harness-timeout-defects.md`), independent of any phase-number
+  mention.
+
+  **What this amendment does NOT close — recorded explicitly so it is not mistaken
+  for having solved it.** IDs-only, repo-wide still only derives files that carry a
+  requirement-ID tag. `internal/platform/gateproof/tree_drain_test.go` — one of six
+  files committed outside any plan during Phase 3's execution — carries a
+  *document* reference (`see 03-INCIDENT-02`) but no requirement-ID tag, so the
+  amended rule still would not derive it. Confirmed directly: Phase 3's close sweep
+  (`03-GOV-SWEEP.md`) caught that commit's *documentation* artifacts
+  (`03-INCIDENT-01`, `03-INCIDENT-02`, `03-REVIEW.md`, `03-REVIEW-FIX-SUMMARY.md`,
+  `03-SECURITY.md`, `03-SECURITY-FIX-SUMMARY.md`) because those live under
+  `.planning/` and name requirement IDs; it structurally could not and did not catch
+  the *code* those same commits touched (`tree_drain_test.go`,
+  `harness_waitdelay_test.go`, the `migrate.go` fix), because none of those files
+  carries a requirement-ID tag at all. **That is a tagging-discipline gap — code
+  written outside any plan going untagged — separate from the derivation rule this
+  amendment fixes, and it is registered as its own item in STATE.md's Deferred
+  Items table rather than left to look solved by this amendment.**
+
 ### Gate Proof
 
 - [x] **PROOF-01**: An automated test proves the gate fails and names `EPISTEMIC_OS_DB_URL` when that variable is unset

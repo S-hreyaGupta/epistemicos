@@ -110,6 +110,42 @@ absence made the GSD pilot's criterion 1 unprovable.
 Exactly what Codex returned, captured before any parsing, summarisation or
 response. No repair may occur before this file exists.
 
+## Declared deviations from the protocol
+
+The protocol's MC-2 specifies nine checks. `scripts/validate_cycle.py` implements
+ten, and two of the nine more strictly than written. These were introduced while
+building against the truncated source and are recorded here as deviations
+awaiting a decision, not as settled design.
+
+```text
+D-1  a tenth check, not in the protocol
+     codex-input.md must contain the target SHA-256 verbatim.
+     Rationale: freezing the target proves the artifact did not change, but
+     only the embedded hash ties that artifact to the input the reviewer
+     received. Its absence is what made the GSD pilot's criterion 1
+     unprovable. This is an addition to a frozen protocol and needs
+     ratifying or removing.
+
+D-2  check 9 made unconditional
+     Protocol: "where target references additional hashed artifacts:
+     recorded hashes match those artifacts" — a conditional. The checker
+     requires plan_files for plan review, and commit, tree,
+     approved_plan_sha256, diff and test_results for implementation review.
+     A cycle omitting them fails rather than passing vacuously.
+     Rationale: as written, an implementation review target carrying no
+     artifacts at all satisfies check 9. That is a check that cannot come
+     back false.
+
+D-3  target named target.json
+     Protocol says "target". The schema fixes the filename and the format.
+     Cosmetic, but it is a choice the protocol did not make.
+```
+
+D-1 and D-2 both make the gate stricter, so no cycle that passes the protocol as
+written would fail here for the wrong reason. That is not a justification for
+making them silently. Until they are ratified, `MC2_CONFORMANCE: PASS` means
+conformance to this schema, not to the protocol text.
+
 ## What MC-2 does not check
 
 Stated so nobody reads a PASS as more than it is.

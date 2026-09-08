@@ -31,3 +31,11 @@ internal/core/domain/segment/testdata/expected.json -text
 # preceding line. Both failures are silent: the hashes read as "wrong file"
 # and the offsets read as an extraction bug rather than as a checkout artefact.
 specs/** -text
+
+# Orchestration scripts are normalised to LF for the same reason go.mod and
+# go.sum are: they get hashed. The bootstrap review freezes validate_cycle.py
+# and its negative controls as a review target with a recorded SHA-256, and
+# under core.autocrlf=true a Windows checkout would rewrite them and that hash
+# would stop verifying. `text eol=lf` rather than `-text`, matching the Go
+# treatment above — normalise, do not merely decline to convert.
+*.py text eol=lf

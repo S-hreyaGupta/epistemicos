@@ -4,27 +4,35 @@ Frozen for the `BOOTSTRAP_REVIEW` of the execution layer. Hand-written, per Alex
 Zamurko, 8 September: a hand-written prompt is acceptable for the bootstrap and
 the five production prompts are built and frozen before A1E-001.
 
-This is **not** one of the five. It is used once, on the three components that
-had to exist before the protocol could run at all.
+This is **not** one of the five. It is used once, on the components that had to
+exist before the protocol could run at all.
+
+Revised 8 September, before use. The first version named three artifacts; the
+ledger and loop controller were built after it was written, so it was frozen a
+step too early and describing it as frozen was premature. Nothing was reviewed
+against the earlier text.
 
 ---
 
 ## What you are reviewing
 
-Three artifacts, hashed and listed in `target.json`:
+Five artifacts, hashed and listed in `target.json`:
 
 ```text
 specs/evidence-schema-v1.0.md   the frozen evidence structure
-scripts/validate_cycle.py       the MC-2 conformance gate
+scripts/validate_cycle.py       the MC-2 conformance gate, fifteen checks
 scripts/run_review.py           the review runner
+scripts/ledger.py               the finding and state ledger
+scripts/loop_state.py           the loop-state controller
 ```
 
 Their negative-control suites are supplied alongside as evidence that the checks
 they contain are falsifiable:
 
 ```text
-scripts/test_validate_cycle.py
-scripts/test_run_review.py
+scripts/test_validate_cycle.py   24 controls
+scripts/test_run_review.py       21 controls
+scripts/test_ledger.py           25 controls, covering both of the last two
 ```
 
 ## What you are reviewing them against
@@ -35,7 +43,7 @@ protocol governs and the disagreement is itself a finding.
 
 ## The question
 
-Do these three artifacts implement the protocol's Step 2.2, MC-1 and MC-2 as
+Do these five artifacts implement §2.2, §5, §6, §10.1, §10.2, MC-1 and MC-2 as
 written, and do their controls actually establish what they claim?
 
 Two failure modes matter more than the rest.
@@ -54,23 +62,47 @@ reporting, but comparable cases elsewhere do.
 scripts or their documentation that implies technical protection, immutability,
 or a proven binding between reviewer input and reviewer output.
 
-## Deviations already declared
+## Decisions already declared
 
-Three are recorded in `specs/evidence-schema-v1.0.md` under "Declared
-deviations". They are disclosed here so you assess them rather than rediscover
-them:
+The protocol underdetermines these, and each was resolved to build at all. They
+are disclosed so you assess them rather than rediscover them. Undeclared
+deviations you find are ordinary findings.
 
 ```text
-D-1  a tenth MC-2 check the protocol does not specify: codex-input.md must
-     contain the target SHA-256 verbatim
-D-2  protocol check 9 is conditional; the implementation makes it
-     unconditional
-D-3  protocol says "target"; the schema fixes the filename as target.json
+A  target is instantiated on disk as target.json, and DIFF_HASH and
+   TEST_RESULT_HASH are paired with diff_path and test_result_path so
+   checks 14 and 15 have an artifact to hash. Ruled a schema-level
+   concretisation, not a protocol change. See evidence-schema-v1.0.md.
+
+B  candidate_tree_hash is derived by the runner from candidate_commit and
+   never supplied by the operator. A hand-typed tree hash can be typed to
+   match whatever was recorded.
+
+C  Checks 11 to 15 report N/A on a plan cycle, never PASS. §10.2 scopes them
+   to implementation review, and reporting PASS for a check that was never
+   evaluated is the defect this gate exists to catch.
+
+D  ACCEPT records a disposition and leaves the finding OPEN. §5 gives
+   RESOLVED only "once the repair is demonstrated in the next review
+   target", so ledger.py refuses to resolve in the same cycle as the
+   acceptance. The protocol does not say who declares a repair demonstrated;
+   `resolve` requires an evidence string rather than inventing an answer.
+
+E  DISPUTED is terminal in the automated loop. §5 and §7.1 place adjudication
+   at the human gate, so nothing here moves a finding out of it.
+
+F  Check 13 compares approved_plan_hash against
+   plan-approval/approval.json, where §7.3 freezes it. Absent that record the
+   check fails rather than passing vacuously.
+
+G  loop_state.py runs the MC-2 gate itself rather than reading a recorded
+   verdict, so §6's n indexes VALID cycles and events recorded in an invalid
+   cycle are ignored entirely, including resolutions. This is the
+   conservative reading: it can delay an exit, never manufacture one.
 ```
 
-Assess whether each is sound, whether it is correctly scoped, and whether
-declaring it is sufficient or it should be removed. Undeclared deviations you
-find are ordinary findings.
+D and G are the two most worth arguing with. D decides when a finding stops
+being open, and G decides what counts as a cycle at all.
 
 ## Output format
 
@@ -105,6 +137,10 @@ An empty review is a finding about the review, not about the code.
 
 ## Scope limits
 
-Out of scope: style, naming beyond D-3, performance, and anything in
-`specs/gap/`. The ledger, loop-state controller and the five production prompts
-do not exist yet and their absence is not a finding.
+Out of scope: style, performance, and anything in `specs/gap/`. Naming is out of
+scope except where decision A is wrong.
+
+Not yet built, so their absence is not a finding: the five production prompts,
+the human review package generator (§7), and the Gold runner (§15). The
+implementing agent has not written a plan or an implementation yet, so there is
+no A1E-001 evidence to review; this is the tooling only.

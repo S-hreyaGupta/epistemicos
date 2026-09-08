@@ -36,3 +36,7 @@ coverage.out
 # the Step 3 reference fixture (§15) and MUST be committed. An unanchored
 # `demo*.md` matched it at every depth and silently excluded it.
 /demo*.md
+
+# Python bytecode, created by running the scripts in scripts/
+__pycache__/
+*.py[cod]

@@ -1,11 +1,13 @@
 # Review evidence schema v1.0
 
-Frozen structure for review-cycle evidence under
-`specs/implementation-review-protocol-v1.0.md`.
+Frozen structure for review-cycle evidence under the implementation and review
+protocol. MC-2 checks evidence against this schema, so the schema must be frozen
+before any cycle is written: a checker cannot validate a structure that is still
+moving.
 
-MC-2 checks evidence against this schema. The schema must therefore be frozen
-before any cycle is written, because a checker cannot validate a structure that
-is still moving.
+Derived against the protocol source containing §2.2 and §10.2, which specifies
+**fifteen** MC-2 checks — 1 to 10 for every cycle, 11 to 15 additionally and
+unconditionally for implementation review.
 
 ## Status of this document
 
@@ -35,11 +37,13 @@ runs/
         target.sha256
         codex-input.md
         codex-output-raw.md
+        invocation.json        written by the runner at record time
         findings.json          written by the runner
         claude-response.md     written by the implementing agent
       cycle-02/
         ...
     plan-approval/
+      approval.json            freezes APPROVED_PLAN_HASH, per Step 7.3
     implementation-review/
       cycle-01/
         ...
@@ -62,8 +66,8 @@ Common fields, both review types:
   "review_type": "plan" | "implementation",
   "run_id": "A1E-001",
   "cycle": 1,
-  "protocol_commit": "ef0565b…",
-  "protocol_sha256": "21d1b59a…",
+  "protocol_commit": "…",
+  "protocol_sha256": "…",
   "spec_sha256": "…",
   "frozen_at": "2026-09-08T13:40:00Z"
 }
@@ -79,17 +83,24 @@ Plan review adds:
 }
 ```
 
-Implementation review adds — all five mandatory, per MC-2 check 9:
+Implementation review adds the §10.1 fields. All five are mandatory, not
+conditional:
 
 ```json
 {
-  "commit": "…",
-  "tree": "…",
-  "approved_plan_sha256": "…",
-  "diff":         { "path": "…", "sha256": "…" },
-  "test_results": { "path": "…", "sha256": "…" }
+  "candidate_commit":    "…",
+  "candidate_tree_hash": "…",
+  "approved_plan_hash":  "…",
+  "diff_path":           "…",
+  "diff_hash":           "…",
+  "test_result_path":    "…",
+  "test_result_hash":    "…"
 }
 ```
+
+`candidate_tree_hash` is derived by the runner from `candidate_commit`, never
+supplied by hand. A tree hash typed in by an operator is a tree hash that can be
+typed to match whatever was recorded.
 
 ## `target.sha256`
 
@@ -97,9 +108,10 @@ One line: the lowercase hex SHA-256 of `target.json`, nothing else.
 
 ## `codex-input.md`
 
-Composed by the review runner, never by the implementing agent. Must contain the
-`target.sha256` value verbatim somewhere in its text. That string is the binding
-between what was frozen and what the reviewer was actually shown.
+Composed by the review runner, never by the implementing agent (§2.2). Must
+contain the `target.sha256` value verbatim somewhere in its text — MC-2 check
+10. That string is the binding between what was frozen and what the reviewer was
+actually shown.
 
 Freezing the target proves the artifact did not change. Only the embedded hash
 ties that artifact to the input the reviewer received. This is the control whose
@@ -110,54 +122,42 @@ absence made the GSD pilot's criterion 1 unprovable.
 Exactly what Codex returned, captured before any parsing, summarisation or
 response. No repair may occur before this file exists.
 
-## Declared deviations from the protocol
+## Schema-level concretisations
 
-The protocol's MC-2 specifies nine checks. `scripts/validate_cycle.py` implements
-ten, and two of the nine more strictly than written. These were introduced while
-building against the truncated source and are recorded here as deviations
-awaiting a decision, not as settled design.
+The protocol names logical artifacts; a checker needs to find them on disk.
+These are instantiations of the protocol, not changes to it, per Alex Zamurko's
+ruling of 8 September on D-3.
 
 ```text
-D-1  a tenth check, not in the protocol
-     codex-input.md must contain the target SHA-256 verbatim.
-     Rationale: freezing the target proves the artifact did not change, but
-     only the embedded hash ties that artifact to the input the reviewer
-     received. Its absence is what made the GSD pilot's criterion 1
-     unprovable. This is an addition to a frozen protocol and needs
-     ratifying or removing.
-
-D-2  check 9 made unconditional
-     Protocol: "where target references additional hashed artifacts:
-     recorded hashes match those artifacts" — a conditional. The checker
-     requires plan_files for plan review, and commit, tree,
-     approved_plan_sha256, diff and test_results for implementation review.
-     A cycle omitting them fails rather than passing vacuously.
-     Rationale: as written, an implementation review target carrying no
-     artifacts at all satisfies check 9. That is a check that cannot come
-     back false.
-
-D-3  target named target.json
-     Protocol says "target". The schema fixes the filename and the format.
-     Cosmetic, but it is a choice the protocol did not make.
+target          → the file target.json
+DIFF_HASH       → diff_hash, plus diff_path so check 14 has an artifact to
+                  hash. The protocol requires the hash to match the reviewed
+                  diff; without a path there is nothing to match against.
+TEST_RESULT_HASH→ test_result_hash, plus test_result_path, same reason.
+APPROVED_PLAN_HASH
+                → check 13 compares the target's value against
+                  plan-approval/approval.json, which is where Step 7.3 freezes
+                  it. Absent that record, the check fails rather than passing
+                  vacuously.
 ```
-
-D-1 and D-2 both make the gate stricter, so no cycle that passes the protocol as
-written would fail here for the wrong reason. That is not a justification for
-making them silently. Until they are ratified, `MC2_CONFORMANCE: PASS` means
-conformance to this schema, not to the protocol text.
 
 ## What MC-2 does not check
 
 Stated so nobody reads a PASS as more than it is.
 
 - That `codex-output-raw.md` came from the invocation `codex-input.md` describes.
-  Nothing in the evidence proves that binding; it rests on the runner behaving.
+  Nothing in the evidence proves that binding; it rests on the runner behaving,
+  and `invocation.json` records how the review was run without claiming more.
 - That the reviewer read the whole input.
 - That findings in `findings.json` correspond to the raw output. A separate check
-  could compare finding IDs against the raw text; it is not in the ten.
+  could compare finding IDs against the raw text; it is not among the fifteen.
 - Anything about content quality. MC-2 is an evidence-completeness gate.
 
-Under `CONVENTION_ONLY` these gaps are procedural, not technical, and the
+Checks 11 to 15 do not apply to plan review and are reported `N/A` there, never
+`PASS`. A check reporting success on a cycle it never examined would be the
+exact defect this gate exists to catch.
+
+Under `CONVENTION_ONLY` the gaps above are procedural, not technical, and the
 protocol's language must reflect that.
 
 ## Bootstrap exception

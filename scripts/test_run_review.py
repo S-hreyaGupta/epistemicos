@@ -226,14 +226,14 @@ def main() -> int:
     def impl_missing(t: Path):
         do_init(t)
         return runner(t, "freeze", "--run", "T-001", "--type", "implementation",
-                      "--prompt", "specs/prompt.md", "--commit", "abc")
-    expect_refused("implementation review missing tree", "requires --tree", impl_missing)
+                      "--prompt", "specs/prompt.md", "--candidate-commit", "HEAD")
+    expect_refused("implementation review missing approved plan hash", "requires --approved-plan-hash", impl_missing)
 
     def impl_bad_hash(t: Path):
         do_init(t)
         return runner(t, "freeze", "--run", "T-001", "--type", "implementation",
-                      "--prompt", "specs/prompt.md", "--commit", "abc", "--tree", "def",
-                      "--approved-plan-sha256", "NOT-A-HASH")
+                      "--prompt", "specs/prompt.md", "--candidate-commit", "HEAD",
+                      "--approved-plan-hash", "NOT-A-HASH")
     expect_refused("approved plan hash not a digest", "64-char hex", impl_bad_hash)
 
     def record_twice(t: Path):

@@ -301,19 +301,36 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         artifacts = [(r, (REPO / r["path"]).read_text(encoding="utf-8", errors="replace"))
                      for r in refs]
     else:
-        for name, val in (("commit", args.commit), ("tree", args.tree),
-                          ("approved_plan_sha256", args.approved_plan_sha256)):
-            if not val:
-                raise Refused(f"implementation review requires --{name.replace('_', '-')}")
-            target[name] = val
-        if not HEX64.match(args.approved_plan_sha256):
-            raise Refused("--approved-plan-sha256 must be a lowercase 64-char hex digest")
-        for name, path in (("diff", args.diff), ("test_results", args.test_results)):
-            if not path:
-                raise Refused(f"implementation review requires --{name.replace('_', '-')}")
-            ref = hashed_ref(require_file(Path(path).resolve(), name))
-            target[name] = ref
-            artifacts.append((ref, (REPO / ref["path"]).read_text(encoding="utf-8", errors="replace")))
+        # §10.1: "These fields are mandatory, not conditional."
+        if not args.candidate_commit:
+            raise Refused("implementation review requires --candidate-commit")
+        r = subprocess.run(
+            ["git", "-C", str(REPO), "rev-parse", f"{args.candidate_commit}^{{tree}}"],
+            capture_output=True, text=True)
+        if r.returncode != 0:
+            raise Refused(f"--candidate-commit does not resolve: {args.candidate_commit}")
+        target["candidate_commit"] = args.candidate_commit
+        # Derived, not supplied: a tree hash typed by hand is a tree hash that
+        # can be typed to match whatever was recorded.
+        target["candidate_tree_hash"] = r.stdout.strip()
+
+        if not args.approved_plan_hash:
+            raise Refused("implementation review requires --approved-plan-hash")
+        if not HEX64.match(args.approved_plan_hash):
+            raise Refused("--approved-plan-hash must be a lowercase 64-char hex digest")
+        target["approved_plan_hash"] = args.approved_plan_hash
+
+        for path_key, hash_key, arg, label in (
+                ("diff_path", "diff_hash", args.diff, "diff"),
+                ("test_result_path", "test_result_hash", args.test_results,
+                 "test results")):
+            if not arg:
+                raise Refused(f"implementation review requires --{label.replace(' ', '-')}")
+            ref = hashed_ref(require_file(Path(arg).resolve(), label))
+            target[path_key] = ref["path"]
+            target[hash_key] = ref["sha256"]
+            artifacts.append((ref, (REPO / ref["path"]).read_text(encoding="utf-8",
+                                                                 errors="replace")))
 
     cycle.mkdir(parents=True)
     tj = cycle / "target.json"
@@ -403,9 +420,9 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--type", required=True, choices=REVIEW_TYPES)
     f.add_argument("--prompt", required=True)
     f.add_argument("--file", action="append", default=[], help="plan review: repeatable")
-    f.add_argument("--commit")
-    f.add_argument("--tree")
-    f.add_argument("--approved-plan-sha256", dest="approved_plan_sha256")
+    # §10.1 fields. candidate_tree_hash is derived from the commit, not passed.
+    f.add_argument("--candidate-commit", dest="candidate_commit")
+    f.add_argument("--approved-plan-hash", dest="approved_plan_hash")
     f.add_argument("--diff")
     f.add_argument("--test-results", dest="test_results")
     f.set_defaults(fn=cmd_freeze)

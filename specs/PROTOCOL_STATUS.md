@@ -1,80 +1,89 @@
 # Protocol status
 
-Read this before treating anything in `specs/` as the governing protocol.
-
 ```text
-AUTHORITATIVE   NO
+AUTHORITATIVE   pending one confirmation from Alex Zamurko
 ```
 
-## What is in git right now
+## The governing file
 
-`specs/implementation-review-protocol-v1.0.md`, committed at `8fcb181`, hash
-`06285a4d74b9b86d9cafb1fd28ce8aa168720aa8d87618df66473fa884ee665e`.
+`specs/implementation-review-protocol-v1.0.md`
 
-It is a faithful, checked conversion of **Document (4)**. Fidelity, structure and
-completeness all pass on it, and the checks are reproducible with:
+```text
+PROTOCOL_HASH  74d7b56124a652525588fbb8548656aad2f7845d9cfea618c9d4136bf1f20a76
+               25,177 bytes
+source docx    0e0978269667ff9b2e906413b4efba05e2176c83d04b5cf4187d0e400faadee2
+               posted in #gap, 8 September 2026
+```
+
+Three checks pass, and each has negative controls in
+`scripts/test_convert_protocol.py`:
+
+```text
+fidelity      word sequence identical, 3,553 words
+structure     one output line per source line, no invented headings
+completeness  V01-V55 contiguous, 6 fields per row, terminal section present
+```
+
+Reproduce with:
 
 ```sh
-python scripts/convert_protocol.py --docx <Document (4)> \
-    --out <path> --terminal "Preservation verdict" --dry-run
+python scripts/convert_protocol.py --docx <source> \
+    --out specs/implementation-review-protocol-v1.0.md \
+    --terminal "Preservation verdict"
 ```
 
-## Why that file does not govern
+## What is still outstanding
 
-Document (4) is the **older** draft. Measured against Document (5) — and (6),
-which is byte-identical to (5), `47f7b9c0768c83fba5b7074fa6ed83d70edce3533bb02e2de18711d6b8188c8e`:
+§0.1 makes the git artifact authoritative, but a conversion nobody confirmed is
+the "which copy are you reading" problem inside the document written to prevent
+it. The mechanical checks establish that this file says what its source says.
+They cannot establish that the source is the document Alex meant to send.
+
+One line from him closes it, and then `PROTOCOL_COMMIT` and `PROTOCOL_HASH` are
+real values for the first A.1-E run.
+
+## Lineage, recorded because it cost a day
+
+Three documents were in play and only this one is right.
 
 ```text
-41 regions differ; 457 of ~600 paragraphs identical
-20 of the 21 overlapping V-rows are reworded in the newer draft
-
-§2.2  Review runner composes the Codex input   newer only, ABSENT from (4)
-§10.2 Implementation-specific MC-2 checks      newer only, ABSENT from (4)
-      checks 11-15: candidate commit, tree hash, approved-plan hash,
-      diff hash, test-result hash. Mandatory, not conditional.
+(4)   929 paras   V01-V44   no §2.2, no §10.2    older draft, complete
+(5)  1011 paras   V01-V21   §2.2 and §10.2       newer, truncated at export
+(6)   byte-identical to (5), same sha256 47f7b9c0…
+PDF   V01-V55, complete, but the table is positioned glyphs with no
+      structure; reconstruction matched 0 of 21 known rows
+(10)  879 paras   V01-V55   §2.2 and §10.2       newer AND complete  ← this one
 ```
 
-So MC-2 has **fifteen** checks, not the nine Document (4) records.
+The trap was that (4) looked complete and passed every completeness check, being
+a tidy document that simply stopped earlier in its own development. Completeness
+checking cannot distinguish "complete at V44" from "an older draft that ends at
+V44". Only the author can.
 
-## Why the newer draft is not in git either
+The scripts were briefly derived from (5), which was the right lineage but
+truncated. Its normative sections are identical to (10)'s, so no re-derivation
+was needed when (10) arrived. That was luck rather than design: had (10) changed
+a requirement, the scripts would have silently implemented a superseded one. The
+51 differences between (5) and (10) in the overlapping region were all cosmetic —
+quotation marks around identifiers, `---` separators, list numbering.
 
-Documents (5) and (6) are truncated at export. `word/document.xml` ends mid-word
-at `V2` after V21; no V22 appears in any part of the container, so nothing
-recovers it. The completeness check fails them and `convert_protocol.py`
-therefore refuses to write them, which is the correct behaviour.
-
-The missing portion is the last 23 of 631 paragraphs: the verification table from
-V22 onward, the preservation verdict and the control chain. The entire normative
-workflow survives — sections 0 to 16, MC-1, MC-2 with all fifteen checks, §2.2,
-§10.2, and the summary chain through FINAL FREEZE / RELEASE.
-
-That distinction is why work continued. The missing tail is an audit record
-*about* the protocol, not a specification of behaviour. Nothing the checker needs
-is absent.
-
-## What the scripts are built against
+## Consistency with the execution layer
 
 `scripts/validate_cycle.py`, `scripts/run_review.py` and
-`specs/evidence-schema-v1.0.md` are derived from the **newer** draft: fifteen
-checks, and the §10.1 field names `CANDIDATE_COMMIT`, `CANDIDATE_TREE_HASH`,
-`APPROVED_PLAN_HASH`, `DIFF_HASH`, `TEST_RESULT_HASH`.
+`specs/evidence-schema-v1.0.md` implement this file: fifteen MC-2 checks, and the
+§10.1 field names `CANDIDATE_COMMIT`, `CANDIDATE_TREE_HASH`,
+`APPROVED_PLAN_HASH`, `DIFF_HASH`, `TEST_RESULT_HASH`. Verified against §10.1,
+§10.2 and MC-2 of this exact file.
 
-They therefore implement a protocol version that is **not the file committed at
-`8fcb181`**. That inconsistency is deliberate and recorded here rather than left
-for someone to discover. It resolves when the complete newer source arrives.
+## Next
 
-## To clear this
-
-1. Obtain the newer draft complete: V22 to the end, preservation verdict,
-   control chain. Requested as pasted text rather than a re-export, since the
-   export path is where the cut occurs.
-2. Convert it. All three checks must pass with no `--dry-run`.
-3. Commit, and record `PROTOCOL_COMMIT` and `PROTOCOL_HASH` here.
-4. Re-verify the schema and scripts against that exact file.
-5. Bootstrap-review all three with Codex, using
+1. Alex confirms the markdown says what he wrote.
+2. Record `PROTOCOL_COMMIT` and `PROTOCOL_HASH` above as final.
+3. Bootstrap-review the schema, checker and runner with Codex, using
    `specs/prompts/bootstrap-review.md`.
-6. Only then may a real cycle begin.
+4. Build the ledger, loop controller and five production prompts.
+5. Only then may a real cycle begin.
 
-Everything produced so far is labelled
+Everything built so far is labelled
 `BOOTSTRAP / DEVELOPMENT EVIDENCE — NOT_A_PROTOCOL_CYCLE`. No real-cycle
 evidence exists and none is contaminated.

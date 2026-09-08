@@ -47,17 +47,44 @@ from pathlib import Path
 
 try:
     from docx import Document
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
 except ImportError:
     print("python-docx is required:  pip install python-docx --break-system-packages",
           file=sys.stderr)
     raise SystemExit(2)
 
 WORD = re.compile(r"[0-9A-Za-z]+(?:['’][0-9A-Za-z]+)*")
-VROW = re.compile(r"\A\s*V(\d{1,3})\s*\|")
+VROW = re.compile(r"\A\s*\|?\s*V(\d{1,3})\s*\|")
 
 
 def words(text: str) -> list[str]:
     return WORD.findall(text)
+
+
+def source_lines(path: Path) -> list[str]:
+    """The document as one flat list of logical lines, in document order.
+
+    A docx can carry the verification table two ways, and both have arrived:
+    as pipe-delimited paragraphs, or as a real Word table. Normalising both to
+    the same pipe form here means the three checks below do not each need to
+    know which kind of document they were handed.
+
+    python-docx exposes paragraphs and tables as separate collections with no
+    document order between them, so the body XML is walked directly.
+    """
+    doc = Document(str(path))
+    body = doc.element.body
+    out: list[str] = []
+    for child in body.iterchildren():
+        tag = child.tag.split("}")[-1]
+        if tag == "p":
+            out.append(Paragraph(child, doc).text)
+        elif tag == "tbl":
+            for row in Table(child, doc).rows:
+                cells = [c.text.strip().replace("\n", " ") for c in row.cells]
+                out.append("| ".join(cells))
+    return out
 
 
 def write_lf(p: Path, text: str) -> None:
@@ -94,7 +121,7 @@ def to_markdown(paras: list[str]) -> str:
             continue
 
         # A pipe-delimited row: the header opens a table, V-rows continue it.
-        if "|" in line and (VROW.match(line) or line.lstrip().startswith("ID|")):
+        if "|" in line and (VROW.match(line) or re.match(r"\A\s*\|?\s*ID\s*\|", line)):
             cells = [c.strip() for c in line.split("|")]
             out.append("| " + " | ".join(cells) + " |")
             if not in_table:
@@ -182,7 +209,7 @@ def _first_divergence(a: list[str], b: list[str]) -> str:
 def check_completeness(paras: list[str], terminal: str) -> Check:
     c = Check()
 
-    header_i = next((i for i, p in enumerate(paras) if p.lstrip().startswith("ID|")), None)
+    header_i = next((i for i, p in enumerate(paras) if re.match(r"\A\s*\|?\s*ID\s*\|", p)), None)
     if header_i is None:
         c.add("verification table header found", False,
               "no row beginning 'ID|'; the table may be absent entirely")
@@ -250,7 +277,7 @@ def main(argv: list[str]) -> int:
         print(f"not found: {src}", file=sys.stderr)
         return 2
 
-    paras = [p.text for p in Document(str(src)).paragraphs]
+    paras = source_lines(src)
     md = to_markdown(paras)
 
     print(f"source   {src.name}")

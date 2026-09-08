@@ -1,8 +1,33 @@
 # Protocol status
 
 ```text
-AUTHORITATIVE   pending one confirmation from Alex Zamurko
+AUTHORITATIVE   YES
+confirmed by    Alex Zamurko, 8 September 2026
 ```
+
+> "Other than that, it is the correct last complete version of the workflow,
+> content-wise."
+
+`PROTOCOL_COMMIT` and `PROTOCOL_HASH` below are therefore real values, and Step 0
+can be completed rather than approximated for the first A.1-E run.
+
+## Known defect, left uncorrected on instruction
+
+V03's second cell reads `SPEC → CODE → TESTmapping`, with no space before
+"mapping". Alex spotted it and ruled: *"I guess, we can leave it like it is."*
+
+It is recorded here rather than fixed, for two reasons.
+
+It is in the source. The docx carries `TESTmapping` in that table cell while both
+prose occurrences elsewhere read `SPEC → CODE → TEST mapping`, and the conversion
+reproduced the difference exactly. So this is not a conversion artifact, and the
+fidelity check did its job: `TEST mapping` and `TESTmapping` are different word
+sequences, so a converter that silently inserted the space would have failed.
+
+And correcting it would change `PROTOCOL_HASH`. A one-character edit to an
+authoritative governing document is a new version, a new commit and a new hash,
+and every run pinning the old value would need re-pinning. Not worth it for a
+missing space in a verification-table cell.
 
 ## The governing file
 
@@ -32,15 +57,12 @@ python scripts/convert_protocol.py --docx <source> \
     --terminal "Preservation verdict"
 ```
 
-## What is still outstanding
+## What the checks established, and what Alex's confirmation added
 
-§0.1 makes the git artifact authoritative, but a conversion nobody confirmed is
-the "which copy are you reading" problem inside the document written to prevent
-it. The mechanical checks establish that this file says what its source says.
-They cannot establish that the source is the document Alex meant to send.
-
-One line from him closes it, and then `PROTOCOL_COMMIT` and `PROTOCOL_HASH` are
-real values for the first A.1-E run.
+The mechanical checks establish that this file says what its source says. They
+could not establish that the source was the document he meant to send, which is
+why §0.1's authority needed a human line rather than a passing test. His
+confirmation of 8 September supplies exactly that and nothing more.
 
 ## Lineage, recorded because it cost a day
 
@@ -77,12 +99,20 @@ quotation marks around identifiers, `---` separators, list numbering.
 
 ## Next
 
-1. Alex confirms the markdown says what he wrote.
-2. Record `PROTOCOL_COMMIT` and `PROTOCOL_HASH` above as final.
-3. Bootstrap-review the schema, checker and runner with Codex, using
-   `specs/prompts/bootstrap-review.md`.
-4. Build the ledger, loop controller and five production prompts.
-5. Only then may a real cycle begin.
+```text
+done  Alex confirms the markdown says what he wrote
+done  PROTOCOL_COMMIT and PROTOCOL_HASH recorded as final
+done  finding ledger and loop-state controller
+next  bootstrap-review the schema, checker, runner, ledger and loop
+      controller with Codex, using specs/prompts/bootstrap-review.md
+then  the five production prompts, built and frozen before A1E-001
+then  human review package generator, and the Gold runner
+last  the first real cycle
+```
+
+The bootstrap prompt currently names three artifacts. It needs widening to five
+before it is used, since the ledger and loop controller were built after it was
+frozen.
 
 Everything built so far is labelled
 `BOOTSTRAP / DEVELOPMENT EVIDENCE — NOT_A_PROTOCOL_CYCLE`. No real-cycle

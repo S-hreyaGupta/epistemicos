@@ -113,6 +113,36 @@ def main() -> int:
         ok(f"both review prompts require all {len(required)} finding fields")
     before = len(failures)
 
+    # ---- OUT OF VOCABULARY is a diagnostic, not a finding ----
+    # Ruled 8 September 2026: kept, but with no Finding ID, never written to
+    # findings.json, never in a state, no effect on loop state. ledger.py refuses
+    # it, so the enforcement is real; this checks the prompts still tell the
+    # reviewer why, because a reviewer that is refused without being told will
+    # reach for one of the six instead, which is worse than the hole.
+    print()
+    print("OUT OF VOCABULARY")
+    ruled = {
+        "no Finding ID":        (r"no Finding ID", ),
+        "not in findings.json": (r"findings\.json", ),
+        "not a lifecycle state": (r"OPEN, RESOLVED or DISPUTED",
+                                  r"OPEN / RESOLVED / DISPUTED"),
+        "no effect on loop state": (r"loop.state", ),
+    }
+    for name in REVIEW_PROMPTS:
+        text = (PROMPTS / name).read_text(encoding="utf-8")
+        if "OUT OF VOCABULARY" not in text:
+            continue  # removing it entirely is a different decision, not drift
+        absent = [label for label, pats in ruled.items()
+                  if not any(re.search(p, text, re.I) for p in pats)]
+        if absent:
+            failures.append(f"{name} keeps OUT OF VOCABULARY but no longer states "
+                            f"what makes it a non-finding: {', '.join(absent)}. "
+                            "ledger.py refuses it either way, so the prompt and "
+                            "the code would disagree about why.")
+    if len(failures) == before:
+        ok("both review prompts state all four non-finding constraints")
+    before = len(failures)
+
     # ---- dispositions, §5 ----
     print()
     print("dispositions")
@@ -159,6 +189,60 @@ def main() -> int:
     else:
         ok("the implementation prompt carries §9's record fields and its "
            "retrospective-legitimisation bar")
+
+    # ---- the two rulings that reversed an earlier reading ----
+    # Both were judgement calls this file's author made where the protocol was
+    # silent, and both were overruled on 8 September. They are under test because
+    # a reverted judgement reverts quietly: the prompt still reads sensibly with
+    # the old rule in it, and nothing else fails.
+    print()
+    print("rulings of 8 September")
+
+    audit = (PROMPTS / "01-claude-audit-plan.md").read_text(encoding="utf-8")
+    if re.search(r"no test is\s+`?PARTIAL`?", audit, re.I) or \
+            re.search(r"implemented without the required test", audit, re.I):
+        failures.append("01-claude-audit-plan.md again makes an untested "
+                        "requirement PARTIAL. Ruled 8 September: the "
+                        "implementation disposition and the verification status "
+                        "stay separate, and absent tests are a test delta.")
+    elif "separate" not in audit.lower():
+        failures.append("01-claude-audit-plan.md no longer says the disposition "
+                        "and test coverage are separate axes")
+    else:
+        ok("the audit prompt keeps disposition and test status separate")
+
+    impl = (PROMPTS / "04-claude-implement.md").read_text(encoding="utf-8")
+    criteria = ["normative behaviour", "ownership", "acceptance criteria",
+                "required tests"]
+    missing_c = [c for c in criteria if c not in impl.lower()]
+    if missing_c:
+        failures.append("04-claude-implement.md does not carry the explicit "
+                        f"materiality criteria: {', '.join(missing_c)}. Ruled "
+                        "8 September: apply the criteria first, and default to "
+                        "MATERIAL only if uncertainty remains after them.")
+    else:
+        # The prompt quotes the ruling, and the quote contains the words "apply
+        # explicit materiality criteria first". Searching the whole file for that
+        # phrase therefore passed on a prompt whose own instruction had been
+        # removed: quoting a rule satisfied a check meant to confirm the rule was
+        # followed. Search the prompt's own text only, with quoted blocks (any
+        # line indented four or more spaces) stripped out.
+        own = "\n".join(l for l in impl.splitlines()
+                        if not re.match(r"\s{4,}\S", l))
+        pos_criteria = own.lower().find("normative behaviour")
+        pos_default = own.lower().find("uncertainty remains")
+        if not re.search(r"apply these criteria first", own, re.I):
+            failures.append("04-claude-implement.md lists materiality criteria "
+                            "but no longer instructs applying them before the "
+                            "default, which is the part of the ruling that "
+                            "changed behaviour")
+        elif pos_criteria == -1 or pos_default == -1 or pos_criteria > pos_default:
+            failures.append("04-claude-implement.md states the residual-"
+                            "uncertainty default before the criteria it is meant "
+                            "to follow; the order is the ruling")
+        else:
+            ok("the implementation prompt applies materiality criteria before "
+               "the default, in its own words rather than the quoted ruling")
 
     print()
     if failures:

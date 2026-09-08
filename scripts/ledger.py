@@ -64,6 +64,20 @@ CLASSES = (
     "CONTRADICTORY IMPLEMENTATION MAPPING",
 )
 
+# Kept out of CLASSES deliberately, and refused by name rather than falling
+# through the generic "not one of the six" message, because the reason it is
+# refused is specific and worth printing.
+#
+# Alex Zamurko, 8 September 2026: OUT OF VOCABULARY is kept in the review prompts
+# "only as a non-finding, human-visible diagnostic ... no Finding ID, must not be
+# written to findings.json, must not enter OPEN / RESOLVED / DISPUTED, and must
+# not affect loop-state calculation."
+#
+# The prompts say so; this refuses it, which is the difference between a rule and
+# a request. An OUT OF VOCABULARY item admitted here would be a seventh class in
+# everything but name, and would silently gain the power to block convergence.
+NON_FINDING = "OUT OF VOCABULARY"
+
 OPEN, RESOLVED, DISPUTED = "OPEN", "RESOLVED", "DISPUTED"
 STATES = (OPEN, RESOLVED, DISPUTED)
 
@@ -134,6 +148,15 @@ def cmd_raise(a: argparse.Namespace) -> int:
         raise Refused(f"{a.id} already exists. Finding identifiers are persistent; "
                       "a re-raised issue in a later cycle is a new finding that may "
                       "reference the old one, not a reuse of its id.")
+    if a.klass.strip().upper() == NON_FINDING:
+        raise Refused(
+            f"{NON_FINDING} is not a finding and cannot enter the ledger.\n"
+            "  It is a human-visible diagnostic only: no Finding ID, never in\n"
+            "  findings.json, never OPEN / RESOLVED / DISPUTED, no effect on\n"
+            "  loop state. Ruled by Alex Zamurko, 8 September 2026.\n"
+            "  It reaches the human at the review gate, in the raw Codex output.\n"
+            "  If the issue must block convergence it has to fit one of the six;\n"
+            "  if it genuinely cannot, that mismatch is the thing being reported.")
     if a.klass not in CLASSES:
         raise Refused(f"class must be one of the six in §4, got {a.klass!r}\n  "
                       + "\n  ".join(CLASSES))
@@ -176,13 +199,30 @@ def cmd_respond(a: argparse.Namespace) -> int:
         print("       §5: RESOLVED only once the repair is demonstrated in the next")
         print("       review target. Use `resolve` from a later cycle.")
     else:
+        # §5's REJECT_WITH_REASON block names Reason and Spec evidence as two
+        # fields, and they answer different questions: why the reviewer is wrong,
+        # and what in the specification says so. One free-text note satisfied the
+        # first and let the second go unwritten, which is how a rejection ends up
+        # resting on the implementing agent's judgement rather than on the spec.
+        # Alex Zamurko, 8 September 2026: "DISPUTE ... requires reason/spec
+        # evidence".
         if not (a.note or "").strip():
-            raise Refused("REJECT_WITH_REASON requires --note; §5 records a Reason "
-                          "and Spec evidence, and a rejection without one is a "
-                          "silent dismissal.")
+            raise Refused("REJECT_WITH_REASON requires --note, the Reason of §5. "
+                          "A rejection without one is a silent dismissal.")
+        if not (a.spec_evidence or "").strip():
+            raise Refused(
+                "REJECT_WITH_REASON requires --spec-evidence, the Spec evidence "
+                "field of §5.\n"
+                "  Reason says why you disagree. Spec evidence says what in the "
+                "specification\n"
+                "  supports you, and it is the half a human adjudicating the "
+                "dispute needs.\n"
+                "  A rejection resting only on the implementing agent's reading "
+                "is the\n  authority inversion MC-1 exists to prevent.")
         f["state"] = DISPUTED
         f["history"].append({"cycle": a.cycle, "event": "REJECT_WITH_REASON",
-                             "state": DISPUTED, "at": now(), "note": a.note})
+                             "state": DISPUTED, "at": now(), "note": a.note,
+                             "spec_evidence": a.spec_evidence})
         print(f"{a.id}  REJECT_WITH_REASON  cycle {a.cycle:02d}  -> {DISPUTED}")
         print("       Requires human adjudication at the plan gate.")
 
@@ -291,7 +331,11 @@ def build_parser() -> argparse.ArgumentParser:
     common(r)
     r.add_argument("--cycle", type=int, required=True)
     r.add_argument("--id", required=True)
-    r.add_argument("--class", dest="klass", required=True, choices=CLASSES,
+    # No argparse `choices` here. argparse would reject an out-of-vocabulary
+    # class with a generic usage error and exit 2, before the refusals above can
+    # explain why. The reason is the useful part, so validation happens in
+    # cmd_raise and every refusal exits 1 with a stated cause.
+    r.add_argument("--class", dest="klass", required=True,
                    metavar="CLASS")
     r.add_argument("--requirement")
     r.add_argument("--note", default="")
@@ -303,7 +347,11 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--id", required=True)
     d.add_argument("--disposition", required=True,
                    choices=("ACCEPT", "REJECT_WITH_REASON"))
-    d.add_argument("--note", default="")
+    d.add_argument("--note", default="",
+                   help="§5 Reason. Required for REJECT_WITH_REASON.")
+    d.add_argument("--spec-evidence", dest="spec_evidence", default="",
+                   help="§5 Spec evidence. Required for REJECT_WITH_REASON: what "
+                        "in the specification supports the rejection.")
     d.set_defaults(fn=cmd_respond)
 
     v = sub.add_parser("resolve", help="record that an accepted repair was demonstrated")

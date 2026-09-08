@@ -132,6 +132,38 @@ def cmd_init(args: argparse.Namespace) -> int:
         raise Refused(f"run.json already exists: {run_json}\n"
                       "A run's pins are fixed at creation. Use a new run id.")
 
+    # The bootstrap gate, ruled mandatory 8 September 2026. This runner and the
+    # MC-2 checker cannot pass through the process they enable, so a one-time
+    # independent review stands in for it, and no real run starts without one.
+    #
+    # Enforced here rather than at freeze because init is where a run becomes a
+    # thing that exists. A run created now and frozen later would otherwise carry
+    # pins made before anyone had looked at the code doing the pinning.
+    if not args.bootstrap_exempt:
+        # Loaded by path rather than by name. `from bootstrap_gate import ...`
+        # works only when the script's own directory happens to be on sys.path,
+        # which it is when run directly and is not in several other cases. A gate
+        # that silently becomes an ImportError is a gate that stops gating.
+        import importlib.util
+        gate_py = Path(__file__).resolve().parent / "bootstrap_gate.py"
+        if not gate_py.is_file():
+            raise Refused(
+                f"the bootstrap gate is missing: {gate_py}\n"
+                "  Refusing rather than proceeding. A missing gate is not an "
+                "absent requirement.")
+        spec_ = importlib.util.spec_from_file_location("_bootstrap_gate", gate_py)
+        mod = importlib.util.module_from_spec(spec_)
+        spec_.loader.exec_module(mod)
+        ok, reasons = mod.evaluate(REPO)
+        if not ok:
+            raise Refused(
+                "BOOTSTRAP_REVIEW not satisfied, so no real protocol run may be "
+                "created:\n  " + "\n  ".join(reasons) +
+                "\n\n  This is the one declared exception to the protocol and it "
+                "is not optional.\n  To produce development evidence instead, "
+                "pass --bootstrap-exempt, which\n  labels the run "
+                "BOOTSTRAP / DEVELOPMENT EVIDENCE — NOT_A_PROTOCOL_CYCLE.")
+
     protocol = require_file(Path(args.protocol).resolve(), "protocol file")
     specs = [hashed_ref(require_file(Path(s).resolve(), "spec file")) for s in args.spec]
     if not specs:
@@ -150,6 +182,12 @@ def cmd_init(args: argparse.Namespace) -> int:
         "spec_files": specs,
         "spec_sha256": spec_digest(specs),
         "max_cycles": MAX_CYCLES,
+        # Recorded on the run, not just checked at init, so a reader of the
+        # evidence can tell which kind of run this was without consulting
+        # anything else.
+        "bootstrap_review": ("EXEMPT — BOOTSTRAP / DEVELOPMENT EVIDENCE, "
+                             "NOT_A_PROTOCOL_CYCLE"
+                             if args.bootstrap_exempt else "APPROVED"),
     }
     run_dir.mkdir(parents=True, exist_ok=True)
     write_lf(run_json, json.dumps(run, indent=2) + "\n")
@@ -413,6 +451,11 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--run", required=True)
     i.add_argument("--protocol", required=True)
     i.add_argument("--spec", action="append", default=[], required=True)
+    i.add_argument("--bootstrap-exempt", action="store_true",
+                   help="produce development evidence rather than a protocol "
+                        "cycle; the run is labelled NOT_A_PROTOCOL_CYCLE and the "
+                        "bootstrap gate is skipped. Not a way to start a real run "
+                        "early.")
     i.set_defaults(fn=cmd_init)
 
     f = sub.add_parser("freeze", help="open the next cycle and compose reviewer input")

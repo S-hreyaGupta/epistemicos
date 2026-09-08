@@ -163,6 +163,22 @@ def main() -> int:
         root2, "respond", "--review", str(rev2), "--cycle", "1", "--id", "C01-F01",
         "--disposition", "REJECT_WITH_REASON"))
 
+    # §5 names Reason and Spec evidence as two fields. A rejection carrying only
+    # a reason rests on the implementing agent's reading of the spec rather than
+    # on the spec, and the human adjudicating the dispute gets half of what the
+    # protocol says they should have.
+    expect_refused("REJECT_WITH_REASON with a reason but no spec evidence",
+                   "requires --spec-evidence", lambda: ledger(
+        root2, "respond", "--review", str(rev2), "--cycle", "1", "--id", "C01-F01",
+        "--disposition", "REJECT_WITH_REASON", "--note", "I disagree"))
+
+    # Whitespace is not evidence.
+    expect_refused("spec evidence that is only whitespace",
+                   "requires --spec-evidence", lambda: ledger(
+        root2, "respond", "--review", str(rev2), "--cycle", "1", "--id", "C01-F01",
+        "--disposition", "REJECT_WITH_REASON", "--note", "I disagree",
+        "--spec-evidence", "   "))
+
     expect_refused("resolve with no prior ACCEPT", "no accept", lambda: ledger(
         root2, "resolve", "--review", str(rev2), "--cycle", "2", "--id", "C01-F01",
         "--evidence", "x"))
@@ -186,7 +202,8 @@ def main() -> int:
     ledger(root3, "raise", "--review", str(rev3), "--cycle", "1", "--id", "C01-F01",
            "--class", "WRONG OWNERSHIP")
     ledger(root3, "respond", "--review", str(rev3), "--cycle", "1", "--id", "C01-F01",
-           "--disposition", "REJECT_WITH_REASON", "--note", "spec says otherwise")
+           "--disposition", "REJECT_WITH_REASON", "--note", "spec says otherwise",
+           "--spec-evidence", "§5: ACCEPT does not resolve")
     data = json.loads((rev3 / "findings.json").read_text(encoding="utf-8"))
     if data["findings"]["C01-F01"]["state"] != "DISPUTED":
         failures.append("REJECT_WITH_REASON did not produce DISPUTED")
@@ -196,6 +213,64 @@ def main() -> int:
     expect_refused("respond to a DISPUTED finding", "human adjudication", lambda: ledger(
         root3, "respond", "--review", str(rev3), "--cycle", "2", "--id", "C01-F01",
         "--disposition", "ACCEPT"))
+
+    # ---- OUT OF VOCABULARY is a diagnostic, not a finding ----
+    # Ruled 8 September 2026: kept in the review prompts, but with no Finding ID,
+    # never in findings.json, never in a state, no effect on loop state. The
+    # prompts say so; these show the ledger enforces it, which is the difference
+    # between a rule and a request.
+    root4, commit4, rev4 = fresh()
+    rev4.mkdir(parents=True)
+
+    expect_refused("raise OUT OF VOCABULARY as a finding", "not a finding",
+                   lambda: ledger(root4, "raise", "--review", str(rev4),
+                                  "--cycle", "1", "--id", "C01-F01",
+                                  "--class", "OUT OF VOCABULARY"))
+
+    # Case and spacing must not be a way around it. A refusal that a different
+    # capitalisation defeats is a refusal in appearance only.
+    expect_refused("raise it in lower case", "not a finding",
+                   lambda: ledger(root4, "raise", "--review", str(rev4),
+                                  "--cycle", "1", "--id", "C01-F02",
+                                  "--class", "out of vocabulary"))
+
+    expect_refused("raise it with surrounding whitespace", "not a finding",
+                   lambda: ledger(root4, "raise", "--review", str(rev4),
+                                  "--cycle", "1", "--id", "C01-F03",
+                                  "--class", "  OUT OF VOCABULARY  "))
+
+    # And nothing was written on the way to being refused.
+    if (rev4 / "findings.json").is_file():
+        data = json.loads((rev4 / "findings.json").read_text(encoding="utf-8"))
+        if data.get("findings"):
+            failures.append("a refused OUT OF VOCABULARY class still left findings "
+                            f"in the ledger: {sorted(data['findings'])}")
+        else:
+            print("  [ok] three refusals left findings.json empty")
+    else:
+        print("  [ok] three refusals wrote no findings.json at all")
+
+    # The six must still be accepted, or the check above is just a broken raise.
+    for i, klass in enumerate(("MISSING REQUIREMENT", "WRONG OWNERSHIP",
+                               "NONDETERMINISTIC WHERE D POSSIBLE",
+                               "SEMANTIC STEP TOO BROAD", "UNTESTED RULE",
+                               "CONTRADICTORY IMPLEMENTATION MAPPING"), start=10):
+        r = ledger(root4, "raise", "--review", str(rev4), "--cycle", "1",
+                   "--id", f"C01-F{i}", "--class", klass)
+        if r.returncode != 0:
+            failures.append(f"the ledger refused a legitimate class {klass!r}:\n"
+                            f"{r.stderr}{r.stdout}")
+            break
+    else:
+        print("  [ok] all six legitimate classes still accepted")
+
+    # An unknown class still refuses, with the general message rather than the
+    # OUT OF VOCABULARY one. Removing argparse's `choices` moved this check into
+    # the code, so it needs its own control.
+    expect_refused("an invented seventh class", "one of the six",
+                   lambda: ledger(root4, "raise", "--review", str(rev4),
+                                  "--cycle", "1", "--id", "C01-F20",
+                                  "--class", "STYLE NIT"))
 
     expect_refused("resolve a DISPUTED finding", "human adjudication", lambda: ledger(
         root3, "resolve", "--review", str(rev3), "--cycle", "2", "--id", "C01-F01",
@@ -254,7 +329,8 @@ def main() -> int:
                "--class", "WRONG OWNERSHIP")
         # A NEW dispute in cycle 2 is progress under §6, so this must NOT stall.
         ledger(root, "respond", "--review", str(rev), "--cycle", "2", "--id", "C01-F02",
-               "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees")
+               "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees",
+               "--spec-evidence", "§4 closed vocabulary")
     scenario("a new dispute counts as progress, so not stalled", 2, new_dispute,
              "CONTINUE")
 
@@ -309,7 +385,8 @@ def main() -> int:
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
                "--class", "WRONG OWNERSHIP")
         ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-               "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees")
+               "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees",
+               "--spec-evidence", "§4 closed vocabulary")
     scenario("nothing open, one dispute outstanding", 1, only_a_dispute,
              "HUMAN_ADJUDICATION_REQUIRED")
 
@@ -327,7 +404,8 @@ def main() -> int:
         ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
                "--evidence", "done")
         ledger(root, "respond", "--review", str(rev), "--cycle", "2", "--id", "C01-F02",
-               "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees")
+               "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees",
+               "--spec-evidence", "§4 closed vocabulary")
     scenario("everything resolved or disputed", 2, resolved_and_disputed,
              "HUMAN_ADJUDICATION_REQUIRED")
 
@@ -338,7 +416,8 @@ def main() -> int:
             ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", fid,
                    "--class", cls)
         ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F02",
-               "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees")
+               "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees",
+               "--spec-evidence", "§4 closed vocabulary")
     scenario("a dispute alongside an open finding does not trigger it", 1,
              dispute_plus_open, "CONTINUE")
 

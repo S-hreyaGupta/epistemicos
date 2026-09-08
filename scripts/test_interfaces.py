@@ -60,7 +60,8 @@ def build_repo() -> tuple[Path, str]:
     """A throwaway repo carrying the real scripts and a real commit."""
     tmp = Path(tempfile.mkdtemp(prefix="iface-")).resolve()
     (tmp / "scripts").mkdir()
-    for n in ("validate_cycle.py", "run_review.py", "ledger.py", "loop_state.py"):
+    for n in ("validate_cycle.py", "run_review.py", "ledger.py", "loop_state.py",
+              "bootstrap_gate.py"):
         shutil.copy2(SRC / n, tmp / "scripts" / n)
     (tmp / "specs").mkdir()
     write_lf(tmp / "specs" / "protocol.md", "# protocol\n\nbody\n")
@@ -178,7 +179,11 @@ def main() -> int:
 
     root2, commit2 = build_repo()
     made.append(root2)
-    r = run(root2, "run_review.py", "init", "--run", "A1E-001",
+    # --bootstrap-exempt: this seam tests that a runner-produced cycle passes the
+    # checker with no hand-editing, which is development evidence about the
+    # machinery rather than a protocol cycle. The gate's own behaviour is
+    # controlled in test_run_review.py and test_bootstrap_gate.py.
+    r = run(root2, "run_review.py", "init", "--run", "A1E-001", "--bootstrap-exempt",
             "--protocol", "specs/protocol.md", "--spec", "specs/spec.md")
     if r.returncode != 0:
         bad(f"init failed:\n{r.stderr}{r.stdout}")
@@ -313,7 +318,8 @@ def main() -> int:
     run(root3, "ledger.py", "raise", "--review", str(rv), "--cycle", "1",
         "--id", "C01-F01", "--class", "WRONG OWNERSHIP")
     run(root3, "ledger.py", "respond", "--review", str(rv), "--cycle", "1",
-        "--id", "C01-F01", "--disposition", "REJECT_WITH_REASON", "--note", "disagree")
+        "--id", "C01-F01", "--disposition", "REJECT_WITH_REASON", "--note", "disagree",
+        "--spec-evidence", "§4: the class does not apply to this requirement")
     out = run(root3, "loop_state.py", "--review", str(rv)).stdout
     got = next((l.split(":", 1)[1].strip() for l in out.splitlines()
                 if l.startswith("LOOP_STATUS:")), "(none)")

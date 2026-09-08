@@ -50,10 +50,36 @@ CONTRADICTORY IMPLEMENTATION MAPPING
     contradicts the spec it cites
 ```
 
-If something is wrong and no class fits, say so explicitly at the end under
+### When no class fits
+
+If something is wrong and none of the six fits, say so at the end under
 `OUT OF VOCABULARY` with your reasoning. Do not stretch a class to cover it, and
-do not stay silent. A vocabulary that cannot express a real defect is itself a
-finding, and one worth knowing about.
+do not stay silent. A vocabulary that cannot express a real defect is worth
+knowing about.
+
+But it is not a finding. Per Alex Zamurko, 8 September 2026, it is kept
+"only as a non-finding, human-visible diagnostic". Specifically:
+
+```text
+no Finding ID
+never written to findings.json
+never OPEN, RESOLVED or DISPUTED
+no effect on loop-state calculation
+```
+
+So write it as prose in a section of its own, after the findings, with no
+`Finding ID:` line. It is addressed to the human reviewer, not to the ledger.
+
+This is what keeps the six-class vocabulary genuinely closed while still letting
+you report a defect that none of the classes can express. If an
+`OUT OF VOCABULARY` item carried an ID and entered the ledger it would be a
+seventh class in everything but name, and a reviewer that can add a class can
+widen its own scope, which is the whole reason the vocabulary is closed.
+
+The consequence is worth stating plainly: an `OUT OF VOCABULARY` item cannot
+block convergence and cannot be disputed. It reaches a human at the review gate
+or not at all. If you believe something must block, it has to fit one of the six,
+and if it genuinely cannot, that mismatch is itself what you are reporting.
 
 ## Finding format
 

@@ -60,8 +60,34 @@ UNTESTED RULE
 CONTRADICTORY IMPLEMENTATION MAPPING
 ```
 
+### When no class fits
+
 If a real defect fits none of them, record it under `OUT OF VOCABULARY` with your
 reasoning rather than forcing a class or staying quiet.
+
+But it is not a finding. Per Alex Zamurko, 8 September 2026, it is kept
+"only as a non-finding, human-visible diagnostic". Specifically:
+
+```text
+no Finding ID
+never written to findings.json
+never OPEN, RESOLVED or DISPUTED
+no effect on loop-state calculation
+```
+
+So write it as prose in a section of its own, after the findings, with no
+`Finding ID:` line. It is addressed to the human reviewer, not to the ledger.
+
+This is what keeps the six-class vocabulary genuinely closed while still letting
+you report a defect that none of the classes can express. If an
+`OUT OF VOCABULARY` item carried an ID and entered the ledger it would be a
+seventh class in everything but name, and a reviewer that can add a class can
+widen its own scope, which is the whole reason the vocabulary is closed.
+
+The consequence is worth stating plainly: an `OUT OF VOCABULARY` item cannot
+block convergence and cannot be disputed. It reaches a human at the review gate
+or not at all. If you believe something must block, it has to fit one of the six,
+and if it genuinely cannot, that mismatch is itself what you are reporting.
 
 ## Finding format
 

@@ -126,7 +126,18 @@ response. No repair may occur before this file exists.
 
 The protocol names logical artifacts; a checker needs to find them on disk.
 These are instantiations of the protocol, not changes to it, per Alex Zamurko's
-ruling of 8 September on D-3.
+ruling of 8 September on D-3, restated 8 September 2026, 11:01 PM:
+
+    use target.json as the concrete schema/filesystem representation of the
+    protocol's logical target. This is an implementation concretisation, not a
+    semantic change. The mapping should be documented explicitly so the
+    protocol term target remains normative.
+
+So `target` is the normative term and `target.json` is only how this
+implementation stores it. Anything reasoning about the protocol says `target`;
+only code touching the filesystem says `target.json`. A future implementation
+storing it under another name would still conform, and this table is the whole
+of what would have to change.
 
 ```text
 target          → the file target.json

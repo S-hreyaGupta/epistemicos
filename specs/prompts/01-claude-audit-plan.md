@@ -29,15 +29,33 @@ failure of it. Do not soften this by describing planned work as partially done.
 Exactly one of:
 
 ```text
-DONE       implemented and tested
-PARTIAL    implemented in part, or implemented without the required test
+DONE       implemented, and the implementation satisfies the requirement
+PARTIAL    implemented in part
 MISSING    not implemented
 CONFLICT   implemented in a way that contradicts the specification
 ```
 
-A requirement with no test is `PARTIAL`, not `DONE`. An untested rule is a
-finding class in its own right at review, so recording it as done here only
-moves the problem.
+The disposition describes the implementation against the requirement, and
+nothing else. Test coverage is a separate axis and is recorded separately, under
+`Required deterministic/conformance test`.
+
+So a requirement that is fully implemented but has no test is `DONE`, with a
+test delta recorded against it. It is not `PARTIAL`. Per Alex Zamurko,
+8 September 2026:
+
+    do not treat missing tests alone as PARTIAL. The implementation disposition
+    and the verification status should remain separate.
+
+This reverses an earlier reading of §1 in this prompt, which made an untested
+requirement `PARTIAL` on the grounds that `UNTESTED RULE` is a finding class at
+review. The reason that reading was wrong: collapsing two independent facts into
+one label loses information in both directions. A `PARTIAL` no longer tells you
+whether the code or the test is what is missing, and the audit stops being able
+to say "implemented and unverified", which is precisely the state worth seeing.
+
+`UNTESTED RULE` remains a finding class at review. A `DONE` disposition carrying
+an unfilled test delta is exactly what that class is for, and recording it
+honestly here is what lets review catch it.
 
 If a requirement is not implementable — a definition, a rationale, a statement of
 scope — leave it out and say how many you excluded and why. Do not give it a
@@ -71,10 +89,18 @@ Where the disposition is `DONE`, `Required implementation delta` is `none`. Wher
 it is anything else, the delta is the smallest change that satisfies the
 requirement, not the change you would prefer to make.
 
+The two deltas are independent. `Required implementation delta: none` alongside a
+real `Required deterministic/conformance test` is a normal and expected pairing:
+it says the code is there and nothing verifies it. Do not let one field's `none`
+pull the other toward `none`.
+
 `Required deterministic/conformance test` must name a test that can fail. "Verify
 the behaviour is correct" is not a test. If you cannot state how the test
 distinguishes conforming from non-conforming behaviour, say so under
 `Dependencies/blockers` instead of writing an untestable line.
+
+Where an adequate test already exists, name it and write `none`. Where none
+exists, the delta is required whatever the disposition says, including on `DONE`.
 
 ### Part 3 — the bounded implementation plan
 

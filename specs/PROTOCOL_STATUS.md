@@ -136,7 +136,24 @@ scripts/test_ledger.py          29 controls across both
 scripts/test_interfaces.py      six seams
 specs/prompts/01..05            the five production prompts, §1 §4 §5 §8 §9 §11
 scripts/test_prompts.py         vocabulary read from the protocol, not restated
+scripts/test_protocol_pin.py    nothing operational names a superseded version
 ```
+
+`test_protocol_pin.py` exists because repinning `test_prompts.py` fixed one
+instance of a defect rather than the defect. Alex ruled on 8 September that the
+pin "should remain under test so future protocol-version changes cannot silently
+leave validators behind."
+
+It reads the governing version out of this document rather than inferring it
+from the highest version file present, so an unfinished draft saved into
+`specs/` does not silently become governing. That also binds this document to
+the code both ways: bumping the protocol without updating this file fails, and
+updating this file without repinning the code fails.
+
+One legitimate reference to the superseded version exists, the old side of the
+declared amendment above. That exception is derived by importing
+`verify_amendment.py`'s live `AMENDMENTS` list, not by keeping a list of blessed
+lines, so removing an amendment removes its exception with it.
 
 ## Lineage, recorded because it cost a day
 
@@ -155,16 +172,75 @@ a tidy document that simply stopped earlier in its own development. Completeness
 checking cannot distinguish "complete at V44" from "an older draft that ends at
 V44". Only the author can.
 
+## Rulings of 8 September, 11:01 PM
+
+Six open questions ruled at once. Three changed what was built.
+
+```text
+1  target vs target.json    concretisation, mapping documented, target normative
+2  OUT OF VOCABULARY        kept, but a non-finding: no ID, not in findings.json,
+                            no state, no effect on loop state
+3  untested requirement     NOT PARTIAL. Disposition describes implementation;
+                            missing tests are a separate test delta
+4  materiality              apply seven explicit criteria first; default to
+                            MATERIAL only on residual uncertainty
+5  ledger state model       unchanged, kept strict
+6  BOOTSTRAP_REVIEW         mandatory one-time gate before any real cycle
+```
+
+Rulings 3 and 4 reverse judgements this repository made where the protocol was
+silent, so both are now under test in `scripts/test_prompts.py`. A reverted
+judgement reverts quietly: the prompt still reads sensibly with the old rule in
+it and nothing else fails.
+
+Ruling 2 is enforced rather than stated. `ledger.py` refuses
+`OUT OF VOCABULARY` as a class, in any casing, and the prompts explain why so a
+refused reviewer does not simply reach for one of the six instead.
+
+Ruling 5 was already satisfied, with one gap found while checking: §5 names
+`Reason` and `Spec evidence` as two fields and the ledger took one `--note` for
+both. `REJECT_WITH_REASON` now requires `--spec-evidence` separately. A rejection
+resting only on the implementing agent's reading is the authority inversion MC-1
+exists to prevent.
+
+## The bootstrap gate
+
+```text
+scripts/bootstrap_gate.py       check | record
+scripts/test_bootstrap_gate.py  13 controls
+bootstrap-review/               decision.json, plus the four preserved artifacts
+```
+
+`run_review.py init` refuses to create a real run until an APPROVE is on record.
+`--bootstrap-exempt` still produces development evidence, and labels the run
+`NOT_A_PROTOCOL_CYCLE` so the two are distinguishable in the record rather than
+only in intent.
+
+The part worth stating: the decision pins the sha256 of every component it
+covers, and `check` re-hashes them. A gate that only asked whether a review had
+happened would pass forever while the reviewed code changed underneath it, which
+is the superseded-pin defect one level up. Editing `validate_cycle.py` or
+`run_review.py` invalidates the approval, by design.
+
+Current state:
+
+```text
+BOOTSTRAP_REVIEW: NOT SATISFIED — no decision on record
+```
+
+That is correct and expected. The review has not been run yet.
+
 ## Next
 
 ```text
 done  v1.0 confirmed; v1.1 converted and checked
 done  ledger, loop controller, interface tests, five production prompts
+done  all six rulings of 8 September implemented and under test
 now   Alex confirms v1.1 says what he wrote
-then  bootstrap-review the five components with Codex, using
-      specs/prompts/bootstrap-review.md
-then  human review package generator (§7), and the Gold runner (§15)
-last  the first real cycle
+then  run BOOTSTRAP_REVIEW: Codex reviews validate_cycle.py and run_review.py,
+      evidence preserved under bootstrap-review/, human decision recorded
+then  human review package generator (§7), and the Gold runner
+last  the first real cycle, which the gate now blocks until the above is done
 ```
 
 Everything built so far is labelled

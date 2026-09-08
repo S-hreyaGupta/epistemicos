@@ -52,7 +52,7 @@ def write_lf(p: Path, text: str) -> None:
 def make_repo() -> Path:
     tmp = Path(tempfile.mkdtemp(prefix="runner-")).resolve()
     (tmp / "scripts").mkdir()
-    for name in ("run_review.py", "validate_cycle.py"):
+    for name in ("run_review.py", "validate_cycle.py", "bootstrap_gate.py"):
         shutil.copy2(SRC / name, tmp / "scripts" / name)
     (tmp / "specs").mkdir()
     write_lf(tmp / "specs" / "protocol.md", PROTOCOL_BODY)
@@ -73,9 +73,24 @@ def runner(tmp: Path, *args: str) -> subprocess.CompletedProcess:
     return sh(sys.executable, str(tmp / "scripts" / "run_review.py"), *args, cwd=tmp)
 
 
-def do_init(tmp: Path) -> subprocess.CompletedProcess:
-    return runner(tmp, "init", "--run", "T-001",
-                  "--protocol", "specs/protocol.md", "--spec", "specs/spec.md")
+def do_init(tmp: Path, *extra: str) -> subprocess.CompletedProcess:
+    # --bootstrap-exempt because these fixtures test the runner's own mechanics
+    # and are development evidence, not protocol cycles. Labelling them honestly
+    # is the point of the flag. The gate's own effect on init is controlled
+    # separately, below, so exempting here does not hide it.
+    return runner(tmp, "init", "--run", "T-001", "--bootstrap-exempt",
+                  "--protocol", "specs/protocol.md", "--spec", "specs/spec.md",
+                  *extra)
+
+
+def approve_bootstrap(tmp: Path) -> subprocess.CompletedProcess:
+    (tmp / "bootstrap-review").mkdir(parents=True, exist_ok=True)
+    for n in ("codex-input.md", "codex-output-raw.md", "findings.md",
+              "claude-response.md"):
+        write_lf(tmp / "bootstrap-review" / n, f"contents of {n}\n")
+    return sh(sys.executable, str(tmp / "scripts" / "bootstrap_gate.py"),
+              "record", "--decision", "APPROVE", "--decided-by", "Alex Zamurko",
+              cwd=tmp)
 
 
 def do_freeze(tmp: Path, *extra: str) -> subprocess.CompletedProcess:
@@ -272,6 +287,67 @@ def main() -> int:
         write_lf(t / "runs" / "T-001" / "plan-review" / "cycle-02", "stray\n")
         return do_freeze(t)
     expect_refused("cycle path already occupied", "already exists", freeze_over_existing)
+
+    # ---- the bootstrap gate, from the runner's side ----
+    # Every init above passes --bootstrap-exempt, so without these three the gate
+    # would be entirely absent from this suite and could be deleted from
+    # cmd_init without a single test noticing.
+    print()
+    print("bootstrap gate")
+
+    def real_init(t: Path) -> subprocess.CompletedProcess:
+        return runner(t, "init", "--run", "A1E-001", "--protocol",
+                      "specs/protocol.md", "--spec", "specs/spec.md")
+
+    expect_refused("a real run created with no bootstrap review",
+                   "bootstrap_review not satisfied", real_init)
+
+    t2 = make_repo(); made.append(t2)
+    if approve_bootstrap(t2).returncode != 0:
+        failures.append("could not record a bootstrap approval in the fixture")
+    else:
+        r = real_init(t2)
+        if r.returncode != 0:
+            failures.append("a real run was refused despite an approved bootstrap "
+                            f"review; the gate would block everything:\n{r.stdout}{r.stderr}")
+        else:
+            run_json = json.loads(
+                (t2 / "runs" / "A1E-001" / "run.json").read_text(encoding="utf-8"))
+            if run_json.get("bootstrap_review") != "APPROVED":
+                failures.append("the run does not record that it ran under an "
+                                "approved bootstrap review")
+            else:
+                print("  [ok] a real run proceeds once the bootstrap review is approved")
+
+    # Editing a gated component after approval must re-block, or the approval
+    # outlives the code it covered. Asserted inline rather than through
+    # expect_refused, which builds its own fresh repo: this control needs the
+    # same repo that was just approved, and a fresh one would refuse for the
+    # ordinary no-review reason and look like a pass.
+    p = t2 / "scripts" / "validate_cycle.py"
+    p.write_text(p.read_text(encoding="utf-8") + "\n# later edit\n", encoding="utf-8")
+    r = runner(t2, "init", "--run", "A1E-002", "--protocol", "specs/protocol.md",
+               "--spec", "specs/spec.md")
+    blob = (r.stdout + r.stderr).lower()
+    if r.returncode == 0:
+        failures.append("a real run was created after a reviewed component "
+                        "changed; the approval outlived the code it covered")
+    elif "has changed since it was reviewed" not in blob:
+        failures.append("refused after a component changed, but not for that "
+                        f"reason:\n  got {blob.strip()[:300]}")
+    else:
+        print("  [ok] refused: a real run after a reviewed component changed")
+
+    # And the exempt path must label itself, or it is a silent bypass.
+    t3 = make_repo(); made.append(t3)
+    do_init(t3)
+    exempt = json.loads((t3 / "runs" / "T-001" / "run.json").read_text(encoding="utf-8"))
+    if "NOT_A_PROTOCOL_CYCLE" not in exempt.get("bootstrap_review", ""):
+        failures.append("--bootstrap-exempt does not label the run as development "
+                        "evidence, so an exempt run and a real one are "
+                        "indistinguishable in the record")
+    else:
+        print("  [ok] --bootstrap-exempt labels the run NOT_A_PROTOCOL_CYCLE")
 
     for t in made:
         shutil.rmtree(t, ignore_errors=True)

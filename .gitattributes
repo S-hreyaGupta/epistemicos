@@ -30,4 +30,4 @@ internal/core/domain/segment/testdata/expected.json -text
 # in the manifest stops matching, and every gold offset shifts by one byte per
 # preceding line. Both failures are silent: the hashes read as "wrong file"
 # and the offsets read as an extraction bug rather than as a checkout artefact.
-specs/gap/** -text
+specs/** -text

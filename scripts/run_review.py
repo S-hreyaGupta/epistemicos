@@ -73,6 +73,20 @@ def sha256_file(p: Path) -> str:
     return h.hexdigest()
 
 
+def write_lf(p: Path, text: str) -> None:
+    """Write evidence with LF endings on every platform.
+
+    Path.write_text translates \\n to the platform line ending, so the same
+    target.json frozen on Windows and on Linux would hash differently while
+    being self-consistent on each. MC-2 would pass on both and the divergence
+    would only surface when someone tried to reproduce a freeze elsewhere and
+    got a different TARGET_SHA256. Evidence hashes have to be a property of the
+    content, not of the machine that wrote it.
+    """
+    with p.open("w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+
+
 def rel(p: Path) -> str:
     """Repo-relative with forward slashes, so evidence is platform-neutral."""
     return p.resolve().relative_to(REPO).as_posix()
@@ -138,7 +152,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         "max_cycles": MAX_CYCLES,
     }
     run_dir.mkdir(parents=True, exist_ok=True)
-    run_json.write_text(json.dumps(run, indent=2) + "\n", encoding="utf-8")
+    write_lf(run_json, json.dumps(run, indent=2) + "\n")
 
     print(f"initialised {rel(run_json)}")
     print(f"  protocol_commit  {head}")
@@ -303,17 +317,20 @@ def cmd_freeze(args: argparse.Namespace) -> int:
 
     cycle.mkdir(parents=True)
     tj = cycle / "target.json"
-    tj.write_text(json.dumps(target, indent=2) + "\n", encoding="utf-8")
+    write_lf(tj, json.dumps(target, indent=2) + "\n")
     digest = sha256_file(tj)
-    (cycle / "target.sha256").write_text(digest + "\n", encoding="utf-8")
+    write_lf(cycle / "target.sha256", digest + "\n")
 
     ci = cycle / "codex-input.md"
-    ci.write_text(compose_input(prompt, digest, run, args.type, n, artifacts), encoding="utf-8")
+    write_lf(ci, compose_input(prompt, digest, run, args.type, n, artifacts))
 
-    # Self-check, not assumption: MC-2 check 10 must hold on what was just written.
+    # Self-checks, not assumptions, on what was just written.
     if digest not in ci.read_text(encoding="utf-8"):
         raise Refused("composed input does not contain the target hash; refusing to "
                       "leave a cycle that MC-2 would reject")
+    if b"\r" in tj.read_bytes():
+        raise Refused("target.json contains CR bytes; its hash would not reproduce "
+                      "on another platform")
 
     print(f"froze {rel(cycle)}")
     print(f"  target.sha256  {digest}")
@@ -345,14 +362,14 @@ def cmd_record(args: argparse.Namespace) -> int:
     # Bytes, not text. Whatever the reviewer returned is what gets stored.
     raw.write_bytes(src.read_bytes())
 
-    (cycle / "invocation.json").write_text(json.dumps({
+    write_lf(cycle / "invocation.json", json.dumps({
         "invocation": args.invocation,
         "recorded_at": now(),
         "source": str(src),
         "note": args.note or "",
         "unproven": "This file records how the review was invoked. It does not "
                     "establish that codex-output-raw.md came from codex-input.md.",
-    }, indent=2) + "\n", encoding="utf-8")
+    }, indent=2) + "\n")
 
     print(f"recorded {rel(raw)}  ({raw.stat().st_size} bytes, invocation={args.invocation})")
     print()

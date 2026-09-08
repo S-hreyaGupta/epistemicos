@@ -37,17 +37,29 @@ def sh(*args: str, cwd: Path) -> subprocess.CompletedProcess:
     return subprocess.run(args, cwd=str(cwd), capture_output=True, text=True)
 
 
+def write_lf(p: Path, text: str) -> None:
+    """Fixtures must be byte-identical on every platform.
+
+    Path.write_text translates \\n to the platform line ending, so a fixture
+    written this way hashes differently on Windows and on Linux. That is how
+    this suite first failed: it passed on Linux and failed on Windows, on a
+    fixture whose bytes were never meant to vary.
+    """
+    with p.open("w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+
+
 def make_repo() -> Path:
     tmp = Path(tempfile.mkdtemp(prefix="runner-")).resolve()
     (tmp / "scripts").mkdir()
     for name in ("run_review.py", "validate_cycle.py"):
         shutil.copy2(SRC / name, tmp / "scripts" / name)
     (tmp / "specs").mkdir()
-    (tmp / "specs" / "protocol.md").write_text(PROTOCOL_BODY, encoding="utf-8")
-    (tmp / "specs" / "spec.md").write_text(SPEC_BODY, encoding="utf-8")
-    (tmp / "specs" / "prompt.md").write_text(PROMPT_BODY, encoding="utf-8")
+    write_lf(tmp / "specs" / "protocol.md", PROTOCOL_BODY)
+    write_lf(tmp / "specs" / "spec.md", SPEC_BODY)
+    write_lf(tmp / "specs" / "prompt.md", PROMPT_BODY)
     (tmp / "plan").mkdir()
-    (tmp / "plan" / "01-PLAN.md").write_text("# plan\n\nstep one\n", encoding="utf-8")
+    write_lf(tmp / "plan" / "01-PLAN.md", "# plan\n\nstep one\n")
 
     sh("git", "init", "-q", cwd=tmp)
     sh("git", "config", "user.email", "t@t", cwd=tmp)
@@ -77,9 +89,9 @@ def fake_cycles(tmp: Path, n: int, close_last: bool = True) -> None:
     for i in range(1, n + 1):
         c = rd / f"cycle-{i:02d}"
         c.mkdir(parents=True)
-        (c / "target.json").write_text(json.dumps({"cycle": i}), encoding="utf-8")
+        write_lf(c / "target.json", json.dumps({"cycle": i}))
         if i < n or close_last:
-            (c / "codex-output-raw.md").write_text("findings\n", encoding="utf-8")
+            write_lf(c / "codex-output-raw.md", "findings\n")
 
 
 def main() -> int:
@@ -107,14 +119,24 @@ def main() -> int:
     if r.returncode != 0:
         failures.append(f"init failed:\n{r.stderr}{r.stdout}")
     else:
-        run = json.loads((tmp / "runs" / "T-001" / "run.json").read_text(encoding="utf-8"))
-        want = hashlib.sha256(
-            f"specs/spec.md:{hashlib.sha256(SPEC_BODY.encode()).hexdigest()}\n".encode()
-        ).hexdigest()
+        run_json = tmp / "runs" / "T-001" / "run.json"
+        run = json.loads(run_json.read_text(encoding="utf-8"))
+        # Derived from the file's actual bytes, not from re-encoding the constant.
+        # The claim under test is the digest-over-digests formula in spec_digest;
+        # re-hashing SPEC_BODY would instead be testing file I/O, which is what
+        # made this assertion platform-dependent in the first place.
+        on_disk = hashlib.sha256((tmp / "specs" / "spec.md").read_bytes()).hexdigest()
+        want = hashlib.sha256(f"specs/spec.md:{on_disk}\n".encode()).hexdigest()
         if run["spec_sha256"] != want:
             failures.append("spec_sha256 is not reproducible from its documented definition")
         else:
             print("  [ok] init pins protocol and specs; spec_sha256 reproducible by hand")
+
+        if b"\r" in run_json.read_bytes():
+            failures.append("run.json carries CR bytes; its hash will not reproduce "
+                            "on another platform")
+        else:
+            print("  [ok] run.json is LF on this platform")
 
         r = do_freeze(tmp)
         if r.returncode != 0:
@@ -128,8 +150,16 @@ def main() -> int:
             else:
                 print("  [ok] freeze binds codex-input.md to the target hash")
 
-            (tmp / "reply.md").write_text("C01-F01 | UNTESTED RULE | R-B7 | ...\n",
-                                          encoding="utf-8")
+            crlf = [n for n in ("target.json", "target.sha256", "codex-input.md")
+                    if b"\r" in (cyc / n).read_bytes()]
+            if crlf:
+                failures.append(f"frozen evidence carries CR bytes: {', '.join(crlf)}\n"
+                                "  the same freeze on another platform would produce a "
+                                "different TARGET_SHA256")
+            else:
+                print("  [ok] frozen evidence is LF, so its hashes are platform-neutral")
+
+            write_lf(tmp / "reply.md", "C01-F01 | UNTESTED RULE | R-B7 | ...\n")
             r = runner(tmp, "record", "--cycle", str(cyc),
                        "--output", "reply.md", "--invocation", "manual")
             if r.returncode != 0:
@@ -153,14 +183,13 @@ def main() -> int:
 
     def protocol_drift(t: Path):
         do_init(t)
-        (t / "specs" / "protocol.md").write_text(PROTOCOL_BODY + "V22 added later\n",
-                                                 encoding="utf-8")
+        write_lf(t / "specs" / "protocol.md", PROTOCOL_BODY + "V22 added later\n")
         return do_freeze(t)
     expect_refused("protocol edited after init", "protocol changed since init", protocol_drift)
 
     def spec_drift(t: Path):
         do_init(t)
-        (t / "specs" / "spec.md").write_text(SPEC_BODY + "rule G8\n", encoding="utf-8")
+        write_lf(t / "specs" / "spec.md", SPEC_BODY + "rule G8\n")
         return do_freeze(t)
     expect_refused("spec edited after init", "spec changed since init", spec_drift)
 
@@ -172,7 +201,7 @@ def main() -> int:
 
     def empty_prompt(t: Path):
         do_init(t)
-        (t / "specs" / "prompt.md").write_text("", encoding="utf-8")
+        write_lf(t / "specs" / "prompt.md", "")
         return do_freeze(t)
     expect_refused("prompt file empty", "prompt file is empty", empty_prompt)
 
@@ -211,16 +240,16 @@ def main() -> int:
         do_init(t)
         do_freeze(t)
         cyc = t / "runs" / "T-001" / "plan-review" / "cycle-01"
-        (t / "reply.md").write_text("findings\n", encoding="utf-8")
+        write_lf(t / "reply.md", "findings\n")
         runner(t, "record", "--cycle", str(cyc), "--output", "reply.md",
                "--invocation", "manual")
-        (t / "reply2.md").write_text("different findings\n", encoding="utf-8")
+        write_lf(t / "reply2.md", "different findings\n")
         return runner(t, "record", "--cycle", str(cyc), "--output", "reply2.md",
                       "--invocation", "manual")
     expect_refused("re-recording raw output", "write-once", record_twice)
 
     def record_unfrozen(t: Path):
-        (t / "reply.md").write_text("findings\n", encoding="utf-8")
+        write_lf(t / "reply.md", "findings\n")
         return runner(t, "record", "--cycle", str(t / "nowhere"),
                       "--output", "reply.md", "--invocation", "manual")
     expect_refused("record against an unfrozen directory", "not a frozen cycle", record_unfrozen)
@@ -228,7 +257,7 @@ def main() -> int:
     def record_empty(t: Path):
         do_init(t)
         do_freeze(t)
-        (t / "reply.md").write_text("", encoding="utf-8")
+        write_lf(t / "reply.md", "")
         return runner(t, "record", "--cycle",
                       str(t / "runs" / "T-001" / "plan-review" / "cycle-01"),
                       "--output", "reply.md", "--invocation", "manual")
@@ -240,8 +269,7 @@ def main() -> int:
         # next_cycle only counts directories, so a non-directory sitting on the
         # next cycle's name is the one way the path can be occupied. Without the
         # guard this surfaces as a mkdir traceback rather than a refusal.
-        (t / "runs" / "T-001" / "plan-review" / "cycle-02").write_text("stray\n",
-                                                                      encoding="utf-8")
+        write_lf(t / "runs" / "T-001" / "plan-review" / "cycle-02", "stray\n")
         return do_freeze(t)
     expect_refused("cycle path already occupied", "already exists", freeze_over_existing)
 

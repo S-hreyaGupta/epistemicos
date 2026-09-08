@@ -21,3 +21,13 @@ go.sum text eol=lf
 # that this fails loudly if the pin is ever removed.
 internal/core/domain/segment/testdata/demo.md -text
 internal/core/domain/segment/testdata/expected.json -text
+
+# A.1-E gap specifications, gold set and probe. Same reason as the Step 3
+# fixtures above, one capability along. MANIFEST.md pins thirteen source
+# documents by SHA-256, and GOLD_SET_v0.1.md carries character offsets into
+# probe/manuscript_normalised.txt — G6 sits at 52791, roughly 800 lines in.
+# Under core.autocrlf=true a Windows checkout rewrites LF to CRLF, every hash
+# in the manifest stops matching, and every gold offset shifts by one byte per
+# preceding line. Both failures are silent: the hashes read as "wrong file"
+# and the offsets read as an extraction bug rather than as a checkout artefact.
+specs/gap/** -text

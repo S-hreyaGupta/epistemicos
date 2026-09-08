@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Loop-state controller.
 
-Computes CONVERGED / STALLED / MAX_4_REACHED / CONTINUE for one review loop,
-per §6 of the protocol, and shows the working.
+Computes CONVERGED / HUMAN_ADJUDICATION_REQUIRED / STALLED / MAX_4_REACHED /
+CONTINUE for one review loop, per §6 and §13 of the protocol, and shows the
+working.
 
     python scripts/loop_state.py --review runs/A1E-001/plan-review
 
@@ -174,26 +175,42 @@ def main(argv: list[str]) -> int:
         lines.append(f"  RESOLVED_NEW_{n}  {len(resolved_new):>2}  {fmt(resolved_new)}")
         lines.append(f"  DISPUTED_NEW_{n}  {len(disputed_new):>2}  {fmt(disputed_new)}")
 
-    # Exits are tested in the protocol's order: CONVERGED, then STALLED, then MAX 4.
+    # Exits are tested in the protocol's order, and the order is load-bearing.
+    # HUMAN_ADJUDICATION_REQUIRED sits between CONVERGED and STALLED because a
+    # loop with nothing open and a dispute outstanding is not stalled: it
+    # finished everything automation can do. Test STALLED first and it swallows
+    # the case a cycle later, which is what v1.0 did.
     lines += ["", "exits"]
     status = None
     detail = ""
 
     converged = not cur[OPEN] and not cur[DISPUTED]
-    lines.append(f"  A CONVERGED      OPEN_{n} = 0 and DISPUTED_{n} = 0"
+    lines.append(f"  A CONVERGED                    OPEN_{n} = 0 and DISPUTED_{n} = 0"
                  f"        {'yes' if converged else 'no'}")
     if converged:
         status = "CONVERGED"
         detail = "Nothing open and nothing disputed. Proceed to human plan review."
 
     if status is None:
+        adjudicate = not cur[OPEN] and cur[DISPUTED]
+        lines.append(f"  B HUMAN_ADJUDICATION_REQUIRED  OPEN_{n} = 0 and "
+                     f"DISPUTED_{n} != 0     {'yes' if adjudicate else 'no'}")
+        if adjudicate:
+            status = "HUMAN_ADJUDICATION_REQUIRED"
+            detail = ("Everything actionable is resolved or disputed, and no further "
+                      "automated repair is available. Stop now rather than spending a "
+                      "cycle on a plan with nothing open to repair. Proceed to human "
+                      "plan review.")
+
+    if status is None:
         if prev is None:
-            lines.append("  B STALLED        not testable at n=1 (§6 requires n > 1)")
+            lines.append("  C STALLED                      not testable at n=1 "
+                         "(§6 requires n > 1)")
         else:
             stalled = (len(cur[OPEN]) >= len(prev[OPEN])
                        and not resolved_new and not disputed_new)
             lines.append(
-                f"  B STALLED        |OPEN_{n}| >= |OPEN_{n-1}|"
+                f"  C STALLED                      |OPEN_{n}| >= |OPEN_{n-1}|"
                 f" ({len(cur[OPEN])} >= {len(prev[OPEN])})"
                 f" and no new resolved/disputed   {'yes' if stalled else 'no'}")
             if stalled:
@@ -204,8 +221,8 @@ def main(argv: list[str]) -> int:
 
     if status is None:
         maxed = len(valid) >= MAX_VALID_CYCLES
-        lines.append(f"  C MAX_4_REACHED  VALID_CYCLE_COUNT = {len(valid)}"
-                     f"                        {'yes' if maxed else 'no'}")
+        lines.append(f"  D MAX_4_REACHED                VALID_CYCLE_COUNT = {len(valid)}"
+                     f"                  {'yes' if maxed else 'no'}")
         if maxed:
             status = "MAX_4_REACHED"
             detail = ("Budget exhausted with findings still open. Proceed to human "
@@ -217,7 +234,7 @@ def main(argv: list[str]) -> int:
                   f"{dirs[-1][0] + 1:02d} with a new frozen target.")
 
     lines += ["", f"LOOP_STATUS: {status}", detail]
-    if status in ("CONVERGED", "STALLED", "MAX_4_REACHED") and cur[DISPUTED]:
+    if status != "CONTINUE" and cur[DISPUTED]:
         lines.append("")
         lines.append(f"Disputes for adjudication ({len(cur[DISPUTED])}): "
                      f"{fmt(cur[DISPUTED])}")

@@ -79,7 +79,12 @@ def source_lines(path: Path) -> list[str]:
     for child in body.iterchildren():
         tag = child.tag.split("}")[-1]
         if tag == "p":
-            out.append(Paragraph(child, doc).text)
+            # A paragraph can carry soft line breaks, which python-docx returns
+            # as \n inside one paragraph's text. They are line breaks the author
+            # typed, so each becomes its own logical line. Without this the
+            # structure check counts one source line against several output
+            # lines and fails on a document that is perfectly fine.
+            out.extend(Paragraph(child, doc).text.split("\n"))
         elif tag == "tbl":
             for row in Table(child, doc).rows:
                 cells = [c.text.strip().replace("\n", " ") for c in row.cells]

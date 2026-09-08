@@ -300,13 +300,27 @@ def main() -> int:
             ok(f"{label} -> {expect}")
 
     # The dispute-only state is deliberately absent. See below.
-    print()
-    print("  [--] OPEN = 0 with DISPUTED > 0 is NOT tested here.")
-    print("       The protocol has no exit for it yet. Alex ruled on 8 September")
-    print("       that HUMAN_ADJUDICATION_REQUIRED belongs in the protocol first,")
-    print("       so the controller currently returns CONTINUE then STALLED and")
-    print("       both are wrong. Adding a test now would freeze one of those")
-    print("       wrong answers as expected behaviour.")
+    root3, commit3 = build_repo()
+    made.append(root3)
+    rv = root3 / "runs" / "T" / "plan-review"
+    d = rv / "cycle-01"
+    d.mkdir(parents=True)
+    lay_cycle(d, {"review_type": "plan", "run_id": "T", "cycle": 1,
+                  "protocol_commit": commit3, "protocol_sha256": "2" * 64,
+                  "spec_sha256": "0" * 64, "frozen_at": "2026-09-08T00:00:00Z",
+                  "plan_files": [{"path": "plan/01-PLAN.md",
+                                  "sha256": sha256_file(root3 / "plan" / "01-PLAN.md")}]})
+    run(root3, "ledger.py", "raise", "--review", str(rv), "--cycle", "1",
+        "--id", "C01-F01", "--class", "WRONG OWNERSHIP")
+    run(root3, "ledger.py", "respond", "--review", str(rv), "--cycle", "1",
+        "--id", "C01-F01", "--disposition", "REJECT_WITH_REASON", "--note", "disagree")
+    out = run(root3, "loop_state.py", "--review", str(rv)).stdout
+    got = next((l.split(":", 1)[1].strip() for l in out.splitlines()
+                if l.startswith("LOOP_STATUS:")), "(none)")
+    if got != "HUMAN_ADJUDICATION_REQUIRED":
+        bad(f"dispute-only state: expected HUMAN_ADJUDICATION_REQUIRED, got {got}")
+    else:
+        ok("nothing open, one dispute -> HUMAN_ADJUDICATION_REQUIRED (protocol v1.1)")
 
     for p in made:
         shutil.rmtree(p, ignore_errors=True)

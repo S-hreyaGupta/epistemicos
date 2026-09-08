@@ -301,6 +301,47 @@ def main() -> int:
              lambda root, rev: four_with_progress(root, rev, cycles=(1, 3, 4, 5)),
              "MAX_4_REACHED", invalid={2})
 
+    # ---- HUMAN_ADJUDICATION_REQUIRED, added in protocol v1.1 ----
+    # v1.0 had no exit here: the cycle the dispute landed in returned CONTINUE,
+    # telling Claude to repair a plan with nothing open, and the next returned
+    # STALLED, which mislabels a loop that finished everything automation could.
+    def only_a_dispute(root, rev):
+        ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+               "--class", "WRONG OWNERSHIP")
+        ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+               "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees")
+    scenario("nothing open, one dispute outstanding", 1, only_a_dispute,
+             "HUMAN_ADJUDICATION_REQUIRED")
+
+    # The exit order is load-bearing: this same fixture returned STALLED under
+    # v1.0 because STALLED was tested first.
+    scenario("precedes STALLED, which would otherwise swallow it", 2,
+             only_a_dispute, "HUMAN_ADJUDICATION_REQUIRED")
+
+    def resolved_and_disputed(root, rev):
+        for fid, cls in (("C01-F01", "UNTESTED RULE"), ("C01-F02", "WRONG OWNERSHIP")):
+            ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", fid,
+                   "--class", cls)
+        ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+               "--disposition", "ACCEPT", "--note", "fix")
+        ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
+               "--evidence", "done")
+        ledger(root, "respond", "--review", str(rev), "--cycle", "2", "--id", "C01-F02",
+               "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees")
+    scenario("everything resolved or disputed", 2, resolved_and_disputed,
+             "HUMAN_ADJUDICATION_REQUIRED")
+
+    # It must NOT fire while anything is still open. A dispute alongside an open
+    # finding leaves automated repair available, so the loop continues.
+    def dispute_plus_open(root, rev):
+        for fid, cls in (("C01-F01", "UNTESTED RULE"), ("C01-F02", "WRONG OWNERSHIP")):
+            ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", fid,
+                   "--class", cls)
+        ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F02",
+               "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees")
+    scenario("a dispute alongside an open finding does not trigger it", 1,
+             dispute_plus_open, "CONTINUE")
+
     def resolved_in_invalid_cycle(root, rev):
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
                "--class", "UNTESTED RULE")

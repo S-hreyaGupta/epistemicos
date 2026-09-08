@@ -4,7 +4,7 @@ Claude–Codex Minimal Implementation and Review Workflow
 This workflow is a version-controlled governing specification.
 Before any implementation run begins, the authoritative protocol must itself be committed to git.
 Recommended location:
-specs/implementation-review-protocol-v1.0.md
+specs/implementation-review-protocol-v1.1.md
 
 Record:
 PROTOCOL_PATH

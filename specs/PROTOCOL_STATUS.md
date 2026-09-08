@@ -14,9 +14,10 @@ the same one-line confirmation before it governs.
 `specs/implementation-review-protocol-v1.1.md`
 
 ```text
-PROTOCOL_HASH  e6c42a1f918e304519977ece3a4c1b567423d2235c0be63b9ad0a8b4c3641c5f
-               26,340 bytes
+PROTOCOL_HASH  296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483
 source docx    7cdb3a96666f254050a4173a0fdf56ae7972852eea348797315e378283fffd64
+as converted   e6c42a1f918e304519977ece3a4c1b567423d2235c0be63b9ad0a8b4c3641c5f
+               plus one declared amendment, below
 
 superseded     specs/implementation-review-protocol-v1.0.md
                74d7b56124a652525588fbb8548656aad2f7845d9cfea618c9d4136bf1f20a76
@@ -43,6 +44,38 @@ python scripts/convert_protocol.py --docx <source> \
 Reconverting the v1.0 source with the current converter still yields
 `74d7b561…`, so the soft-line-break fix below changed nothing about documents
 that do not contain soft breaks.
+
+## Amendment, and how it stays checkable
+
+§0.1's "Recommended location" named `...-v1.0.md`, the superseded filename, so
+the governing document pointed at a document it had replaced. Alex ruled on
+8 September that this is operational metadata rather than an inert typo and must
+be fixed rather than recorded: it creates exactly the which-copy-are-you-reading
+ambiguity §0.1 exists to remove.
+
+```diff
+ Recommended location:
+-specs/implementation-review-protocol-v1.0.md
++specs/implementation-review-protocol-v1.1.md
+```
+
+§0.1 makes the git artifact authoritative rather than the docx, so amending the
+markdown is legitimate. It costs something though: the file is no longer a
+byte-faithful conversion, so `convert_protocol.py` can no longer establish that
+nothing *else* changed in the same edit, and "I only changed one line" becomes an
+assertion.
+
+`scripts/verify_amendment.py` restores the check. It reconverts the docx, applies
+each declared amendment, and requires the result to be byte-identical to the
+committed file:
+
+```sh
+python scripts/verify_amendment.py --docx <rev2 docx>
+```
+
+An undeclared edit fails it. Demonstrated by softening "Stop the automated plan
+loop immediately" to "Stop the automated plan loop" in the STALLED text: the
+verifier failed and named that line.
 
 ## What v1.1 changes
 

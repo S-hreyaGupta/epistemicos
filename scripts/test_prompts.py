@@ -22,7 +22,10 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-PROTOCOL = REPO / "specs" / "implementation-review-protocol-v1.0.md"
+# The governing protocol, not a superseded one. This pin was left at v1.0 when
+# v1.1 landed, which is precisely the drift this file exists to catch: it kept
+# passing because the vocabulary happened not to change between versions.
+PROTOCOL = REPO / "specs" / "implementation-review-protocol-v1.1.md"
 PROMPTS = REPO / "specs" / "prompts"
 
 FIVE = {

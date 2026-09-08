@@ -5,7 +5,7 @@ Composes review input, freezes the target, captures raw reviewer output, and
 refuses to open a cycle whose preconditions do not hold.
 
     python scripts/run_review.py init   --run A1E-001 \
-        --protocol specs/implementation-review-protocol-v1.0.md \
+        --protocol specs/implementation-review-protocol-v1.1.md \
         --spec specs/gap/A1E_gap_object_schema_v1-4.md
     python scripts/run_review.py freeze --run A1E-001 --type plan \
         --prompt specs/prompts/plan-review.md --file runs/A1E-001/plan/01-PLAN.md

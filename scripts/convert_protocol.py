@@ -3,7 +3,7 @@
 
     python scripts/convert_protocol.py \
         --docx "Untitled document (4).docx" \
-        --out specs/implementation-review-protocol-v1.0.md \
+        --out specs/implementation-review-protocol-v1.1.md \
         --terminal "Preservation verdict"
 
 Exit 0 = both checks passed and the file was written.

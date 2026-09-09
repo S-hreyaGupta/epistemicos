@@ -100,6 +100,15 @@ def main() -> int:
     def bad(msg: str) -> None:
         failures.append(msg)
 
+    def failed_checks_of(r) -> set[int]:
+        """Which numbered MC-2 checks reported FAIL.
+
+        Asserting the specific check matters: a probe that accepts any failure
+        proves nothing about the rule it claims to test, which is B01-F18.
+        """
+        return {int(m.group(1)) for m in
+                re.finditer(r"^\s*(\d+)\.\s*\[FAIL\]", r.stdout, re.M)}
+
     # ---------------------------------------------------------- seam 1
     print("seam 1  schema <-> checker")
 
@@ -154,6 +163,10 @@ def main() -> int:
     # approval record so check 13 has something authoritative
     write_lf(root / "runs" / "I-001" / "plan-approval" / "approval.json",
              json.dumps({"decision": "APPROVE",
+                         # B01-F06: the record has to name the artifact its
+                         # hash is of, or check 13 can only compare a hash
+                         # against another copy of itself.
+                         "approved_plan_path": "plan/01-PLAN.md",
                          "approved_plan_hash": sha256_file(root / "plan" / "01-PLAN.md")},
                         indent=2))
 
@@ -164,6 +177,64 @@ def main() -> int:
         bad(f"a conformant implementation cycle failed the gate:\n{r.stdout}")
     else:
         ok("a conformant implementation cycle passes all fifteen")
+
+    # ---- B01-F06: check 13 must reach the plan, not two copies of a hash ----
+    # Codex: "Check 13 compares two recorded strings. It neither hashes the
+    # approved plan nor checks the approval decision. An isolated implementation
+    # fixture continued to pass all fifteen checks after the approved plan's
+    # contents changed."
+    def f06_fixture(name: str, approval: dict, mutate_plan: bool = False) -> Path:
+        rd = root / "runs" / name
+        write_lf(rd / "plan-approval" / "approval.json",
+                 json.dumps(approval, indent=2))
+        cdir = rd / "implementation-review" / "cycle-01"
+        cdir.mkdir(parents=True)
+        write_lf(cdir / "findings.json", json.dumps({
+            "schema": "cycle-findings/1", "cycle": 1, "count": 0,
+            "zero_findings_asserted": True, "findings": []}, indent=2))
+        write_lf(cdir / "target.json", json.dumps(impl_target(), indent=2))
+        d = sha256_file(cdir / "target.json")
+        write_lf(cdir / "target.sha256", d + "\n")
+        write_lf(cdir / "codex-input.md", f"target {d}\n")
+        write_lf(cdir / "codex-output-raw.md", "findings\n")
+        if mutate_plan:
+            write_lf(root / "plan" / "01-PLAN.md", "# plan v1\n\nstep one CHANGED\n")
+        return cdir
+
+    good_approval = {"decision": "APPROVE",
+                     "approved_plan_path": "plan/01-PLAN.md",
+                     "approved_plan_hash": sha256_file(root / "plan" / "01-PLAN.md")}
+
+    c13 = f06_fixture("F06-BASE", good_approval)
+    if failed_checks_of(run(root, "validate_cycle.py", str(c13))):
+        bad("the F06 baseline fixture fails, so the controls below prove nothing")
+    else:
+        ok("an implementation cycle with a matching approved plan passes check 13")
+
+    c13 = f06_fixture("F06-DECISION",
+                      {**good_approval, "decision": "RETURN_FOR_REWORK"})
+    if 13 not in failed_checks_of(run(root, "validate_cycle.py", str(c13))):
+        bad("a hash carried by a RETURN_FOR_REWORK record was accepted as an "
+            "approved plan; §7.3 freezes it on approval and nowhere else")
+    else:
+        ok("check 13 refuses an approval record that is not an APPROVE")
+
+    c13 = f06_fixture("F06-NOPATH",
+                      {k: v for k, v in good_approval.items()
+                       if k != "approved_plan_path"})
+    if 13 not in failed_checks_of(run(root, "validate_cycle.py", str(c13))):
+        bad("check 13 passed with no artifact named, so it compared a hash "
+            "against another copy of itself")
+    else:
+        ok("check 13 refuses when no artifact is named for the hash")
+
+    c13 = f06_fixture("F06-DRIFT", good_approval, mutate_plan=True)
+    if 13 not in failed_checks_of(run(root, "validate_cycle.py", str(c13))):
+        bad("the approved plan changed and check 13 still passed; this is "
+            "B01-F06, code approved against a plan nobody approved")
+    else:
+        ok("check 13 fails once the approved plan's contents change")
+    write_lf(root / "plan" / "01-PLAN.md", "# plan v1\n\nstep one\n")
 
     # ---- the probes, rebuilt after B01-F18 ----
     #
@@ -189,6 +260,7 @@ def main() -> int:
         rd = root / "runs" / name
         write_lf(rd / "plan-approval" / "approval.json",
                  json.dumps({"decision": "APPROVE",
+                             "approved_plan_path": "plan/01-PLAN.md",
                              "approved_plan_hash":
                                  sha256_file(root / "plan" / "01-PLAN.md")},
                             indent=2))

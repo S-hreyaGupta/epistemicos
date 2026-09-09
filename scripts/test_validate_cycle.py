@@ -100,6 +100,9 @@ def build(root: Path, commit: str, tree: str, kind: str = "plan",
         if approval:
             write_lf(root / "runs" / "T-001" / "plan-approval" / "approval.json",
                      json.dumps({"decision": "APPROVE",
+                                 # B01-F06: name the artifact, or check 13 can
+                                 # only compare a hash with a copy of itself.
+                                 "approved_plan_path": "plan.md",
                                  "approved_plan_hash": plan_hash}, indent=2))
 
     if mutate:

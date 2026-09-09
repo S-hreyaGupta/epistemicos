@@ -163,9 +163,18 @@ def cmd_raise(a: argparse.Namespace) -> int:
     data = load(review)
     check_id(a.id, a.cycle)
     if a.id in data["findings"]:
-        raise Refused(f"{a.id} already exists. Finding identifiers are persistent; "
-                      "a re-raised issue in a later cycle is a new finding that may "
-                      "reference the old one, not a reuse of its id.")
+        # B01-F13. The refusal is right; its guidance was not. Telling the
+        # operator to create a new finding for a recurrence contradicts V40 and
+        # defeats §6's re-raise detection, which needs the identity to persist.
+        # Issue 7 gave the recurrence its own transition, so this now points at
+        # it instead of instructing a rename.
+        raise Refused(
+            f"{a.id} already exists, and identifiers are persistent (V40).\n"
+            f"  If this is the same underlying finding recurring after it was "
+            "resolved, use\n  `reopen`, which keeps the identifier and moves "
+            "RESOLVED -> OPEN.\n"
+            "  If it is genuinely a different finding, it needs its own "
+            "identifier.")
     if a.klass.strip().upper() == NON_FINDING:
         raise Refused(
             f"{NON_FINDING} is not a finding and cannot enter the ledger.\n"
@@ -198,8 +207,10 @@ def cmd_respond(a: argparse.Namespace) -> int:
     f = get(data, a.id)
 
     if f["state"] == RESOLVED:
-        raise Refused(f"{a.id} is RESOLVED. A resolved finding is not reopened by "
-                      "the automated loop.")
+        raise Refused(f"{a.id} is RESOLVED. Responding again is not how a "
+                      "recurrence is recorded:\n  use `reopen` with evidence, "
+                      "which keeps the identifier and moves\n  RESOLVED -> OPEN "
+                      "per §7 of the 9 September ruling.")
     if f["state"] == DISPUTED:
         raise Refused(f"{a.id} is DISPUTED and requires human adjudication (§5, §7.1). "
                       "The automated loop does not move findings out of DISPUTED.")
@@ -245,6 +256,52 @@ def cmd_respond(a: argparse.Namespace) -> int:
         print("       Requires human adjudication at the plan gate.")
 
     save(review, data)
+    return 0
+
+
+def cmd_reopen(a: argparse.Namespace) -> int:
+    """RESOLVED -> OPEN when the same underlying finding recurs.
+
+    Alex Zamurko, 9 September 2026, issue 7:
+
+        If a previously RESOLVED finding is raised again as the same underlying
+        finding, the persistent Finding ID is retained and its state transitions
+        RESOLVED -> OPEN. The recurrence is recorded as a reopen event with
+        cycle and evidence. No new authoritative finding state is introduced.
+
+    Before this the ledger refused outright, which was wrong in both directions:
+    a recurrence either had to be recorded under a new identifier, breaking V40
+    and §6's re-raise detection, or not recorded at all. There is still no fourth
+    state; the controller sees an ordinary member of OPEN_n.
+    """
+    review = Path(a.review).resolve()
+    data = load(review)
+    f = get(data, a.id)
+
+    if f["state"] != RESOLVED:
+        raise Refused(f"{a.id} is {f['state']}, not RESOLVED. Reopening applies "
+                      "only to a finding that was resolved and has recurred.")
+    if not (a.evidence or "").strip():
+        raise Refused(
+            "--evidence is required. A reopen asserts that the same underlying "
+            "finding is\n  present again, and the record has to say what shows "
+            "it rather than leaving\n  the claim bare.")
+
+    last = last_event(f, "DEMONSTRATED")
+    if last and a.cycle <= last["cycle"]:
+        raise Refused(
+            f"{a.id} was resolved in cycle {last['cycle']:02d} and cannot "
+            f"recur in cycle {a.cycle:02d}.\n  A recurrence is observed in a "
+            "later cycle than the resolution it undoes.")
+
+    f["state"] = OPEN
+    f["history"].append({"cycle": a.cycle, "event": "REOPENED", "state": OPEN,
+                         "at": now(), "note": a.evidence,
+                         "prior_state": RESOLVED})
+    save(review, data)
+    print(f"{a.id}  REOPENED  cycle {a.cycle:02d}  {RESOLVED} -> {OPEN}")
+    print("       The identifier is retained; §6 counts it as an ordinary "
+          "member of OPEN_n.")
     return 0
 
 
@@ -378,6 +435,14 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--id", required=True)
     v.add_argument("--evidence", default="")
     v.set_defaults(fn=cmd_resolve)
+
+    o = sub.add_parser("reopen", help="record that a RESOLVED finding recurred")
+    common(o)
+    o.add_argument("--cycle", type=int, required=True)
+    o.add_argument("--id", required=True)
+    o.add_argument("--evidence", default="",
+                   help="what shows the same underlying finding is present again")
+    o.set_defaults(fn=cmd_reopen)
 
     s = sub.add_parser("show", help="print the ledger, or a per-cycle snapshot")
     common(s)

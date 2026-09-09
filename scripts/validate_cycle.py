@@ -134,6 +134,27 @@ def _check_hashed_ref(entry, repo_root: Path, label: str,
             "that has since moved on."]
 
 
+def _approval_plan_path(approval: Path) -> str | None:
+    """Which artifact the approval record's hash is of.
+
+    §7.3 freezes APPROVED_PLAN_HASH but the protocol does not say where the
+    path lives, so both places are accepted and either is enough. What is not
+    acceptable is neither: a hash with no named artifact can only be compared
+    against another copy of itself, which is what B01-F06 was.
+    """
+    try:
+        d = json.loads(approval.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    p = d.get("approved_plan_path")
+    if p:
+        return p
+    files = d.get("approved_plan_files")
+    if isinstance(files, list) and len(files) == 1:
+        return files[0]
+    return None
+
+
 def _hash_of_declared_file(target: dict, hash_field: str, path_field: str,
                            repo_root: Path) -> tuple[bool, str]:
     """Recorded hash present, its artifact resolvable, and the two agree."""
@@ -307,9 +328,55 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
             r.add(13, "approved-plan hash matches the frozen approved plan", False,
                   "approval record carries no approved_plan_hash")
         else:
-            ok = str(ap).lower() == str(frozen).lower()
-            r.add(13, "approved-plan hash matches the frozen approved plan", ok,
-                  "" if ok else f"target   {ap}\n          approval {frozen}")
+            # B01-F06. This used to stop here, comparing two recorded strings.
+            # Both records could agree perfectly while the plan itself had
+            # changed underneath them, so an implementation cycle passed all
+            # fifteen checks against a plan nobody approved. Codex demonstrated
+            # exactly that on an isolated fixture.
+            #
+            # So the artifact is hashed, and the approval's decision is read
+            # rather than assumed: an approval record that says
+            # RETURN_FOR_REWORK is not an approval, and a hash matching one is
+            # matching the wrong thing.
+            problems13: list[str] = []
+            if str(ap).lower() != str(frozen).lower():
+                problems13.append(f"target {ap}\n          approval {frozen}")
+
+            decision = None
+            try:
+                decision = json.loads(
+                    approval.read_text(encoding="utf-8")).get("decision")
+            except json.JSONDecodeError:
+                pass
+            if decision != "APPROVE":
+                problems13.append(
+                    f"the approval record's decision is {decision!r}, not "
+                    "APPROVE; §7.3 freezes APPROVED_PLAN_HASH on approval, so a "
+                    "hash carried by any other decision is not an approved plan")
+
+            plan_ref = target.get("approved_plan_path") or _approval_plan_path(approval)
+            if not plan_ref:
+                problems13.append(
+                    "neither the target nor the approval record says which "
+                    "artifact the approved-plan hash is of, so the hash cannot "
+                    "be checked against anything. Two matching records are not "
+                    "an approved plan.")
+            else:
+                snap = cycle_dir / "artifacts" / plan_ref
+                live = repo_root / plan_ref
+                src = snap if snap.is_file() else live
+                if not src.is_file():
+                    problems13.append(f"approved plan not found: {plan_ref}")
+                else:
+                    actual = sha256_file(src)
+                    if actual != str(frozen).lower():
+                        problems13.append(
+                            f"{plan_ref} does not hash to the approved value\n"
+                            f"          approved {frozen}\n"
+                            f"          actual   {actual}")
+
+            r.add(13, "approved-plan hash matches the frozen approved plan",
+                  not problems13, "; ".join(problems13))
 
     # 14-15. diff and test results
     ok14, d14 = _hash_of_declared_file(target, "diff_hash", "diff_path", repo_root)

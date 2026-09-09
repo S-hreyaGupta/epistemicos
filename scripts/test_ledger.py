@@ -179,6 +179,79 @@ def main() -> int:
     else:
         print("  [ok] refused: finding id changed between raw review and record")
 
+    # ---- issue 7: recurrence of a previously RESOLVED finding ----
+    # Alex Zamurko, 9 September: same persistent ID, RESOLVED -> OPEN, a reopen
+    # event with cycle and evidence, no fourth authoritative state, and the
+    # controller treats it as an ordinary member of OPEN_n. Before this the
+    # ledger refused outright, so a recurrence either got a new identifier —
+    # breaking V40 and §6's re-raise detection — or went unrecorded.
+    print()
+    print("recurrence of a resolved finding")
+
+    def resolved_fixture():
+        root, commit, rev = fresh()
+        rev.mkdir(parents=True)
+        ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--class", "UNTESTED RULE")
+        ledger(root, "respond", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "will fix")
+        ledger(root, "resolve", "--review", str(rev), "--cycle", "2",
+               "--id", "C01-F01", "--evidence", "repaired in 02-PLAN.md")
+        return root, rev
+
+    root, rev = resolved_fixture()
+    r = ledger(root, "reopen", "--review", str(rev), "--cycle", "3",
+               "--id", "C01-F01", "--evidence", "recurred in 03-PLAN.md §4")
+    data = json.loads((rev / "ledger.json").read_text(encoding="utf-8"))
+    f = data["findings"].get("C01-F01", {})
+    if r.returncode != 0:
+        failures.append(f"reopening a recurred finding was refused:\n{r.stderr}{r.stdout}")
+    elif f.get("state") != "OPEN":
+        failures.append(f"reopen did not move the state to OPEN: {f.get('state')}")
+    elif not any(e["event"] == "REOPENED" and e.get("prior_state") == "RESOLVED"
+                 for e in f["history"]):
+        failures.append("reopen did not record a reopen event carrying the "
+                        "prior state")
+    elif set(e["state"] for e in f["history"]) - {"OPEN", "RESOLVED", "DISPUTED"}:
+        failures.append("reopen introduced a state outside the protocol's three")
+    else:
+        print("  [ok] recurrence keeps the identifier and moves RESOLVED -> OPEN")
+
+    rootE, revE = resolved_fixture()
+    expect_refused("reopen with no evidence", "--evidence is required",
+                   lambda: ledger(rootE, "reopen", "--review", str(revE),
+                                  "--cycle", "3", "--id", "C01-F01"))
+
+    # Non-recurrence: nothing that was never resolved can be reopened.
+    root2, commit2, rev2 = fresh()
+    rev2.mkdir(parents=True)
+    ledger(root2, "raise", "--review", str(rev2), "--cycle", "1",
+           "--id", "C01-F01", "--class", "UNTESTED RULE")
+    expect_refused("reopen a finding that is still OPEN", "not RESOLVED",
+                   lambda: ledger(root2, "reopen", "--review", str(rev2),
+                                  "--cycle", "2", "--id", "C01-F01",
+                                  "--evidence", "x"))
+
+    root3, rev3 = resolved_fixture()
+    expect_refused("recurrence dated before the resolution it undoes",
+                   "cannot recur",
+                   lambda: ledger(root3, "reopen", "--review", str(rev3),
+                                  "--cycle", "2", "--id", "C01-F01",
+                                  "--evidence", "x"))
+
+    # The duplicate-id refusal must now point at reopen rather than instruct a
+    # rename, which is what B01-F13 was about.
+    root4, rev4 = resolved_fixture()
+    r = ledger(root4, "raise", "--review", str(rev4), "--cycle", "1",
+               "--id", "C01-F01", "--class", "UNTESTED RULE")
+    if r.returncode == 0:
+        failures.append("a duplicate identifier was accepted")
+    elif "reopen" not in (r.stdout + r.stderr):
+        failures.append("the duplicate-id refusal does not point at reopen; it "
+                        "still implies a recurrence needs a new identifier")
+    else:
+        print("  [ok] the duplicate-id refusal points at reopen, not a rename")
+
     print()
     print("ledger")
 

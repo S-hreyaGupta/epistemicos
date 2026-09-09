@@ -49,6 +49,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 VALIDATOR = REPO / "scripts" / "validate_cycle.py"
 
 MAX_CYCLES = 4
@@ -513,53 +514,26 @@ def cmd_freeze(args: argparse.Namespace) -> int:
 
 # ---------------------------------------------------------------- findings
 
-# The finding block the review prompts mandate. §4 fixes the first two fields;
-# the rest vary by prompt, so only the two that carry meaning are required here.
-FINDING_ID = re.compile(r"^Finding ID:\s*([A-Z]?\d{2}-F\d{2,3})\s*$", re.M)
-FINDING_CLASS = re.compile(r"^Class:\s*(.+?)\s*$", re.M)
+# The parser and the canonical Finding ID grammar live in one module, imported
+# by this runner and by the MC-2 checker. Two implementations of a format is how
+# the prompt, the ledger and the parser ended up each enforcing their own.
+import findings_format
 
-CLASSES = (
-    "MISSING REQUIREMENT",
-    "WRONG OWNERSHIP",
-    "NONDETERMINISTIC WHERE D POSSIBLE",
-    "SEMANTIC STEP TOO BROAD",
-    "UNTESTED RULE",
-    "CONTRADICTORY IMPLEMENTATION MAPPING",
-)
+CLASSES = findings_format.CLASSES
+
+
+def canonical_id_grammar():
+    return findings_format.canonical_id_grammar()
 
 
 def extract_findings(raw: str) -> tuple[list[dict], list[str]]:
-    """(findings, problems) parsed from raw reviewer output.
-
-    Deterministic by construction: the review prompts mandate the block format,
-    so this reads it rather than interpreting prose. Anything it cannot parse is
-    a problem rather than a silent omission, because the failure this exists to
-    prevent is findings quietly going missing between the reviewer and the
-    ledger.
-    """
-    found: list[dict] = []
-    problems: list[str] = []
-
-    starts = [(m.start(), m.group(1)) for m in FINDING_ID.finditer(raw)]
-    for i, (pos, fid) in enumerate(starts):
-        end = starts[i + 1][0] if i + 1 < len(starts) else len(raw)
-        block = raw[pos:end]
-        km = FINDING_CLASS.search(block)
-        if not km:
-            problems.append(f"{fid} has no Class: line")
-            continue
-        klass = km.group(1).strip()
-        if klass not in CLASSES:
-            problems.append(f"{fid} declares a class outside the closed "
-                            f"vocabulary of §4: {klass!r}")
-            continue
-        found.append({"id": fid, "class": klass})
-
-    ids = [f["id"] for f in found]
-    dupes = sorted({i for i in ids if ids.count(i) > 1})
-    if dupes:
-        problems.append(f"duplicate finding identifiers: {', '.join(dupes)}")
-    return found, problems
+    # A missing or unreadable schema is a refusal, not a traceback: the parser
+    # cannot know the canonical grammar, so it cannot say anything about the
+    # review, and saying nothing must not look like finding nothing.
+    try:
+        return findings_format.extract(raw)
+    except findings_format.FormatError as e:
+        raise Refused(str(e))
 
 
 def cmd_record(args: argparse.Namespace) -> int:
@@ -620,6 +594,14 @@ def cmd_record(args: argparse.Namespace) -> int:
 
     write_lf(cycle / "findings.json", json.dumps({
         "schema": "cycle-findings/1",
+        # Requirement 2: a review that cannot be parsed deterministically is
+        # INVALID, and INVALID is not zero. Nothing reaches this line unless the
+        # parse was clean, so the field is VALID here by construction — it is
+        # recorded so a reader of the evidence sees the status rather than
+        # inferring it from the file's existence.
+        "review_result_status": "VALID",
+        "raw_finding_count": len(found),
+        "finding_id_grammar": canonical_id_grammar().pattern,
         "cycle": json.loads((cycle / "target.json").read_text(encoding="utf-8"))
                      .get("cycle"),
         "extracted_at": now(),

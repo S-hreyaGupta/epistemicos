@@ -52,6 +52,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 VALIDATOR = REPO / "scripts" / "validate_cycle.py"
 MAX_VALID_CYCLES = 4
 
@@ -110,7 +111,45 @@ def authoritative_findings(cycle_dir: Path) -> list[str]:
     record is not a cycle with no findings; it is a cycle whose result nobody
     can determine, and the controller says so rather than guessing.
     """
+    # Requirements 3 and 4: the structured result must still account for the
+    # raw review, and identifiers must be unchanged along the whole chain
+    #
+    #     codex-output-raw.md -> findings.json -> ledger.json
+    #
+    # Checked here rather than only at record time, because findings.json is an
+    # ordinary file afterwards. A finding quietly dropped from it, or renamed,
+    # would otherwise never be noticed again.
+    raw = cycle_dir / "codex-output-raw.md"
     p = cycle_dir / "findings.json"
+    if raw.is_file() and p.is_file():
+        try:
+            import findings_format
+            parsed, problems = findings_format.extract(
+                raw.read_text(encoding="utf-8", errors="replace"))
+        except Exception as e:
+            raise CannotCalculate(
+                f"{cycle_dir.name}: the raw review cannot be reparsed, so the "
+                f"structured result cannot be checked against it: {e}")
+        if problems:
+            raise CannotCalculate(
+                f"{cycle_dir.name}: the raw review no longer parses "
+                "deterministically:\n  " + "\n  ".join(problems))
+        try:
+            structured = json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            raise CannotCalculate(f"{cycle_dir.name}/findings.json is not valid "
+                                  f"JSON: {e}")
+        raw_ids = [f["id"] for f in parsed]
+        got_ids = [f.get("id") for f in structured.get("findings", [])]
+        if raw_ids != got_ids:
+            raise CannotCalculate(
+                f"{cycle_dir.name}: findings.json does not match the raw review "
+                "it was extracted from.\n"
+                f"  raw        {raw_ids}\n"
+                f"  structured {got_ids}\n"
+                "  A finding dropped or renamed here is a finding the loop will "
+                "never see.")
+
     if not p.is_file():
         raise CannotCalculate(
             f"{p.parent.name} passed MC-2 but has no findings.json.\n"

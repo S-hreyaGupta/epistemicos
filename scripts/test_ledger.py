@@ -39,8 +39,15 @@ def sh(*args: str, cwd: Path) -> subprocess.CompletedProcess:
 def make_repo() -> tuple[Path, str]:
     tmp = Path(tempfile.mkdtemp(prefix="ledger-")).resolve()
     (tmp / "scripts").mkdir()
-    for n in ("ledger.py", "loop_state.py", "validate_cycle.py"):
+    for n in ("ledger.py", "loop_state.py", "validate_cycle.py",
+              "findings_format.py"):
         shutil.copy2(SRC / n, tmp / "scripts" / n)
+    # The parser reads the canonical Finding ID grammar from the schema, and the
+    # controller reparses the raw review, so a fixture without it cannot compute
+    # a loop state at all.
+    (tmp / "specs").mkdir()
+    shutil.copy2(SRC.parent / "specs" / "evidence-schema-v1.0.md",
+                 tmp / "specs" / "evidence-schema-v1.0.md")
     write_lf(tmp / "plan.md", "# plan\n\nbody\n")
     sh("git", "init", "-q", cwd=tmp)
     sh("git", "config", "user.email", "t@t", cwd=tmp)
@@ -115,6 +122,64 @@ def main() -> int:
             return
         print(f"  [ok] refused: {label}")
 
+    # ---- issue 5, requirements 3 and 4, enforced at gate time ----
+    # findings.json is an ordinary file after record, so the invariants have to
+    # hold whenever the controller runs, not only when the runner writes.
+    print("review-result integrity at gate time")
+
+    def integrity_fixture():
+        root, commit = make_repo()
+        made.append(root)
+        rev = root / "runs" / "T-001" / "plan-review"
+        make_cycle(root, rev, 1, commit)
+        c = rev / "cycle-01"
+        write_lf(c / "codex-output-raw.md",
+                 "Finding ID: C01-F01\nClass: UNTESTED RULE\n\n"
+                 "Finding ID: C01-F02\nClass: WRONG OWNERSHIP\n")
+        write_lf(c / "findings.json", json.dumps({
+            "schema": "cycle-findings/1", "cycle": 1, "count": 2,
+            "zero_findings_asserted": False,
+            "findings": [{"id": "C01-F01", "class": "UNTESTED RULE"},
+                         {"id": "C01-F02", "class": "WRONG OWNERSHIP"}],
+        }, indent=2))
+        digest = hashlib.sha256((c / "target.json").read_bytes()).hexdigest()
+        write_lf(c / "target.sha256", digest + "\n")
+        write_lf(c / "codex-input.md", f"target {digest}\n")
+        for fid, kl in (("C01-F01", "UNTESTED RULE"), ("C01-F02", "WRONG OWNERSHIP")):
+            ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+                   "--id", fid, "--class", kl)
+        return root, rev, c
+
+    root, rev, c = integrity_fixture()
+    if loop(root, rev).returncode != 0:
+        failures.append("the integrity fixture does not compute a loop state, "
+                        "so the two controls below prove nothing")
+    else:
+        print("  [ok] a consistent raw/structured/ledger chain computes")
+
+    root, rev, c = integrity_fixture()
+    d = json.loads((c / "findings.json").read_text(encoding="utf-8"))
+    d["findings"] = d["findings"][:1]; d["count"] = 1
+    write_lf(c / "findings.json", json.dumps(d, indent=2))
+    r = loop(root, rev)
+    if r.returncode == 0:
+        failures.append("a finding present in the raw review but dropped from "
+                        "findings.json still computed a loop state")
+    else:
+        print("  [ok] refused: raw finding omitted from findings.json")
+
+    root, rev, c = integrity_fixture()
+    d = json.loads((c / "findings.json").read_text(encoding="utf-8"))
+    d["findings"][0]["id"] = "C01-F99"
+    write_lf(c / "findings.json", json.dumps(d, indent=2))
+    r = loop(root, rev)
+    if r.returncode == 0:
+        failures.append("a finding renamed between the raw review and the "
+                        "structured record still computed a loop state")
+    else:
+        print("  [ok] refused: finding id changed between raw review and record")
+
+    print()
     print("ledger")
 
     # ---- happy path ----

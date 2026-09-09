@@ -61,9 +61,13 @@ def build_repo() -> tuple[Path, str]:
     tmp = Path(tempfile.mkdtemp(prefix="iface-")).resolve()
     (tmp / "scripts").mkdir()
     for n in ("validate_cycle.py", "run_review.py", "ledger.py", "loop_state.py",
-              "bootstrap_gate.py"):
+              "bootstrap_gate.py", "findings_format.py"):
         shutil.copy2(SRC / n, tmp / "scripts" / n)
     (tmp / "specs").mkdir()
+    # The parser reads the canonical Finding ID grammar out of the schema, so a
+    # fixture without it cannot record a cycle. Copied rather than stubbed.
+    shutil.copy2(REPO / "specs" / "evidence-schema-v1.0.md",
+                 tmp / "specs" / "evidence-schema-v1.0.md")
     write_lf(tmp / "specs" / "protocol.md", "# protocol\n\nbody\n")
     write_lf(tmp / "specs" / "spec.md", "# spec\n\nrules\n")
     write_lf(tmp / "specs" / "prompt.md", "Review the plan. Report findings.\n")

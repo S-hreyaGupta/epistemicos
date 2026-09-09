@@ -125,6 +125,33 @@ authority that can rewrite the artifact establishes drift detection, not
 immutability. The distinction is the whole content of MC-1's enforcement-status
 field, so the schema should not blur it.
 
+## Canonical Finding ID grammar
+
+One grammar, declared here, validated by the runner, preserved unchanged by the
+ledger. Per Alex Zamurko, 9 September 2026:
+
+    Prompt, parser, and ledger must not independently impose different
+    grammars. The clean choice is: the review format defines the canonical
+    grammar, the runner validates it, and the ledger preserves it unchanged.
+
+```text
+FINDING_ID_GRAMMAR = ^[A-Z]{0,2}\d{2}-F\d{2,3}$
+```
+
+An optional prefix of up to two capitals, the cycle as two digits, `-F`, and the
+finding number. `C02-F03` from §4 and `B01-F01` from the bootstrap review both
+satisfy it.
+
+This exists because they did diverge. The prompt told the reviewer to use
+`B01-F01`; the ledger enforced `C{cycle}-F{nn}`; so eighteen findings were
+renamed during transcription and the authoritative record disagreed with the
+ledger about what every one of them was called. Renaming a reviewer's identifier
+is B01-F13.
+
+An identifier that does not match makes the review result invalid. It is never
+silently corrected, because a corrected identifier is a different finding
+wearing the right name.
+
 ## `codex-output-raw.md`
 
 Exactly what Codex returned, captured before any parsing, summarisation or

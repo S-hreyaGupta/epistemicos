@@ -53,7 +53,7 @@ def make_repo() -> Path:
     tmp = Path(tempfile.mkdtemp(prefix="runner-")).resolve()
     (tmp / "scripts").mkdir()
     for name in ("run_review.py", "validate_cycle.py", "bootstrap_gate.py",
-                 "ledger.py", "loop_state.py"):
+                 "ledger.py", "loop_state.py", "findings_format.py"):
         shutil.copy2(SRC / name, tmp / "scripts" / name)
     (tmp / "specs").mkdir()
     # Copied rather than stubbed: it is a covered component now (B01-F10), so
@@ -501,6 +501,57 @@ def main() -> int:
         failures.append("a finding block with no Class: line was recorded")
     else:
         print("  [ok] refused: finding block with no class")
+
+    # ---- issue 5: deterministic review-result integrity ----
+    # Alex Zamurko's minimum spec, 9 September. The first version of
+    # --zero-findings stopped absence meaning zero, but left the case he named:
+    # the reviewer produced findings, the parser failed to see them, and an
+    # honest operator asserts zero over a review nobody read correctly.
+    print()
+    print("review-result integrity")
+
+    t12 = make_repo(); made.append(t12)
+    r, _ = recorded(t12, "Required correction: separate the deficiency.\n",
+                    "--zero-findings")
+    if r.returncode == 0:
+        failures.append("zero was asserted over a review carrying finding "
+                        "signals the parser did not account for")
+    else:
+        print("  [ok] refused: zero asserted over an unparsed finding signal")
+
+    t13 = make_repo(); made.append(t13)
+    r, _ = recorded(t13, "Finding ID: not-an-id\nClass: UNTESTED RULE\n")
+    if r.returncode == 0:
+        failures.append("an identifier outside the canonical grammar was "
+                        "silently accepted")
+    elif "canonical grammar" not in (r.stdout + r.stderr):
+        failures.append("refused a bad identifier without naming the grammar")
+    else:
+        print("  [ok] refused: identifier outside the canonical grammar")
+
+    # Requirement 5: never silently corrected. The refusal above must not have
+    # written a repaired identifier anywhere.
+    t14 = make_repo(); made.append(t14)
+    r, cyc = recorded(t14, "Finding ID: C1-F1\nClass: UNTESTED RULE\n")
+    if (cyc / "findings.json").exists():
+        failures.append("a findings.json was written for a review whose "
+                        "identifier failed the grammar")
+    else:
+        print("  [ok] a malformed identifier writes nothing, corrected or otherwise")
+
+    # The grammar has one authoritative home, and the runner reads it rather
+    # than restating it. Break the declaration and the parse must stop.
+    t15 = make_repo(); made.append(t15)
+    sch = t15 / "specs" / "evidence-schema-v1.0.md"
+    sch.write_text(sch.read_text(encoding="utf-8")
+                   .replace("FINDING_ID_GRAMMAR", "REMOVED_GRAMMAR"),
+                   encoding="utf-8")
+    r, _ = recorded(t15, "Finding ID: C01-F01\nClass: UNTESTED RULE\n")
+    if r.returncode == 0:
+        failures.append("the runner parsed findings with no canonical grammar "
+                        "declared; it is carrying its own copy")
+    else:
+        print("  [ok] refused: no canonical grammar declared in the schema")
 
     # ---- B01-F08: the gate must hold at freeze, not only at init ----
     # A run can sit for days between init and its first cycle, and every cycle is

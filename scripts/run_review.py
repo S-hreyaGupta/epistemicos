@@ -267,7 +267,25 @@ def check_previous_cycle_closed(review_dir: Path, n: int) -> None:
 
 
 def compose_input(prompt: str, target_hash: str, run: dict, rtype: str,
-                  cycle_n: int, artifacts: list[tuple[dict, str]]) -> str:
+                  cycle_n: int, artifacts: list[tuple[dict, str]],
+                  protocol_text: str = "") -> str:
+    """Everything the reviewer needs, in the file the target hash binds.
+
+    The protocol text is included, not merely hashed. Every review is *against*
+    the protocol, and an earlier version of this function named PROTOCOL_SHA256
+    in the header and stopped there. A reviewer cannot read a hash, so it would
+    have been asked to judge conformance to a document it had never seen and
+    would have answered from memory or invention.
+
+    That is the pilot's failure restated: freezing an artifact proves it did not
+    change, not that the reviewer read it. Here it was worse, because the
+    reviewer could not have read it at all.
+
+    It belongs in this file rather than being pasted alongside, because
+    codex-input.md is what MC-2 check 10 binds to the frozen target. Anything
+    supplied next to it is outside the evidence and cannot be shown to have been
+    what the reviewer saw.
+    """
     lines = [
         f"# Review input — {run['run_id']} / {rtype} review / cycle {cycle_n:02d}",
         "",
@@ -286,6 +304,24 @@ def compose_input(prompt: str, target_hash: str, run: dict, rtype: str,
         "",
         "---",
         "",
+    ]
+    if protocol_text:
+        lines += [
+            "# The governing protocol",
+            "",
+            f"`{run['protocol']['path']}`, sha256 `{run['protocol_sha256']}`.",
+            "",
+            "This is the document the artifacts below are reviewed against. Where",
+            "it and the review prompt disagree, this governs.",
+            "",
+            "```",
+            protocol_text.rstrip("\n"),
+            "```",
+            "",
+            "---",
+            "",
+        ]
+    lines += [
         "# Artifacts under review",
         "",
     ]
@@ -377,7 +413,12 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     write_lf(cycle / "target.sha256", digest + "\n")
 
     ci = cycle / "codex-input.md"
-    write_lf(ci, compose_input(prompt, digest, run, args.type, n, artifacts))
+    # Read from the pinned path. check_pins_still_hold has already verified this
+    # file hashes to run.json's protocol_sha256, so the text embedded below is
+    # the text the header names rather than whatever is on disk under that name.
+    protocol_text = (REPO / run["protocol"]["path"]).read_text(encoding="utf-8")
+    write_lf(ci, compose_input(prompt, digest, run, args.type, n, artifacts,
+                               protocol_text))
 
     # Self-checks, not assumptions, on what was just written.
     if digest not in ci.read_text(encoding="utf-8"):

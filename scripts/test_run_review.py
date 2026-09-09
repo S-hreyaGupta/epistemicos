@@ -167,6 +167,22 @@ def main() -> int:
             else:
                 print("  [ok] freeze binds codex-input.md to the target hash")
 
+            # The reviewer is asked to judge conformance to the protocol, so the
+            # protocol has to be in the file it is judging from. An earlier
+            # version named PROTOCOL_SHA256 in the header and stopped, which
+            # would have produced a review of a document the reviewer never saw.
+            proto_text = (tmp / "specs" / "protocol.md").read_text(encoding="utf-8")
+            body = "\n".join(l for l in proto_text.splitlines() if l.strip())
+            missing = [l for l in body.splitlines() if l not in ci]
+            if missing:
+                failures.append(
+                    "codex-input.md does not carry the protocol text, only its "
+                    "hash. The reviewer cannot read a hash, so it would be asked "
+                    "to check conformance to a document it never saw.\n"
+                    f"  first absent line: {missing[0][:70]!r}")
+            else:
+                print("  [ok] codex-input.md carries the protocol text, not just its hash")
+
             crlf = [n for n in ("target.json", "target.sha256", "codex-input.md")
                     if b"\r" in (cyc / n).read_bytes()]
             if crlf:

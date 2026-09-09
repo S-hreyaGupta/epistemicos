@@ -82,6 +82,11 @@ def build(root: Path, commit: str, tree: str, kind: str = "plan",
     plan_hash = sha256_file(root / "plan.md")
     if kind == "plan":
         target["plan_files"] = [{"path": "plan.md", "sha256": plan_hash}]
+        # Preserved copy: check 9 validates the snapshot, not the live tree,
+        # so a cycle survives the repairs its review asked for.
+        snap = cycle / "artifacts" / "plan.md"
+        snap.parent.mkdir(parents=True, exist_ok=True)
+        snap.write_bytes((root / "plan.md").read_bytes())
     else:
         target.update({
             "candidate_commit": commit,

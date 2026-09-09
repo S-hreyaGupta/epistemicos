@@ -61,11 +61,18 @@ def make_cycle(root: Path, review: Path, n: int, commit: str, valid: bool = True
         "plan_files": [{"path": "plan.md",
                         "sha256": hashlib.sha256((root / "plan.md").read_bytes()).hexdigest()}],
     }
+    snap = c / "artifacts" / "plan.md"
+    snap.parent.mkdir(parents=True, exist_ok=True)
+    snap.write_bytes((root / "plan.md").read_bytes())
     write_lf(c / "target.json", json.dumps(target, indent=2))
     digest = hashlib.sha256((c / "target.json").read_bytes()).hexdigest()
     write_lf(c / "target.sha256", digest + "\n")
     write_lf(c / "codex-input.md", f"target {digest}\n")
     write_lf(c / "codex-output-raw.md", "findings\n")
+    write_lf(c / "findings.json", json.dumps({
+        "schema": "cycle-findings/1", "cycle": n, "count": 0,
+        "zero_findings_asserted": True, "findings": [],
+    }, indent=2))
     if not valid:
         # Break check 5: a required file is empty.
         write_lf(c / "codex-output-raw.md", "")
@@ -122,7 +129,7 @@ def main() -> int:
 
     r = ledger(root, "respond", "--review", str(rev), "--cycle", "1",
                "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "will fix")
-    data = json.loads((rev / "findings.json").read_text(encoding="utf-8"))
+    data = json.loads((rev / "ledger.json").read_text(encoding="utf-8"))
     if data["findings"]["C01-F01"]["state"] != "OPEN":
         failures.append("ACCEPT changed the state; §5 resolves only once the repair "
                         "is demonstrated in the next review target")
@@ -131,7 +138,7 @@ def main() -> int:
 
     r = ledger(root, "resolve", "--review", str(rev), "--cycle", "2",
                "--id", "C01-F01", "--evidence", "repaired in 02-PLAN.md")
-    data = json.loads((rev / "findings.json").read_text(encoding="utf-8"))
+    data = json.loads((rev / "ledger.json").read_text(encoding="utf-8"))
     if r.returncode != 0 or data["findings"]["C01-F01"]["state"] != "RESOLVED":
         failures.append(f"resolve from a later cycle should work:\n{r.stderr}{r.stdout}")
     else:
@@ -204,7 +211,7 @@ def main() -> int:
     ledger(root3, "respond", "--review", str(rev3), "--cycle", "1", "--id", "C01-F01",
            "--disposition", "REJECT_WITH_REASON", "--note", "spec says otherwise",
            "--spec-evidence", "§5: ACCEPT does not resolve")
-    data = json.loads((rev3 / "findings.json").read_text(encoding="utf-8"))
+    data = json.loads((rev3 / "ledger.json").read_text(encoding="utf-8"))
     if data["findings"]["C01-F01"]["state"] != "DISPUTED":
         failures.append("REJECT_WITH_REASON did not produce DISPUTED")
     else:
@@ -241,7 +248,7 @@ def main() -> int:
 
     # And nothing was written on the way to being refused.
     if (rev4 / "findings.json").is_file():
-        data = json.loads((rev4 / "findings.json").read_text(encoding="utf-8"))
+        data = json.loads((rev4 / "ledger.json").read_text(encoding="utf-8"))
         if data.get("findings"):
             failures.append("a refused OUT OF VOCABULARY class still left findings "
                             f"in the ledger: {sorted(data['findings'])}")

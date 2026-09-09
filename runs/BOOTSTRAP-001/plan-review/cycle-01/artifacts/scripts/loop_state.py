@@ -79,66 +79,11 @@ def gate(cycle_dir: Path) -> tuple[bool, str]:
     return r.returncode == 0, reason
 
 
-class CannotCalculate(Exception):
-    """Loop state is not determinable from the evidence present. Exit 2."""
-
-
 def load_ledger(review: Path) -> dict:
-    """State history. Absent means no findings have been responded to yet.
-
-    Distinct from the per-cycle authoritative findings, which are checked
-    separately below and whose absence is a refusal rather than a zero.
-    """
-    p = review / "ledger.json"
+    p = review / "findings.json"
     if not p.is_file():
         return {"findings": {}}
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        raise CannotCalculate(f"ledger.json is not valid JSON: {e}")
-
-
-def authoritative_findings(cycle_dir: Path) -> list[str]:
-    """The finding IDs the runner extracted for this cycle.
-
-    Alex Zamurko, issue 4: "Controller refuses to calculate loop state if
-    findings.json is missing or invalid."
-
-    Absence used to mean zero. That is the path by which a review full of
-    findings produces CONVERGED: nobody transcribes them, the ledger is empty,
-    and empty reads as clean. So a valid cycle without an authoritative findings
-    record is not a cycle with no findings; it is a cycle whose result nobody
-    can determine, and the controller says so rather than guessing.
-    """
-    p = cycle_dir / "findings.json"
-    if not p.is_file():
-        raise CannotCalculate(
-            f"{p.parent.name} passed MC-2 but has no findings.json.\n"
-            "  Absence is not zero. Either the runner did not record this cycle "
-            "or the file\n  was removed; both make the loop state "
-            "undeterminable. Re-record the cycle.")
-    try:
-        d = json.loads(p.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        raise CannotCalculate(f"{p.parent.name}/findings.json is not valid "
-                              f"JSON: {e}")
-    if d.get("schema") != "cycle-findings/1":
-        raise CannotCalculate(
-            f"{p.parent.name}/findings.json declares schema "
-            f"{d.get('schema')!r}, expected 'cycle-findings/1'")
-    items = d.get("findings")
-    if not isinstance(items, list) or "count" not in d:
-        raise CannotCalculate(f"{p.parent.name}/findings.json is malformed: "
-                              "needs a findings list and a count")
-    if d["count"] != len(items):
-        raise CannotCalculate(
-            f"{p.parent.name}/findings.json says count={d['count']} but carries "
-            f"{len(items)} findings")
-    if not items and not d.get("zero_findings_asserted"):
-        raise CannotCalculate(
-            f"{p.parent.name}/findings.json records zero findings without "
-            "zero_findings_asserted.\n  Zero has to be asserted, never inferred.")
-    return [f["id"] for f in items if isinstance(f, dict) and "id" in f]
+    return json.loads(p.read_text(encoding="utf-8"))
 
 
 def state_after(f: dict, valid_upto: set[int]) -> str | None:
@@ -168,18 +113,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--review", required=True)
     ap.add_argument("--quiet", action="store_true", help="print LOOP_STATUS only")
     a = ap.parse_args(argv[1:])
-    try:
-        return _run(a)
-    except CannotCalculate as e:
-        print(f"CANNOT CALCULATE LOOP STATE: {e}", file=sys.stderr)
-        print()
-        print("No LOOP_STATUS is emitted. An undeterminable state is not "
-              "CONTINUE, and it is\nnot CONVERGED; treating it as either is the "
-              "failure this refusal exists to stop.", file=sys.stderr)
-        return 2
 
-
-def _run(a) -> int:
     review = Path(a.review).resolve()
     if not review.is_dir():
         print(f"not a directory: {review}", file=sys.stderr)
@@ -210,30 +144,7 @@ def _run(a) -> int:
         print("\n".join(lines) if not a.quiet else "LOOP_STATUS: CONTINUE")
         return 0
 
-    # Every valid cycle must carry an authoritative findings record, and the
-    # ledger must account for everything in it. Without this the controller
-    # measures only what someone remembered to transcribe, and silence reads as
-    # a clean review.
     ledger = load_ledger(review)
-    lines += ["", "authoritative findings"]
-    unaccounted: list[str] = []
-    for num, d in dirs:
-        if num not in valid:
-            continue
-        ids = authoritative_findings(d)
-        missing = [i for i in ids if i not in ledger["findings"]]
-        lines.append(f"  cycle-{num:02d}  {len(ids)} finding(s)"
-                     + (f": {', '.join(ids)}" if ids else ", explicitly zero"))
-        unaccounted += [f"cycle-{num:02d}: {i}" for i in missing]
-    if unaccounted:
-        raise CannotCalculate(
-            "findings the reviewer recorded are absent from the ledger:\n  "
-            + "\n  ".join(unaccounted) +
-            "\n\n  The loop state would be computed over a smaller finding set "
-            "than the review\n  produced, which is how a review full of findings "
-            "reaches CONVERGED.")
-    lines.append("  every recorded finding is accounted for in the ledger")
-
     n = len(valid)
     upto_n = set(valid)
     upto_prev = set(valid[:-1])

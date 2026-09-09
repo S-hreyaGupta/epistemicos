@@ -97,41 +97,17 @@ def git_commit_exists(repo_root: Path, commit: str) -> bool:
     return git(repo_root, "cat-file", "-e", f"{commit}^{{commit}}")[0] == 0
 
 
-def _check_hashed_ref(entry, repo_root: Path, label: str,
-                      cycle_dir: Path | None = None) -> list[str]:
-    """Validate a bound artifact against the cycle's preserved copy.
-
-    Alex Zamurko, 9 September 2026: "At freeze, snapshot the exact reviewed
-    artifact bytes into the cycle evidence directory and validate those
-    preserved copies, not the live working tree."
-
-    This used to hash `repo_root / path`, the live file. A completed cycle
-    therefore went INVALID the moment anyone repaired what it had reviewed —
-    and since the controller ignores events in invalid cycles, acting on a
-    review erased it. Repair between cycles is the design; it cannot be what
-    destroys the previous cycle.
-
-    The live tree is now irrelevant to a completed cycle's validity. That is the
-    point: the evidence is self-contained, and a cycle means the same thing on a
-    fresh clone a year later as it does here.
-    """
+def _check_hashed_ref(entry, repo_root: Path, label: str) -> list[str]:
     if not isinstance(entry, dict) or "path" not in entry or "sha256" not in entry:
         return [f"{label} must be an object with path and sha256"]
-
-    snap = (cycle_dir / "artifacts" / entry["path"]) if cycle_dir else None
-    if snap is not None and snap.is_file():
-        actual = sha256_file(snap)
-        if actual != entry["sha256"]:
-            return [f"{label} preserved copy of {entry['path']} does not match "
-                    f"its record: {entry['sha256']} vs {actual}. The snapshot "
-                    "has been altered since the freeze."]
-        return []
-
-    return [f"{label} has no preserved copy: expected "
-            f"{(snap.relative_to(cycle_dir) if snap else '?')}.\n"
-            "A cycle frozen without snapshots cannot be validated, because the "
-            "only\nremaining source for the reviewed bytes is a working tree "
-            "that has since moved on."]
+    p = repo_root / entry["path"]
+    if not p.is_file():
+        return [f"{label} path not found: {entry['path']}"]
+    actual = sha256_file(p)
+    if actual != entry["sha256"]:
+        return [f"{label} hash mismatch for {entry['path']}: "
+                f"recorded {entry['sha256']}, actual {actual}"]
+    return []
 
 
 def _hash_of_declared_file(target: dict, hash_field: str, path_field: str,
@@ -240,8 +216,7 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
             problems.append("plan review requires a non-empty plan_files list")
         else:
             for entry in files:
-                problems += _check_hashed_ref(entry, repo_root, "plan_files entry",
-                                             cycle_dir)
+                problems += _check_hashed_ref(entry, repo_root, "plan_files entry")
     elif rtype == "implementation":
         absent = [f for f in IMPL_FIELDS if not target.get(f)]
         if absent:

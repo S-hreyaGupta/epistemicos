@@ -133,6 +133,14 @@ def main() -> int:
         return t
 
     def lay_cycle(cdir: Path, target: dict) -> None:
+        for e in target.get("plan_files", []):
+            snap = cdir / "artifacts" / e["path"]
+            snap.parent.mkdir(parents=True, exist_ok=True)
+            snap.write_bytes((root / e["path"]).read_bytes())
+        write_lf(cdir / "findings.json", json.dumps({
+            "schema": "cycle-findings/1", "cycle": target.get("cycle"),
+            "count": 0, "zero_findings_asserted": True, "findings": [],
+        }, indent=2))
         write_lf(cdir / "target.json", json.dumps(target, indent=2))
         d = sha256_file(cdir / "target.json")
         write_lf(cdir / "target.sha256", d + "\n")
@@ -284,7 +292,9 @@ def main() -> int:
         ok(f"freeze wrote the documented layout ({len(documented_files)} names "
            "checked against the schema)")
 
-    write_lf(root2 / "reply.md", "C01-F01 | UNTESTED RULE | R-B7 | ...\n")
+    write_lf(root2 / "reply.md",
+             "Finding ID: C01-F01\nClass: UNTESTED RULE\n"
+             "Requirement ID: R-B7\nEvidence: ...\n")
     r = run(root2, "run_review.py", "record", "--cycle", str(cyc),
             "--output", "reply.md", "--invocation", "manual")
     if r.returncode != 0 or "MC2_CONFORMANCE: PASS" not in r.stdout:

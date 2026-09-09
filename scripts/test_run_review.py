@@ -218,7 +218,7 @@ def main() -> int:
             else:
                 print("  [ok] frozen evidence is LF, so its hashes are platform-neutral")
 
-            write_lf(tmp / "reply.md", "C01-F01 | UNTESTED RULE | R-B7 | ...\n")
+            write_lf(tmp / "reply.md", "Finding ID: C01-F01\nClass: UNTESTED RULE\nRequirement ID: R-B7\nEvidence: ...\n")
             r = runner(tmp, "record", "--cycle", str(cyc),
                        "--output", "reply.md", "--invocation", "manual")
             if r.returncode != 0:
@@ -341,7 +341,7 @@ def main() -> int:
         do_init(t)
         do_freeze(t)
         cyc = t / "runs" / "T-001" / "plan-review" / "cycle-01"
-        write_lf(t / "reply.md", "findings\n")
+        write_lf(t / "reply.md", "Finding ID: C01-F01\nClass: UNTESTED RULE\nRequirement ID: R-B7\nEvidence: ...\n")
         runner(t, "record", "--cycle", str(cyc), "--output", "reply.md",
                "--invocation", "manual")
         write_lf(t / "reply2.md", "different findings\n")
@@ -350,7 +350,7 @@ def main() -> int:
     expect_refused("re-recording raw output", "write-once", record_twice)
 
     def record_unfrozen(t: Path):
-        write_lf(t / "reply.md", "findings\n")
+        write_lf(t / "reply.md", "Finding ID: C01-F01\nClass: UNTESTED RULE\nRequirement ID: R-B7\nEvidence: ...\n")
         return runner(t, "record", "--cycle", str(t / "nowhere"),
                       "--output", "reply.md", "--invocation", "manual")
     expect_refused("record against an unfrozen directory", "not a frozen cycle", record_unfrozen)
@@ -423,6 +423,84 @@ def main() -> int:
                         f"reason:\n  got {blob.strip()[:300]}")
     else:
         print("  [ok] refused: a real run after a reviewed component changed")
+
+    # ---- issue 4: authoritative per-cycle findings ----
+    # Alex Zamurko, 9 September: "Add tests for populated findings, explicit
+    # zero findings, missing findings, and malformed findings."
+    print()
+    print("authoritative findings")
+
+    def recorded(t: Path, body: str, *extra: str):
+        do_init(t)
+        do_freeze(t)
+        write_lf(t / "reply.md", body)
+        cyc = t / "runs" / "T-001" / "plan-review" / "cycle-01"
+        return runner(t, "record", "--cycle", str(cyc), "--output", "reply.md",
+                      "--invocation", "manual", *extra), cyc
+
+    POPULATED = ("Finding ID: C01-F01\nClass: UNTESTED RULE\nEvidence: x\n\n"
+                 "Finding ID: C01-F02\nClass: WRONG OWNERSHIP\nEvidence: y\n")
+
+    t6 = make_repo(); made.append(t6)
+    r, cyc = recorded(t6, POPULATED)
+    if r.returncode != 0:
+        failures.append(f"recording populated findings failed:\n{r.stdout}{r.stderr}")
+    else:
+        d = json.loads((cyc / "findings.json").read_text(encoding="utf-8"))
+        ids = [f["id"] for f in d["findings"]]
+        if ids != ["C01-F01", "C01-F02"] or d["count"] != 2:
+            failures.append(f"findings.json did not capture both findings: {d}")
+        elif d.get("source_sha256") != hashlib.sha256(
+                (cyc / "codex-output-raw.md").read_bytes()).hexdigest():
+            failures.append("findings.json is not bound to the capture it was "
+                            "extracted from")
+        else:
+            print("  [ok] populated: both findings extracted and bound to the capture")
+
+    t7 = make_repo(); made.append(t7)
+    r, cyc = recorded(t7, "The plan is sound. No findings.\n", "--zero-findings")
+    if r.returncode != 0:
+        failures.append(f"explicit zero findings should record:\n{r.stdout}{r.stderr}")
+    else:
+        d = json.loads((cyc / "findings.json").read_text(encoding="utf-8"))
+        if d["count"] != 0 or not d.get("zero_findings_asserted"):
+            failures.append("zero findings recorded without the assertion flag")
+        else:
+            print("  [ok] explicit zero: recorded as asserted, not inferred")
+
+    t8 = make_repo(); made.append(t8)
+    r, _ = recorded(t8, "The plan is sound. No findings.\n")
+    if r.returncode == 0:
+        failures.append("a review with no finding blocks recorded silently as "
+                        "zero; absence must never mean zero")
+    elif "--zero-findings" not in (r.stdout + r.stderr):
+        failures.append("refused a no-blocks review without naming --zero-findings")
+    else:
+        print("  [ok] refused: no finding blocks and no explicit zero assertion")
+
+    t9 = make_repo(); made.append(t9)
+    r, _ = recorded(t9, POPULATED, "--zero-findings")
+    if r.returncode == 0:
+        failures.append("--zero-findings accepted alongside two finding blocks")
+    else:
+        print("  [ok] refused: --zero-findings contradicted by present findings")
+
+    t10 = make_repo(); made.append(t10)
+    r, cyc = recorded(t10, "Finding ID: C01-F01\nClass: SOMETHING INVENTED\n")
+    if r.returncode == 0:
+        failures.append("a class outside the closed vocabulary was recorded")
+    elif (cyc / "codex-output-raw.md").exists():
+        failures.append("raw output was written despite the findings being "
+                        "unparseable; nothing should be written on refusal")
+    else:
+        print("  [ok] refused: class outside §4, and nothing written")
+
+    t11 = make_repo(); made.append(t11)
+    r, cyc = recorded(t11, "Finding ID: C01-F01\nEvidence: no class line here\n")
+    if r.returncode == 0:
+        failures.append("a finding block with no Class: line was recorded")
+    else:
+        print("  [ok] refused: finding block with no class")
 
     # ---- B01-F08: the gate must hold at freeze, not only at init ----
     # A run can sit for days between init and its first cycle, and every cycle is

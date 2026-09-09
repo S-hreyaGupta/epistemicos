@@ -1,6 +1,6 @@
 {
   "findings": {
-    "C01-F01": {
+    "B01-F01": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
       "cycle_raised": 1,
       "history": [
@@ -20,9 +20,10 @@
         }
       ],
       "requirement_id": "MC-2",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F01 on 9 September; corrected to B01-F01, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F02": {
+    "B01-F02": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
       "cycle_raised": 1,
       "history": [
@@ -42,9 +43,10 @@
         }
       ],
       "requirement_id": "S6",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F02 on 9 September; corrected to B01-F02, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F03": {
+    "B01-F03": {
       "class": "WRONG OWNERSHIP",
       "cycle_raised": 1,
       "history": [
@@ -64,9 +66,10 @@
         }
       ],
       "requirement_id": "MC-1",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F03 on 9 September; corrected to B01-F03, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F04": {
+    "B01-F04": {
       "class": "MISSING REQUIREMENT",
       "cycle_raised": 1,
       "history": [
@@ -86,9 +89,10 @@
         }
       ],
       "requirement_id": "S2.2",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F04 on 9 September; corrected to B01-F04, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F05": {
+    "B01-F05": {
       "class": "NONDETERMINISTIC WHERE D POSSIBLE",
       "cycle_raised": 1,
       "history": [
@@ -108,9 +112,10 @@
         }
       ],
       "requirement_id": "S10.1",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F05 on 9 September; corrected to B01-F05, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F06": {
+    "B01-F06": {
       "class": "MISSING REQUIREMENT",
       "cycle_raised": 1,
       "history": [
@@ -130,9 +135,10 @@
         }
       ],
       "requirement_id": "S10.2",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F06 on 9 September; corrected to B01-F06, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F07": {
+    "B01-F07": {
       "class": "MISSING REQUIREMENT",
       "cycle_raised": 1,
       "history": [
@@ -152,9 +158,10 @@
         }
       ],
       "requirement_id": "MC-2",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F07 on 9 September; corrected to B01-F07, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F08": {
+    "B01-F08": {
       "class": "MISSING REQUIREMENT",
       "cycle_raised": 1,
       "history": [
@@ -174,9 +181,10 @@
         }
       ],
       "requirement_id": "MC-2",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F08 on 9 September; corrected to B01-F08, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F09": {
+    "B01-F09": {
       "class": "MISSING REQUIREMENT",
       "cycle_raised": 1,
       "history": [
@@ -196,9 +204,10 @@
         }
       ],
       "requirement_id": "MC-1",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F09 on 9 September; corrected to B01-F09, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F10": {
+    "B01-F10": {
       "class": "MISSING REQUIREMENT",
       "cycle_raised": 1,
       "history": [
@@ -218,9 +227,10 @@
         }
       ],
       "requirement_id": "MC-1",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F10 on 9 September; corrected to B01-F10, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F11": {
+    "B01-F11": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
       "cycle_raised": 1,
       "history": [
@@ -240,9 +250,10 @@
         }
       ],
       "requirement_id": "S6",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F11 on 9 September; corrected to B01-F11, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F12": {
+    "B01-F12": {
       "class": "MISSING REQUIREMENT",
       "cycle_raised": 1,
       "history": [
@@ -262,9 +273,10 @@
         }
       ],
       "requirement_id": "S5",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F12 on 9 September; corrected to B01-F12, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F13": {
+    "B01-F13": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
       "cycle_raised": 1,
       "history": [
@@ -284,9 +296,10 @@
         }
       ],
       "requirement_id": "V40",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F13 on 9 September; corrected to B01-F13, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F14": {
+    "B01-F14": {
       "class": "MISSING REQUIREMENT",
       "cycle_raised": 1,
       "history": [
@@ -306,9 +319,10 @@
         }
       ],
       "requirement_id": "MC-1",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F14 on 9 September; corrected to B01-F14, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F15": {
+    "B01-F15": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
       "cycle_raised": 1,
       "history": [
@@ -328,9 +342,10 @@
         }
       ],
       "requirement_id": "MC-1",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F15 on 9 September; corrected to B01-F15, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F16": {
+    "B01-F16": {
       "class": "UNTESTED RULE",
       "cycle_raised": 1,
       "history": [
@@ -350,9 +365,10 @@
         }
       ],
       "requirement_id": "MC-1",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F16 on 9 September; corrected to B01-F16, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F17": {
+    "B01-F17": {
       "class": "UNTESTED RULE",
       "cycle_raised": 1,
       "history": [
@@ -372,9 +388,10 @@
         }
       ],
       "requirement_id": "S10.1",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F17 on 9 September; corrected to B01-F17, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
-    "C01-F18": {
+    "B01-F18": {
       "class": "UNTESTED RULE",
       "cycle_raised": 1,
       "history": [
@@ -394,7 +411,8 @@
         }
       ],
       "requirement_id": "MC-2",
-      "state": "OPEN"
+      "state": "OPEN",
+      "transcription_note": "recorded as C01-F18 on 9 September; corrected to B01-F18, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     }
   },
   "review": "plan-review"

@@ -56,12 +56,6 @@ REVIEW_TYPES = ("plan", "implementation")
 INVOCATIONS = ("manual", "automated")
 HEX64 = re.compile(r"\A[0-9a-f]{64}\Z")
 
-# MC-1 requires every run to record this. CONVENTION_ONLY here because the
-# implementing agent and the review evidence share one write authority on a
-# single-user machine; see specs/evidence-schema-v1.0.md. Upgrading it is a
-# change to the environment, not to this constant.
-MC1_ENFORCEMENT = "CONVENTION_ONLY"
-
 
 class Refused(Exception):
     """A precondition did not hold. Exit 1, change nothing."""
@@ -150,7 +144,17 @@ def cmd_init(args: argparse.Namespace) -> int:
         # works only when the script's own directory happens to be on sys.path,
         # which it is when run directly and is not in several other cases. A gate
         # that silently becomes an ImportError is a gate that stops gating.
-        ok, reasons = load_gate().evaluate(REPO)
+        import importlib.util
+        gate_py = Path(__file__).resolve().parent / "bootstrap_gate.py"
+        if not gate_py.is_file():
+            raise Refused(
+                f"the bootstrap gate is missing: {gate_py}\n"
+                "  Refusing rather than proceeding. A missing gate is not an "
+                "absent requirement.")
+        spec_ = importlib.util.spec_from_file_location("_bootstrap_gate", gate_py)
+        mod = importlib.util.module_from_spec(spec_)
+        spec_.loader.exec_module(mod)
+        ok, reasons = mod.evaluate(REPO)
         if not ok:
             raise Refused(
                 "BOOTSTRAP_REVIEW not satisfied, so no real protocol run may be "
@@ -178,11 +182,6 @@ def cmd_init(args: argparse.Namespace) -> int:
         "spec_files": specs,
         "spec_sha256": spec_digest(specs),
         "max_cycles": MAX_CYCLES,
-        # B01-F14. MC-1: "Each run records: MC1_ENFORCEMENT:". A statement in
-        # repository documentation is not a record on the run, and a reader of
-        # this run's evidence should not have to go looking elsewhere to learn
-        # what the enforcement status was at the time it was created.
-        "mc1_enforcement": MC1_ENFORCEMENT,
         # Recorded on the run, not just checked at init, so a reader of the
         # evidence can tell which kind of run this was without consulting
         # anything else.
@@ -245,50 +244,6 @@ def check_pins_still_hold(run: dict) -> None:
                       "nobody reviewed.")
 
 
-def load_gate():
-    """The bootstrap gate module, loaded by path.
-
-    By path rather than by name: `from bootstrap_gate import ...` works only
-    when the script's directory happens to be on sys.path, and a gate that
-    silently becomes an ImportError is a gate that stops gating.
-    """
-    import importlib.util
-    gate_py = Path(__file__).resolve().parent / "bootstrap_gate.py"
-    if not gate_py.is_file():
-        raise Refused(f"the bootstrap gate is missing: {gate_py}\n"
-                      "  Refusing rather than proceeding. A missing gate is not "
-                      "an absent requirement.")
-    spec_ = importlib.util.spec_from_file_location("_bootstrap_gate", gate_py)
-    mod = importlib.util.module_from_spec(spec_)
-    spec_.loader.exec_module(mod)
-    return mod
-
-
-def check_bootstrap_still_holds(run: dict) -> None:
-    """B01-F08: the gate has to hold now, not just when the run was created.
-
-    Codex: "Bootstrap approval is evaluated only at initialization. A probe
-    approved bootstrap, initialized a real run, changed validate_cycle.py, and
-    successfully froze a cycle."
-
-    I put the check at init and reasoned that init is where a run becomes a thing
-    that exists. That was half right and wrong about the half that matters: a run
-    can sit for days between init and its cycles, and every cycle is where the
-    tooling is actually relied upon. So the gate is checked at both, and an
-    exempt run stays exempt at both.
-    """
-    if str(run.get("bootstrap_review", "")).startswith("EXEMPT"):
-        return
-    ok, reasons = load_gate().evaluate(REPO)
-    if not ok:
-        raise Refused(
-            "BOOTSTRAP_REVIEW no longer holds, so this cycle may not be "
-            "frozen:\n  " + "\n  ".join(reasons) +
-            "\n\n  The approval was valid when the run was created. Something "
-            "covered by it has\n  changed since. Re-review, or revert the "
-            "change.")
-
-
 def next_cycle(review_dir: Path) -> int:
     if not review_dir.is_dir():
         return 1
@@ -322,9 +277,9 @@ def compose_input(prompt: str, target_hash: str, run: dict, rtype: str,
     have been asked to judge conformance to a document it had never seen and
     would have answered from memory or invention.
 
-    That is the pilot's failure restated: recording an artifact's hash detects a
-    later change to it, and says nothing about whether the reviewer read it.
-    Here it was worse, because the reviewer could not have read it at all.
+    That is the pilot's failure restated: freezing an artifact proves it did not
+    change, not that the reviewer read it. Here it was worse, because the
+    reviewer could not have read it at all.
 
     It belongs in this file rather than being pasted alongside, because
     codex-input.md is what MC-2 check 10 binds to the frozen target. Anything
@@ -382,7 +337,6 @@ def cmd_freeze(args: argparse.Namespace) -> int:
 
     run = load_run(args.run)
     check_pins_still_hold(run)
-    check_bootstrap_still_holds(run)
 
     prompt_path = require_file(Path(args.prompt).resolve(), "prompt file")
     prompt = prompt_path.read_text(encoding="utf-8")
@@ -453,33 +407,6 @@ def cmd_freeze(args: argparse.Namespace) -> int:
                                                                  errors="replace")))
 
     cycle.mkdir(parents=True)
-
-    # ---- snapshot the reviewed bytes ----
-    # Alex Zamurko, 9 September 2026:
-    #
-    #     At freeze, snapshot the exact reviewed artifact bytes into the cycle
-    #     evidence directory and validate those preserved copies, not the live
-    #     working tree. A completed review cycle must remain valid after the
-    #     implementation is repaired.
-    #
-    # Before this, freeze recorded a hash of a file that stayed mutable, and
-    # check 9 re-hashed the live tree. So repairing the code a review asked for
-    # invalidated the cycle that asked, the controller then ignored its events,
-    # and eighteen findings vanished from loop state. Repair between cycles is
-    # the entire design; it cannot be the thing that destroys the previous cycle.
-    #
-    # Every artifact bound to the target, and only those: not top-level files
-    # alone, not the whole repository.
-    snapshot = cycle / "artifacts"
-    for ref, body in artifacts:
-        dest = snapshot / ref["path"]
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes((REPO / ref["path"]).read_bytes())
-        if sha256_file(dest) != ref["sha256"]:
-            raise Refused(f"snapshot of {ref['path']} does not match the hash "
-                          "recorded for it; refusing to freeze a cycle whose "
-                          "preserved copy already disagrees with its own record")
-
     tj = cycle / "target.json"
     write_lf(tj, json.dumps(target, indent=2) + "\n")
     digest = sha256_file(tj)
@@ -511,56 +438,7 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------------------------------------------------------------- findings
-
-# The finding block the review prompts mandate. §4 fixes the first two fields;
-# the rest vary by prompt, so only the two that carry meaning are required here.
-FINDING_ID = re.compile(r"^Finding ID:\s*([A-Z]?\d{2}-F\d{2,3})\s*$", re.M)
-FINDING_CLASS = re.compile(r"^Class:\s*(.+?)\s*$", re.M)
-
-CLASSES = (
-    "MISSING REQUIREMENT",
-    "WRONG OWNERSHIP",
-    "NONDETERMINISTIC WHERE D POSSIBLE",
-    "SEMANTIC STEP TOO BROAD",
-    "UNTESTED RULE",
-    "CONTRADICTORY IMPLEMENTATION MAPPING",
-)
-
-
-def extract_findings(raw: str) -> tuple[list[dict], list[str]]:
-    """(findings, problems) parsed from raw reviewer output.
-
-    Deterministic by construction: the review prompts mandate the block format,
-    so this reads it rather than interpreting prose. Anything it cannot parse is
-    a problem rather than a silent omission, because the failure this exists to
-    prevent is findings quietly going missing between the reviewer and the
-    ledger.
-    """
-    found: list[dict] = []
-    problems: list[str] = []
-
-    starts = [(m.start(), m.group(1)) for m in FINDING_ID.finditer(raw)]
-    for i, (pos, fid) in enumerate(starts):
-        end = starts[i + 1][0] if i + 1 < len(starts) else len(raw)
-        block = raw[pos:end]
-        km = FINDING_CLASS.search(block)
-        if not km:
-            problems.append(f"{fid} has no Class: line")
-            continue
-        klass = km.group(1).strip()
-        if klass not in CLASSES:
-            problems.append(f"{fid} declares a class outside the closed "
-                            f"vocabulary of §4: {klass!r}")
-            continue
-        found.append({"id": fid, "class": klass})
-
-    ids = [f["id"] for f in found]
-    dupes = sorted({i for i in ids if ids.count(i) > 1})
-    if dupes:
-        problems.append(f"duplicate finding identifiers: {', '.join(dupes)}")
-    return found, problems
-
+# ---------------------------------------------------------------- record
 
 def cmd_record(args: argparse.Namespace) -> int:
     if args.invocation not in INVOCATIONS:
@@ -577,60 +455,8 @@ def cmd_record(args: argparse.Namespace) -> int:
                       "is wrong; open a new one.")
 
     src = require_file(Path(args.output).resolve(), "reviewer output")
-    body = src.read_text(encoding="utf-8", errors="replace")
-
-    # ---- authoritative findings, extracted before anything is written ----
-    # Alex Zamurko, 9 September 2026, issue 4:
-    #
-    #     Runner creates findings.json for every completed review. Explicitly
-    #     represent zero findings; absence must never mean zero. Implementing
-    #     agent must not manually create or overwrite authoritative findings.
-    #
-    # Extraction happens here rather than being left to whoever is present,
-    # because the failure this closes is real findings never reaching the ledger
-    # and the controller reading that silence as a clean review.
-    found, problems = extract_findings(body)
-    if problems:
-        raise Refused(
-            "the reviewer output does not parse as review evidence:\n  "
-            + "\n  ".join(problems) +
-            "\n\n  Nothing has been written. The raw output is captured only "
-            "alongside an\n  authoritative findings record, so a cycle cannot "
-            "exist with evidence nobody\n  could read.")
-
-    # Zero has to be asserted, never inferred. "No blocks found" is equally
-    # consistent with a clean review and with a capture that went wrong — which
-    # happened four times before this cycle was recorded — so the operator
-    # states which, and the record says a human said so.
-    if not found and not args.zero_findings:
-        raise Refused(
-            "no finding blocks found in the reviewer output.\n"
-            "  That is either a clean review or a capture that went wrong, and "
-            "the two are\n  indistinguishable from here. If the reviewer "
-            "genuinely reported none, pass\n  --zero-findings to assert it. "
-            "Absence is not permitted to mean zero.")
-    if found and args.zero_findings:
-        raise Refused(
-            f"--zero-findings was passed but {len(found)} finding block(s) are "
-            "present:\n  " + ", ".join(f["id"] for f in found) +
-            "\n  Nothing written.")
-
     # Bytes, not text. Whatever the reviewer returned is what gets stored.
     raw.write_bytes(src.read_bytes())
-
-    write_lf(cycle / "findings.json", json.dumps({
-        "schema": "cycle-findings/1",
-        "cycle": json.loads((cycle / "target.json").read_text(encoding="utf-8"))
-                     .get("cycle"),
-        "extracted_at": now(),
-        # Binds this record to the exact capture it was read out of, so a later
-        # recapture cannot leave a findings file describing different bytes.
-        "source": "codex-output-raw.md",
-        "source_sha256": sha256_file(raw),
-        "count": len(found),
-        "zero_findings_asserted": bool(args.zero_findings),
-        "findings": found,
-    }, indent=2) + "\n")
 
     write_lf(cycle / "invocation.json", json.dumps({
         "invocation": args.invocation,
@@ -642,11 +468,6 @@ def cmd_record(args: argparse.Namespace) -> int:
     }, indent=2) + "\n")
 
     print(f"recorded {rel(raw)}  ({raw.stat().st_size} bytes, invocation={args.invocation})")
-    if found:
-        print(f"  findings.json  {len(found)} finding(s): "
-              + ", ".join(f["id"] for f in found))
-    else:
-        print("  findings.json  zero findings, explicitly asserted")
     print()
 
     r = subprocess.run([sys.executable, str(VALIDATOR), str(cycle)],
@@ -695,10 +516,6 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--output", required=True)
     r.add_argument("--invocation", required=True, choices=INVOCATIONS)
     r.add_argument("--note", default="")
-    r.add_argument("--zero-findings", dest="zero_findings", action="store_true",
-                   help="assert that the reviewer reported no findings. "
-                        "Required when the output contains no finding blocks: "
-                        "absence must never be read as zero.")
     r.set_defaults(fn=cmd_record)
 
     return p

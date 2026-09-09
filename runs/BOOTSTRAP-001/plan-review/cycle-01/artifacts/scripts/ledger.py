@@ -51,13 +51,7 @@ import re
 import sys
 from pathlib import Path
 
-# An optional single-letter prefix, then the cycle, then the finding number.
-# §4's example is C02-F03; the bootstrap review used B01-F01 because the prompt
-# said so. Identifiers are the reviewer's and are persistent (V40), so the
-# ledger records what was issued rather than renaming it — renaming a finding
-# during transcription is exactly what B01-F13 is about. The digits still have
-# to match the cycle, which is the part that carries meaning.
-FINDING_ID = re.compile(r"\A[A-Z]?(\d{2})-F(\d{2,3})\Z")
+FINDING_ID = re.compile(r"\AC(\d{2})-F(\d{2,3})\Z")
 
 # §4, and the vocabulary "remains unchanged across cycles so that finding sets
 # remain comparable". Anything outside it is refused rather than recorded.
@@ -102,18 +96,7 @@ def write_lf(p: Path, text: str) -> None:
 
 
 def ledger_path(review: Path) -> Path:
-    """State history, deliberately not called findings.json.
-
-    Alex Zamurko, issue 4: "Separate authoritative findings from response/state
-    history." They were both findings.json, at different levels — the schema
-    documented a per-cycle file written by the runner, and this wrote a
-    review-level one. Two files with one name is how a reader ends up believing
-    the wrong one is authoritative.
-
-    cycle-NN/findings.json  what the reviewer found, written by the runner
-    ledger.json             what happened to each finding since, written here
-    """
-    return review / "ledger.json"
+    return review / "findings.json"
 
 
 def load(review: Path) -> dict:
@@ -134,8 +117,7 @@ def save(review: Path, data: dict) -> None:
 def check_id(fid: str, cycle: int) -> None:
     m = FINDING_ID.match(fid)
     if not m:
-        raise Refused(f"finding id must look like C02-F03 or B01-F01, "
-                      f"got {fid!r}")
+        raise Refused(f"finding id must look like C02-F03, got {fid!r}")
     if int(m.group(1)) != cycle:
         raise Refused(f"{fid} declares cycle {int(m.group(1))} but was raised in "
                       f"cycle {cycle}. The identifier is persistent and carries the "

@@ -43,7 +43,8 @@ def build(with_evidence: bool = True) -> Path:
     """A throwaway repo carrying the real gate and the real components."""
     tmp = Path(tempfile.mkdtemp(prefix="bgate-")).resolve()
     (tmp / "scripts").mkdir()
-    for n in ("bootstrap_gate.py", "validate_cycle.py", "run_review.py"):
+    for n in ("bootstrap_gate.py", "validate_cycle.py", "run_review.py",
+              "ledger.py", "loop_state.py"):
         shutil.copy2(SRC / n, tmp / "scripts" / n)
     if with_evidence:
         for n in EVIDENCE:
@@ -143,7 +144,11 @@ def main() -> int:
     print("approval covers bytes, not filenames")
 
     # ---- THE control: editing a reviewed component invalidates the review ----
-    for target in ("validate_cycle.py", "run_review.py"):
+    # All four roots, plus the gate itself. bootstrap_gate.py is the one that was
+    # missing: it did not hash itself, so editing `evaluate` to return (True, [])
+    # would have defeated every other pin while check still said APPROVED.
+    for target in ("validate_cycle.py", "run_review.py", "ledger.py",
+                   "loop_state.py", "bootstrap_gate.py"):
         root = build(); made.append(root)
         if approve(root).returncode != 0 or gate(root, "check").returncode != 0:
             failures.append(f"fixture for {target} did not reach an approved state")
@@ -155,21 +160,108 @@ def main() -> int:
                        "has changed since it was reviewed", gate(root, "check"))
 
     # ---- a reviewed component deleted ----
+    # Refuses in covered(), before the per-file comparison, because a root that
+    # is gone cannot be hashed at all. Both refusals are correct; this asserts
+    # the one that actually fires rather than the one written first.
     root = build(); made.append(root)
     approve(root)
     (root / "scripts" / "validate_cycle.py").unlink()
-    expect_refused("approval surviving deletion of a reviewed component",
+    expect_refused("approval surviving deletion of a reviewed root",
+                   "component under bootstrap review is missing",
+                   gate(root, "check"))
+
+    # A deleted *dependency* takes the other path: the closure no longer reaches
+    # it, so it is not required, but the decision still pins it. Without this the
+    # "was reviewed but no longer exists" branch would be dead code.
+    root = build(); made.append(root)
+    write_lf(root / "scripts" / "helper_two.py", "VALUE = 1\n")
+    lg = root / "scripts" / "ledger.py"
+    lg.write_text(lg.read_text(encoding="utf-8") + '\n_H = "helper_two.py"\n',
+                  encoding="utf-8")
+    approve(root)
+    (root / "scripts" / "helper_two.py").unlink()
+    expect_refused("approval surviving deletion of a pinned dependency",
                    "no longer exists", gate(root, "check"))
 
     # ---- a decision that covers fewer components than required ----
+    # This is also what an old decision looks like after the root list is
+    # widened, which happened on 9 September when ledger.py and loop_state.py
+    # were added. A decision predating a widening is not a decision about the
+    # current system.
+    for dropped in ("scripts/run_review.py", "scripts/ledger.py",
+                    "scripts/loop_state.py"):
+        root = build(); made.append(root)
+        approve(root)
+        rec = root / "bootstrap-review" / "decision.json"
+        d = json.loads(rec.read_text(encoding="utf-8"))
+        d["components"].pop(dropped)
+        write_lf(rec, json.dumps(d, indent=2) + "\n")
+        expect_refused(f"a decision that never covered {Path(dropped).name}",
+                       "does not cover every component", gate(root, "check"))
+
+    print()
+    print("executable dependencies are derived, not listed")
+
+    # The closure is empty on the real repository, because the four roots plus
+    # the gate happen to cover everything they reference. An empty result from a
+    # scanner that cannot find anything looks identical, so this builds a
+    # dependency that does not exist in the real tree and requires it to be
+    # found, pinned, and to invalidate the approval when edited.
+    root = build(); made.append(root)
+    write_lf(root / "scripts" / "helper_module.py", "VALUE = 1\n")
+    vc = root / "scripts" / "validate_cycle.py"
+    vc.write_text(
+        vc.read_text(encoding="utf-8").replace(
+            "import hashlib",
+            'import hashlib\n_HELPER = "helper_module.py"  # loaded at runtime',
+            1),
+        encoding="utf-8")
+
+    r = approve(root)
+    if r.returncode != 0:
+        failures.append(f"could not approve the dependency fixture:\n{r.stdout}{r.stderr}")
+    else:
+        d = json.loads((root / "bootstrap-review" / "decision.json")
+                       .read_text(encoding="utf-8"))
+        if "scripts/helper_module.py" not in d.get("components", {}):
+            failures.append(
+                "a module referenced by validate_cycle.py was not pulled into "
+                "the pinned set. The closure is empty on the real repo, so "
+                "without this control an inert scanner would look correct.")
+        elif "scripts/helper_module.py" not in d.get("dependencies", {}):
+            failures.append("the dependency was pinned but not recorded as a "
+                            "dependency, so the record does not say why it is "
+                            "covered")
+        else:
+            print("  [ok] a referenced local module is discovered and pinned")
+
+            h = root / "scripts" / "helper_module.py"
+            h.write_text("VALUE = 2\n", encoding="utf-8")
+            expect_refused("approval surviving an edit to a dependency",
+                           "has changed since it was reviewed", gate(root, "check"))
+
+    # A dependency appearing after the decision must also block: the reviewed
+    # bytes did not change, but what they reach did.
     root = build(); made.append(root)
     approve(root)
-    rec = root / "bootstrap-review" / "decision.json"
-    d = json.loads(rec.read_text(encoding="utf-8"))
-    d["components"].pop("scripts/run_review.py")
-    write_lf(rec, json.dumps(d, indent=2) + "\n")
-    expect_refused("a decision covering only some of the components",
-                   "does not cover every component", gate(root, "check"))
+    if gate(root, "check").returncode != 0:
+        failures.append("fixture did not reach an approved state")
+    else:
+        write_lf(root / "scripts" / "late_helper.py", "VALUE = 1\n")
+        lp = root / "scripts" / "loop_state.py"
+        lp.write_text(lp.read_text(encoding="utf-8") +
+                      '\n_LATE = "late_helper.py"\n', encoding="utf-8")
+        # loop_state.py itself changed too, so accept either reason; the point
+        # is that it no longer passes.
+        r = gate(root, "check")
+        blob = (r.stdout + r.stderr).lower()
+        if r.returncode == 0:
+            failures.append("a component that started reaching new code still "
+                            "passed on an old approval")
+        elif "has changed" not in blob and "does not cover" not in blob:
+            failures.append(f"blocked for an unexpected reason:\n{blob[:240]}")
+        else:
+            print("  [ok] refused: a component reaching code the decision never saw")
 
     # ---- a corrupt record is a refusal, not a crash ----
     root = build(); made.append(root)

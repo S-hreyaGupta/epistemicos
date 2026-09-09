@@ -2,12 +2,15 @@
 
 ```text
 VERSION         v1.1
-AUTHORITATIVE   pending one confirmation from Alex Zamurko
+AUTHORITATIVE   yes, confirmed by Alex Zamurko 9 September 2026, 12:03 AM
 ```
 
-v1.0 was confirmed authoritative on 8 September: *"it is the correct last
-complete version of the workflow, content-wise."* v1.1 adds one exit and needs
-the same one-line confirmation before it governs.
+    Confirmed: specs/implementation-review-protocol-v1.1.md, with
+    PROTOCOL_HASH 296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483,
+    is the authoritative governing protocol.
+
+v1.0 was confirmed on 8 September and is retained rather than overwritten. No run
+ever referenced it.
 
 ## The governing file
 
@@ -207,7 +210,7 @@ exists to prevent.
 
 ```text
 scripts/bootstrap_gate.py       check | record
-scripts/test_bootstrap_gate.py  13 controls
+scripts/test_bootstrap_gate.py  22 controls
 bootstrap-review/               decision.json, plus the four preserved artifacts
 ```
 
@@ -216,11 +219,44 @@ bootstrap-review/               decision.json, plus the four preserved artifacts
 `NOT_A_PROTOCOL_CYCLE` so the two are distinguishable in the record rather than
 only in intent.
 
-The part worth stating: the decision pins the sha256 of every component it
-covers, and `check` re-hashes them. A gate that only asked whether a review had
-happened would pass forever while the reviewed code changed underneath it, which
-is the superseded-pin defect one level up. Editing `validate_cycle.py` or
-`run_review.py` invalidates the approval, by design.
+The decision pins the sha256 of everything it covers and `check` re-hashes them.
+A gate that only asked whether a review had happened would pass forever while the
+reviewed code changed underneath it, which is the superseded-pin defect one level
+up.
+
+### Scope, and the hole in the first version
+
+Widened by Alex Zamurko on 9 September, twice.
+
+```text
+validate_cycle.py   MC-2, §10.2      declared 8 September
+run_review.py       §2.2, §10.1      declared 8 September
+ledger.py           §§5, 12          added 9 September
+loop_state.py       §§6, 13          added 9 September
+bootstrap_gate.py                    always, see below
+```
+
+The ledger and controller were added because they "determine the authoritative
+meaning of otherwise valid review evidence": finding state and loop outcome. An
+error there produces a false process outcome from evidence that passes MC-2
+cleanly, which is the failure MC-2 cannot see.
+
+He also asked whether the pinned files have executable dependencies, and they
+did. The sharpest case was in the gate itself: `bootstrap_gate.py` did not hash
+`bootstrap_gate.py`, so editing `evaluate` to return approval unconditionally
+would have defeated every other pin while `check` still reported APPROVED. It now
+always covers itself.
+
+Dependencies are derived rather than listed. Each covered file is scanned for
+`scripts/*.py` it references, transitively, and the closure is pinned with it.
+A hand-maintained dependency list is right on the day it is written and silently
+wrong afterwards, which is the failure this gate exists to prevent one level down.
+
+The closure is currently empty: the five covered files reference nothing outside
+themselves. That is a result, not an assumption, and it is recomputed on every
+check. Because an empty closure and an inert scanner look identical, a control
+builds a dependency that does not exist in this tree and requires it to be
+discovered, pinned, and to invalidate the approval when edited.
 
 Current state:
 
@@ -228,20 +264,30 @@ Current state:
 BOOTSTRAP_REVIEW: NOT SATISFIED — no decision on record
 ```
 
-That is correct and expected. The review has not been run yet.
+Correct and expected. The review has not been run yet.
 
 ## Next
 
 ```text
-done  v1.0 confirmed; v1.1 converted and checked
+done  v1.1 confirmed authoritative, 9 September
 done  ledger, loop controller, interface tests, five production prompts
-done  all six rulings of 8 September implemented and under test
-now   Alex confirms v1.1 says what he wrote
-then  run BOOTSTRAP_REVIEW: Codex reviews validate_cycle.py and run_review.py,
-      evidence preserved under bootstrap-review/, human decision recorded
-then  human review package generator (§7), and the Gold runner
-last  the first real cycle, which the gate now blocks until the above is done
+done  the six rulings of 8 September, implemented and under test
+done  bootstrap scope widened to four components plus the gate itself,
+      executable-dependency closure derived and pinned
+now   run BOOTSTRAP_REVIEW: Codex reviews the four against
+      MC-2/§10.2, §2.2/§10.1, §§5 and 12, §§6 and 13; evidence preserved
+      under bootstrap-review/; human decision recorded
+then  human review package generator (§§7, 14)
+then  Gold runner (§15)
+then  full dry run end to end, on evidence marked NOT_A_PROTOCOL_CYCLE
+last  the first real A.1-E cycle
 ```
+
+The dry run is Alex's, and its point is that unit and interface tests prove
+components locally and not the control chain: hashes propagating, invalid cycles
+excluded, findings moving through the ledger, exits firing in order, human
+packages carrying the required evidence, the Gold step reachable, and no
+real-cycle evidence created by accident along the way.
 
 Everything built so far is labelled
 `BOOTSTRAP / DEVELOPMENT EVIDENCE — NOT_A_PROTOCOL_CYCLE`. No real-cycle

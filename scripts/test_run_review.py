@@ -52,7 +52,8 @@ def write_lf(p: Path, text: str) -> None:
 def make_repo() -> Path:
     tmp = Path(tempfile.mkdtemp(prefix="runner-")).resolve()
     (tmp / "scripts").mkdir()
-    for name in ("run_review.py", "validate_cycle.py", "bootstrap_gate.py"):
+    for name in ("run_review.py", "validate_cycle.py", "bootstrap_gate.py",
+                 "ledger.py", "loop_state.py"):
         shutil.copy2(SRC / name, tmp / "scripts" / name)
     (tmp / "specs").mkdir()
     write_lf(tmp / "specs" / "protocol.md", PROTOCOL_BODY)

@@ -51,14 +51,34 @@ REPO = Path(__file__).resolve().parent.parent
 REVIEW_DIR = REPO / "bootstrap-review"
 RECORD = REVIEW_DIR / "decision.json"
 
-# The components Alex named: "the checker/orchestrator". Exactly those two, not a
-# list widened by me. ledger.py and loop_state.py are arguable candidates, since
-# they compute the loop state a human acts on, but adding them is his ruling to
-# make and quietly broadening a ruling is how D-1 and D-2 happened.
+# The declared roots. Widened from two to four by Alex Zamurko, 9 September 2026:
+# ledger.py and loop_state.py "determine the authoritative meaning of otherwise
+# valid review evidence ... An error here could produce a false process outcome
+# even when MC-2 evidence is valid."
+#
+# The section mapping is his, and it is what the review is against:
+#
+#     validate_cycle.py   MC-2, §10.2
+#     run_review.py       §2.2, §10.1
+#     ledger.py           §§5, 12
+#     loop_state.py       §§6, 13
 COMPONENTS = (
     "scripts/validate_cycle.py",
     "scripts/run_review.py",
+    "scripts/ledger.py",
+    "scripts/loop_state.py",
 )
+
+# This file is always covered, whatever the roots are. It was not, and that was
+# the sharpest form of the hole Alex found: bootstrap_gate.py did not hash
+# itself, so editing `evaluate` to return (True, []) would have defeated every
+# other pin while `check` still reported APPROVED. A gate that does not cover
+# itself is an honour system with extra steps.
+ALWAYS = ("scripts/bootstrap_gate.py",)
+
+# Anything matching this that resolves to a file in scripts/ is treated as an
+# executable dependency of the component that mentions it.
+PY_REF = __import__("re").compile(r"\b([A-Za-z_][A-Za-z0-9_]*\.py)\b")
 
 # Named in the ruling: "the exact bootstrap input, raw Codex output, findings,
 # responses, and human decision". The decision is decision.json; these are the
@@ -92,14 +112,76 @@ def write_lf(p: Path, text: str) -> None:
         f.write(text)
 
 
-def component_hashes(root: Path) -> dict[str, str]:
+def closure(root: Path) -> dict[str, list[str]]:
+    """Every scripts/*.py a covered component can reach, and who reaches it.
+
+    Alex Zamurko, 9 September 2026:
+
+        If validate_cycle.py or run_review.py imports repository-local modules
+        whose changes can alter their behaviour, pinning only the two top-level
+        files is insufficient. Either include those executable dependencies in
+        the bootstrap decision hash set, or establish that the two files are
+        behaviorally self-contained.
+
+    They are not self-contained. run_review.py loads bootstrap_gate.py by path
+    and invokes validate_cycle.py as a subprocess; loop_state.py invokes
+    validate_cycle.py too. Editing a dependency changes a reviewed component's
+    behaviour without changing its bytes, so a hash set of top-level files only
+    is a hash set with a hole in it.
+
+    Derived by walking references rather than listed by hand, because a
+    hand-maintained dependency list is one that is right on the day it is written
+    and silently wrong afterwards, which is the failure this whole gate exists to
+    prevent one level down.
+
+    Deliberately over-inclusive: a scripts/*.py named anywhere in a covered file,
+    including in a usage line in its docstring, is treated as a dependency. The
+    cost of over-inclusion is that an unrelated edit forces a re-review. The cost
+    of under-inclusion is a component whose behaviour changed while its approval
+    still verified. Those are not comparable, so the ambiguity resolves toward
+    covering more.
+    """
+    reached: dict[str, list[str]] = {}
+    pending = list(COMPONENTS) + list(ALWAYS)
+    seen: set[str] = set()
+
+    while pending:
+        rel = pending.pop(0)
+        if rel in seen:
+            continue
+        seen.add(rel)
+        p = root / rel
+        if not p.is_file():
+            continue
+        for name in sorted(set(PY_REF.findall(p.read_text(encoding="utf-8")))):
+            dep = f"scripts/{name}"
+            if dep == rel or not (root / dep).is_file():
+                continue
+            reached.setdefault(dep, []).append(rel)
+            if dep not in seen:
+                pending.append(dep)
+
+    # Roots are covered because they were declared, not because something
+    # reached them. Keep the two kinds separate in the record.
+    for rel in list(COMPONENTS) + list(ALWAYS):
+        reached.pop(rel, None)
+    return reached
+
+
+def covered(root: Path) -> dict[str, str]:
+    """Every path the decision must pin: declared roots, this file, and the
+    executable closure of both."""
     out: dict[str, str] = {}
-    for rel in COMPONENTS:
+    for rel in list(COMPONENTS) + list(ALWAYS) + sorted(closure(root)):
         p = root / rel
         if not p.is_file():
             raise Refused(f"component under bootstrap review is missing: {rel}")
         out[rel] = sha256_file(p)
     return out
+
+
+def component_hashes(root: Path) -> dict[str, str]:
+    return covered(root)
 
 
 # ------------------------------------------------------------------ check
@@ -110,9 +192,12 @@ def evaluate(root: Path) -> tuple[bool, list[str]]:
     if not rec.is_file():
         return False, [
             "no bootstrap review on record.",
-            "  The orchestrator and the MC-2 checker have not been independently",
-            "  reviewed, and they are the two components that cannot go through",
-            "  the process they enable. Ruled mandatory 8 September 2026.",
+            "  These components have not been independently reviewed, and they",
+            "  cannot go through the process they enable:",
+            *[f"    {c}" for c in list(COMPONENTS) + list(ALWAYS)],
+            "  Ruled mandatory 8 September 2026, widened to the finding ledger",
+            "  and loop controller on 9 September because they determine the",
+            "  authoritative meaning of otherwise valid review evidence.",
             f"  Expected: {rec.relative_to(root).as_posix()}",
         ]
 
@@ -130,13 +215,27 @@ def evaluate(root: Path) -> tuple[bool, list[str]]:
             reasons.append("  Repair the components, rerun the review, record a "
                            "new decision.")
 
-    covered = d.get("components") or {}
-    missing = [c for c in COMPONENTS if c not in covered]
-    if missing:
-        reasons.append("the review does not cover every component it must: "
-                       + ", ".join(missing))
+    pinned = d.get("components") or {}
 
-    for rel, recorded in sorted(covered.items()):
+    # Required now, which may be more than was required when the decision was
+    # written: the root list was widened on 9 September, and the dependency
+    # closure changes whenever a covered file starts referencing another. A
+    # decision that predates either is not a decision about the current system.
+    try:
+        required = set(covered(root))
+    except Refused as e:
+        return False, [str(e)]
+
+    absent = sorted(required - set(pinned))
+    if absent:
+        reasons.append(
+            "the review does not cover every component it must: "
+            + ", ".join(absent) +
+            "\n    Either the covered set was widened after this decision, or a "
+            "reviewed file\n    now reaches code the decision never pinned. "
+            "Re-review.")
+
+    for rel, recorded in sorted(pinned.items()):
         p = root / rel
         if not p.is_file():
             reasons.append(f"{rel} was reviewed but no longer exists")
@@ -159,11 +258,16 @@ def cmd_check(root: Path = REPO, quiet: bool = False) -> int:
         d = json.loads((root / "bootstrap-review" / "decision.json")
                        .read_text(encoding="utf-8"))
         if not quiet:
+            deps = closure(root)
             print("BOOTSTRAP_REVIEW: APPROVED")
             print(f"  decided by  {d.get('decided_by', '?')}")
             print(f"  decided at  {d.get('decided_at', '?')}")
-            for rel in COMPONENTS:
-                print(f"  covers      {rel}  {d['components'][rel][:16]}…")
+            for rel in list(COMPONENTS) + list(ALWAYS):
+                print(f"  root        {rel}  {d['components'][rel][:16]}…")
+            for rel in sorted(deps):
+                via = ", ".join(Path(v).name for v in deps[rel])
+                print(f"  dependency  {rel}  {d['components'][rel][:16]}…  "
+                      f"via {via}")
         return 0
     if not quiet:
         print("BOOTSTRAP_REVIEW: NOT SATISFIED")
@@ -214,6 +318,8 @@ def cmd_record(a: argparse.Namespace) -> int:
         "decided_at": now(),
         "note": a.note,
         "components": component_hashes(REPO),
+        "roots": list(COMPONENTS) + list(ALWAYS),
+        "dependencies": {k: v for k, v in sorted(closure(REPO).items())},
         "evidence": {n: sha256_file(REVIEW_DIR / n) for n in EVIDENCE},
         "authority": "Alex Zamurko, 8 September 2026: a one-time BOOTSTRAP_REVIEW "
                      "is mandatory before relying on these components for real "

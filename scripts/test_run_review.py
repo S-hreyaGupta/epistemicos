@@ -126,6 +126,24 @@ def do_freeze(tmp: Path, *extra: str) -> subprocess.CompletedProcess:
                   "--prompt", "specs/prompt.md", "--file", "plan/01-PLAN.md", *extra)
 
 
+def reply_for(tmp: Path, body: str, run: str = "T-001",
+              rtype: str = "plan", cycle: int = 1) -> str:
+    """A reply quoting the cycle's target hash.
+
+    Capture validity requires it: the review prompt tells the reviewer to quote
+    the target SHA-256, and a capture without it is not demonstrably a capture
+    of this target. Fixtures have to satisfy the same rule real captures do.
+    """
+    p = (tmp / "runs" / run / f"{rtype}-review" / f"cycle-{cycle:02d}"
+         / "target.sha256")
+    if not p.is_file():
+        # Some fixtures deliberately have no frozen cycle — recording against an
+        # unfrozen directory is one of the refusals under test. Those never
+        # reach capture validity, so the body alone is right.
+        return body
+    return f"TARGET_SHA256 {p.read_text(encoding='utf-8').strip()}\n\n{body}"
+
+
 def fake_cycles(tmp: Path, n: int, close_last: bool = True) -> None:
     """n cycle directories, each with raw output unless the last is left open."""
     rd = tmp / "runs" / "T-001" / "plan-review"
@@ -218,7 +236,9 @@ def main() -> int:
             else:
                 print("  [ok] frozen evidence is LF, so its hashes are platform-neutral")
 
-            write_lf(tmp / "reply.md", "Finding ID: C01-F01\nClass: UNTESTED RULE\nRequirement ID: R-B7\nEvidence: ...\n")
+            write_lf(tmp / "reply.md", reply_for(tmp,
+                "Finding ID: C01-F01\nClass: UNTESTED RULE\n"
+                "Requirement ID: R-B7\nEvidence: ...\n"))
             r = runner(tmp, "record", "--cycle", str(cyc),
                        "--output", "reply.md", "--invocation", "manual")
             if r.returncode != 0:
@@ -341,16 +361,25 @@ def main() -> int:
         do_init(t)
         do_freeze(t)
         cyc = t / "runs" / "T-001" / "plan-review" / "cycle-01"
-        write_lf(t / "reply.md", "Finding ID: C01-F01\nClass: UNTESTED RULE\nRequirement ID: R-B7\nEvidence: ...\n")
+        write_lf(t / "reply.md", reply_for(t,
+                     "Finding ID: C01-F01\nClass: UNTESTED RULE\n"
+                     "Requirement ID: R-B7\nEvidence: ...\n"))
         runner(t, "record", "--cycle", str(cyc), "--output", "reply.md",
                "--invocation", "manual")
-        write_lf(t / "reply2.md", "different findings\n")
+        write_lf(t / "reply2.md", reply_for(t, "Finding ID: C01-F02\n"
+                                       "Class: WRONG OWNERSHIP\n"))
         return runner(t, "record", "--cycle", str(cyc), "--output", "reply2.md",
                       "--invocation", "manual")
-    expect_refused("re-recording raw output", "write-once", record_twice)
+    # Was a flat write-once refusal. Issue 6 replaced it: a second capture is
+    # recorded and preserved, it simply does not displace the designated one
+    # without explicit invalidation. The evidence is still never overwritten.
+    expect_refused("re-recording without superseding", "already the authoritative",
+                   record_twice)
 
     def record_unfrozen(t: Path):
-        write_lf(t / "reply.md", "Finding ID: C01-F01\nClass: UNTESTED RULE\nRequirement ID: R-B7\nEvidence: ...\n")
+        write_lf(t / "reply.md", reply_for(t,
+                     "Finding ID: C01-F01\nClass: UNTESTED RULE\n"
+                     "Requirement ID: R-B7\nEvidence: ...\n"))
         return runner(t, "record", "--cycle", str(t / "nowhere"),
                       "--output", "reply.md", "--invocation", "manual")
     expect_refused("record against an unfrozen directory", "not a frozen cycle", record_unfrozen)
@@ -433,7 +462,7 @@ def main() -> int:
     def recorded(t: Path, body: str, *extra: str):
         do_init(t)
         do_freeze(t)
-        write_lf(t / "reply.md", body)
+        write_lf(t / "reply.md", reply_for(t, body))
         cyc = t / "runs" / "T-001" / "plan-review" / "cycle-01"
         return runner(t, "record", "--cycle", str(cyc), "--output", "reply.md",
                       "--invocation", "manual", *extra), cyc
@@ -552,6 +581,83 @@ def main() -> int:
                         "declared; it is carrying its own copy")
     else:
         print("  [ok] refused: no canonical grammar declared in the schema")
+
+    # ---- issue 6: authoritative capture ----
+    # Before this, a failed capture killed the cycle, so the only way to retry
+    # was to delete what was there. That happened three times in one afternoon,
+    # two junk captures passed MC-2, and a better capture sat unnoticed in
+    # another directory with nothing saying which governed.
+    print()
+    print("authoritative capture")
+
+    def with_target(t: Path, body: str) -> str:
+        th = (t / "runs" / "T-001" / "plan-review" / "cycle-01"
+              / "target.sha256").read_text(encoding="utf-8").strip()
+        return f"TARGET_SHA256 {th}\n\n{body}"
+
+    GOOD = "Finding ID: C01-F01\nClass: UNTESTED RULE\nEvidence: x\n"
+
+    t16 = make_repo(); made.append(t16)
+    do_init(t16); do_freeze(t16)
+    cyc = t16 / "runs" / "T-001" / "plan-review" / "cycle-01"
+    write_lf(t16 / "junk.md", "Get-Clipboard -Raw | Set-Content reply.md\n")
+    r = runner(t16, "record", "--cycle", str(cyc), "--output", "junk.md",
+               "--invocation", "manual")
+    if r.returncode == 0:
+        failures.append("a capture not quoting the target hash was accepted")
+    elif not (cyc / "captures" / "attempt-01" / "raw.md").is_file():
+        failures.append("a rejected capture was not preserved; the only way to "
+                        "retry is then to delete evidence, which is the "
+                        "behaviour issue 6 removes")
+    else:
+        print("  [ok] an invalid capture is refused and preserved, not discarded")
+
+    write_lf(t16 / "good.md", with_target(t16, GOOD))
+    r = runner(t16, "record", "--cycle", str(cyc), "--output", "good.md",
+               "--invocation", "manual", "--reason", "attempt 1 caught the shell command")
+    if r.returncode != 0:
+        failures.append(f"a valid retry after a failed capture was refused:\n{r.stdout}{r.stderr}")
+    else:
+        log = json.loads((cyc / "capture-log.json").read_text(encoding="utf-8"))
+        if log["authoritative"] != 2 or len(log["attempts"]) != 2:
+            failures.append(f"capture log did not record both attempts: {log}")
+        else:
+            print("  [ok] the first valid capture becomes authoritative, both kept")
+
+    write_lf(t16 / "other.md", with_target(t16, GOOD.replace("F01", "F02")))
+    r = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",
+               "--invocation", "manual")
+    if r.returncode == 0:
+        failures.append("a later capture displaced the authoritative one with "
+                        "no explicit invalidation")
+    else:
+        print("  [ok] refused: a later capture cannot displace silently")
+
+    r = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",
+               "--invocation", "manual", "--supersede-capture")
+    if r.returncode == 0:
+        failures.append("--supersede-capture was accepted with no reason")
+    else:
+        print("  [ok] refused: superseding without a stated reason")
+
+    r = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",
+               "--invocation", "manual", "--supersede-capture",
+               "--reason", "partial paste; full reply recaptured")
+    if r.returncode != 0:
+        failures.append(f"a reasoned supersession was refused:\n{r.stdout}{r.stderr}")
+    else:
+        log = json.loads((cyc / "capture-log.json").read_text(encoding="utf-8"))
+        kept = all((cyc / "captures" / f"attempt-{i:02d}" / "raw.md").is_file()
+                   for i in (1, 2, 3))
+        if log["authoritative"] != 3:
+            failures.append("supersession did not move the designation")
+        elif not kept:
+            failures.append("supersession removed a prior attempt; both must be "
+                            "preserved")
+        elif not log.get("invalidated"):
+            failures.append("supersession did not record the invalidation")
+        else:
+            print("  [ok] supersession moves the designation and keeps every attempt")
 
     # ---- B01-F08: the gate must hold at freeze, not only at init ----
     # A run can sit for days between init and its first cycle, and every cycle is

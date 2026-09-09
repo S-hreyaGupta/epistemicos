@@ -296,7 +296,11 @@ def main() -> int:
         ok(f"freeze wrote the documented layout ({len(documented_files)} names "
            "checked against the schema)")
 
+    # Capture validity requires the reviewer to quote the target hash, so the
+    # fixture has to as well.
+    _th = (cyc / "target.sha256").read_text(encoding="utf-8").strip()
     write_lf(root2 / "reply.md",
+             f"TARGET_SHA256 {_th}\n\n"
              "Finding ID: C01-F01\nClass: UNTESTED RULE\n"
              "Requirement ID: R-B7\nEvidence: ...\n")
     r = run(root2, "run_review.py", "record", "--cycle", str(cyc),

@@ -536,6 +536,68 @@ def extract_findings(raw: str) -> tuple[list[dict], list[str]]:
         raise Refused(str(e))
 
 
+# ---------------------------------------------------------------- capture
+#
+# Alex Zamurko, 9 September 2026, issue 6. Before this, `record` refused if a
+# capture already existed, so a failed capture killed the cycle. In practice
+# that meant deleting evidence: the reply reached the file on the fourth
+# attempt, two earlier attempts held seventy bytes of shell command and passed
+# MC-2, and a better capture sat unnoticed in another directory. Nothing said
+# which of them governed.
+#
+#     Use the rule that the first capture satisfying the predefined
+#     capture-validity requirements becomes authoritative. Any replacement
+#     requires explicit invalidation and preservation of both attempts.
+#
+# So attempts are numbered, all are kept, and one is designated. Nothing is
+# deleted to tidy up, which is what happened three times in one afternoon.
+
+CAPTURE_SCHEMA = "cycle-capture/1"
+
+
+def capture_validity(raw_text: str, target_hash: str,
+                     zero_asserted: bool) -> list[str]:
+    """The predefined requirements. Empty list means this capture is valid.
+
+    Fixed in advance rather than judged per case, because the point of a
+    designation rule is that it does not depend on who is looking.
+    """
+    problems: list[str] = []
+    if not raw_text.strip():
+        problems.append("empty")
+    if target_hash not in raw_text:
+        problems.append(
+            f"does not quote the target hash {target_hash[:16]}…; the review "
+            "prompt requires the reviewer to, and without it this is not "
+            "demonstrably a capture of this target")
+    found, parse_problems = extract_findings(raw_text)
+    problems += parse_problems
+    if not found and not parse_problems and not zero_asserted:
+        problems.append("no finding blocks, and zero was not asserted; pass "
+                        "--zero-findings if the reviewer genuinely reported "
+                        "none, since absence must never be read as zero")
+    return problems
+
+
+def next_attempt(cycle: Path) -> int:
+    d = cycle / "captures"
+    if not d.is_dir():
+        return 1
+    used = [int(m.group(1)) for p in d.iterdir()
+            if (m := re.fullmatch(r"attempt-(\d{2})", p.name))]
+    return max(used) + 1 if used else 1
+
+
+def load_capture_log(cycle: Path) -> dict:
+    p = cycle / "capture-log.json"
+    if not p.is_file():
+        return {"schema": CAPTURE_SCHEMA, "authoritative": None, "attempts": []}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise Refused(f"capture-log.json is not valid JSON: {e}")
+
+
 def cmd_record(args: argparse.Namespace) -> int:
     if args.invocation not in INVOCATIONS:
         raise Refused(f"--invocation must be one of {INVOCATIONS}")
@@ -544,14 +606,81 @@ def cmd_record(args: argparse.Namespace) -> int:
     if not (cycle / "target.json").is_file():
         raise Refused(f"not a frozen cycle directory: {cycle}")
 
-    raw = cycle / "codex-output-raw.md"
-    if raw.exists():
-        raise Refused(f"raw output already recorded: {rel(raw)}\n"
-                      "Raw reviewer output is write-once. If it was wrong, the cycle "
-                      "is wrong; open a new one.")
+    log = load_capture_log(cycle)
+    if log.get("authoritative") and not args.supersede_capture:
+        raise Refused(
+            f"attempt-{log['authoritative']:02d} is already the authoritative "
+            "capture for this cycle.\n"
+            "  The first capture meeting the validity requirements governs, and "
+            "later ones do\n  not displace it silently. To replace it, pass "
+            "--supersede-capture with\n  --reason explaining why the current "
+            "one is being invalidated. Both are kept.")
+    if args.supersede_capture and not log.get("authoritative"):
+        raise Refused("--supersede-capture passed but no authoritative capture "
+                      "exists to supersede")
+    if args.supersede_capture and not (args.reason or "").strip():
+        raise Refused(
+            "--supersede-capture requires --reason.\n"
+            "  Replacing the capture that governs a review is a decision, and "
+            "the record has\n  to say why it was made rather than leaving a "
+            "silent substitution.")
 
     src = require_file(Path(args.output).resolve(), "reviewer output")
     body = src.read_text(encoding="utf-8", errors="replace")
+    raw = cycle / "codex-output-raw.md"
+
+    # ---- preserve this attempt, whatever comes of it ----
+    # Written before validity is judged, so a failed capture leaves a record
+    # rather than nothing. Three attempts vanished today because the only way to
+    # retry was to delete what was there.
+    target_hash = (cycle / "target.sha256").read_text(encoding="utf-8").strip()
+    n = next_attempt(cycle)
+    adir = cycle / "captures" / f"attempt-{n:02d}"
+    adir.mkdir(parents=True)
+    (adir / "raw.md").write_bytes(src.read_bytes())
+
+    invalid = capture_validity(body, target_hash, bool(args.zero_findings))
+    entry = {
+        "attempt": n,
+        "recorded_at": now(),
+        "source": str(src),
+        "invocation": args.invocation,
+        "note": args.note or "",
+        "sha256": sha256_file(adir / "raw.md"),
+        "bytes": (adir / "raw.md").stat().st_size,
+        "valid": not invalid,
+        "problems": invalid,
+        "retry_reason": args.reason or "",
+    }
+    write_lf(adir / "capture.json", json.dumps(entry, indent=2) + "\n")
+    log["attempts"].append(entry)
+
+    if invalid:
+        if args.supersede_capture:
+            log["attempts"][-1]["superseded_nothing"] = True
+        write_lf(cycle / "capture-log.json", json.dumps(log, indent=2) + "\n")
+        raise Refused(
+            f"attempt-{n:02d} does not meet the capture validity requirements:\n  "
+            + "\n  ".join(invalid) +
+            f"\n\n  The attempt is preserved at {rel(adir)} and recorded in "
+            "capture-log.json.\n  Nothing was designated authoritative and the "
+            "cycle is unchanged. Retry with a\n  better capture; failed attempts "
+            "are kept rather than deleted.")
+
+    if args.supersede_capture:
+        prior = log["authoritative"]
+        log.setdefault("invalidated", []).append({
+            "attempt": prior,
+            "invalidated_at": now(),
+            "reason": args.reason,
+            "superseded_by": n,
+        })
+        # The prior attempt stays on disk. Only the designation moves.
+        raw.unlink(missing_ok=True)
+        (cycle / "findings.json").unlink(missing_ok=True)
+
+    log["authoritative"] = n
+    log["authoritative_sha256"] = entry["sha256"]
 
     # ---- authoritative findings, extracted before anything is written ----
     # Alex Zamurko, 9 September 2026, issue 4:
@@ -607,14 +736,20 @@ def cmd_record(args: argparse.Namespace) -> int:
         "extracted_at": now(),
         # Binds this record to the exact capture it was read out of, so a later
         # recapture cannot leave a findings file describing different bytes.
-        "source": "codex-output-raw.md",
+        "source": f"captures/attempt-{n:02d}/raw.md",
+        "source_attempt": n,
         "source_sha256": sha256_file(raw),
         "count": len(found),
         "zero_findings_asserted": bool(args.zero_findings),
         "findings": found,
     }, indent=2) + "\n")
 
+    write_lf(cycle / "capture-log.json", json.dumps(log, indent=2) + "\n")
+
     write_lf(cycle / "invocation.json", json.dumps({
+        "authoritative_attempt": n,
+        "authoritative_sha256": entry["sha256"],
+        "attempts_recorded": len(log["attempts"]),
         "invocation": args.invocation,
         "recorded_at": now(),
         "source": str(src),
@@ -677,6 +812,13 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--output", required=True)
     r.add_argument("--invocation", required=True, choices=INVOCATIONS)
     r.add_argument("--note", default="")
+    r.add_argument("--supersede-capture", dest="supersede_capture",
+                   action="store_true",
+                   help="replace the authoritative capture. Requires --reason. "
+                        "Both attempts are preserved; only the designation moves.")
+    r.add_argument("--reason", default="",
+                   help="why the current authoritative capture is being "
+                        "invalidated, or why this attempt was retried.")
     r.add_argument("--zero-findings", dest="zero_findings", action="store_true",
                    help="assert that the reviewer reported no findings. "
                         "Required when the output contains no finding blocks: "

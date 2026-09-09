@@ -121,6 +121,34 @@ def authoritative_findings(cycle_dir: Path) -> list[str]:
     # would otherwise never be noticed again.
     raw = cycle_dir / "codex-output-raw.md"
     p = cycle_dir / "findings.json"
+
+    # Issue 6: "controller reads only the designated authoritative capture."
+    # codex-output-raw.md is written from that attempt, so the two must agree.
+    # If they do not, someone edited the working copy after the designation, and
+    # the loop would be measuring a review nobody designated.
+    clog = cycle_dir / "capture-log.json"
+    if clog.is_file() and raw.is_file():
+        try:
+            cl = json.loads(clog.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            raise CannotCalculate(f"{cycle_dir.name}/capture-log.json is not "
+                                  f"valid JSON: {e}")
+        chosen = cl.get("authoritative")
+        if chosen is None:
+            raise CannotCalculate(
+                f"{cycle_dir.name} has capture attempts but none is designated "
+                "authoritative.\n  Every attempt failed the validity "
+                "requirements, so there is no review to evaluate.")
+        import hashlib
+        actual = hashlib.sha256(raw.read_bytes()).hexdigest()
+        if actual != cl.get("authoritative_sha256"):
+            raise CannotCalculate(
+                f"{cycle_dir.name}: codex-output-raw.md does not match "
+                f"attempt-{chosen:02d}, the designated authoritative capture.\n"
+                f"  designated  {cl.get('authoritative_sha256')}\n"
+                f"  on disk     {actual}\n"
+                "  The loop must read the designated capture and nothing else.")
+
     if raw.is_file() and p.is_file():
         try:
             import findings_format

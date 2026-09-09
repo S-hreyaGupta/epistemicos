@@ -56,6 +56,10 @@ def make_repo() -> Path:
                  "ledger.py", "loop_state.py"):
         shutil.copy2(SRC / name, tmp / "scripts" / name)
     (tmp / "specs").mkdir()
+    # Copied rather than stubbed: it is a covered component now (B01-F10), so
+    # the gate hashes it and a stub would diverge from the real one.
+    shutil.copy2(SRC.parent / "specs" / "evidence-schema-v1.0.md",
+                 tmp / "specs" / "evidence-schema-v1.0.md")
     write_lf(tmp / "specs" / "protocol.md", PROTOCOL_BODY)
     write_lf(tmp / "specs" / "spec.md", SPEC_BODY)
     write_lf(tmp / "specs" / "prompt.md", PROMPT_BODY)
@@ -85,14 +89,36 @@ def do_init(tmp: Path, *extra: str) -> subprocess.CompletedProcess:
 
 
 def approve_bootstrap(tmp: Path) -> subprocess.CompletedProcess:
+    """Record a bootstrap approval bound to a target covering the gate's set.
+
+    B01-F09 makes --target mandatory, so the fixture has to freeze one. Built
+    from the gate's own covered set rather than a hand-written list, so adding a
+    component to the gate does not silently leave this fixture approving five of
+    six things.
+    """
     (tmp / "bootstrap-review").mkdir(parents=True, exist_ok=True)
     for n in ("codex-input.md", "codex-output-raw.md", "findings.md",
               "claude-response.md"):
         write_lf(tmp / "bootstrap-review" / n, f"contents of {n}\n")
+
+    import importlib.util
+    spec_ = importlib.util.spec_from_file_location(
+        "_bg_rr", tmp / "scripts" / "bootstrap_gate.py")
+    mod = importlib.util.module_from_spec(spec_)
+    spec_.loader.exec_module(mod)
+
+    rel_target = "runs/B-BOOT/plan-review/cycle-01/target.json"
+    (tmp / rel_target).parent.mkdir(parents=True, exist_ok=True)
+    write_lf(tmp / rel_target, json.dumps({
+        "review_type": "plan", "run_id": "B-BOOT", "cycle": 1,
+        "plan_files": [{"path": p, "sha256": h}
+                       for p, h in mod.covered(tmp).items()],
+    }, indent=2) + "\n")
+
     return sh(sys.executable, str(tmp / "scripts" / "bootstrap_gate.py"),
               "record", "--decision", "APPROVE", "--decided-by", "Alex Zamurko",
               "--note", "#gap, 9 Sep 2026, Alex Zamurko: fixture approval",
-              cwd=tmp)
+              "--target", rel_target, cwd=tmp)
 
 
 def do_freeze(tmp: Path, *extra: str) -> subprocess.CompletedProcess:
@@ -397,6 +423,45 @@ def main() -> int:
                         f"reason:\n  got {blob.strip()[:300]}")
     else:
         print("  [ok] refused: a real run after a reviewed component changed")
+
+    # ---- B01-F08: the gate must hold at freeze, not only at init ----
+    # A run can sit for days between init and its first cycle, and every cycle is
+    # where the tooling is actually relied upon. Checking only at init let a
+    # component change in between and a cycle freeze against tooling whose
+    # approval no longer covered it.
+    t4 = make_repo(); made.append(t4)
+    if approve_bootstrap(t4).returncode != 0 or real_init(t4).returncode != 0:
+        failures.append("could not reach an approved real run for the freeze-time "
+                        "bootstrap control")
+    else:
+        vc = t4 / "scripts" / "validate_cycle.py"
+        vc.write_text(vc.read_text(encoding="utf-8") + "\n# edited after init\n",
+                      encoding="utf-8")
+        r = runner(t4, "freeze", "--run", "A1E-001", "--type", "plan",
+                   "--prompt", "specs/prompt.md", "--file", "plan/01-PLAN.md")
+        blob = (r.stdout + r.stderr).lower()
+        if r.returncode == 0:
+            failures.append("a cycle froze against tooling whose bootstrap "
+                            "approval no longer covers it; the gate was checked "
+                            "at init and never again")
+        elif "no longer holds" not in blob:
+            failures.append("freeze refused after the component changed, but not "
+                            f"on the bootstrap gate:\n  {blob.strip()[:220]}")
+        else:
+            print("  [ok] refused: freezing a cycle after a covered component changed")
+
+    # An exempt run must stay exempt at freeze too, or development evidence
+    # becomes impossible to produce the moment any component is edited.
+    t5 = make_repo(); made.append(t5)
+    do_init(t5)
+    vc = t5 / "scripts" / "validate_cycle.py"
+    vc.write_text(vc.read_text(encoding="utf-8") + "\n# edited\n", encoding="utf-8")
+    if do_freeze(t5).returncode != 0:
+        failures.append("an exempt run was blocked by the bootstrap gate at "
+                        "freeze; exempt means exempt at every step or the flag "
+                        "does not do what it says")
+    else:
+        print("  [ok] an exempt run still freezes after a component changes")
 
     # And the exempt path must label itself, or it is a silent bypass.
     t3 = make_repo(); made.append(t3)

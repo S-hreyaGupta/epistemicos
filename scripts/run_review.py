@@ -56,6 +56,12 @@ REVIEW_TYPES = ("plan", "implementation")
 INVOCATIONS = ("manual", "automated")
 HEX64 = re.compile(r"\A[0-9a-f]{64}\Z")
 
+# MC-1 requires every run to record this. CONVENTION_ONLY here because the
+# implementing agent and the review evidence share one write authority on a
+# single-user machine; see specs/evidence-schema-v1.0.md. Upgrading it is a
+# change to the environment, not to this constant.
+MC1_ENFORCEMENT = "CONVENTION_ONLY"
+
 
 class Refused(Exception):
     """A precondition did not hold. Exit 1, change nothing."""
@@ -144,17 +150,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         # works only when the script's own directory happens to be on sys.path,
         # which it is when run directly and is not in several other cases. A gate
         # that silently becomes an ImportError is a gate that stops gating.
-        import importlib.util
-        gate_py = Path(__file__).resolve().parent / "bootstrap_gate.py"
-        if not gate_py.is_file():
-            raise Refused(
-                f"the bootstrap gate is missing: {gate_py}\n"
-                "  Refusing rather than proceeding. A missing gate is not an "
-                "absent requirement.")
-        spec_ = importlib.util.spec_from_file_location("_bootstrap_gate", gate_py)
-        mod = importlib.util.module_from_spec(spec_)
-        spec_.loader.exec_module(mod)
-        ok, reasons = mod.evaluate(REPO)
+        ok, reasons = load_gate().evaluate(REPO)
         if not ok:
             raise Refused(
                 "BOOTSTRAP_REVIEW not satisfied, so no real protocol run may be "
@@ -182,6 +178,11 @@ def cmd_init(args: argparse.Namespace) -> int:
         "spec_files": specs,
         "spec_sha256": spec_digest(specs),
         "max_cycles": MAX_CYCLES,
+        # B01-F14. MC-1: "Each run records: MC1_ENFORCEMENT:". A statement in
+        # repository documentation is not a record on the run, and a reader of
+        # this run's evidence should not have to go looking elsewhere to learn
+        # what the enforcement status was at the time it was created.
+        "mc1_enforcement": MC1_ENFORCEMENT,
         # Recorded on the run, not just checked at init, so a reader of the
         # evidence can tell which kind of run this was without consulting
         # anything else.
@@ -242,6 +243,50 @@ def check_pins_still_hold(run: dict) -> None:
                       "\n\nEither restore the pinned bytes or start a new run. "
                       "Continuing would produce cycles that cite a spec version "
                       "nobody reviewed.")
+
+
+def load_gate():
+    """The bootstrap gate module, loaded by path.
+
+    By path rather than by name: `from bootstrap_gate import ...` works only
+    when the script's directory happens to be on sys.path, and a gate that
+    silently becomes an ImportError is a gate that stops gating.
+    """
+    import importlib.util
+    gate_py = Path(__file__).resolve().parent / "bootstrap_gate.py"
+    if not gate_py.is_file():
+        raise Refused(f"the bootstrap gate is missing: {gate_py}\n"
+                      "  Refusing rather than proceeding. A missing gate is not "
+                      "an absent requirement.")
+    spec_ = importlib.util.spec_from_file_location("_bootstrap_gate", gate_py)
+    mod = importlib.util.module_from_spec(spec_)
+    spec_.loader.exec_module(mod)
+    return mod
+
+
+def check_bootstrap_still_holds(run: dict) -> None:
+    """B01-F08: the gate has to hold now, not just when the run was created.
+
+    Codex: "Bootstrap approval is evaluated only at initialization. A probe
+    approved bootstrap, initialized a real run, changed validate_cycle.py, and
+    successfully froze a cycle."
+
+    I put the check at init and reasoned that init is where a run becomes a thing
+    that exists. That was half right and wrong about the half that matters: a run
+    can sit for days between init and its cycles, and every cycle is where the
+    tooling is actually relied upon. So the gate is checked at both, and an
+    exempt run stays exempt at both.
+    """
+    if str(run.get("bootstrap_review", "")).startswith("EXEMPT"):
+        return
+    ok, reasons = load_gate().evaluate(REPO)
+    if not ok:
+        raise Refused(
+            "BOOTSTRAP_REVIEW no longer holds, so this cycle may not be "
+            "frozen:\n  " + "\n  ".join(reasons) +
+            "\n\n  The approval was valid when the run was created. Something "
+            "covered by it has\n  changed since. Re-review, or revert the "
+            "change.")
 
 
 def next_cycle(review_dir: Path) -> int:
@@ -337,6 +382,7 @@ def cmd_freeze(args: argparse.Namespace) -> int:
 
     run = load_run(args.run)
     check_pins_still_hold(run)
+    check_bootstrap_still_holds(run)
 
     prompt_path = require_file(Path(args.prompt).resolve(), "prompt file")
     prompt = prompt_path.read_text(encoding="utf-8")

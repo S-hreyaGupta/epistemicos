@@ -63,7 +63,16 @@ RECORD = REVIEW_DIR / "decision.json"
 #     run_review.py       §2.2, §10.1
 #     ledger.py           §§5, 12
 #     loop_state.py       §§6, 13
+# The evidence schema is here because of B01-F10: the frozen review target
+# carried six artifacts and the covered set held five. Codex was reviewing the
+# schema, and editing it afterwards did not invalidate its own approval.
+#
+# It is not a script, and it implements no code, but MC-2 checks evidence
+# against it. A gate that covers the checker and not the document the checker
+# reads its expectations from has a seam running straight through the middle of
+# what it claims to cover.
 COMPONENTS = (
+    "specs/evidence-schema-v1.0.md",
     "scripts/validate_cycle.py",
     "scripts/run_review.py",
     "scripts/ledger.py",
@@ -146,6 +155,13 @@ def references(path: Path) -> set[str]:
     """
     text = path.read_text(encoding="utf-8")
     found = {f"scripts/{n}" for n in PY_REF.findall(text)}
+
+    # The filename scan applies to every covered file; import analysis only to
+    # Python. A covered file need not be code — the evidence schema is covered
+    # because MC-2 reads its expectations from it — and ast.parse on markdown
+    # raises rather than returning nothing.
+    if path.suffix != ".py":
+        return found
 
     tree = ast.parse(text, filename=str(path))
     for node in ast.walk(tree):
@@ -233,6 +249,52 @@ def covered(root: Path) -> dict[str, str]:
 
 def component_hashes(root: Path) -> dict[str, str]:
     return covered(root)
+
+
+def target_artifacts(target_json: Path) -> dict[str, str]:
+    """The path→sha256 map the review target froze, from its plan_files."""
+    if not target_json.is_file():
+        raise Refused(f"review target not found: {target_json}")
+    try:
+        t = json.loads(target_json.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise Refused(f"review target is not valid JSON: {e}")
+    entries = t.get("plan_files") or []
+    if not entries:
+        raise Refused(f"{target_json} lists no plan_files, so there is nothing "
+                      "to bind the decision to")
+    return {e["path"]: e["sha256"] for e in entries
+            if isinstance(e, dict) and "path" in e and "sha256" in e}
+
+
+def target_drift(root: Path, target_json: Path) -> list[str]:
+    """Where the covered set and the reviewed target disagree.
+
+    Three ways they can, and each means the decision would be about something
+    other than what was reviewed:
+
+      - a covered file was edited after the freeze;
+      - a covered file was never in the target, so nobody reviewed it;
+      - the target carried an artifact the gate does not cover, so approving it
+        commits to nothing.
+    """
+    frozen = target_artifacts(target_json)
+    now = covered(root)
+    out: list[str] = []
+
+    for rel, digest in sorted(now.items()):
+        if rel not in frozen:
+            out.append(f"{rel} is covered but was not in the review target, so "
+                       "no reviewer saw it")
+        elif frozen[rel] != digest:
+            out.append(f"{rel} changed after the freeze\n"
+                       f"      reviewed  {frozen[rel]}\n"
+                       f"      on disk   {digest}")
+
+    for rel in sorted(set(frozen) - set(now)):
+        out.append(f"{rel} was reviewed but is not in the covered set, so "
+                   "approving it would bind nothing")
+    return out
 
 
 # ------------------------------------------------------------------ check
@@ -352,6 +414,34 @@ def cmd_record(a: argparse.Namespace) -> int:
             "...'\"\n"
             "  --decided-by alone is a name typed by whoever ran this command.")
 
+    # B01-F09. The decision must be about the artifacts that were reviewed, not
+    # about whatever is on disk when someone gets round to recording it.
+    #
+    # Codex: "Recording a decision checks only that four evidence files are
+    # nonempty, then hashes the current component files. It never compares those
+    # files with the frozen review target."
+    #
+    # So: approve, edit a component, record — and the approval covered code the
+    # reviewer never saw, under evidence describing code that no longer exists.
+    # `check` would then verify the decision against itself and pass forever.
+    if a.target:
+        drift = target_drift(REPO, Path(a.target).resolve())
+        if drift:
+            raise Refused(
+                "the components have changed since the review target was "
+                "frozen:\n  " + "\n  ".join(drift) +
+                "\n\n  A decision recorded now would approve bytes the reviewer "
+                "never saw.\n  Revert the drift, or re-freeze and re-review.")
+    else:
+        raise Refused(
+            "--target is required: the frozen target.json the review was run "
+            "against.\n"
+            "  The decision has to be bound to what was reviewed. Without it "
+            "this records\n  an approval of whatever happens to be on disk now, "
+            "which is B01-F09.\n"
+            "  Example:\n"
+            "    --target runs/BOOTSTRAP-001/plan-review/cycle-01/target.json")
+
     absent = []
     for name in EVIDENCE:
         p = REVIEW_DIR / name
@@ -383,6 +473,10 @@ def cmd_record(a: argparse.Namespace) -> int:
         "decided_at": now(),
         "note": a.note,
         "components": component_hashes(REPO),
+        "reviewed_target": {
+            "path": Path(a.target).resolve().relative_to(REPO).as_posix(),
+            "sha256": sha256_file(Path(a.target).resolve()),
+        },
         "roots": list(COMPONENTS) + list(ALWAYS),
         "dependencies": {k: v for k, v in sorted(closure(REPO).items())},
         "evidence": {n: sha256_file(REVIEW_DIR / n) for n in EVIDENCE},
@@ -420,6 +514,10 @@ def main(argv: list[str]) -> int:
     r.add_argument("--decision", required=True, help=" | ".join(DECISIONS))
     r.add_argument("--decided-by", required=True)
     r.add_argument("--note", default="")
+    r.add_argument("--target", default="",
+                   help="the frozen target.json the review was run against. "
+                        "Required: it is what binds the decision to the "
+                        "artifacts a reviewer actually saw.")
     r.add_argument("--supersede", action="store_true",
                    help="replace an existing decision, preserving it in the record")
 

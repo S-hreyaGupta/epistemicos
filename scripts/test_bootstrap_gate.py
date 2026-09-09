@@ -40,17 +40,52 @@ def write_lf(p: Path, text: str) -> None:
         f.write(text)
 
 
+def sha256_file(p: Path) -> str:
+    import hashlib
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
 def build(with_evidence: bool = True) -> Path:
-    """A throwaway repo carrying the real gate and the real components."""
+    """A throwaway repo carrying the real gate, components and a review target."""
     tmp = Path(tempfile.mkdtemp(prefix="bgate-")).resolve()
     (tmp / "scripts").mkdir()
+    (tmp / "specs").mkdir()
     for n in ("bootstrap_gate.py", "validate_cycle.py", "run_review.py",
               "ledger.py", "loop_state.py"):
         shutil.copy2(SRC / n, tmp / "scripts" / n)
+    shutil.copy2(REPO / "specs" / "evidence-schema-v1.0.md",
+                 tmp / "specs" / "evidence-schema-v1.0.md")
     if with_evidence:
         for n in EVIDENCE:
             write_lf(tmp / "bootstrap-review" / n, f"contents of {n}\n")
+    freeze_target(tmp)
     return tmp
+
+
+def freeze_target(root: Path) -> Path:
+    """A target.json covering exactly the files the gate covers.
+
+    B01-F09 requires the decision to be bound to what was reviewed, so a fixture
+    that wants to approve needs a target to bind to. Built from the gate's own
+    covered set, so the two agree by construction here and any disagreement in a
+    control below is one the control deliberately introduced.
+    """
+    import importlib.util
+    spec_ = importlib.util.spec_from_file_location(
+        "_bg_fixture", root / "scripts" / "bootstrap_gate.py")
+    mod = importlib.util.module_from_spec(spec_)
+    spec_.loader.exec_module(mod)
+
+    tgt = root / "runs" / "B-001" / "plan-review" / "cycle-01" / "target.json"
+    write_lf(tgt, json.dumps({
+        "review_type": "plan", "run_id": "B-001", "cycle": 1,
+        "plan_files": [{"path": rel, "sha256": digest}
+                       for rel, digest in mod.covered(root).items()],
+    }, indent=2) + "\n")
+    return tgt
+
+
+TARGET = "runs/B-001/plan-review/cycle-01/target.json"
 
 
 def gate(root: Path, *args: str) -> subprocess.CompletedProcess:
@@ -61,7 +96,8 @@ def gate(root: Path, *args: str) -> subprocess.CompletedProcess:
 def approve(root: Path, who: str = "Alex Zamurko") -> subprocess.CompletedProcess:
     return gate(root, "record", "--decision", "APPROVE", "--decided-by", who,
                 "--note", "#gap, 9 Sep 2026 00:03, Alex Zamurko: reviewed and "
-                          "approved for the bootstrap exception")
+                          "approved for the bootstrap exception",
+                "--target", TARGET)
 
 
 def main() -> int:
@@ -103,24 +139,27 @@ def main() -> int:
     root = build(); made.append(root)
     expect_refused("record a decision with no human named", "decided-by",
                    gate(root, "record", "--decision", "APPROVE", "--decided-by", "  ",
-                        "--note", "#gap, 9 Sep 2026, some attribution text here"))
+                        "--note", "#gap, 9 Sep 2026, some attribution text here",
+                        "--target", TARGET))
 
     # A name in --decided-by is typed by whoever ran the command. Without an
     # attribution the record cannot distinguish a relayed approval from an
     # invented one.
     expect_refused("record an approval with no attribution", "--note is required",
                    gate(root, "record", "--decision", "APPROVE",
-                        "--decided-by", "Alex Zamurko"))
+                        "--decided-by", "Alex Zamurko", "--target", TARGET))
 
     expect_refused("attribution too thin to identify anything", "--note is required",
                    gate(root, "record", "--decision", "APPROVE",
-                        "--decided-by", "Alex Zamurko", "--note", "ok"))
+                        "--decided-by", "Alex Zamurko", "--note", "ok",
+                        "--target", TARGET))
 
     # ---- a decision that is not an approval ----
     root = build(); made.append(root)
     r = gate(root, "record", "--decision", "RETURN_FOR_REWORK",
              "--decided-by", "Alex Zamurko",
-             "--note", "#gap, 9 Sep 2026, Alex Zamurko: rework required")
+             "--note", "#gap, 9 Sep 2026, Alex Zamurko: rework required",
+             "--target", TARGET)
     if r.returncode != 0:
         failures.append(f"recording RETURN_FOR_REWORK should succeed:\n{r.stderr}{r.stdout}")
     else:
@@ -147,7 +186,7 @@ def main() -> int:
 
     r = gate(root, "record", "--decision", "APPROVE", "--decided-by", "Alex Zamurko",
              "--note", "#gap, 9 Sep 2026, Alex Zamurko: re-approved after rework",
-             "--supersede")
+             "--target", TARGET, "--supersede")
     if r.returncode != 0:
         failures.append(f"--supersede should be permitted:\n{r.stderr}{r.stdout}")
     else:
@@ -197,6 +236,7 @@ def main() -> int:
     lg = root / "scripts" / "ledger.py"
     lg.write_text(lg.read_text(encoding="utf-8") + '\n_H = "helper_two.py"\n',
                   encoding="utf-8")
+    freeze_target(root)
     approve(root)
     (root / "scripts" / "helper_two.py").unlink()
     expect_refused("approval surviving deletion of a pinned dependency",
@@ -247,6 +287,9 @@ def main() -> int:
             f"import hashlib\nimport {HELPER}\n_T = {HELPER}.THRESHOLD",
             1),
         encoding="utf-8")
+    # Re-freeze: the edited component is what a reviewer would have seen in this
+    # scenario, and B01-F09 now binds the decision to the frozen target.
+    freeze_target(root)
 
     r = approve(root)
     if r.returncode != 0:
@@ -312,6 +355,63 @@ def main() -> int:
     # Prose drifts in the flattering direction on its own. A hash check reads
     # like a guarantee to whoever writes about it next, so this refuses the
     # phrasings rather than trusting everyone to remember the distinction.
+    print()
+    print("the decision is bound to what was reviewed")
+
+    # ---- B01-F09 ----
+    # Approval must be about the artifacts a reviewer saw, not about whatever is
+    # on disk when someone gets round to recording the decision. Without this,
+    # approve-then-edit-then-record produces an approval covering code nobody
+    # reviewed, under evidence describing code that no longer exists — and
+    # `check` then verifies the decision against itself and passes forever.
+    root = build(); made.append(root)
+    expect_refused("record a decision with no --target at all",
+                   "--target is required",
+                   gate(root, "record", "--decision", "APPROVE",
+                        "--decided-by", "Alex Zamurko",
+                        "--note", "#gap, 9 Sep 2026, approved after review"))
+
+    root = build(); made.append(root)
+    vc = root / "scripts" / "validate_cycle.py"
+    vc.write_text(vc.read_text(encoding="utf-8") + "\n# edited after the freeze\n",
+                  encoding="utf-8")
+    expect_refused("record a decision after a component changed post-freeze",
+                   "changed after the freeze", approve(root))
+
+    # ---- B01-F10 ----
+    # The target carried six artifacts and the covered set held five, so editing
+    # the evidence schema did not invalidate its own approval. Both directions
+    # of that mismatch are refusals now.
+    root = build(); made.append(root)
+    tgt = root / TARGET
+    d = json.loads(tgt.read_text(encoding="utf-8"))
+    d["plan_files"] = [e for e in d["plan_files"]
+                       if e["path"] != "specs/evidence-schema-v1.0.md"]
+    write_lf(tgt, json.dumps(d, indent=2) + "\n")
+    expect_refused("a covered file the review target never contained",
+                   "was not in the review target", approve(root))
+
+    root = build(); made.append(root)
+    tgt = root / TARGET
+    d = json.loads(tgt.read_text(encoding="utf-8"))
+    d["plan_files"].append({"path": "specs/unreviewed-extra.md",
+                            "sha256": "f" * 64})
+    write_lf(tgt, json.dumps(d, indent=2) + "\n")
+    expect_refused("a reviewed artifact the gate does not cover",
+                   "not in the covered set", approve(root))
+
+    # And the schema must actually be in the covered set, or F10 is only
+    # half-repaired: the mismatch check would pass while nothing pinned it.
+    root = build(); made.append(root)
+    if approve(root).returncode != 0 or gate(root, "check").returncode != 0:
+        failures.append("the six-artifact fixture did not reach an approved state")
+    else:
+        sch = root / "specs" / "evidence-schema-v1.0.md"
+        sch.write_text(sch.read_text(encoding="utf-8") + "\n<!-- later edit -->\n",
+                       encoding="utf-8")
+        expect_refused("approval surviving an edit to the evidence schema",
+                       "has changed since it was reviewed", gate(root, "check"))
+
     print()
     print("no claim stronger than CONVENTION_ONLY")
 

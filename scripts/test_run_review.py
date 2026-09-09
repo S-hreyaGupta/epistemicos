@@ -53,7 +53,8 @@ def make_repo() -> Path:
     tmp = Path(tempfile.mkdtemp(prefix="runner-")).resolve()
     (tmp / "scripts").mkdir()
     for name in ("run_review.py", "validate_cycle.py", "bootstrap_gate.py",
-                 "ledger.py", "loop_state.py", "findings_format.py"):
+                 "ledger.py", "loop_state.py", "findings_format.py",
+                 "cycle_projection.py"):
         shutil.copy2(SRC / name, tmp / "scripts" / name)
     (tmp / "specs").mkdir()
     # Copied rather than stubbed: it is a covered component now (B01-F10), so

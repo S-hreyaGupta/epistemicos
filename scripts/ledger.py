@@ -40,6 +40,19 @@ DISPUTED is terminal here
 §5 says a dispute "requires human adjudication" and §7.1 puts that at the human
 gate. Nothing in the automated loop may move a finding out of DISPUTED, so this
 ledger refuses. Adjudication belongs to the approval record, not here.
+
+Invalid cycles do not authorize and do not block
+------------------------------------------------
+B01-F11. Transition authority is computed through `cycle_projection`, the same
+module the loop controller uses, rather than from the stored state. An event
+recorded in a cycle that fails MC-2 stays in the history as evidence and is
+printed by `show`, but it cannot satisfy a precondition and it cannot stand in
+the way of a valid transition. Before this, an ACCEPT in an invalid cycle could
+authorize a closure and a DEMONSTRATED in an invalid cycle could prevent one
+forever.
+
+The stored `state` field is a cache of that projection, rewritten on every
+command. Nothing reads it to decide anything.
 """
 
 from __future__ import annotations
@@ -50,6 +63,9 @@ import json
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cycle_projection  # noqa: E402
 
 # An optional single-letter prefix, then the cycle, then the finding number.
 # §4's example is C02-F03; the bootstrap review used B01-F01 because the prompt
@@ -150,10 +166,52 @@ def get(data: dict, fid: str) -> dict:
 
 
 def last_event(f: dict, event: str) -> dict | None:
+    """Unfiltered. Kept for reporting; never for authority. See `authorized`."""
     for e in reversed(f["history"]):
         if e["event"] == event:
             return e
     return None
+
+
+# ------------------------------------------------- the projection (B01-F11)
+
+def projection(review: Path) -> cycle_projection.Projection:
+    return cycle_projection.project(review)
+
+
+def effective_state(f: dict, proj: cycle_projection.Projection) -> str:
+    """The state this finding is actually in, ignoring events without authority.
+
+    This replaces every former read of f["state"]. The difference only shows up
+    once a cycle has been judged and failed, which is precisely the case B01-F11
+    is about.
+    """
+    return cycle_projection.replay(f["history"], proj) or OPEN
+
+
+def authorized(f: dict, event: str,
+               proj: cycle_projection.Projection) -> dict | None:
+    return cycle_projection.last_authorized(f["history"], event, proj)
+
+
+def note_ignored(f: dict, proj: cycle_projection.Projection) -> str:
+    """A line naming the events being disregarded, so a refusal is legible.
+
+    Without this, a resolve that is refused for want of an ACCEPT looks wrong to
+    an operator who can see an ACCEPT sitting in the history.
+    """
+    ignored = [f"cycle {e['cycle']:02d} {e['event']}"
+               for e in f["history"] if not proj.authorizes(e["cycle"])]
+    if not ignored:
+        return ""
+    return ("\n  Disregarded, recorded in a cycle that fails MC-2: "
+            + "; ".join(ignored)
+            + "\n  They remain in the history as evidence. Repair the cycle's "
+            "evidence and they\n  count again.")
+
+
+def restate(f: dict, proj: cycle_projection.Projection) -> None:
+    f["state"] = effective_state(f, proj)
 
 
 # ---------------------------------------------------------------- commands
@@ -205,13 +263,15 @@ def cmd_respond(a: argparse.Namespace) -> int:
     review = Path(a.review).resolve()
     data = load(review)
     f = get(data, a.id)
+    proj = projection(review)
+    state = effective_state(f, proj)
 
-    if f["state"] == RESOLVED:
+    if state == RESOLVED:
         raise Refused(f"{a.id} is RESOLVED. Responding again is not how a "
                       "recurrence is recorded:\n  use `reopen` with evidence, "
                       "which keeps the identifier and moves\n  RESOLVED -> OPEN "
                       "per §7 of the 9 September ruling.")
-    if f["state"] == DISPUTED:
+    if state == DISPUTED:
         raise Refused(f"{a.id} is DISPUTED and requires human adjudication (§5, §7.1). "
                       "The automated loop does not move findings out of DISPUTED.")
 
@@ -248,13 +308,13 @@ def cmd_respond(a: argparse.Namespace) -> int:
                 "dispute needs.\n"
                 "  A rejection resting only on the implementing agent's reading "
                 "is the\n  authority inversion MC-1 exists to prevent.")
-        f["state"] = DISPUTED
         f["history"].append({"cycle": a.cycle, "event": "REJECT_WITH_REASON",
                              "state": DISPUTED, "at": now(), "note": a.note,
                              "spec_evidence": a.spec_evidence})
         print(f"{a.id}  REJECT_WITH_REASON  cycle {a.cycle:02d}  -> {DISPUTED}")
         print("       Requires human adjudication at the plan gate.")
 
+    restate(f, proj)
     save(review, data)
     return 0
 
@@ -277,27 +337,30 @@ def cmd_reopen(a: argparse.Namespace) -> int:
     review = Path(a.review).resolve()
     data = load(review)
     f = get(data, a.id)
+    proj = projection(review)
+    state = effective_state(f, proj)
 
-    if f["state"] != RESOLVED:
-        raise Refused(f"{a.id} is {f['state']}, not RESOLVED. Reopening applies "
-                      "only to a finding that was resolved and has recurred.")
+    if state != RESOLVED:
+        raise Refused(f"{a.id} is {state}, not RESOLVED. Reopening applies "
+                      "only to a finding that was resolved and has recurred."
+                      + note_ignored(f, proj))
     if not (a.evidence or "").strip():
         raise Refused(
             "--evidence is required. A reopen asserts that the same underlying "
             "finding is\n  present again, and the record has to say what shows "
             "it rather than leaving\n  the claim bare.")
 
-    last = last_event(f, "DEMONSTRATED")
+    last = authorized(f, "DEMONSTRATED", proj)
     if last and a.cycle <= last["cycle"]:
         raise Refused(
             f"{a.id} was resolved in cycle {last['cycle']:02d} and cannot "
             f"recur in cycle {a.cycle:02d}.\n  A recurrence is observed in a "
             "later cycle than the resolution it undoes.")
 
-    f["state"] = OPEN
     f["history"].append({"cycle": a.cycle, "event": "REOPENED", "state": OPEN,
                          "at": now(), "note": a.evidence,
                          "prior_state": RESOLVED})
+    restate(f, proj)
     save(review, data)
     print(f"{a.id}  REOPENED  cycle {a.cycle:02d}  {RESOLVED} -> {OPEN}")
     print("       The identifier is retained; §6 counts it as an ordinary "
@@ -309,18 +372,21 @@ def cmd_resolve(a: argparse.Namespace) -> int:
     review = Path(a.review).resolve()
     data = load(review)
     f = get(data, a.id)
+    proj = projection(review)
+    state = effective_state(f, proj)
 
-    if f["state"] == RESOLVED:
+    if state == RESOLVED:
         raise Refused(f"{a.id} is already RESOLVED.")
-    if f["state"] == DISPUTED:
+    if state == DISPUTED:
         raise Refused(f"{a.id} is DISPUTED. A dispute is resolved by human "
                       "adjudication at the gate, not by demonstrating a repair.")
 
-    acc = last_event(f, "ACCEPT")
+    acc = authorized(f, "ACCEPT", proj)
     if acc is None:
         raise Refused(f"{a.id} has no ACCEPT. §5 gives RESOLVED only to a finding "
                       "that was accepted and then repaired; a finding cannot become "
-                      "resolved without first having been accepted.")
+                      "resolved without first having been accepted."
+                      + note_ignored(f, proj))
     if a.cycle <= acc["cycle"]:
         raise Refused(f"{a.id} was accepted in cycle {acc['cycle']:02d} and cannot be "
                       f"resolved in cycle {a.cycle:02d}. §5 requires the repair to be "
@@ -331,9 +397,9 @@ def cmd_resolve(a: argparse.Namespace) -> int:
                       "the repair is demonstrated; recording what demonstrates it is "
                       "the difference between a demonstration and an assertion.")
 
-    f["state"] = RESOLVED
     f["history"].append({"cycle": a.cycle, "event": "DEMONSTRATED", "state": RESOLVED,
                          "at": now(), "note": a.evidence})
+    restate(f, proj)
     save(review, data)
     print(f"{a.id}  DEMONSTRATED  cycle {a.cycle:02d}  -> {RESOLVED}")
     return 0
@@ -352,10 +418,17 @@ def state_after(f: dict, cycle: int) -> str:
     return state or ""
 
 
-def snapshot(data: dict, cycle: int) -> dict[str, set[str]]:
+def snapshot(data: dict, cycle: int,
+             proj: cycle_projection.Projection | None = None) -> dict[str, set[str]]:
+    """Per-cycle view. Also projected, or `show --cycle` would contradict `show`."""
     out = {OPEN: set(), RESOLVED: set(), DISPUTED: set()}
     for fid, f in data["findings"].items():
-        s = state_after(f, cycle)
+        if proj is None:
+            s = state_after(f, cycle)
+        else:
+            s = cycle_projection.replay(
+                f["history"], proj,
+                upto={e["cycle"] for e in f["history"] if e["cycle"] <= cycle})
         if s in out:
             out[s].add(fid)
     return out
@@ -369,25 +442,33 @@ def cmd_show(a: argparse.Namespace) -> int:
         return 0
 
     if a.cycle is not None:
-        snap = snapshot(data, a.cycle)
+        snap = snapshot(data, a.cycle, projection(review))
         print(f"state after cycle {a.cycle:02d}")
         for s in STATES:
             ids = sorted(snap[s])
             print(f"  {s:<9} {len(ids):>2}  {', '.join(ids) if ids else '-'}")
         return 0
 
+    proj = projection(review)
     print(f"findings ledger — {review}")
+    if proj.invalid:
+        print("  cycles failing MC-2, whose events are evidence only: "
+              + ", ".join(f"{c:02d}" for c in sorted(proj.invalid)))
     for fid in sorted(data["findings"]):
         f = data["findings"][fid]
-        print(f"\n  {fid}  [{f['state']}]  {f['class']}"
+        print(f"\n  {fid}  [{effective_state(f, proj)}]  {f['class']}"
               + (f"  ({f['requirement_id']})" if f["requirement_id"] else ""))
         for e in f["history"]:
             note = f"  {e['note'][:60]}" if e.get("note") else ""
-            print(f"      cycle {e['cycle']:02d}  {e['event']:<18} -> {e['state']}{note}")
+            mark = "" if proj.authorizes(e["cycle"]) else "  [no authority]"
+            print(f"      cycle {e['cycle']:02d}  {e['event']:<18} -> "
+                  f"{e['state']}{mark}{note}")
     print()
-    snap = snapshot(data, 10**6)
+    counts = {s: 0 for s in STATES}
+    for f in data["findings"].values():
+        counts[effective_state(f, proj)] += 1
     for s in STATES:
-        print(f"  {s:<9} {len(snap[s])}")
+        print(f"  {s:<9} {counts[s]}")
     return 0
 
 

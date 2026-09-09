@@ -53,31 +53,19 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cycle_projection  # noqa: E402
+
 VALIDATOR = REPO / "scripts" / "validate_cycle.py"
 MAX_VALID_CYCLES = 4
+TERMINAL = ("CONVERGED", "HUMAN_ADJUDICATION_REQUIRED", "STALLED",
+            "MAX_4_REACHED")
 
 OPEN, RESOLVED, DISPUTED = "OPEN", "RESOLVED", "DISPUTED"
 
-
-def cycle_dirs(review: Path) -> list[tuple[int, Path]]:
-    out = []
-    for d in sorted(review.iterdir()) if review.is_dir() else []:
-        m = re.fullmatch(r"cycle-(\d{2})", d.name)
-        if m and d.is_dir():
-            out.append((int(m.group(1)), d))
-    return sorted(out)
-
-
-def gate(cycle_dir: Path) -> tuple[bool, str]:
-    r = subprocess.run([sys.executable, str(VALIDATOR), str(cycle_dir)],
-                       capture_output=True, text=True)
-    if r.returncode == 2:
-        return False, "checker could not run"
-    reason = ""
-    if r.returncode != 0:
-        fails = [l.strip() for l in r.stdout.splitlines() if "[FAIL]" in l]
-        reason = fails[0] if fails else "MC-2 FAIL"
-    return r.returncode == 0, reason
+# B01-F11: both live in cycle_projection now, so the ledger and this controller
+# cannot drift apart about which cycles count.
+cycle_dirs = cycle_projection.cycle_dirs
+gate = cycle_projection.gate
 
 
 class CannotCalculate(Exception):
@@ -211,13 +199,57 @@ def authoritative_findings(cycle_dir: Path) -> list[str]:
 def state_after(f: dict, valid_upto: set[int]) -> str | None:
     """State as at the end of the valid cycles in `valid_upto`.
 
-    Events in cycles outside the set are skipped, per consequence 2 above.
+    Events in cycles outside the set are skipped, per consequence 2 above. The
+    replay itself lives in cycle_projection so the ledger applies the identical
+    rule when it decides whether a transition is permitted (B01-F11).
     """
-    state = None
-    for e in f["history"]:
-        if e["cycle"] in valid_upto:
-            state = e["state"]
-    return state
+    allow_all = cycle_projection.Projection([], {})
+    return cycle_projection.replay(f["history"], allow_all, upto=valid_upto)
+
+
+def load_authorizations(review: Path) -> list[dict]:
+    """Recorded human authorizations to run another loop past a terminal exit.
+
+    B01-F02's correction: "Refuse further automated cycles after that outcome
+    unless an explicitly recorded human transition authorizes another loop."
+
+    An authorization has to name both the boundary and the outcome it clears. A
+    blanket "keep going" would restore the defect under a different spelling: it
+    would let any later cycle override any earlier mandatory termination, which
+    is the finding.
+    """
+    p = review / "loop-authorizations.json"
+    if not p.is_file():
+        return []
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise CannotCalculate(f"loop-authorizations.json is not valid JSON: {e}")
+    if d.get("schema") != "loop-authorization/1":
+        raise CannotCalculate(
+            f"loop-authorizations.json declares schema {d.get('schema')!r}, "
+            "expected 'loop-authorization/1'")
+    items = d.get("authorizations")
+    if not isinstance(items, list):
+        raise CannotCalculate("loop-authorizations.json has no authorizations list")
+    for i, a in enumerate(items):
+        missing = [k for k in ("after_valid_cycle", "outcome", "authorized_by",
+                               "reason") if not str(a.get(k, "")).strip()]
+        if missing:
+            raise CannotCalculate(
+                f"authorization {i} is missing {', '.join(missing)}.\n"
+                "  An authorization to continue past a mandatory exit has to say "
+                "which exit,\n  at which boundary, on whose authority, and why. "
+                "Any of those blank and it\n  is not a recorded human transition, "
+                "it is a switch the loop turned off for itself.")
+    return items
+
+
+def cleared_by(auths: list[dict], n: int, outcome: str) -> dict | None:
+    for a in auths:
+        if a.get("after_valid_cycle") == n and a.get("outcome") == outcome:
+            return a
+    return None
 
 
 def sets_at(ledger: dict, valid_upto: set[int]) -> dict[str, set[str]]:
@@ -301,95 +333,75 @@ def _run(a) -> int:
             "reaches CONVERGED.")
     lines.append("  every recorded finding is accounted for in the ledger")
 
-    n = len(valid)
-    upto_n = set(valid)
-    upto_prev = set(valid[:-1])
+    # B01-F02. Every valid cycle boundary is evaluated in order, and the first
+    # terminal outcome governs. Evaluating only the latest boundary let a later
+    # cycle overwrite an earlier mandatory exit: one finding accepted in cycle
+    # 01, untouched in 02 and resolved in 03 reported CONVERGED, even though
+    # cycle 02 had already required STALLED and the loop should never have
+    # reached 03.
+    auths = load_authorizations(review)
+    governing = None          # (n, status, detail, cur)
+    overridden: list[str] = []
+    lines += ["", "boundaries, in order"]
 
-    cur = sets_at(ledger, upto_n)
-    prev = sets_at(ledger, upto_prev) if n > 1 else None
+    for n in range(1, len(valid) + 1):
+        cur, prev, resolved_new, disputed_new = sets_at_boundary(ledger, valid, n)
+        status, detail, shown = decide(cur, prev, resolved_new, disputed_new, n)
+        lines.append(f"  n={n} (cycle-{valid[n-1]:02d})  OPEN {len(cur[OPEN])}  "
+                     f"DISPUTED {len(cur[DISPUTED])}  RESOLVED {len(cur[RESOLVED])}"
+                     f"   -> {status}")
+        if status == "CONTINUE":
+            continue
+        auth = cleared_by(auths, n, status)
+        if auth is None:
+            governing = (n, status, detail, cur, shown)
+            break
+        lines.append(f"        {status} at n={n} cleared by recorded "
+                     f"authorization: {auth['authorized_by']}")
+        lines.append(f"        reason: {auth['reason']}")
+        overridden.append(f"n={n} {status} (authorized by {auth['authorized_by']})")
 
-    # §6: the _NEW_n sets are findings that were OPEN after n-1 and changed during n.
-    resolved_new: set[str] = set()
-    disputed_new: set[str] = set()
-    if prev is not None:
-        for fid in prev[OPEN]:
-            s = state_after(ledger["findings"][fid], upto_n)
-            if s == RESOLVED:
-                resolved_new.add(fid)
-            elif s == DISPUTED:
-                disputed_new.add(fid)
+    n_latest = len(valid)
+    if governing is None:
+        cur, prev, resolved_new, disputed_new = sets_at_boundary(
+            ledger, valid, n_latest)
+        status, detail, shown = decide(cur, prev, resolved_new, disputed_new,
+                                       n_latest)
+        governing = (n_latest, status, detail, cur, shown)
+
+    n, status, detail, cur, shown = governing
 
     def fmt(ids: set[str]) -> str:
         return ", ".join(sorted(ids)) if ids else "-"
 
-    lines += ["", "§6 sets"]
-    lines.append(f"  OPEN_{n}          {len(cur[OPEN]):>2}  {fmt(cur[OPEN])}")
-    lines.append(f"  DISPUTED_{n}      {len(cur[DISPUTED]):>2}  {fmt(cur[DISPUTED])}")
-    lines.append(f"  RESOLVED_{n}      {len(cur[RESOLVED]):>2}  {fmt(cur[RESOLVED])}")
-    if prev is not None:
-        lines.append(f"  OPEN_{n-1}          {len(prev[OPEN]):>2}  {fmt(prev[OPEN])}")
-        lines.append(f"  RESOLVED_NEW_{n}  {len(resolved_new):>2}  {fmt(resolved_new)}")
-        lines.append(f"  DISPUTED_NEW_{n}  {len(disputed_new):>2}  {fmt(disputed_new)}")
+    lines += ["", f"§6 sets and exits at the governing boundary, n={n}"] + shown
 
-    # Exits are tested in the protocol's order, and the order is load-bearing.
-    # HUMAN_ADJUDICATION_REQUIRED sits between CONVERGED and STALLED because a
-    # loop with nothing open and a dispute outstanding is not stalled: it
-    # finished everything automation can do. Test STALLED first and it swallows
-    # the case a cycle later, which is what v1.0 did.
-    lines += ["", "exits"]
-    status = None
-    detail = ""
-
-    converged = not cur[OPEN] and not cur[DISPUTED]
-    lines.append(f"  A CONVERGED                    OPEN_{n} = 0 and DISPUTED_{n} = 0"
-                 f"        {'yes' if converged else 'no'}")
-    if converged:
-        status = "CONVERGED"
-        detail = "Nothing open and nothing disputed. Proceed to human plan review."
-
-    if status is None:
-        adjudicate = not cur[OPEN] and cur[DISPUTED]
-        lines.append(f"  B HUMAN_ADJUDICATION_REQUIRED  OPEN_{n} = 0 and "
-                     f"DISPUTED_{n} != 0     {'yes' if adjudicate else 'no'}")
-        if adjudicate:
-            status = "HUMAN_ADJUDICATION_REQUIRED"
-            detail = ("Everything actionable is resolved or disputed, and no further "
-                      "automated repair is available. Stop now rather than spending a "
-                      "cycle on a plan with nothing open to repair. Proceed to human "
-                      "plan review.")
-
-    if status is None:
-        if prev is None:
-            lines.append("  C STALLED                      not testable at n=1 "
-                         "(§6 requires n > 1)")
-        else:
-            stalled = (len(cur[OPEN]) >= len(prev[OPEN])
-                       and not resolved_new and not disputed_new)
-            lines.append(
-                f"  C STALLED                      |OPEN_{n}| >= |OPEN_{n-1}|"
-                f" ({len(cur[OPEN])} >= {len(prev[OPEN])})"
-                f" and no new resolved/disputed   {'yes' if stalled else 'no'}")
-            if stalled:
-                status = "STALLED"
-                detail = ("The last valid cycle reduced nothing, resolved nothing and "
-                          "disputed nothing. Stop now rather than spending the "
-                          "remaining budget. Proceed to human plan review.")
-
-    if status is None:
-        maxed = len(valid) >= MAX_VALID_CYCLES
-        lines.append(f"  D MAX_4_REACHED                VALID_CYCLE_COUNT = {len(valid)}"
-                     f"                  {'yes' if maxed else 'no'}")
-        if maxed:
-            status = "MAX_4_REACHED"
-            detail = ("Budget exhausted with findings still open. Proceed to human "
-                      "plan review with the unresolved matters exposed.")
-
-    if status is None:
-        status = "CONTINUE"
+    if status == "CONTINUE":
         detail = (f"Repair the plan, produce a new version, and open cycle "
                   f"{dirs[-1][0] + 1:02d} with a new frozen target.")
 
     lines += ["", f"LOOP_STATUS: {status}", detail]
+
+    # The cycles that should never have been opened. Reported rather than
+    # silently absorbed, because the evidence in them was produced under a loop
+    # that had already terminated and no one authorized restarting it.
+    if status in TERMINAL and n < n_latest:
+        after = [f"cycle-{c:02d}" for c in valid[n:]]
+        lines += ["",
+                  f"UNAUTHORIZED CONTINUATION: the loop reached {status} at n={n} "
+                  f"(cycle-{valid[n-1]:02d}).",
+                  f"  {len(after)} further valid cycle(s) were run after it: "
+                  + ", ".join(after),
+                  "  §6's exits are mandatory, so the first one governs and the "
+                  "later cycles do",
+                  "  not override it. Record a human authorization in "
+                  "loop-authorizations.json if",
+                  "  another loop was genuinely approved, or take the outcome "
+                  "above to the gate."]
+    if overridden:
+        lines += ["", "Earlier terminal outcomes cleared by recorded "
+                  "authorization: " + "; ".join(overridden)]
+
     if status != "CONTINUE" and cur[DISPUTED]:
         lines.append("")
         lines.append(f"Disputes for adjudication ({len(cur[DISPUTED])}): "
@@ -399,6 +411,91 @@ def _run(a) -> int:
 
     print(f"LOOP_STATUS: {status}" if a.quiet else "\n".join(lines))
     return 0
+
+
+def sets_at_boundary(ledger: dict, valid: list[int], n: int):
+    """The §6 sets as at valid cycle boundary n, plus the _NEW_n deltas."""
+    upto_n = set(valid[:n])
+    cur = sets_at(ledger, upto_n)
+    prev = sets_at(ledger, set(valid[:n - 1])) if n > 1 else None
+    resolved_new: set[str] = set()
+    disputed_new: set[str] = set()
+    if prev is not None:
+        for fid in prev[OPEN]:
+            s = state_after(ledger["findings"][fid], upto_n)
+            if s == RESOLVED:
+                resolved_new.add(fid)
+            elif s == DISPUTED:
+                disputed_new.add(fid)
+    return cur, prev, resolved_new, disputed_new
+
+
+def decide(cur, prev, resolved_new: set[str], disputed_new: set[str],
+           n: int) -> tuple[str, str, list[str]]:
+    """The §6 exit test at one boundary.
+
+    Exits are tested in the protocol's order, and the order is load-bearing.
+    HUMAN_ADJUDICATION_REQUIRED sits between CONVERGED and STALLED because a loop
+    with nothing open and a dispute outstanding is not stalled: it finished
+    everything automation can do. Test STALLED first and it swallows the case a
+    cycle later, which is what v1.0 did.
+    """
+    def fmt(ids: set[str]) -> str:
+        return ", ".join(sorted(ids)) if ids else "-"
+
+    shown = [
+        f"  OPEN_{n}          {len(cur[OPEN]):>2}  {fmt(cur[OPEN])}",
+        f"  DISPUTED_{n}      {len(cur[DISPUTED]):>2}  {fmt(cur[DISPUTED])}",
+        f"  RESOLVED_{n}      {len(cur[RESOLVED]):>2}  {fmt(cur[RESOLVED])}",
+    ]
+    if prev is not None:
+        shown += [
+            f"  OPEN_{n-1}          {len(prev[OPEN]):>2}  {fmt(prev[OPEN])}",
+            f"  RESOLVED_NEW_{n}  {len(resolved_new):>2}  {fmt(resolved_new)}",
+            f"  DISPUTED_NEW_{n}  {len(disputed_new):>2}  {fmt(disputed_new)}",
+        ]
+
+    if not cur[OPEN] and not cur[DISPUTED]:
+        shown.append(f"  A CONVERGED                    OPEN_{n} = 0 and "
+                     f"DISPUTED_{n} = 0        yes")
+        return ("CONVERGED",
+                "Nothing open and nothing disputed. Proceed to human plan review.",
+                shown)
+
+    if not cur[OPEN] and cur[DISPUTED]:
+        shown.append(f"  B HUMAN_ADJUDICATION_REQUIRED  OPEN_{n} = 0 and "
+                     f"DISPUTED_{n} != 0     yes")
+        return ("HUMAN_ADJUDICATION_REQUIRED",
+                "Everything actionable is resolved or disputed, and no further "
+                "automated repair is available. Stop now rather than spending a "
+                "cycle on a plan with nothing open to repair. Proceed to human "
+                "plan review.", shown)
+
+    if prev is None:
+        shown.append("  C STALLED                      not testable at n=1 "
+                     "(§6 requires n > 1)")
+    else:
+        stalled = (len(cur[OPEN]) >= len(prev[OPEN])
+                   and not resolved_new and not disputed_new)
+        shown.append(
+            f"  C STALLED                      |OPEN_{n}| >= |OPEN_{n-1}|"
+            f" ({len(cur[OPEN])} >= {len(prev[OPEN])})"
+            f" and no new resolved/disputed   {'yes' if stalled else 'no'}")
+        if stalled:
+            return ("STALLED",
+                    "The last valid cycle reduced nothing, resolved nothing and "
+                    "disputed nothing. Stop now rather than spending the "
+                    "remaining budget. Proceed to human plan review.", shown)
+
+    maxed = n >= MAX_VALID_CYCLES
+    shown.append(f"  D MAX_4_REACHED                VALID_CYCLE_COUNT = {n}"
+                 f"                  {'yes' if maxed else 'no'}")
+    if maxed:
+        return ("MAX_4_REACHED",
+                "Budget exhausted with findings still open. Proceed to human "
+                "plan review with the unresolved matters exposed.", shown)
+
+    return ("CONTINUE", "", shown)
 
 
 if __name__ == "__main__":

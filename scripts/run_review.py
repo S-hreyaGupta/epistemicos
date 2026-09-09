@@ -54,6 +54,12 @@ VALIDATOR = REPO / "scripts" / "validate_cycle.py"
 
 MAX_CYCLES = 4
 REVIEW_TYPES = ("plan", "implementation")
+
+# §6's four exits. Named here rather than "not CONTINUE" so that a future status
+# the controller learns to emit does not silently become permission to open
+# another cycle.
+TERMINAL_EXITS = ("CONVERGED", "HUMAN_ADJUDICATION_REQUIRED", "STALLED",
+                  "MAX_4_REACHED")
 INVOCATIONS = ("manual", "automated")
 HEX64 = re.compile(r"\A[0-9a-f]{64}\Z")
 
@@ -312,6 +318,52 @@ def check_previous_cycle_closed(review_dir: Path, n: int) -> None:
                       "Two open cycles means the budget count is guesswork.")
 
 
+def check_loop_not_terminated(review_dir: Path, n: int) -> None:
+    """Refuse to open a cycle after the loop has already exited.
+
+    B01-F02: "The runner checks previous output existence, not the previous loop
+    exit." Existence is the wrong question. A cycle can be perfectly well closed
+    and still be the cycle at which §6 required the loop to stop, and freezing
+    the next one produced evidence under a loop that had already terminated.
+
+    The controller now retains the first terminal outcome, so it will report that
+    exit rather than being overwritten by whatever the new cycle does. This makes
+    the runner refuse to create the situation in the first place, which is the
+    half that keeps the unauthorized cycle from existing at all.
+
+    An undeterminable loop state is a refusal too. If the controller cannot say
+    whether the loop has exited, nobody can say whether another cycle is
+    permitted, and guessing CONTINUE is the assumption that costs a cycle.
+    """
+    if n <= 1:
+        return
+    r = subprocess.run(
+        [sys.executable, str(REPO / "scripts" / "loop_state.py"),
+         "--review", str(review_dir), "--quiet"],
+        capture_output=True, text=True)
+    if r.returncode == 2:
+        raise Refused(
+            "the loop state cannot be determined, so whether another cycle is "
+            "permitted cannot be\ndetermined either:\n  "
+            + (r.stderr.strip().splitlines() or ["(no reason given)"])[0]
+            + "\nRepair the evidence and rerun. Opening a cycle on an "
+              "undeterminable loop is how a\nterminated loop keeps running.")
+    status = ""
+    for line in r.stdout.splitlines():
+        if line.startswith("LOOP_STATUS:"):
+            status = line.split(":", 1)[1].strip()
+    if status in TERMINAL_EXITS:
+        raise Refused(
+            f"the loop has already exited: LOOP_STATUS is {status}.\n"
+            f"Opening cycle {n:02d} would produce evidence under a loop that "
+            "§6 had already stopped.\n"
+            "If another loop was genuinely approved, record the human "
+            "authorization in\n  "
+            f"{rel(review_dir / 'loop-authorizations.json')}\n"
+            "naming the boundary, the outcome it clears, who authorized it and "
+            "why. Otherwise\ntake the outcome to human review.")
+
+
 def compose_input(prompt: str, target_hash: str, run: dict, rtype: str,
                   cycle_n: int, artifacts: list[tuple[dict, str]],
                   protocol_text: str = "") -> str:
@@ -396,6 +448,7 @@ def cmd_freeze(args: argparse.Namespace) -> int:
                       "MAX_4_REACHED is an exit, not an obstacle to route around. "
                       "Escalate to human review.")
     check_previous_cycle_closed(review_dir, n)
+    check_loop_not_terminated(review_dir, n)
 
     cycle = review_dir / f"cycle-{n:02d}"
     if cycle.exists():

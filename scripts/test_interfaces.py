@@ -61,7 +61,8 @@ def build_repo() -> tuple[Path, str]:
     tmp = Path(tempfile.mkdtemp(prefix="iface-")).resolve()
     (tmp / "scripts").mkdir()
     for n in ("validate_cycle.py", "run_review.py", "ledger.py", "loop_state.py",
-              "bootstrap_gate.py", "findings_format.py"):
+              "bootstrap_gate.py", "findings_format.py",
+              "cycle_projection.py"):
         shutil.copy2(SRC / n, tmp / "scripts" / n)
     (tmp / "specs").mkdir()
     # The parser reads the canonical Finding ID grammar out of the schema, so a
@@ -422,6 +423,62 @@ def main() -> int:
         bad(f"an invalid cycle still counted toward the budget\n{after}")
     else:
         ok("an invalid cycle contributes nothing to the budget")
+
+    # ---------------------------------------------------------- seam 7
+    print()
+    print("seam 7  runner <-> loop exit  (B01-F02)")
+
+    # "The runner checks previous output existence, not the previous loop exit."
+    # Existence is the wrong question: a cycle can be properly closed and still
+    # be the one at which §6 required the loop to stop. This seam is the one the
+    # finding is about, so it is built end to end rather than simulated.
+    root3, commit3 = build_repo()
+    made.append(root3)
+    rev3 = root3 / "runs" / "A1E-001" / "plan-review"
+    run(root3, "run_review.py", "init", "--run", "A1E-001", "--bootstrap-exempt",
+        "--protocol", "specs/protocol.md", "--spec", "specs/spec.md")
+    run(root3, "run_review.py", "freeze", "--run", "A1E-001", "--type", "plan",
+        "--prompt", "specs/prompt.md", "--file", "plan/01-PLAN.md")
+    c1 = rev3 / "cycle-01"
+    th3 = (c1 / "target.sha256").read_text(encoding="utf-8").strip()
+    # A clean review: nothing found, so the loop converges at cycle 01.
+    write_lf(root3 / "reply.md",
+             f"TARGET_SHA256 {th3}\n\nNo findings in any category.\n")
+    r = run(root3, "run_review.py", "record", "--cycle", str(c1),
+            "--output", "reply.md", "--invocation", "manual", "--zero-findings")
+    if r.returncode != 0:
+        bad(f"seam 7 fixture: record failed\n{r.stderr}{r.stdout}")
+    r = run(root3, "loop_state.py", "--review", str(rev3), "--quiet")
+    if "CONVERGED" not in r.stdout:
+        bad(f"seam 7 fixture: expected a converged loop, got\n{r.stdout}")
+
+    # The previous cycle is closed and has recorded output, so the old check is
+    # satisfied. Only consulting the exit refuses this.
+    r = run(root3, "run_review.py", "freeze", "--run", "A1E-001", "--type", "plan",
+            "--prompt", "specs/prompt.md", "--file", "plan/01-PLAN.md")
+    if r.returncode == 0:
+        bad("the runner opened cycle 02 on a loop that had already CONVERGED; "
+            "it is checking output existence, not the loop exit")
+    elif "already exited" not in (r.stderr + r.stdout):
+        bad(f"the runner refused, but not for the loop exit\n{r.stderr}{r.stdout}")
+    elif (rev3 / "cycle-02").exists():
+        bad("the runner refused but left a cycle-02 directory behind")
+    else:
+        ok("the runner refuses to open a cycle after the loop has exited, with "
+           "the previous cycle properly closed")
+
+    # An undeterminable loop state is a refusal too: if nobody can say whether
+    # the loop exited, nobody can say another cycle is permitted.
+    (c1 / "findings.json").unlink()
+    r = run(root3, "run_review.py", "freeze", "--run", "A1E-001", "--type", "plan",
+            "--prompt", "specs/prompt.md", "--file", "plan/01-PLAN.md")
+    if r.returncode == 0:
+        bad("the runner opened a cycle while the loop state was undeterminable")
+    elif "cannot be determined" not in (r.stderr + r.stdout):
+        bad(f"refused, but not for the undeterminable state\n{r.stderr}{r.stdout}")
+    else:
+        ok("an undeterminable loop state refuses the next cycle rather than "
+           "assuming CONTINUE")
 
     # ---------------------------------------------------------- seam 6
     print()

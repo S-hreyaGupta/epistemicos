@@ -40,7 +40,7 @@ def make_repo() -> tuple[Path, str]:
     tmp = Path(tempfile.mkdtemp(prefix="ledger-")).resolve()
     (tmp / "scripts").mkdir()
     for n in ("ledger.py", "loop_state.py", "validate_cycle.py",
-              "findings_format.py"):
+              "findings_format.py", "cycle_projection.py"):
         shutil.copy2(SRC / n, tmp / "scripts" / n)
     # The parser reads the canonical Finding ID grammar from the schema, and the
     # controller reparses the raw review, so a fixture without it cannot compute
@@ -421,6 +421,97 @@ def main() -> int:
         root3, "resolve", "--review", str(rev3), "--cycle", "2", "--id", "C01-F01",
         "--evidence", "x"))
 
+    # ---- B01-F11: one projection for authority and for loop arithmetic ----
+    # "The ledger authorizes transitions from its unfiltered stored state and
+    # history, while the controller filters events by valid cycles." Decision G
+    # was implemented in the controller alone, which was exploitable in both
+    # directions. Both are proved here, and both are proved on the ledger side:
+    # the controller was already correct, so a control that only asked the
+    # controller would pass with the repair removed.
+    print()
+    print("invalid cycles neither authorize nor block (B01-F11)")
+
+    def review_with(cycles: dict[int, bool]):
+        root, commit = make_repo()
+        made.append(root)
+        rev = root / "runs" / "T-001" / "plan-review"
+        for n in sorted(cycles):
+            make_cycle(root, rev, n, commit, valid=cycles[n])
+        return root, rev
+
+    # Direction one: an ACCEPT recorded in a cycle that fails MC-2 must not
+    # satisfy the precondition for closing the finding. Before the projection it
+    # did, so an invalid acceptance could support a resolution the controller
+    # then counted as real.
+    root, rev = review_with({1: True, 2: False, 3: True})
+    ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--class", "UNTESTED RULE")
+    ledger(root, "respond", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
+           "--disposition", "ACCEPT", "--note", "accepted in a cycle that failed")
+    expect_refused(
+        "an ACCEPT in an invalid cycle does not authorize a resolution",
+        "has no ACCEPT",
+        lambda: ledger(root, "resolve", "--review", str(rev), "--cycle", "3",
+                       "--id", "C01-F01", "--evidence", "done"))
+
+    # The refusal has to be legible: the operator can see an ACCEPT sitting in
+    # the history, so the message must say which events were disregarded.
+    r = ledger(root, "resolve", "--review", str(rev), "--cycle", "3",
+               "--id", "C01-F01", "--evidence", "done")
+    if "cycle 02 ACCEPT" in (r.stderr + r.stdout):
+        print("  [ok] the refusal names the disregarded event")
+    else:
+        failures.append("the refusal does not name the disregarded ACCEPT\n"
+                        + r.stderr + r.stdout)
+
+    # And it must still be in the ledger as evidence, marked rather than erased.
+    r = ledger(root, "show", "--review", str(rev))
+    if "ACCEPT" in r.stdout and "[no authority]" in r.stdout:
+        print("  [ok] the disregarded event is preserved and marked in show")
+    else:
+        failures.append("the invalid-cycle event was not preserved and marked\n"
+                        + r.stdout)
+
+    # Direction two: a DEMONSTRATED recorded in an invalid cycle must not leave
+    # the finding permanently RESOLVED. Before the projection the ledger refused
+    # every later resolution while the controller still counted the finding
+    # OPEN, so it could never be closed by anyone.
+    #
+    # The cycle is broken AFTER the resolution is recorded, which is both the
+    # realistic order and the only order that tests anything. Written the other
+    # way round the ledger's own restate() has already stored OPEN, so reading
+    # the stored state gives the right answer by accident and the control
+    # survives the repair being removed. It did, on the first attempt.
+    root, rev = review_with({1: True, 2: True, 3: True})
+    ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--class", "UNTESTED RULE")
+    ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--disposition", "ACCEPT", "--note", "fix")
+    ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
+           "--evidence", "demonstrated while cycle 2 still passed")
+    stored = json.loads((rev / "ledger.json").read_text(encoding="utf-8"))
+    if stored["findings"]["C01-F01"]["state"] != "RESOLVED":
+        failures.append("fixture precondition: the stored state should be "
+                        "RESOLVED before cycle 2 is broken")
+    write_lf(rev / "cycle-02" / "codex-output-raw.md", "")   # cycle 2 now fails
+    r = ledger(root, "resolve", "--review", str(rev), "--cycle", "3",
+               "--id", "C01-F01", "--evidence", "demonstrated again, in a valid cycle")
+    if r.returncode == 0:
+        print("  [ok] a resolution in an invalid cycle does not block a valid one")
+    else:
+        failures.append("the valid resolution was refused because of an "
+                        f"invalid-cycle one\n{r.stderr}{r.stdout}")
+
+    # The two components must now agree about the finding's state. The whole
+    # finding is that they did not.
+    r_show = ledger(root, "show", "--review", str(rev))
+    r_loop = loop(root, rev)
+    if "RESOLVED" in r_show.stdout and status_of(r_loop.stdout) == "CONVERGED":
+        print("  [ok] ledger and controller agree once the valid cycle resolves it")
+    else:
+        failures.append("ledger and controller still disagree\n"
+                        + r_show.stdout + "\n" + r_loop.stdout)
+
     # ---------------------------------------------------------------- loop
     print()
     print("loop controller")
@@ -438,6 +529,66 @@ def main() -> int:
             failures.append(f"{label}: expected {expect}, got {got}\n{r.stdout}")
             return
         print(f"  [ok] {expect:<14} {label}")
+
+    def scenario_out(label: str, n_cycles: int, script, *needles: str,
+                     invalid: set[int] | None = None) -> None:
+        """Assert on what the controller reports, not only on the exit name.
+
+        The exit is the same either way when the loop is flagged; the point of
+        B01-F02's second half is that the cycles run after a terminal outcome
+        are named rather than absorbed.
+        """
+        root, commit, rev = fresh()
+        rev.mkdir(parents=True)
+        for i in range(1, n_cycles + 1):
+            make_cycle(root, rev, i, commit, valid=(i not in (invalid or set())))
+        script(root, rev)
+        r = loop(root, rev)
+        missing = [n for n in needles if n not in r.stdout]
+        if missing:
+            failures.append(f"{label}: output does not mention "
+                            f"{missing}\n{r.stdout}")
+            return
+        print(f"  [ok] reported      {label}")
+
+    def scenario_absent(label: str, n_cycles: int, script, *needles: str,
+                        invalid: set[int] | None = None) -> None:
+        """Assert the controller did NOT do something.
+
+        Needed because several of these scenarios stall again at the next
+        boundary, so the final exit name is the same whether or not the earlier
+        one was wrongly cleared. Asserting only on the status let the repair be
+        removed with every control still green.
+        """
+        root, commit, rev = fresh()
+        rev.mkdir(parents=True)
+        for i in range(1, n_cycles + 1):
+            make_cycle(root, rev, i, commit, valid=(i not in (invalid or set())))
+        script(root, rev)
+        r = loop(root, rev)
+        present = [n for n in needles if n in r.stdout]
+        if present:
+            failures.append(f"{label}: output should not mention "
+                            f"{present}\n{r.stdout}")
+            return
+        print(f"  [ok] did not      {label}")
+
+    def scenario_refuses(label: str, n_cycles: int, script, needle: str,
+                         invalid: set[int] | None = None) -> None:
+        root, commit, rev = fresh()
+        rev.mkdir(parents=True)
+        for i in range(1, n_cycles + 1):
+            make_cycle(root, rev, i, commit, valid=(i not in (invalid or set())))
+        script(root, rev)
+        r = loop(root, rev)
+        if r.returncode != 2 or needle not in (r.stderr + r.stdout):
+            failures.append(f"{label}: expected exit 2 mentioning {needle!r}, "
+                            f"got exit {r.returncode}\n{r.stdout}\n{r.stderr}")
+            return
+        if "LOOP_STATUS:" in r.stdout:
+            failures.append(f"{label}: emitted a LOOP_STATUS while refusing")
+            return
+        print(f"  [ok] refused       {label}")
 
     def nothing(root, rev):
         pass
@@ -507,6 +658,15 @@ def main() -> int:
                    "--id", f"C{c:02d}-F01", "--class", "UNTESTED RULE")
     scenario("STALLED is tested before MAX_4", 4, four_no_progress, "STALLED")
 
+    # B01-F02. This scenario used to assert CONVERGED, and Codex named the
+    # control itself as reinforcing the defect: "Later cycles can override an
+    # earlier mandatory termination. The supplied four_then_resolved control
+    # reinforces this incorrect behavior."
+    #
+    # Raised and accepted in cycle 1, untouched in cycle 2, resolved in cycle 4.
+    # At n=2 nothing had reduced, resolved or disputed, so §6 required STALLED
+    # and the loop should never have reached cycles 3 or 4. Reading only the
+    # latest boundary let the cycle-4 resolution erase the cycle-2 exit.
     def four_then_resolved(root, rev):
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
                "--class", "UNTESTED RULE")
@@ -514,7 +674,68 @@ def main() -> int:
                "--disposition", "ACCEPT", "--note", "fix")
         ledger(root, "resolve", "--review", str(rev), "--cycle", "4", "--id", "C01-F01",
                "--evidence", "done")
-    scenario("CONVERGED takes precedence over MAX_4", 4, four_then_resolved, "CONVERGED")
+    scenario("a later cycle cannot erase an earlier mandatory exit", 4,
+             four_then_resolved, "STALLED")
+
+    def four_then_resolved_flagged(root, rev):
+        four_then_resolved(root, rev)
+    scenario_out("the cycles run after the exit are named", 4,
+                 four_then_resolved_flagged,
+                 "UNAUTHORIZED CONTINUATION", "cycle-03", "cycle-04")
+
+    # And the escape hatch the correction requires, which must be a recorded
+    # human transition rather than a flag the loop can set for itself.
+    def auth_record(rev, *boundaries):
+        write_lf(rev / "loop-authorizations.json", json.dumps({
+            "schema": "loop-authorization/1",
+            "authorizations": [{
+                "after_valid_cycle": n, "outcome": "STALLED",
+                "authorized_by": "Alex Zamurko",
+                "reason": "test fixture: another loop approved at the gate",
+                "at": "2026-09-09T00:00:00Z"} for n in boundaries]}, indent=2))
+
+    def authorized_continuation(root, rev):
+        four_then_resolved(root, rev)
+        auth_record(rev, 2, 3)
+    scenario("recorded human authorizations let the loop continue past them", 4,
+             authorized_continuation, "CONVERGED")
+
+    # One authorization is not a blanket one. The loop stalls again at n=3 and
+    # that exit needs its own recorded transition, or "keep going" would restore
+    # the finding under a different spelling.
+    def authorized_only_once(root, rev):
+        four_then_resolved(root, rev)
+        auth_record(rev, 2)
+    scenario("clearing one boundary does not clear the next", 4,
+             authorized_only_once, "STALLED")
+
+    def authorization_for_another_exit(root, rev):
+        four_then_resolved(root, rev)
+        write_lf(rev / "loop-authorizations.json", json.dumps({
+            "schema": "loop-authorization/1",
+            "authorizations": [{
+                "after_valid_cycle": 2, "outcome": "CONVERGED",
+                "authorized_by": "Alex Zamurko",
+                "reason": "names an outcome that did not occur at this boundary",
+                "at": "2026-09-09T00:00:00Z"}]}, indent=2))
+    scenario("an authorization naming a different outcome clears nothing", 4,
+             authorization_for_another_exit, "STALLED")
+    # The status alone cannot show this: the loop stalls again at n=3, so it
+    # reports STALLED either way. What distinguishes the two is whether the n=2
+    # exit was cleared at all.
+    scenario_absent("clear an exit the authorization does not name", 4,
+                    authorization_for_another_exit,
+                    "cleared by recorded authorization")
+
+    def authorization_without_attribution(root, rev):
+        four_then_resolved(root, rev)
+        write_lf(rev / "loop-authorizations.json", json.dumps({
+            "schema": "loop-authorization/1",
+            "authorizations": [{
+                "after_valid_cycle": 2, "outcome": "STALLED",
+                "authorized_by": "", "reason": "", "at": ""}]}, indent=2))
+    scenario_refuses("an authorization with no attribution or reason is refused",
+                     4, authorization_without_attribution, "authorized_by")
 
     # The one that would have bitten: cycle-02 fails the gate, so the four valid
     # cycles are 1, 3, 4, 5 and the budget is reached at directory cycle 5.

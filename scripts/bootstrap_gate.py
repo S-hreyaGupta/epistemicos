@@ -42,6 +42,7 @@ Re-reviewing is the cost of changing the thing that everything else trusts.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import sys
@@ -69,15 +70,26 @@ COMPONENTS = (
     "scripts/loop_state.py",
 )
 
-# This file is always covered, whatever the roots are. It was not, and that was
-# the sharpest form of the hole Alex found: bootstrap_gate.py did not hash
-# itself, so editing `evaluate` to return (True, []) would have defeated every
-# other pin while `check` still reported APPROVED. A gate that does not cover
-# itself is an honour system with extra steps.
+# This file is always covered, whatever the roots are. It was not, which is the
+# hole Alex found on 9 September.
+#
+# What that fixes, precisely, and what it does not. Covering this file means a
+# later edit to it is DETECTED, by a subsequent run of the unedited code. It does
+# not mean the edit is prevented, and it does not survive an edit that also
+# disables the detection: replacing `evaluate` with an unconditional success
+# defeats the self-hash along with everything else, because the same writable
+# code performs both.
+#
+# An earlier comment here claimed self-hashing closed that hole. Codex raised it
+# as B01-F15 and was right. Under CONVENTION_ONLY this is drift detection that
+# holds when the checks run faithfully, and nothing stronger. The stronger claim
+# needs a write boundary the implementing agent does not hold, which is what
+# MC1_ENFORCEMENT: TECHNICALLY_ENFORCED would record.
 ALWAYS = ("scripts/bootstrap_gate.py",)
 
-# Anything matching this that resolves to a file in scripts/ is treated as an
-# executable dependency of the component that mentions it.
+# A filename mentioned as a string, which is how this repository loads modules
+# dynamically: run_review.py builds a path to bootstrap_gate.py, and both
+# run_review.py and loop_state.py invoke validate_cycle.py as a subprocess.
 PY_REF = __import__("re").compile(r"\b([A-Za-z_][A-Za-z0-9_]*\.py)\b")
 
 # Named in the ruling: "the exact bootstrap input, raw Codex output, findings,
@@ -110,6 +122,46 @@ def write_lf(p: Path, text: str) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("w", encoding="utf-8", newline="\n") as f:
         f.write(text)
+
+
+def references(path: Path) -> set[str]:
+    """Every scripts/*.py this file could load, by either route.
+
+    Two routes, because this repository uses both and an earlier version saw
+    only one. Codex, B01-F16:
+
+        Dependency discovery recognizes filename strings ending in `.py`.
+        Ordinary `import helper_module` and `from helper_module import VALUE`
+        are not recognized.
+
+    That was correct, and the control that was supposed to demonstrate the
+    closure inserted `_HELPER = "helper_module.py"` — a string. So it exercised
+    the route that already worked and said nothing about the one that did not.
+    A real local import sat outside the approval hash set.
+
+    Imports are read from the parsed syntax tree rather than by regex, because a
+    regex over source text cannot tell an import from the word "import" in a
+    comment, and being wrong in that direction means covering files nothing
+    actually loads.
+    """
+    text = path.read_text(encoding="utf-8")
+    found = {f"scripts/{n}" for n in PY_REF.findall(text)}
+
+    tree = ast.parse(text, filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                found.add(f"scripts/{alias.name.split('.')[0]}.py")
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                # from . import x  /  from .x import y
+                for alias in node.names:
+                    found.add(f"scripts/{alias.name}.py")
+                if node.module:
+                    found.add(f"scripts/{node.module.split('.')[0]}.py")
+            elif node.module:
+                found.add(f"scripts/{node.module.split('.')[0]}.py")
+    return found
 
 
 def closure(root: Path) -> dict[str, list[str]]:
@@ -153,8 +205,7 @@ def closure(root: Path) -> dict[str, list[str]]:
         p = root / rel
         if not p.is_file():
             continue
-        for name in sorted(set(PY_REF.findall(p.read_text(encoding="utf-8")))):
-            dep = f"scripts/{name}"
+        for dep in sorted(references(p)):
             if dep == rel or not (root / dep).is_file():
                 continue
             reached.setdefault(dep, []).append(rel)

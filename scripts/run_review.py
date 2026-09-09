@@ -277,9 +277,9 @@ def compose_input(prompt: str, target_hash: str, run: dict, rtype: str,
     have been asked to judge conformance to a document it had never seen and
     would have answered from memory or invention.
 
-    That is the pilot's failure restated: freezing an artifact proves it did not
-    change, not that the reviewer read it. Here it was worse, because the
-    reviewer could not have read it at all.
+    That is the pilot's failure restated: recording an artifact's hash detects a
+    later change to it, and says nothing about whether the reviewer read it.
+    Here it was worse, because the reviewer could not have read it at all.
 
     It belongs in this file rather than being pasted alongside, because
     codex-input.md is what MC-2 check 10 binds to the frozen target. Anything

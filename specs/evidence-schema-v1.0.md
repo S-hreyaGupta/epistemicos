@@ -113,9 +113,17 @@ contain the `target.sha256` value verbatim somewhere in its text — MC-2 check
 10. That string is the binding between what was frozen and what the reviewer was
 actually shown.
 
-Freezing the target proves the artifact did not change. Only the embedded hash
-ties that artifact to the input the reviewer received. This is the control whose
-absence made the GSD pilot's criterion 1 unprovable.
+Recording the target's hash detects a later change to the artifact, provided the
+check is run and the checking code is faithful. It does not prevent one, and
+under `CONVENTION_ONLY` nothing here does. The embedded hash is what ties that
+artifact to the input the reviewer received, and its absence is what made the
+GSD pilot's criterion 1 unprovable.
+
+An earlier version of this paragraph said freezing "proves the artifact did not
+change". Codex raised that as B01-F15 and was right: a hash recorded by the same
+authority that can rewrite the artifact establishes drift detection, not
+immutability. The distinction is the whole content of MC-1's enforcement-status
+field, so the schema should not blur it.
 
 ## `codex-output-raw.md`
 

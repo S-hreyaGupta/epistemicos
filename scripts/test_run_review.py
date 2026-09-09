@@ -269,6 +269,48 @@ def main() -> int:
                       "--approved-plan-hash", "NOT-A-HASH")
     expect_refused("approved plan hash not a digest", "64-char hex", impl_bad_hash)
 
+    # ---- B01-F17: the other three implementation refusals ----
+    # cmd_freeze raises five refusals for implementation review. Two were
+    # exercised above and three were not, while this suite's closing line said
+    # every refusal is reachable. Each is a distinct guard on a distinct §10.1
+    # field, so covering two of five and claiming five is the same shape of
+    # over-claim as the seam-1 probes.
+    GOOD_HASH = "a" * 64
+
+    def impl_no_commit(t: Path):
+        do_init(t)
+        return runner(t, "freeze", "--run", "T-001", "--type", "implementation",
+                      "--prompt", "specs/prompt.md",
+                      "--approved-plan-hash", GOOD_HASH)
+    expect_refused("implementation review with no candidate commit",
+                   "requires --candidate-commit", impl_no_commit)
+
+    def impl_unresolvable_commit(t: Path):
+        do_init(t)
+        return runner(t, "freeze", "--run", "T-001", "--type", "implementation",
+                      "--prompt", "specs/prompt.md",
+                      "--candidate-commit", "0" * 40,
+                      "--approved-plan-hash", GOOD_HASH)
+    expect_refused("candidate commit that does not resolve",
+                   "does not resolve", impl_unresolvable_commit)
+
+    def impl_no_diff(t: Path):
+        do_init(t)
+        return runner(t, "freeze", "--run", "T-001", "--type", "implementation",
+                      "--prompt", "specs/prompt.md", "--candidate-commit", "HEAD",
+                      "--approved-plan-hash", GOOD_HASH)
+    expect_refused("implementation review with no diff", "requires --diff",
+                   impl_no_diff)
+
+    def impl_no_test_results(t: Path):
+        do_init(t)
+        write_lf(t / "candidate.diff", "--- a\n+++ b\n@@ -1 +1 @@\n-x\n+y\n")
+        return runner(t, "freeze", "--run", "T-001", "--type", "implementation",
+                      "--prompt", "specs/prompt.md", "--candidate-commit", "HEAD",
+                      "--approved-plan-hash", GOOD_HASH, "--diff", "candidate.diff")
+    expect_refused("implementation review with no test results",
+                   "requires --test-results", impl_no_test_results)
+
     def record_twice(t: Path):
         do_init(t)
         do_freeze(t)

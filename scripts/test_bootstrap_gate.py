@@ -20,6 +20,7 @@ looked at since. That is the superseded-protocol-pin defect one level up.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -66,6 +67,9 @@ def approve(root: Path, who: str = "Alex Zamurko") -> subprocess.CompletedProces
 def main() -> int:
     failures: list[str] = []
     made: list[Path] = []
+
+    def ok(msg: str) -> None:
+        print(f"  [ok] {msg}")
 
     def expect_refused(label: str, needle: str, r: subprocess.CompletedProcess) -> None:
         if r.returncode == 0:
@@ -222,13 +226,25 @@ def main() -> int:
     # scanner that cannot find anything looks identical, so this builds a
     # dependency that does not exist in the real tree and requires it to be
     # found, pinned, and to invalidate the approval when edited.
+    # B01-F16: the first version of this control inserted
+    #     _HELPER = "helper_module.py"
+    # which is a string, so it exercised filename discovery — the route that
+    # already worked — and said nothing about imports, the route that did not.
+    # This uses a real import whose value the component actually reads, so the
+    # dependency genuinely affects behaviour rather than merely being named.
+    # The module name must appear nowhere in any covered file, including in
+    # comments. An earlier attempt used `helper_module`, which bootstrap_gate.py
+    # mentions in the docstring explaining this very finding — so the
+    # filename scan pulled it in from the documentation and the control passed
+    # with import discovery entirely removed. Same defect, one layer out.
+    HELPER = "zqx_probe_dep"
     root = build(); made.append(root)
-    write_lf(root / "scripts" / "helper_module.py", "VALUE = 1\n")
+    write_lf(root / "scripts" / f"{HELPER}.py", "THRESHOLD = 64\n")
     vc = root / "scripts" / "validate_cycle.py"
     vc.write_text(
         vc.read_text(encoding="utf-8").replace(
             "import hashlib",
-            'import hashlib\n_HELPER = "helper_module.py"  # loaded at runtime',
+            f"import hashlib\nimport {HELPER}\n_T = {HELPER}.THRESHOLD",
             1),
         encoding="utf-8")
 
@@ -238,19 +254,19 @@ def main() -> int:
     else:
         d = json.loads((root / "bootstrap-review" / "decision.json")
                        .read_text(encoding="utf-8"))
-        if "scripts/helper_module.py" not in d.get("components", {}):
+        if f"scripts/{HELPER}.py" not in d.get("components", {}):
             failures.append(
                 "a module referenced by validate_cycle.py was not pulled into "
                 "the pinned set. The closure is empty on the real repo, so "
                 "without this control an inert scanner would look correct.")
-        elif "scripts/helper_module.py" not in d.get("dependencies", {}):
+        elif f"scripts/{HELPER}.py" not in d.get("dependencies", {}):
             failures.append("the dependency was pinned but not recorded as a "
                             "dependency, so the record does not say why it is "
                             "covered")
         else:
             print("  [ok] a referenced local module is discovered and pinned")
 
-            h = root / "scripts" / "helper_module.py"
+            h = root / "scripts" / f"{HELPER}.py"
             h.write_text("VALUE = 2\n", encoding="utf-8")
             expect_refused("approval surviving an edit to a dependency",
                            "has changed since it was reviewed", gate(root, "check"))
@@ -262,10 +278,11 @@ def main() -> int:
     if gate(root, "check").returncode != 0:
         failures.append("fixture did not reach an approved state")
     else:
-        write_lf(root / "scripts" / "late_helper.py", "VALUE = 1\n")
+        write_lf(root / "scripts" / "zqx_late_dep.py", "LIMIT = 4\n")
         lp = root / "scripts" / "loop_state.py"
         lp.write_text(lp.read_text(encoding="utf-8") +
-                      '\n_LATE = "late_helper.py"\n', encoding="utf-8")
+                      "\nimport zqx_late_dep\n_L = zqx_late_dep.LIMIT\n",
+                      encoding="utf-8")
         # loop_state.py itself changed too, so accept either reason; the point
         # is that it no longer passes.
         r = gate(root, "check")
@@ -284,6 +301,106 @@ def main() -> int:
     write_lf(root / "bootstrap-review" / "decision.json", "{not json\n")
     expect_refused("a decision record that is not valid JSON",
                    "not valid json", gate(root, "check"))
+
+    # ---- B01-F15: no claim stronger than CONVENTION_ONLY supports ----
+    # MC-1: while enforcement is CONVENTION_ONLY, claims that findings are
+    # immutable or that review input is technically protected "must not be
+    # made". Two such claims had grown back by the time Codex read the code:
+    # the schema said freezing "proves the artifact did not change", and the
+    # comment here said self-hashing closed the replace-evaluate hole.
+    #
+    # Prose drifts in the flattering direction on its own. A hash check reads
+    # like a guarantee to whoever writes about it next, so this refuses the
+    # phrasings rather than trusting everyone to remember the distinction.
+    print()
+    print("no claim stronger than CONVENTION_ONLY")
+
+    # Word-boundary on both sides: an earlier version used r"prove[sd]?\b" and
+    # matched the "prove" inside "approved", flagging every mention of the
+    # approved-plan hash. And "prevents" was a trigger until it flagged "the
+    # defect this gate exists to prevent", which is a claim about a logic
+    # property rather than about enforcement. Both were noise, and a check that
+    # cries wolf gets silenced rather than heeded.
+    OVERCLAIM = (
+        (r"\bprove[sd]?\b|\bproof\b", "proof"),
+        (r"\bimmutab", "immutability"),
+        (r"technically protected", "technical protection"),
+        (r"cannot be (?:changed|edited|modified|overwritten|rewritten)",
+         "prevention of modification"),
+        (r"\bguarantee[sd]?\b", "guarantee"),
+    )
+    # Denying the claim is the point, not a violation of it. Checked over a
+    # two-line window because these are wrapped paragraphs and the negation
+    # frequently lands on the following line.
+    DENIAL = re.compile(
+        r"\b(?:not|never|no|nothing|cannot|rather than|instead of|without|"
+        r"neither|nor|unsupportable|forbid)", re.I)
+
+    scanned = [REPO / "specs" / "evidence-schema-v1.0.md"]
+    scanned += [REPO / c for c in
+                ("scripts/validate_cycle.py", "scripts/run_review.py",
+                 "scripts/ledger.py", "scripts/loop_state.py",
+                 "scripts/bootstrap_gate.py")]
+
+    def sentences(text: str):
+        """(sentence, first line number). Prose here wraps, so a sentence is the
+        unit that carries the claim; a line is not."""
+        line_of, pos = [], 0
+        for n, ln in enumerate(text.splitlines(keepends=True), 1):
+            line_of.append((pos, n))
+            pos += len(ln)
+        # Strip comment markers before flattening. Left in, a bare "#" between
+        # two comment paragraphs stops the sentence splitter, so the claim in
+        # the second paragraph merges with a sentence from the first — and if
+        # that one contains a negation, the claim is silently excused. That is
+        # how "Self-hashing guarantees tamper evidence" went unflagged.
+        stripped = []
+        for ln in text.splitlines():
+            body = re.sub(r"^\s*#\s?", "", ln)
+            stripped.append("" if not body.strip() else body)
+        flat = re.sub(r"\s*\n\s*", " ", "\n".join(stripped))
+        flat = re.sub(r"\n\s*\n", ".\n", flat)
+        # Offsets shift once newlines collapse, so locate each sentence by
+        # searching the original for its opening words instead.
+        for s in re.split(r"(?<=[.:])\s+(?=[A-Z`\"'(])", flat):
+            s = s.strip()
+            if not s:
+                continue
+            head = re.escape(s[:40].strip())
+            m = re.search(head.replace(r"\ ", r"\s+"), text)
+            n = 1
+            if m:
+                n = next((ln for off, ln in reversed(line_of)
+                          if off <= m.start()), 1)
+            yield s, n
+
+    offenders = []
+    for f in scanned:
+        if not f.is_file():
+            continue
+        for sentence, n in sentences(f.read_text(encoding="utf-8")):
+            # The denial has to be in the same sentence as the claim. An earlier
+            # version looked at a window of neighbouring lines, which in prose
+            # discussing what things do and do not establish suppressed almost
+            # every real over-claim — including all three Codex had flagged.
+            if DENIAL.search(sentence):
+                continue
+            for pat, label in OVERCLAIM:
+                if re.search(pat, sentence, re.I):
+                    offenders.append(
+                        f"{f.relative_to(REPO).as_posix()}:{n} claims {label}\n"
+                        f"        {sentence[:88]}")
+                    break
+    if offenders:
+        failures.append(
+            "language asserting more than CONVENTION_ONLY supports:\n      "
+            + "\n      ".join(offenders) +
+            "\n      MC-1 forbids these claims while enforcement is by "
+            "convention. Restate as\n      detection that holds when the checks "
+            "run faithfully, or negate the claim explicitly.")
+    else:
+        ok(f"{len(scanned)} covered files carry no unqualified proof, "
+           "immutability or prevention claim")
 
     print()
     for d in made:

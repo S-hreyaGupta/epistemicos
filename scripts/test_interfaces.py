@@ -153,25 +153,100 @@ def main() -> int:
     else:
         ok("a conformant implementation cycle passes all fifteen")
 
-    unenforced = []
+    # ---- the probes, rebuilt after B01-F18 ----
+    #
+    # The first version put each probe at runs/I-001/probe-<field>. Check 13
+    # resolves the approval record as cycle_dir.parent.parent / "plan-approval",
+    # which from there is runs/plan-approval — a path that does not exist. So
+    # every probe failed on check 13 before the field under test was reached,
+    # and the probe only asked for a nonzero exit.
+    #
+    # That made this control unfalsifiable. Deleting check 12's enforcement of
+    # candidate_tree_hash outright still produced "7/7 enforced" and exit 0.
+    #
+    # Three things fix it, and all three are needed:
+    #   1. each probe sits in a complete run laid out like a real one, so the
+    #      approval record resolves;
+    #   2. an unmodified fixture at that same layout must PASS first, or the
+    #      probes could again be failing for a reason unrelated to the field;
+    #   3. the probe asserts the specific check responsible for the field,
+    #      rather than accepting any failure.
+
+    def probe_run(name: str, target: dict) -> Path:
+        """A complete, isolated run directory in the real layout."""
+        rd = root / "runs" / name
+        write_lf(rd / "plan-approval" / "approval.json",
+                 json.dumps({"decision": "APPROVE",
+                             "approved_plan_hash":
+                                 sha256_file(root / "plan" / "01-PLAN.md")},
+                            indent=2))
+        cdir = rd / "implementation-review" / "cycle-01"
+        cdir.mkdir(parents=True)
+        write_lf(cdir / "target.json", json.dumps(target, indent=2))
+        d = sha256_file(cdir / "target.json")
+        write_lf(cdir / "target.sha256", d + "\n")
+        write_lf(cdir / "codex-input.md", f"target {d}\n")
+        write_lf(cdir / "codex-output-raw.md", "findings\n")
+        return cdir
+
+    def failed_checks(cdir: Path) -> set[int]:
+        """Which numbered checks reported FAIL."""
+        out = run(root, "validate_cycle.py", str(cdir)).stdout
+        return {int(m.group(1)) for m in
+                re.finditer(r"^\s*(\d+)\.\s*\[FAIL\]", out, re.M)}
+
+    # Step 2: the layout itself must be sound.
+    control = probe_run("P-CONTROL", impl_target())
+    control_fails = failed_checks(control)
+    if control_fails:
+        bad("an unmodified implementation fixture fails at the probe layout: "
+            f"checks {sorted(control_fails)}. Every probe below would then fail "
+            "for that reason rather than the field under test, which is exactly "
+            "how B01-F18 happened.")
+        documented = []
+    elif documented:
+        ok("an unmodified fixture passes at the probe layout, so probe failures "
+           "below are attributable to the removed field")
+
+    # Step 3: the check each field is actually enforced by. A field absent from
+    # this map is one nothing specific guards, and that is itself a finding.
+    RESPONSIBLE = {
+        "candidate_commit":    11,
+        "candidate_tree_hash": 12,
+        "approved_plan_hash":  13,
+        "diff_path":           14,
+        "diff_hash":           14,
+        "test_result_path":    15,
+        "test_result_hash":    15,
+    }
+
+    unenforced, wrong_check, unmapped = [], [], []
     for field in documented:
-        d = root / "runs" / "I-001" / f"probe-{field}"
-        d.mkdir(parents=True)
-        lay_cycle(d, impl_target(**{field: None}))
-        (d / "target.json").write_text(
-            json.dumps({k: v for k, v in impl_target().items() if k != field}, indent=2),
-            encoding="utf-8", newline="\n")
-        dg = sha256_file(d / "target.json")
-        write_lf(d / "target.sha256", dg + "\n")
-        write_lf(d / "codex-input.md", f"target {dg}\n")
-        if run(root, "validate_cycle.py", str(d)).returncode == 0:
+        if field not in RESPONSIBLE:
+            unmapped.append(field)
+            continue
+        t = {k: v for k, v in impl_target().items() if k != field}
+        fails = failed_checks(probe_run(f"P-{field}", t))
+        if not fails:
             unenforced.append(field)
+        elif RESPONSIBLE[field] not in fails:
+            wrong_check.append(f"{field}: expected check "
+                               f"{RESPONSIBLE[field]} to fail, got {sorted(fails)}")
+
+    if unmapped:
+        bad("no specific check is identified for: " + ", ".join(unmapped) +
+            ". A mandatory field with no responsible check cannot be shown to be "
+            "enforced by anything in particular.")
     if unenforced:
         bad("the schema declares these mandatory but the checker accepts a "
             f"cycle without them: {', '.join(unenforced)}")
-    elif documented:
-        ok(f"every field the schema calls mandatory is enforced ({len(documented)}/"
-           f"{len(documented)})")
+    if wrong_check:
+        bad("a probe failed, but not on the check responsible for the removed "
+            "field, so the failure does not demonstrate enforcement:\n      "
+            + "\n      ".join(wrong_check))
+    if documented and not (unmapped or unenforced or wrong_check):
+        ok(f"every field the schema calls mandatory fails its own check when "
+           f"removed ({len(documented)}/{len(documented)})")
 
     # ---------------------------------------------------------- seam 2 and 3
     print()

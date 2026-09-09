@@ -7,16 +7,22 @@ the five production prompts are built and frozen before A1E-001.
 This is **not** one of the five. It is used once, on the components that had to
 exist before the protocol could run at all.
 
-Revised 8 September, before use. The first version named three artifacts; the
-ledger and loop controller were built after it was written, so it was frozen a
-step too early and describing it as frozen was premature. Nothing was reviewed
-against the earlier text.
+Revised twice, both times before use, and both times because it was written
+before the thing it had to describe existed.
+
+- 8 September. The first version named three artifacts. The ledger and loop
+  controller were built after it was written, so calling it frozen was premature.
+- 9 September. It did not name `scripts/bootstrap_gate.py`, the gate that now
+  blocks every real cycle, and it predated Alex Zamurko's section mapping of the
+  review scope. Both are below.
+
+Nothing has been reviewed against any earlier text.
 
 ---
 
 ## What you are reviewing
 
-Five artifacts, hashed and listed in `target.json`:
+Six artifacts, hashed and listed in `target.json`:
 
 ```text
 specs/evidence-schema-v1.0.md   the frozen evidence structure
@@ -24,6 +30,7 @@ scripts/validate_cycle.py       the MC-2 conformance gate, fifteen checks
 scripts/run_review.py           the review runner
 scripts/ledger.py               the finding and state ledger
 scripts/loop_state.py           the loop-state controller
+scripts/bootstrap_gate.py       the gate enforcing this review
 ```
 
 Their negative-control suites are supplied alongside as evidence that the checks
@@ -31,15 +38,44 @@ they contain are falsifiable:
 
 ```text
 scripts/test_validate_cycle.py   24 controls
-scripts/test_run_review.py       21 controls
-scripts/test_ledger.py           25 controls, covering both of the last two
+scripts/test_run_review.py       25 controls
+scripts/test_ledger.py           37 controls, covering the ledger and controller
+scripts/test_bootstrap_gate.py   24 controls
+scripts/test_interfaces.py       12 controls, across six component seams
 ```
+
+Those counts are asserted here and checked by `scripts/test_prompts.py` against
+the suites themselves. A count typed into a prompt is a count that drifts, and
+an inflated one would misrepresent how well controlled these components are to
+the reviewer being asked to trust them.
 
 ## What you are reviewing them against
 
 The protocol at the commit and hash recorded in `target.json`. That file is
 authoritative for this review. Where this prompt and the protocol disagree, the
 protocol governs and the disagreement is itself a finding.
+
+Alex Zamurko fixed the scope on 9 September, and it maps directly rather than
+being left to your judgement:
+
+```text
+scripts/validate_cycle.py   MC-2, and §10.2 for implementation review
+scripts/run_review.py       §2.2 input composition, §10.1 target fields
+scripts/ledger.py           §§5 and 12
+scripts/loop_state.py       §§6 and 13
+scripts/bootstrap_gate.py   no protocol section; see below
+```
+
+His reason for including the last two, in his words: they "determine the
+authoritative meaning of otherwise valid review evidence", finding state and loop
+outcome. An error there produces a false process outcome from evidence that
+passes MC-2 cleanly.
+
+`bootstrap_gate.py` implements no protocol section. It implements his ruling of
+8 September that this review is mandatory before any real cycle. Review it
+against that ruling and against whether it can be circumvented: it is the single
+boolean standing between development evidence and a live protocol run, and it
+covers itself in its own hash set precisely because an earlier version did not.
 
 ## The question
 

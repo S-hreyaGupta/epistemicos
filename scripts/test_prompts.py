@@ -244,6 +244,63 @@ def main() -> int:
             ok("the implementation prompt applies materiality criteria before "
                "the default, in its own words rather than the quoted ruling")
 
+    # ---- the bootstrap prompt's control counts are real ----
+    # The prompt tells the reviewer how well controlled these components are, as
+    # a reason to trust them. A number typed into prose drifts the moment a
+    # control is added, and an inflated one misrepresents the thing the reviewer
+    # is being asked to rely on. So the counts are asserted there and verified
+    # here by running the suites.
+    print()
+    print("bootstrap prompt control counts")
+    boot = PROMPTS / "bootstrap-review.md"
+    if not boot.is_file():
+        failures.append("specs/prompts/bootstrap-review.md is missing; the "
+                        "bootstrap review has no prompt to run against")
+    else:
+        text = boot.read_text(encoding="utf-8")
+        claimed = {f"scripts/{m}": int(n) for m, n in
+                   re.findall(r"scripts/(\w+\.py)\s+(\d+)\s+controls", text)}
+        if not claimed:
+            failures.append("bootstrap-review.md no longer states any control "
+                            "counts, so nothing tells the reviewer whether these "
+                            "components are controlled at all")
+        wrong = []
+        for rel, n in sorted(claimed.items()):
+            p = REPO / rel
+            if not p.is_file():
+                wrong.append(f"{rel} is named but does not exist")
+                continue
+            import subprocess
+            out = subprocess.run([sys.executable, str(p)], cwd=str(REPO),
+                                 capture_output=True, text=True)
+            actual = (out.stdout + out.stderr).count("[ok]")
+            if actual != n:
+                wrong.append(f"{rel}: prompt claims {n}, suite reports {actual}")
+        if wrong:
+            failures.append("bootstrap-review.md misstates its control counts:\n      "
+                            + "\n      ".join(wrong))
+        elif claimed:
+            ok(f"all {len(claimed)} stated control counts match the suites")
+
+        # Every component the gate covers must appear in the prompt, or it goes
+        # to review unreviewed. bootstrap_gate.py was missing exactly this way.
+        gate_py = REPO / "scripts" / "bootstrap_gate.py"
+        if gate_py.is_file():
+            import importlib.util as _il
+            s_ = _il.spec_from_file_location("_bg_probe", gate_py)
+            m_ = _il.module_from_spec(s_)
+            s_.loader.exec_module(m_)
+            required = list(m_.COMPONENTS) + list(m_.ALWAYS)
+            unnamed = [c for c in required if c not in text]
+            if unnamed:
+                failures.append(
+                    "bootstrap-review.md does not name every component the gate "
+                    f"covers: {', '.join(unnamed)}. A component absent from the "
+                    "prompt is one the reviewer is never asked about, while the "
+                    "gate still treats it as reviewed.")
+            else:
+                ok(f"the prompt names all {len(required)} components the gate covers")
+
     print()
     if failures:
         for f in failures:

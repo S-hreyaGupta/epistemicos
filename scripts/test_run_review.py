@@ -91,6 +91,7 @@ def approve_bootstrap(tmp: Path) -> subprocess.CompletedProcess:
         write_lf(tmp / "bootstrap-review" / n, f"contents of {n}\n")
     return sh(sys.executable, str(tmp / "scripts" / "bootstrap_gate.py"),
               "record", "--decision", "APPROVE", "--decided-by", "Alex Zamurko",
+              "--note", "#gap, 9 Sep 2026, Alex Zamurko: fixture approval",
               cwd=tmp)
 
 

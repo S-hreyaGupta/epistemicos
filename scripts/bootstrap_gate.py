@@ -286,6 +286,20 @@ def cmd_record(a: argparse.Namespace) -> int:
     if not a.decided_by.strip():
         raise Refused("--decided-by is required; a human gate with no human "
                       "named is not a human gate")
+    # The decision is made in Slack and recorded here by someone else, so the
+    # record has to point back at where it was actually made. Without this the
+    # operator can write any name into --decided-by and nothing distinguishes a
+    # relayed approval from an invented one. Same distinction as everywhere else
+    # in this repository: recorded, or merely asserted.
+    if len(a.note.strip()) < 20:
+        raise Refused(
+            "--note is required, and must attribute the decision.\n"
+            "  Give where it was made and what was said: channel, timestamp, and "
+            "the words.\n"
+            "  Example:\n"
+            '    --note "#gap, 9 Sep 2026 12:03 AM, Alex Zamurko: \'Confirmed '
+            "...'\"\n"
+            "  --decided-by alone is a name typed by whoever ran this command.")
 
     absent = []
     for name in EVIDENCE:

@@ -59,7 +59,8 @@ def gate(root: Path, *args: str) -> subprocess.CompletedProcess:
 
 def approve(root: Path, who: str = "Alex Zamurko") -> subprocess.CompletedProcess:
     return gate(root, "record", "--decision", "APPROVE", "--decided-by", who,
-                "--note", "reviewed by Codex, bootstrap exception")
+                "--note", "#gap, 9 Sep 2026 00:03, Alex Zamurko: reviewed and "
+                          "approved for the bootstrap exception")
 
 
 def main() -> int:
@@ -97,12 +98,25 @@ def main() -> int:
     # ---- no human named ----
     root = build(); made.append(root)
     expect_refused("record a decision with no human named", "decided-by",
-                   gate(root, "record", "--decision", "APPROVE", "--decided-by", "  "))
+                   gate(root, "record", "--decision", "APPROVE", "--decided-by", "  ",
+                        "--note", "#gap, 9 Sep 2026, some attribution text here"))
+
+    # A name in --decided-by is typed by whoever ran the command. Without an
+    # attribution the record cannot distinguish a relayed approval from an
+    # invented one.
+    expect_refused("record an approval with no attribution", "--note is required",
+                   gate(root, "record", "--decision", "APPROVE",
+                        "--decided-by", "Alex Zamurko"))
+
+    expect_refused("attribution too thin to identify anything", "--note is required",
+                   gate(root, "record", "--decision", "APPROVE",
+                        "--decided-by", "Alex Zamurko", "--note", "ok"))
 
     # ---- a decision that is not an approval ----
     root = build(); made.append(root)
     r = gate(root, "record", "--decision", "RETURN_FOR_REWORK",
-             "--decided-by", "Alex Zamurko")
+             "--decided-by", "Alex Zamurko",
+             "--note", "#gap, 9 Sep 2026, Alex Zamurko: rework required")
     if r.returncode != 0:
         failures.append(f"recording RETURN_FOR_REWORK should succeed:\n{r.stderr}{r.stdout}")
     else:
@@ -128,6 +142,7 @@ def main() -> int:
                    "already exists", approve(root, "Someone Else"))
 
     r = gate(root, "record", "--decision", "APPROVE", "--decided-by", "Alex Zamurko",
+             "--note", "#gap, 9 Sep 2026, Alex Zamurko: re-approved after rework",
              "--supersede")
     if r.returncode != 0:
         failures.append(f"--supersede should be permitted:\n{r.stderr}{r.stdout}")

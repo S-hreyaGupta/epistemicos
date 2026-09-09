@@ -274,9 +274,11 @@ done  ledger, loop controller, interface tests, five production prompts
 done  the six rulings of 8 September, implemented and under test
 done  bootstrap scope widened to four components plus the gate itself,
       executable-dependency closure derived and pinned
-now   run BOOTSTRAP_REVIEW: Codex reviews the four against
-      MC-2/§10.2, §2.2/§10.1, §§5 and 12, §§6 and 13; evidence preserved
-      under bootstrap-review/; human decision recorded
+done  bootstrap-review.md updated: names all five covered components, carries
+      Alex's section mapping, control counts now verified against the suites
+now   run BOOTSTRAP_REVIEW: Codex reviews the five against
+      MC-2/§10.2, §2.2/§10.1, §§5 and 12, §§6 and 13, and the ruling itself;
+      evidence preserved under bootstrap-review/; human decision recorded
 then  human review package generator (§§7, 14)
 then  Gold runner (§15)
 then  full dry run end to end, on evidence marked NOT_A_PROTOCOL_CYCLE

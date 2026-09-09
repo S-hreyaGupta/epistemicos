@@ -282,6 +282,58 @@ def main() -> int:
         elif claimed:
             ok(f"all {len(claimed)} stated control counts match the suites")
 
+        # The prompt states how many artifacts are under review, in prose, in two
+        # places. They disagreed: "Six artifacts" in the list and "these five
+        # artifacts" in the question, because widening the list did not update
+        # the question. Codex would have spent a finding on it, and the wasted
+        # finding would have been the least of it: a reviewer told to judge five
+        # things when six are supplied has to guess which one to drop.
+        # Scoped to the two places that actually make the claim. A first version
+        # counted every `path  description` line in the file, so the control
+        # suites and the section-mapping table inflated it to sixteen, and it
+        # read "named three artifacts" out of the revision history. It failed on
+        # a correct prompt, which is the mirror of a check that cannot fail and
+        # just as useless.
+        block = re.search(r"hashed and listed in `target\.json`:\s*\n+```\w*\n"
+                          r"(.*?)```", text, re.S)
+        listed = len([l for l in block.group(1).splitlines() if l.strip()]) \
+            if block else 0
+        question = re.search(r"^## The question\s*\n(.*?)(?=^## )", text,
+                             re.S | re.M)
+        words = {"three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+                 "eight": 8}
+        stated = {words[w.lower()]
+                  for w in re.findall(r"\b(three|four|five|six|seven|eight)\b"
+                                      r"\s+artifacts",
+                                      question.group(1) if question else "",
+                                      re.I)}
+        if listed and stated and stated != {listed}:
+            failures.append(
+                f"bootstrap-review.md contradicts itself on how many artifacts "
+                f"are under review: the target list has {listed}, but the prose "
+                f"says {' and '.join(str(s) for s in sorted(stated))}. A reviewer "
+                "told to judge a different number than it was handed has to guess "
+                "which to drop.")
+        elif listed and stated:
+            ok(f"the prompt's artifact count agrees with its list ({listed})")
+
+        # Claims that something is unbuilt must be true. The prompt told the
+        # reviewer the five production prompts did not exist, months after they
+        # were written, which would have excused a real gap as expected absence.
+        m = re.search(r"Not yet built[^.]*?:(.*?)\.", text, re.S)
+        if m:
+            claimed_absent = m.group(1)
+            wrongly = [p.name for p in sorted(PROMPTS.glob("0[1-9]-*.md"))
+                       if "production prompt" in claimed_absent.lower()]
+            if wrongly:
+                failures.append(
+                    "bootstrap-review.md says the production prompts are not yet "
+                    f"built, but {len(wrongly)} exist: {', '.join(wrongly)}. "
+                    "Telling a reviewer that something absent is expected to be "
+                    "absent excuses a real gap as a known one.")
+            else:
+                ok("the prompt's not-yet-built claims match the filesystem")
+
         # Every component the gate covers must appear in the prompt, or it goes
         # to review unreviewed. bootstrap_gate.py was missing exactly this way.
         gate_py = REPO / "scripts" / "bootstrap_gate.py"

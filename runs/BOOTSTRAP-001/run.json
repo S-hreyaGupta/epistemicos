@@ -1,0 +1,19 @@
+{
+  "run_id": "BOOTSTRAP-001",
+  "created_at": "2026-09-09T07:58:17Z",
+  "protocol_commit": "f4d366fd86cf2e37d97113710dfb720acefccc57",
+  "protocol": {
+    "path": "specs/implementation-review-protocol-v1.1.md",
+    "sha256": "296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483"
+  },
+  "protocol_sha256": "296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483",
+  "spec_files": [
+    {
+      "path": "specs/evidence-schema-v1.0.md",
+      "sha256": "98a5920def59c39dc5c8bdbb5700376e21560ee40654173219a5ac0bef246379"
+    }
+  ],
+  "spec_sha256": "ad7f1099b66263123795dc2bf15f8275ad290bf91cdb0f5efaa09a942a8f321f",
+  "max_cycles": 4,
+  "bootstrap_review": "EXEMPT \u2014 BOOTSTRAP / DEVELOPMENT EVIDENCE, NOT_A_PROTOCOL_CYCLE"
+}

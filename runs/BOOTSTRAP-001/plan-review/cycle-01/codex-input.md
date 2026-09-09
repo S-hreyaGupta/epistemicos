@@ -1,7 +1,7 @@
 # Review input — BOOTSTRAP-001 / plan review / cycle 01
 
 ```text
-TARGET_SHA256   164a56eff646d852066cb0195fb0101d33d8bd471ceeb5e7fe37bd236c90f26b
+TARGET_SHA256   22c86a1b4bd6b9b0c304bb4113b552df30801b61c35e134df95db1882d2e07b8
 PROTOCOL_SHA256 296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483
 SPEC_SHA256     ad7f1099b66263123795dc2bf15f8275ad290bf91cdb0f5efaa09a942a8f321f
 ```
@@ -92,7 +92,7 @@ covers itself in its own hash set precisely because an earlier version did not.
 
 ## The question
 
-Do these five artifacts implement §2.2, §5, §6, §10.1, §10.2, MC-1 and MC-2 as
+Do these six artifacts implement §2.2, §5, §6, §10.1, §10.2, MC-1 and MC-2 as
 written, and do their controls actually establish what they claim?
 
 Two failure modes matter more than the rest.
@@ -189,10 +189,15 @@ An empty review is a finding about the review, not about the code.
 Out of scope: style, performance, and anything in `specs/gap/`. Naming is out of
 scope except where decision A is wrong.
 
-Not yet built, so their absence is not a finding: the five production prompts,
-the human review package generator (§7), and the Gold runner (§15). The
-implementing agent has not written a plan or an implementation yet, so there is
-no A1E-001 evidence to review; this is the tooling only.
+Not yet built, so their absence is not a finding: the human review package
+generator (§7) and the Gold runner (§15). The implementing agent has not written
+a plan or an implementation yet, so there is no A1E-001 evidence to review; this
+is the tooling only.
+
+The five production prompts `specs/prompts/01`–`05` **do** exist and are not in
+this target. Their absence from the review is a scoping decision, not a claim
+that they are unwritten, and if you think the six artifacts cannot be judged
+without them, say so as a finding.
 
 ---
 

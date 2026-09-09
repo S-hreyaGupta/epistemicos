@@ -2,10 +2,10 @@
   "review_type": "plan",
   "run_id": "BOOTSTRAP-001",
   "cycle": 1,
-  "protocol_commit": "f4d366fd86cf2e37d97113710dfb720acefccc57",
+  "protocol_commit": "63939ecbe0f5271569bba09a203c8df534612e64",
   "protocol_sha256": "296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483",
   "spec_sha256": "ad7f1099b66263123795dc2bf15f8275ad290bf91cdb0f5efaa09a942a8f321f",
-  "frozen_at": "2026-09-09T07:58:30Z",
+  "frozen_at": "2026-09-09T08:23:20Z",
   "plan_files": [
     {
       "path": "specs/evidence-schema-v1.0.md",

@@ -63,10 +63,17 @@
           "event": "ACCEPT",
           "note": "The schema assigns per-cycle findings.json to the runner; the runner never writes it and the ledger writes a review-level file instead. An absent ledger reads as a review that found nothing. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-10T14:27:48Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review, 'Claimed repairs checked and found to hold': runner-owned per-cycle findings.json, affirmative zero, separated from ledger.json",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-1",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F03 on 9 September; corrected to B01-F03, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F04": {
@@ -132,10 +139,17 @@
           "event": "ACCEPT",
           "note": "Check 13 compares two recorded strings and never hashes the approved plan, so the plan can change while both records still agree. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-10T14:27:47Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review, 'Claimed repairs checked and found to hold': check 13 hashes the named plan, compares with approval and target, requires APPROVE",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "S10.2",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F06 on 9 September; corrected to B01-F06, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F07": {
@@ -224,10 +238,17 @@
           "event": "ACCEPT",
           "note": "The review target carries six artifacts; the gate covers five. Editing evidence-schema-v1.0.md does not invalidate its own approval. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-10T14:27:46Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review, 'Claimed repairs checked and found to hold': evidence schema is a required bootstrap component; gate rejects drift",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-1",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F10 on 9 September; corrected to B01-F10, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F11": {
@@ -293,10 +314,17 @@
           "event": "ACCEPT",
           "note": "The duplicate-id refusal instructs that a re-raised issue becomes a new finding, which contradicts V40 and defeats S6's re-raise detection. The refusal itself is right; its guidance is wrong. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-10T14:27:45Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review, 'Claimed repairs checked and found to hold': reopen preserves the identifier and moves RESOLVED to OPEN; guidance points to reopen",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "V40",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F13 on 9 September; corrected to B01-F13, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F14": {
@@ -339,10 +367,17 @@
           "event": "ACCEPT",
           "note": "The schema says freezing proves the artifact did not change, and I told Alex self-hashing closed the replace-evaluate hole. Neither holds under CONVENTION_ONLY: the same writable code performs the check. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-10T14:27:47Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review, 'Claimed repairs checked and found to hold': freezing-as-proof and self-hashing-as-protection claims corrected to CONVENTION_ONLY",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-1",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F15 on 9 September; corrected to B01-F15, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F16": {
@@ -362,10 +397,17 @@
           "event": "ACCEPT",
           "note": "PY_REF matches filename strings, so a real import is invisible to the closure, and my control inserted a string rather than an import. The closure claim I gave Alex was stronger than its evidence. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-10T14:27:48Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review, 'Claimed repairs checked and found to hold': AST import discovery repairs the flat-module omission; control uses a real import",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-1",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F16 on 9 September; corrected to B01-F16, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F17": {
@@ -385,10 +427,17 @@
           "event": "ACCEPT",
           "note": "Two of five implementation refusals are exercised while the suite prints that every refusal is reachable. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-10T14:27:45Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review, 'Claimed repairs checked and found to hold': all five implementation refusals assert their particular refusal reasons",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "S10.1",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F17 on 9 September; corrected to B01-F17, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F18": {
@@ -408,11 +457,168 @@
           "event": "ACCEPT",
           "note": "Seam-1 probes sit outside a cycle layout, so check 13 fails on all of them for the wrong reason. Demonstrated: deleting check 12's enforcement outright still reports 7/7 enforced and exits 0.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-10T14:27:46Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review, 'Claimed repairs checked and found to hold': seam-1 probes use cycle layouts and assert the responsible numbered check",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-2",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F18 on 9 September; corrected to B01-F18, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
+    },
+    "B02-F01": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-10T14:22:46Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
+    },
+    "B02-F02": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-10T14:22:46Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
+    },
+    "B02-F03": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-10T14:22:46Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
+    },
+    "B02-F04": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-10T14:22:46Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
+    },
+    "B02-F05": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-10T14:22:47Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
+    },
+    "B02-F06": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-10T14:22:47Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
+    },
+    "B02-F07": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-10T14:22:47Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
+    },
+    "B02-F08": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-10T14:22:47Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
+    },
+    "B02-F09": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-10T14:22:47Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
+    },
+    "B02-F10": {
+      "class": "UNTESTED RULE",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-10T14:22:48Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
     }
   },
   "review": "plan-review"

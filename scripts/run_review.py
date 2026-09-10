@@ -898,6 +898,39 @@ def cmd_record(args: argparse.Namespace) -> int:
             "present:\n  " + ", ".join(f["id"] for f in found) +
             "\n  Nothing written.")
 
+    # B02-F02. A recurrence names a persistent identifier and deliberately does
+    # not restate its class, so the class is looked up here, in the one place
+    # that knows what was raised. Asking the reviewer to re-assert it would
+    # permit two records claiming different classes for one identifier.
+    #
+    # An identifier the ledger has never seen is refused rather than recorded
+    # with an empty class: a repair cannot fail to be demonstrated for a finding
+    # that was never raised, and a typo in an identifier must not create one.
+    recurrences = [f for f in found if f.get("kind") == "recurrence"]
+    if recurrences:
+        led = cycle.parent / "ledger.json"
+        known: dict[str, str] = {}
+        if led.is_file():
+            try:
+                known = {k: v.get("class", "")
+                         for k, v in json.loads(
+                             led.read_text(encoding="utf-8"))["findings"].items()}
+            except (json.JSONDecodeError, KeyError, AttributeError) as e:
+                raise Refused(
+                    f"the review reports recurrences but {rel(led)} cannot be "
+                    f"read, so their classes\n  cannot be resolved: {e}")
+        unknown = [f["id"] for f in recurrences if f["id"] not in known]
+        if unknown:
+            raise Refused(
+                "the review reports a repair as not demonstrated for "
+                f"identifier(s) the ledger has never\n  seen: "
+                + ", ".join(unknown) +
+                "\n  A recurrence keeps the identifier of a finding that was "
+                "raised. If this is a new\n  finding it needs its own "
+                "identifier and a class from §4.")
+        for f in recurrences:
+            f["class"] = known[f["id"]]
+
     # Bytes, not text. Whatever the reviewer returned is what gets stored.
     raw.write_bytes(src.read_bytes())
 

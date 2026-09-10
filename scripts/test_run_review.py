@@ -728,6 +728,113 @@ def main() -> int:
             print("  [ok] an authorized supersession moves the designation, "
                   "keeps every attempt and records who authorized it")
 
+    # ---- B02-F01 and B02-F02: the parser reads what the prompt asks for ----
+    # Two defects found by cycle 02, in the module that exists to stop the
+    # prompt, the parser and the ledger from disagreeing.
+    print()
+    print("recurrence blocks, and blocks the strict parser cannot see")
+
+    import importlib.util as _iu
+    _sp = _iu.spec_from_file_location("_ff", SRC / "findings_format.py")
+    _ff = _iu.module_from_spec(_sp); _sp.loader.exec_module(_ff)
+
+    def parses(label: str, body: str, want_ids, want_kinds=None) -> None:
+        got, probs = _ff.extract(body)
+        if probs:
+            failures.append(f"{label}: unexpected problems {probs}")
+            return
+        if [g["id"] for g in got] != list(want_ids):
+            failures.append(f"{label}: got {[g['id'] for g in got]}, "
+                            f"wanted {list(want_ids)}")
+            return
+        if want_kinds and [g.get("kind") for g in got] != list(want_kinds):
+            failures.append(f"{label}: kinds {[g.get('kind') for g in got]}")
+            return
+        print(f"  [ok] parsed: {label}")
+
+    def refuses(label: str, body: str, needle: str) -> None:
+        got, probs = _ff.extract(body)
+        if not probs:
+            failures.append(f"{label}: parsed cleanly, expected a problem "
+                            f"(got {[g['id'] for g in got]})")
+        elif not any(needle.lower() in p.lower() for p in probs):
+            failures.append(f"{label}: wrong problem\n  wanted {needle!r}\n"
+                            f"  got {probs}")
+        else:
+            print(f"  [ok] refused: {label}")
+
+    NEW = "Finding ID: B02-F01\nClass: UNTESTED RULE\nEvidence: x\n"
+    REC = ("Finding ID: B01-F11\nStatus: REPAIR NOT DEMONSTRATED\n"
+           "Evidence: x\nFinding: y\nRequired correction: z\n")
+
+    parses("a new finding", NEW, ["B02-F01"], ["finding"])
+    parses("a recurrence with no Class line", REC, ["B01-F11"], ["recurrence"])
+    parses("a review mixing both forms", NEW + "\n" + REC,
+           ["B02-F01", "B01-F11"], ["finding", "recurrence"])
+
+    refuses("a block carrying both Class and Status",
+            "Finding ID: B02-F01\nClass: UNTESTED RULE\n"
+            "Status: REPAIR NOT DEMONSTRATED\nEvidence: x\n",
+            "either a new finding")
+    refuses("a block with neither Class nor Status",
+            "Finding ID: B02-F01\nEvidence: x\n", "neither a Class")
+    refuses("an unrecognised Status",
+            "Finding ID: B01-F11\nStatus: LOOKS FINE TO ME\nEvidence: x\n",
+            "not recognised")
+
+    # B02-F01 proper. Codex's reproduction: one canonical block, one indented by
+    # a single space. Before the repair this returned one identifier and an
+    # empty problems list, because the signal net only ran when nothing parsed.
+    refuses("a second block indented by one space",
+            NEW + "\n Finding ID: B02-F02\nClass: UNTESTED RULE\nEvidence: y\n",
+            "apparent finding block")
+    refuses("an indented block when it is the only one",
+            " Finding ID: B02-F01\nClass: UNTESTED RULE\nEvidence: x\n",
+            "apparent finding block")
+
+    # And the class really does come from the ledger, not from the review.
+    tf = make_repo(); made.append(tf)
+    do_init(tf); do_freeze(tf)
+    sh(sys.executable, str(tf / "scripts" / "ledger.py"), "raise",
+       "--review", "runs/T-001/plan-review", "--cycle", "1", "--id", "C01-F01",
+       "--class", "WRONG OWNERSHIP", cwd=tf)
+    write_lf(tf / "rec.md", with_target(tf, "Finding ID: C01-F01\n"
+                                            "Status: REPAIR NOT DEMONSTRATED\n"
+                                            "Evidence: x\nFinding: y\n"
+                                            "Required correction: z\n"))
+    r = runner(tf, "record", "--cycle", "runs/T-001/plan-review/cycle-01",
+               "--output", "rec.md", "--invocation", "manual")
+    if r.returncode != 0:
+        failures.append(f"a recurrence was refused:\n{r.stdout}{r.stderr}")
+    else:
+        fj = json.loads((tf / "runs/T-001/plan-review/cycle-01/findings.json")
+                        .read_text(encoding="utf-8"))
+        rec0 = fj["findings"][0]
+        if rec0.get("class") != "WRONG OWNERSHIP":
+            failures.append(f"the recurrence class was not resolved from the "
+                            f"ledger: {rec0}")
+        elif rec0.get("kind") != "recurrence":
+            failures.append(f"the recurrence was not marked as one: {rec0}")
+        else:
+            print("  [ok] a recurrence takes its class from the ledger, not the "
+                  "review")
+
+    tu = make_repo(); made.append(tu)
+    do_init(tu); do_freeze(tu)
+    write_lf(tu / "rec.md", with_target(tu, "Finding ID: C01-F09\n"
+                                            "Status: REPAIR NOT DEMONSTRATED\n"
+                                            "Evidence: x\n"))
+    r = runner(tu, "record", "--cycle", "runs/T-001/plan-review/cycle-01",
+               "--output", "rec.md", "--invocation", "manual")
+    if r.returncode == 0:
+        failures.append("a recurrence was recorded for an identifier the ledger "
+                        "has never seen")
+    elif "never" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the unknown identifier\n"
+                        f"{r.stdout}{r.stderr}")
+    else:
+        print("  [ok] refused: a recurrence for an identifier never raised")
+
     # ---- run-pin and review-target separation, 10 September ----
     # "No review process may require an artifact to remain byte-invariant for
     # the duration of a run while simultaneously requiring that same artifact

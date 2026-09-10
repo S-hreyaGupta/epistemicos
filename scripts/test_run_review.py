@@ -702,7 +702,43 @@ def main() -> int:
     refuse_with("an approval of the wrong kind", "schema",
                 schema="runner-approval/1")
 
+    # ---- B02-F04: a refused supersession must leave the cycle intact ----
+    # Codex's reproduction, exactly: a valid authoritative capture, a correctly
+    # bound approval, and a replacement containing a finding, invoked with
+    # --zero-findings. The command returned 1 saying "Nothing written" while
+    # codex-output-raw.md and findings.json had already been deleted and the
+    # log still designated the old attempt. The bytes survived in captures/;
+    # the cycle did not.
     approve()
+    before_raw = (cyc / "codex-output-raw.md").read_bytes()
+    before_fj = (cyc / "findings.json").read_bytes()
+    before_log = json.loads((cyc / "capture-log.json").read_text(encoding="utf-8"))
+    r = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",
+               "--invocation", "manual", "--supersede-capture",
+               "--reason", "partial paste; full reply recaptured",
+               "--zero-findings")
+    if r.returncode == 0:
+        failures.append("--zero-findings was accepted against a reply carrying "
+                        "a finding")
+    elif not (cyc / "codex-output-raw.md").is_file():
+        failures.append("a refused supersession deleted codex-output-raw.md; "
+                        "the cycle was destroyed by a command that reported "
+                        "nothing written")
+    elif not (cyc / "findings.json").is_file():
+        failures.append("a refused supersession deleted findings.json")
+    elif (cyc / "codex-output-raw.md").read_bytes() != before_raw:
+        failures.append("a refused supersession altered the authoritative raw "
+                        "capture")
+    elif (cyc / "findings.json").read_bytes() != before_fj:
+        failures.append("a refused supersession altered findings.json")
+    else:
+        after_log = json.loads((cyc / "capture-log.json").read_text(encoding="utf-8"))
+        if after_log.get("authoritative") != before_log.get("authoritative"):
+            failures.append("a refused supersession moved the designation")
+        else:
+            print("  [ok] a refused supersession leaves the authoritative "
+                  "capture, findings and designation intact")
+
     r = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",
                "--invocation", "manual", "--supersede-capture",
                "--reason", "partial paste; full reply recaptured")
@@ -788,9 +824,15 @@ def main() -> int:
     refuses("a second block indented by one space",
             NEW + "\n Finding ID: B02-F02\nClass: UNTESTED RULE\nEvidence: y\n",
             "apparent finding block")
-    refuses("an indented block when it is the only one",
+    # Caught by the SIGNALS net rather than by the loose-header comparison: when
+    # the indented block is the only one, nothing parses at all. Verified by
+    # mutation — with the loose comparison disabled this control still passes,
+    # so it is evidence about the signal net and is labelled as such. Left in
+    # because two independent mechanisms covering the case is worth recording,
+    # and a control named for the wrong mechanism is worth not having.
+    refuses("a review whose only block is indented, caught by the signal net",
             " Finding ID: B02-F01\nClass: UNTESTED RULE\nEvidence: x\n",
-            "apparent finding block")
+            "signals that one is present")
 
     # And the class really does come from the ledger, not from the review.
     tf = make_repo(); made.append(tf)

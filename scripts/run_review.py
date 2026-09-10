@@ -840,6 +840,79 @@ def cmd_record(args: argparse.Namespace) -> int:
             "cycle is unchanged. Retry with a\n  better capture; failed attempts "
             "are kept rather than deleted.")
 
+    # ---- authoritative findings, extracted before anything is written ----
+    # Alex Zamurko, 9 September 2026, issue 4:
+    #
+    #     Runner creates findings.json for every completed review. Explicitly
+    #     represent zero findings; absence must never mean zero. Implementing
+    #     agent must not manually create or overwrite authoritative findings.
+    #
+    # Extraction happens here rather than being left to whoever is present,
+    # because the failure this closes is real findings never reaching the ledger
+    # and the controller reading that silence as a clean review.
+    #
+    # B02-F04 moved this block ABOVE the supersession deletion below. Every
+    # refusal a replacement can trigger has to be reachable while the existing
+    # cycle is still intact, or a refused command is not a no-op.
+    found, problems = extract_findings(body)
+    if problems:
+        raise Refused(
+            "the reviewer output does not parse as review evidence:\n  "
+            + "\n  ".join(problems) +
+            "\n\n  Nothing has been written. The raw output is captured only "
+            "alongside an\n  authoritative findings record, so a cycle cannot "
+            "exist with evidence nobody\n  could read.")
+
+    # Zero has to be asserted, never inferred. "No blocks found" is equally
+    # consistent with a clean review and with a capture that went wrong — which
+    # happened four times before this cycle was recorded — so the operator
+    # states which, and the record says a human said so.
+    if not found and not args.zero_findings:
+        raise Refused(
+            "no finding blocks found in the reviewer output.\n"
+            "  That is either a clean review or a capture that went wrong, and "
+            "the two are\n  indistinguishable from here. If the reviewer "
+            "genuinely reported none, pass\n  --zero-findings to assert it. "
+            "Absence is not permitted to mean zero.")
+    if found and args.zero_findings:
+        raise Refused(
+            f"--zero-findings was passed but {len(found)} finding block(s) are "
+            "present:\n  " + ", ".join(f["id"] for f in found) +
+            "\n  Nothing written, and the existing capture is untouched.")
+
+    # B02-F02. A recurrence names a persistent identifier and deliberately does
+    # not restate its class, so the class is looked up here, in the one place
+    # that knows what was raised. Asking the reviewer to re-assert it would
+    # permit two records claiming different classes for one identifier.
+    #
+    # An identifier the ledger has never seen is refused rather than recorded
+    # with an empty class: a repair cannot fail to be demonstrated for a finding
+    # that was never raised, and a typo in an identifier must not create one.
+    recurrences = [f for f in found if f.get("kind") == "recurrence"]
+    if recurrences:
+        led = cycle.parent / "ledger.json"
+        known: dict[str, str] = {}
+        if led.is_file():
+            try:
+                known = {k: v.get("class", "")
+                         for k, v in json.loads(
+                             led.read_text(encoding="utf-8"))["findings"].items()}
+            except (json.JSONDecodeError, KeyError, AttributeError) as e:
+                raise Refused(
+                    f"the review reports recurrences but {rel(led)} cannot be "
+                    f"read, so their classes\n  cannot be resolved: {e}")
+        unknown = [f["id"] for f in recurrences if f["id"] not in known]
+        if unknown:
+            raise Refused(
+                "the review reports a repair as not demonstrated for "
+                f"identifier(s) the ledger has never\n  seen: "
+                + ", ".join(unknown) +
+                "\n  A recurrence keeps the identifier of a finding that was "
+                "raised. If this is a new\n  finding it needs its own "
+                "identifier and a class from §4.")
+        for f in recurrences:
+            f["class"] = known[f["id"]]
+
     if args.supersede_capture:
         prior = log["authoritative"]
         approval = getattr(args, "_approval", {})
@@ -856,23 +929,22 @@ def cmd_record(args: argparse.Namespace) -> int:
             "authorized_at": approval.get("at", ""),
         })
         # The prior attempt stays on disk. Only the designation moves.
+        #
+        # Reached only after every refusal above has been cleared. B02-F04: this
+        # deletion used to run before the zero-findings consistency check, so
+        # `--supersede-capture --zero-findings` against a reply that did contain
+        # findings deleted the working authoritative evidence and then refused
+        # with "Nothing written." The message was true of the replacement and
+        # false of the cycle, which had just been broken.
+        #
+        # Preserving every attempt is not the same as keeping the cycle intact.
+        # The bytes survived in captures/; the designation pointed at a capture
+        # whose raw.md and findings.json no longer existed.
         raw.unlink(missing_ok=True)
         (cycle / "findings.json").unlink(missing_ok=True)
 
     log["authoritative"] = n
     log["authoritative_sha256"] = entry["sha256"]
-
-    # ---- authoritative findings, extracted before anything is written ----
-    # Alex Zamurko, 9 September 2026, issue 4:
-    #
-    #     Runner creates findings.json for every completed review. Explicitly
-    #     represent zero findings; absence must never mean zero. Implementing
-    #     agent must not manually create or overwrite authoritative findings.
-    #
-    # Extraction happens here rather than being left to whoever is present,
-    # because the failure this closes is real findings never reaching the ledger
-    # and the controller reading that silence as a clean review.
-    found, problems = extract_findings(body)
     if problems:
         raise Refused(
             "the reviewer output does not parse as review evidence:\n  "

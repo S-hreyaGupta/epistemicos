@@ -503,6 +503,109 @@ def main() -> int:
         ok(f"{len(scanned)} covered files carry no unqualified proof, "
            "immutability or prevention claim")
 
+    # ---- rulings 1 and 2: the exception is bounded, and ends one way ----
+    # "Without a precise termination point, 'bootstrap' can become an indefinite
+    # exemption." The termination is the first runner approval, so these ask
+    # whether the gate actually notices it and whether the notice can be undone.
+    print()
+    print("the bootstrap exception ends at the first approved runner")
+
+    def git(root: Path, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", "-C", str(root), *args],
+                              capture_output=True, text=True)
+
+    def git_repo() -> Path:
+        root = build(); made.append(root)
+        git(root, "init", "-q")
+        git(root, "config", "user.email", "t@t")
+        git(root, "config", "user.name", "t")
+        git(root, "add", "-A")
+        git(root, "commit", "-qm", "fixture")
+        return root
+
+    def approve_runner(root: Path, *extra: str) -> subprocess.CompletedProcess:
+        return gate(root, "approve-runner", "--runner", "scripts/run_review.py",
+                    "--decided-by", "Alex Zamurko",
+                    "--note", "#gap, 10 Sep 2026 09:00, Alex Zamurko: approved "
+                              "as ACTIVE_REVIEW_RUNNER",
+                    "--review", TARGET, *extra)
+
+    t = git_repo()
+    r = gate(t, "exception")
+    if "BOOTSTRAP_EXCEPTION: AVAILABLE" not in r.stdout:
+        failures.append(f"the exception should be available before any runner "
+                        f"approval\n{r.stdout}{r.stderr}")
+    else:
+        ok("before any runner approval the exception is available")
+
+    if approve(t).returncode != 0:
+        failures.append("fixture: could not record the bootstrap approval")
+    r = approve_runner(t)
+    if r.returncode != 0:
+        failures.append(f"approving a runner was refused:\n{r.stdout}{r.stderr}")
+    elif not list((t / "runner-approvals").glob("*.json")):
+        failures.append("approve-runner wrote no record")
+    else:
+        ok("a runner can be approved once the bootstrap review holds")
+
+    r = gate(t, "exception")
+    if "BOOTSTRAP_EXCEPTION: ENDED" not in r.stdout:
+        failures.append(f"the exception did not end at the first runner "
+                        f"approval\n{r.stdout}")
+    else:
+        ok("the first runner approval ends the exception")
+
+    # The one that matters. If the gate decided by listing a directory, deleting
+    # the directory would reopen the exception and nothing would show it had ever
+    # ended. Ruling 2 ends it at the first approval, not at the last surviving
+    # copy of the file.
+    git(t, "add", "-A")
+    git(t, "commit", "-qm", "runner approved")
+    shutil.rmtree(t / "runner-approvals")
+    r = gate(t, "exception")
+    if "BOOTSTRAP_EXCEPTION: ENDED" not in r.stdout:
+        failures.append("deleting the approval reopened the exception; the "
+                        f"termination is not one-way\n{r.stdout}")
+    elif "no longer on disk" not in r.stdout:
+        failures.append(f"the deletion was not reported\n{r.stdout}")
+    else:
+        ok("deleting the approval does not reopen the exception, and the "
+           "deletion is named")
+
+    # An approval that was never committed is exactly the case the command warns
+    # about, and the warning has to be true.
+    t2 = git_repo()
+    approve(t2)
+    approve_runner(t2)
+    shutil.rmtree(t2 / "runner-approvals")
+    r = gate(t2, "exception")
+    if "BOOTSTRAP_EXCEPTION: AVAILABLE" not in r.stdout:
+        failures.append("an uncommitted approval survived deletion, so the "
+                        "instruction to commit it is wrong and the control that "
+                        f"passed above proves nothing\n{r.stdout}")
+    else:
+        ok("an uncommitted approval does not survive deletion, which is why "
+           "approve-runner says to commit it")
+
+    # And the flag itself has to stop working, not merely be discouraged.
+    t3 = git_repo()
+    approve(t3)
+    approve_runner(t3)
+    r = subprocess.run(
+        [sys.executable, str(t3 / "scripts" / "run_review.py"), "init",
+         "--run", "X-001", "--bootstrap-exempt",
+         "--protocol", "specs/evidence-schema-v1.0.md",
+         "--spec", "specs/evidence-schema-v1.0.md"],
+        cwd=str(t3), capture_output=True, text=True)
+    if r.returncode == 0:
+        failures.append("--bootstrap-exempt still created a run after the "
+                        "exception ended")
+    elif "no longer available" not in (r.stdout + r.stderr):
+        failures.append(f"init refused, but not because the exception ended\n"
+                        f"{r.stdout}{r.stderr}")
+    else:
+        ok("--bootstrap-exempt is refused once a runner has been approved")
+
     print()
     for d in made:
         shutil.rmtree(d, ignore_errors=True)

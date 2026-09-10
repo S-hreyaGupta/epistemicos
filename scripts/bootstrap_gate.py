@@ -45,12 +45,24 @@ import argparse
 import ast
 import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 REVIEW_DIR = REPO / "bootstrap-review"
 RECORD = REVIEW_DIR / "decision.json"
+
+# Alex Zamurko, 9 September 2026, rulings 1 and 2:
+#
+#     Cycle 02 remains inside the bootstrap exception; start the ACTIVE/CANDIDATE
+#     chain only after the first human approval ... The bootstrap exception ends
+#     immediately after the first human approval of a runner ... without a precise
+#     termination point, "bootstrap" can become an indefinite exemption.
+#
+# So the exception is not a period someone declares over. It ends when the first
+# runner approval exists, and that is a fact on disk rather than a judgement.
+RUNNER_APPROVAL_DIR = "runner-approvals"
 
 # The declared roots. Widened from two to four by Alex Zamurko, 9 September 2026:
 # ledger.py and loop_state.py "determine the authoritative meaning of otherwise
@@ -299,6 +311,93 @@ def target_drift(root: Path, target_json: Path) -> list[str]:
 
 # ------------------------------------------------------------------ check
 
+# -------------------------------------------------- the exception's end
+
+def runner_approvals_on_disk(root: Path) -> list[Path]:
+    d = root / RUNNER_APPROVAL_DIR
+    return sorted(d.glob("*.json")) if d.is_dir() else []
+
+
+def runner_approvals_in_history(root: Path) -> list[str]:
+    """Runner approvals git has ever seen added, whether or not they exist now.
+
+    This is what makes the termination one-way, and it is the part that took a
+    second look. A gate that decides by listing a directory can be reopened by
+    deleting the directory: the exception would end and then quietly resume, and
+    nothing in the tree would show it had ever ended. "Bootstrap" becoming an
+    indefinite exemption is the exact failure ruling 2 exists to prevent, and
+    deletion is the easiest route to it.
+
+    Git history is the cheapest available record that a delete does not reach. It
+    is not tamper-proof; a history rewrite defeats it. But a rewrite is a loud,
+    deliberate act that leaves the reflog and every clone disagreeing, where
+    deleting a file is neither.
+
+    The asymmetry that makes this sound under MC1_ENFORCEMENT: CONVENTION_ONLY is
+    worth stating. Nothing stops the implementing agent from WRITING an approval,
+    but writing one only ever makes the rules stricter: it ends its own
+    exemption and subjects every later runner to review by a prior approved one.
+    The direction that would benefit the implementing agent is removing one, and
+    that is the direction this closes.
+    """
+    r = subprocess.run(
+        ["git", "-C", str(root), "log", "--all", "--diff-filter=A",
+         "--format=%H", "--name-only", "--", f"{RUNNER_APPROVAL_DIR}/"],
+        capture_output=True, text=True)
+    if r.returncode != 0:
+        return []
+    return sorted({l.strip() for l in r.stdout.splitlines()
+                   if l.strip().startswith(f"{RUNNER_APPROVAL_DIR}/")
+                   and l.strip().endswith(".json")})
+
+
+def bootstrap_exception_available(root: Path) -> tuple[bool, list[str]]:
+    """(available, reasons). Ruling 2's termination point, asked as a question.
+
+    Available means no runner has been approved yet, so there is still no prior
+    approved runner that could serve as ACTIVE_REVIEW_RUNNER, and development
+    evidence is the only kind obtainable. That is ruling 1's reasoning for
+    cycle 02 and it stops being true the moment the first approval exists.
+    """
+    live = runner_approvals_on_disk(root)
+    historic = runner_approvals_in_history(root)
+
+    if live:
+        return False, [
+            "the bootstrap exception ended when the first runner was approved:",
+            *[f"    {p.relative_to(root).as_posix()}" for p in live],
+            "  From that approval onward every candidate runner is reviewed by "
+            "the prior",
+            "  approved one. There is no route back to the exception; it covered "
+            "the period",
+            "  before any approved runner existed, and that period is over.",
+        ]
+
+    if historic:
+        return False, [
+            "a runner approval was recorded and is no longer on disk:",
+            *[f"    {h}" for h in historic],
+            "  git history has it even though the working tree does not, so the "
+            "exception is",
+            "  still over. Ruling 2 ends it at the first approval, not at the "
+            "most recent",
+            "  surviving copy of the file.",
+            "  Restore the approval record, or explain the deletion in a commit. "
+            "A gate that",
+            "  could be reopened by deleting a file would be a convention, not a "
+            "termination.",
+        ]
+
+    return True, [
+        "no runner has been approved yet, so the bootstrap exception is still "
+        "available.",
+        "  There is no prior approved runner to act as ACTIVE_REVIEW_RUNNER, "
+        "which is the",
+        "  condition the exception exists to cover. It ends at the first "
+        "approval.",
+    ]
+
+
 def evaluate(root: Path) -> tuple[bool, list[str]]:
     """(ok, reasons). Never raises; the reasons are the useful output."""
     rec = root / "bootstrap-review" / "decision.json"
@@ -499,6 +598,103 @@ def cmd_record(a: argparse.Namespace) -> int:
     return 0
 
 
+# ------------------------------------------------------- approve a runner
+
+def cmd_approve_runner(a: argparse.Namespace) -> int:
+    """Record the first human approval of a runner, which ends the exception.
+
+    Ruling 2: "The first approved runner creates the missing first link in the
+    chain; from that point onward, every candidate runner can and should be
+    reviewed by the prior approved runner."
+
+    Deliberately a separate command from `record`. The bootstrap decision
+    approves the components as reviewed; this approves a specific runner to act
+    as ACTIVE_REVIEW_RUNNER for the next candidate, and it is the event that ends
+    the exemption. Folding them together would make ending the exception a side
+    effect of approving code, and the two are different decisions taken at
+    different moments.
+    """
+    if not a.decided_by.strip():
+        raise Refused("--decided-by is required; the approval that ends the "
+                      "exception cannot be anonymous")
+    if len(a.note.strip()) < 20:
+        raise Refused(
+            "--note is required, and must attribute the decision.\n"
+            "  Give where it was made and what was said: channel, timestamp, and "
+            "the words.\n"
+            "  This approval ends the bootstrap exception permanently, so the "
+            "record has to\n  say who ended it and on what basis.")
+
+    runner = Path(a.runner).resolve()
+    if not runner.is_file():
+        raise Refused(f"runner not found: {a.runner}")
+    if not a.review:
+        raise Refused(
+            "--review is required: the review that approved this runner.\n"
+            "  A runner approved by nothing is the thing the chain exists to "
+            "rule out.")
+    review = Path(a.review).resolve()
+    if not review.is_file():
+        raise Refused(f"review evidence not found: {a.review}")
+
+    ok, reasons = evaluate(REPO)
+    if not ok:
+        raise Refused(
+            "the bootstrap review does not currently hold, so no runner can be "
+            "approved on\nthe strength of it:\n  " + "\n  ".join(reasons))
+
+    available, _ = bootstrap_exception_available(REPO)
+    d = REPO / RUNNER_APPROVAL_DIR
+    d.mkdir(parents=True, exist_ok=True)
+    rel_runner = runner.relative_to(REPO).as_posix()
+    digest = sha256_file(runner)
+    out = d / f"{digest[:12]}.json"
+    if out.exists():
+        raise Refused(f"this exact runner is already approved: "
+                      f"{out.relative_to(REPO).as_posix()}")
+
+    record = {
+        "schema": "runner-approval/1",
+        "runner_path": rel_runner,
+        "runner_sha256": digest,
+        "approved_by": a.decided_by.strip(),
+        "approved_at": now(),
+        "note": a.note,
+        "review_evidence": {
+            "path": review.relative_to(REPO).as_posix(),
+            "sha256": sha256_file(review),
+        },
+        "components": component_hashes(REPO),
+        "ends_bootstrap_exception": bool(available),
+        "authority": "Alex Zamurko, 9 September 2026: the bootstrap exception "
+                     "ends immediately after the first human approval of a "
+                     "runner.",
+    }
+    write_lf(out, json.dumps(record, indent=2) + "\n")
+    print(f"recorded {out.relative_to(REPO).as_posix()}")
+    print(f"  runner      {rel_runner}  {digest[:16]}…")
+    print(f"  approved by {record['approved_by']}")
+    if available:
+        print()
+        print("The bootstrap exception ends here. --bootstrap-exempt will be "
+              "refused from now on,")
+        print("and every candidate runner is reviewed by the prior approved "
+              "runner.")
+        print()
+        print("Commit this file. The termination is one-way, and git history is "
+              "what makes it")
+        print("one-way; an uncommitted approval can be undone by deleting it.")
+    return 0
+
+
+def cmd_exception(root: Path = REPO) -> int:
+    available, why = bootstrap_exception_available(root)
+    print("BOOTSTRAP_EXCEPTION: " + ("AVAILABLE" if available else "ENDED"))
+    for line in why:
+        print(f"  {line}")
+    return 0
+
+
 # ------------------------------------------------------------------ main
 
 def main(argv: list[str]) -> int:
@@ -521,10 +717,27 @@ def main(argv: list[str]) -> int:
     r.add_argument("--supersede", action="store_true",
                    help="replace an existing decision, preserving it in the record")
 
+    sub.add_parser("exception", help="is the bootstrap exception still available")
+
+    ar = sub.add_parser("approve-runner",
+                        help="record the first human approval of a runner, which "
+                             "ends the bootstrap exception")
+    ar.add_argument("--runner", required=True,
+                    help="the runner being approved, e.g. scripts/run_review.py")
+    ar.add_argument("--decided-by", required=True)
+    ar.add_argument("--note", default="")
+    ar.add_argument("--review", default="",
+                    help="the review evidence this approval rests on, e.g. a "
+                         "cycle's codex-output-raw.md")
+
     a = ap.parse_args(argv[1:])
     try:
         if a.cmd == "check":
             return cmd_check()
+        if a.cmd == "exception":
+            return cmd_exception()
+        if a.cmd == "approve-runner":
+            return cmd_approve_runner(a)
         return cmd_record(a)
     except Refused as e:
         print(f"refused: {e}", file=sys.stderr)

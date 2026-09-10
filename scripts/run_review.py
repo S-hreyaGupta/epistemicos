@@ -158,12 +158,28 @@ def cmd_init(args: argparse.Namespace) -> int:
     # Enforced here rather than at freeze because init is where a run becomes a
     # thing that exists. A run created now and frozen later would otherwise carry
     # pins made before anyone had looked at the code doing the pinning.
-    if not args.bootstrap_exempt:
-        # Loaded by path rather than by name. `from bootstrap_gate import ...`
-        # works only when the script's own directory happens to be on sys.path,
-        # which it is when run directly and is not in several other cases. A gate
-        # that silently becomes an ImportError is a gate that stops gating.
-        ok, reasons = load_gate().evaluate(REPO)
+    # Loaded by path rather than by name. `from bootstrap_gate import ...` works
+    # only when the script's own directory happens to be on sys.path, which it is
+    # when run directly and is not in several other cases. A gate that silently
+    # becomes an ImportError is a gate that stops gating.
+    gate = load_gate()
+
+    if args.bootstrap_exempt:
+        # Ruling 2, 9 September: the exception "ends immediately after the first
+        # human approval of a runner". Before this, --bootstrap-exempt was a flag
+        # with no expiry, so "bootstrap" could quietly become the permanent way
+        # runs were created. The termination is now a question the gate answers
+        # from the record rather than a date anyone has to remember.
+        available, why = gate.bootstrap_exception_available(REPO)
+        if not available:
+            raise Refused(
+                "--bootstrap-exempt is no longer available.\n  "
+                + "\n  ".join(why) +
+                "\n\n  Create the run without the flag. The components have an "
+                "approved runner now,\n  so real protocol runs are the only kind "
+                "left to make.")
+    else:
+        ok, reasons = gate.evaluate(REPO)
         if not ok:
             raise Refused(
                 "BOOTSTRAP_REVIEW not satisfied, so no real protocol run may be "
@@ -202,6 +218,14 @@ def cmd_init(args: argparse.Namespace) -> int:
         "bootstrap_review": ("EXEMPT — BOOTSTRAP / DEVELOPMENT EVIDENCE, "
                              "NOT_A_PROTOCOL_CYCLE"
                              if args.bootstrap_exempt else "APPROVED"),
+        # Ruling 1: cycle 02 sits inside the exception because no approved runner
+        # exists yet. Recorded on the run so a later reader can see which side of
+        # the termination this run was created on, without reconstructing the
+        # state of runner-approvals/ at the time.
+        "runner_approval_chain": ("NOT_STARTED — no approved runner exists"
+                                  if gate.bootstrap_exception_available(REPO)[0]
+                                  else "ACTIVE — candidate runners are reviewed "
+                                       "by the prior approved runner"),
     }
     run_dir.mkdir(parents=True, exist_ok=True)
     write_lf(run_json, json.dumps(run, indent=2) + "\n")

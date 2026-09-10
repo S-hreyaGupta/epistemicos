@@ -739,6 +739,22 @@ def main() -> int:
             print("  [ok] a refused supersession leaves the authoritative "
                   "capture, findings and designation intact")
 
+    # The refusal above created an attempt directory. The log must know about
+    # it, or next_attempt (which counts directories) and the log disagree, and
+    # the next designation points past the end of the recorded attempts. Found
+    # only because the B02-F04 control happened to run a refusal before a
+    # success; nothing was asserting it.
+    _log = json.loads((cyc / "capture-log.json").read_text(encoding="utf-8"))
+    _dirs = sorted((cyc / "captures").glob("attempt-*"))
+    if len(_log["attempts"]) != len(_dirs):
+        failures.append(
+            f"the capture log records {len(_log['attempts'])} attempt(s) but "
+            f"{len(_dirs)} exist on disk. A refused attempt is preserved and "
+            "must be recorded, or the count of attempts is understated.")
+    else:
+        print(f"  [ok] a refused attempt is recorded in the log, not only on "
+              f"disk ({len(_dirs)} attempts)")
+
     r = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",
                "--invocation", "manual", "--supersede-capture",
                "--reason", "partial paste; full reply recaptured")
@@ -746,11 +762,19 @@ def main() -> int:
         failures.append(f"an authorized supersession was refused:\n{r.stdout}{r.stderr}")
     else:
         log = json.loads((cyc / "capture-log.json").read_text(encoding="utf-8"))
+        # Every attempt so far, counted rather than hardcoded. A refused
+        # supersession still preserves its attempt — that is issue 6's whole
+        # point — so inserting the B02-F04 control above consumes a number, and
+        # a literal 3 here made this control fail for a reason that had nothing
+        # to do with what it tests.
+        n_attempts = len(log["attempts"])
         kept = all((cyc / "captures" / f"attempt-{i:02d}" / "raw.md").is_file()
-                   for i in (1, 2, 3))
+                   for i in range(1, n_attempts + 1))
         inv = (log.get("invalidated") or [{}])[-1]
-        if log["authoritative"] != 3:
-            failures.append("supersession did not move the designation")
+        if log["authoritative"] != n_attempts:
+            failures.append(
+                f"supersession did not move the designation to the new attempt: "
+                f"authoritative={log['authoritative']}, attempts={n_attempts}")
         elif not kept:
             failures.append("supersession removed a prior attempt; both must be "
                             "preserved")

@@ -828,6 +828,17 @@ def cmd_record(args: argparse.Namespace) -> int:
     write_lf(adir / "capture.json", json.dumps(entry, indent=2) + "\n")
     log["attempts"].append(entry)
 
+    # Written here, not only on the paths that succeed. The attempt directory
+    # exists from the line above, and next_attempt counts directories, so any
+    # refusal between here and the end of the function used to leave the log
+    # describing fewer attempts than are on disk. The next call then designated
+    # attempt 4 while the log knew about 3.
+    #
+    # Found by the B02-F04 control: moving the validation earlier created
+    # exactly that window. Issue 6 exists so the count of attempts is never
+    # understated, and a refusal is the case where that matters most.
+    write_lf(cycle / "capture-log.json", json.dumps(log, indent=2) + "\n")
+
     if invalid:
         if args.supersede_capture:
             log["attempts"][-1]["superseded_nothing"] = True

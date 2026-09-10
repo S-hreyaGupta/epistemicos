@@ -577,15 +577,51 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         # §10.1: "These fields are mandatory, not conditional."
         if not args.candidate_commit:
             raise Refused("implementation review requires --candidate-commit")
-        r = subprocess.run(
-            ["git", "-C", str(REPO), "rev-parse", f"{args.candidate_commit}^{{tree}}"],
+
+        # B01-F05. Alex Zamurko, 10 September: "resolve any mutable reference
+        # such as HEAD to an immutable commit SHA at freeze time and verify the
+        # corresponding tree hash. Reject unresolved/mutable refs."
+        #
+        # The reference was previously stored exactly as typed. `HEAD` recorded
+        # as `HEAD` names whatever the branch points at whenever anyone looks,
+        # so the reviewed implementation could move after the freeze while
+        # checks 11 and 12 kept passing against the new commit. The freeze
+        # recorded a pointer, not an object.
+        rc = subprocess.run(
+            ["git", "-C", str(REPO), "rev-parse", "--verify",
+             f"{args.candidate_commit}^{{commit}}"],
             capture_output=True, text=True)
-        if r.returncode != 0:
-            raise Refused(f"--candidate-commit does not resolve: {args.candidate_commit}")
-        target["candidate_commit"] = args.candidate_commit
+        if rc.returncode != 0:
+            raise Refused(
+                f"--candidate-commit does not resolve to a commit: "
+                f"{args.candidate_commit}\n"
+                "  A reference that git cannot resolve now is a reference "
+                "nothing can be bound to.")
+        resolved = rc.stdout.strip()
+        if not re.fullmatch(r"[0-9a-f]{40}", resolved):
+            raise Refused(
+                f"--candidate-commit resolved to {resolved!r}, which is not a "
+                "full commit SHA.\n  The target records an immutable object, "
+                "never an abbreviation or a name.")
+
+        # The tree is derived from the RESOLVED commit, not from the reference.
+        # Deriving it from the reference would re-read the mutable name a second
+        # time and could pair a tree with a commit that was never the one frozen.
+        rt = subprocess.run(
+            ["git", "-C", str(REPO), "rev-parse", f"{resolved}^{{tree}}"],
+            capture_output=True, text=True)
+        if rt.returncode != 0:
+            raise Refused(f"cannot resolve the tree of {resolved}")
+
+        target["candidate_commit"] = resolved
+        # What the operator typed, kept alongside the resolution. A record that
+        # silently replaces `HEAD` with a SHA hides the fact that a mutable name
+        # was supplied, and a later reader should be able to see both.
+        if args.candidate_commit != resolved:
+            target["candidate_commit_supplied"] = args.candidate_commit
         # Derived, not supplied: a tree hash typed by hand is a tree hash that
         # can be typed to match whatever was recorded.
-        target["candidate_tree_hash"] = r.stdout.strip()
+        target["candidate_tree_hash"] = rt.stdout.strip()
 
         if not args.approved_plan_hash:
             raise Refused("implementation review requires --approved-plan-hash")

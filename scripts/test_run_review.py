@@ -341,6 +341,67 @@ def main() -> int:
     expect_refused("candidate commit that does not resolve",
                    "does not resolve", impl_unresolvable_commit)
 
+    # ---- B01-F05: a mutable reference is resolved before it is recorded ----
+    # Alex Zamurko, 10 September: "resolve any mutable reference such as HEAD to
+    # an immutable commit SHA at freeze time and verify the corresponding tree
+    # hash." Before this the reference was stored as typed, so a target could
+    # name HEAD and the reviewed implementation could move underneath it while
+    # checks 11 and 12 kept passing against whatever HEAD had become.
+    print()
+    print("mutable candidate references")
+
+    t5 = make_repo(); made.append(t5)
+    do_init(t5)
+    write_lf(t5 / "diff.txt", "diff --git a/x b/x\n")
+    write_lf(t5 / "results.txt", "ok\n")
+    head = sh("git", "rev-parse", "HEAD", cwd=t5).stdout.strip()
+    r = runner(t5, "freeze", "--run", "T-001", "--type", "implementation",
+               "--prompt", "specs/prompt.md", "--candidate-commit", "HEAD",
+               "--approved-plan-hash", GOOD_HASH, "--diff", "diff.txt",
+               "--test-results", "results.txt")
+    if r.returncode != 0:
+        failures.append(f"freezing with HEAD was refused outright; the decision "
+                        f"is to resolve it, not reject it\n{r.stdout}{r.stderr}")
+    else:
+        tgt = json.loads((t5 / "runs/T-001/implementation-review/cycle-01"
+                          / "target.json").read_text(encoding="utf-8"))
+        if tgt["candidate_commit"] == "HEAD":
+            failures.append("the target recorded the literal reference HEAD, so "
+                            "the reviewed implementation can still move under it")
+        elif tgt["candidate_commit"] != head:
+            failures.append(f"HEAD resolved to {tgt['candidate_commit']}, "
+                            f"expected {head}")
+        elif tgt.get("candidate_commit_supplied") != "HEAD":
+            failures.append("the target does not record that a mutable "
+                            "reference was supplied, so a reader cannot tell")
+        else:
+            # The tree must belong to the resolved commit, not be re-derived
+            # from the name a second time.
+            tree = sh("git", "rev-parse", f"{head}^{{tree}}", cwd=t5).stdout.strip()
+            if tgt["candidate_tree_hash"] != tree:
+                failures.append("the recorded tree does not belong to the "
+                                "resolved commit")
+            else:
+                print("  [ok] HEAD is resolved to an immutable SHA, the "
+                      "reference is recorded, and the tree matches")
+
+    # And the resolution has to actually bind: moving HEAD afterwards must not
+    # change what the frozen cycle refers to.
+    if r.returncode == 0:
+        write_lf(t5 / "later.txt", "a commit made after the freeze\n")
+        sh("git", "add", "-A", cwd=t5)
+        sh("git", "commit", "-qm", "after the freeze", cwd=t5)
+        new_head = sh("git", "rev-parse", "HEAD", cwd=t5).stdout.strip()
+        tgt = json.loads((t5 / "runs/T-001/implementation-review/cycle-01"
+                          / "target.json").read_text(encoding="utf-8"))
+        if new_head == head:
+            failures.append("fixture: HEAD did not move")
+        elif tgt["candidate_commit"] != head:
+            failures.append("the frozen target followed HEAD to a later commit")
+        else:
+            print("  [ok] the frozen target still names the commit that was "
+                  "reviewed after HEAD moves on")
+
     def impl_no_diff(t: Path):
         do_init(t)
         return runner(t, "freeze", "--run", "T-001", "--type", "implementation",

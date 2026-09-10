@@ -54,7 +54,7 @@ def make_repo() -> Path:
     (tmp / "scripts").mkdir()
     for name in ("run_review.py", "validate_cycle.py", "bootstrap_gate.py",
                  "ledger.py", "loop_state.py", "findings_format.py",
-                 "cycle_projection.py"):
+                 "cycle_projection.py", "authority.py"):
         shutil.copy2(SRC / name, tmp / "scripts" / name)
     (tmp / "specs").mkdir()
     # Copied rather than stubbed: it is a covered component now (B01-F10), so
@@ -641,15 +641,78 @@ def main() -> int:
     else:
         print("  [ok] refused: superseding without a stated reason")
 
+    # ---- ruling 3, 9 September: supersession needs an outside authority ----
+    # "Allowing the implementing agent to choose a later Codex capture creates a
+    # direct cherry-picking path. Preserving all attempts is not sufficient if
+    # the same party can decide which one governs."
+    #
+    # --reason alone was not an outside authority. It is a string the
+    # implementing agent types, in a command the implementing agent runs.
+    log_before = json.loads((cyc / "capture-log.json").read_text(encoding="utf-8"))
+    superseded = log_before["authoritative_sha256"]
+    superseding = hashlib.sha256((t16 / "other.md").read_bytes()).hexdigest()
+    approval_path = cyc / "capture-supersession-approval.json"
+
+    r = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",
+               "--invocation", "manual", "--supersede-capture",
+               "--reason", "partial paste; full reply recaptured")
+    if r.returncode == 0:
+        failures.append("supersession succeeded on a reason alone, with no "
+                        "approval from outside the implementing agent")
+    elif "not authorized" not in (r.stdout + r.stderr):
+        failures.append(f"supersession refused, but not for want of authority:\n"
+                        f"{r.stdout}{r.stderr}")
+    elif superseding not in (r.stdout + r.stderr):
+        failures.append("the refusal did not print the hashes the approval must "
+                        "name, so obtaining one would be guesswork")
+    else:
+        print("  [ok] refused: a reason alone does not authorize supersession")
+
+    def approve(**over):
+        rec = {"schema": "capture-supersession/1",
+               "cycle": cyc.name,
+               "superseded_sha256": superseded,
+               "superseding_sha256": superseding,
+               "authorized_by": "Alex Zamurko",
+               "reason": "attempt 2 truncated mid-finding; recapture is complete",
+               "at": "2026-09-09T21:40:00Z"}
+        rec.update(over)
+        write_lf(approval_path, json.dumps(rec, indent=2) + "\n")
+
+    def refuse_with(label: str, needle: str, **over) -> None:
+        approve(**over)
+        rr = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",
+                    "--invocation", "manual", "--supersede-capture",
+                    "--reason", "partial paste; full reply recaptured")
+        if rr.returncode == 0:
+            failures.append(f"{label}: accepted")
+        elif needle.lower() not in (rr.stdout + rr.stderr).lower():
+            failures.append(f"{label}: refused for the wrong reason\n"
+                            f"  wanted {needle!r}\n  got {(rr.stderr + rr.stdout)[:300]}")
+        else:
+            print(f"  [ok] refused: {label}")
+
+    refuse_with("an approval naming nobody", "authorized_by", authorized_by="")
+    refuse_with("an approval whose reason is a placeholder", "at least",
+                reason="ok")
+    refuse_with("an approval for a different capture", "does not match",
+                superseding_sha256="0" * 64)
+    refuse_with("an approval for a different cycle", "does not match",
+                cycle="cycle-09")
+    refuse_with("an approval of the wrong kind", "schema",
+                schema="runner-approval/1")
+
+    approve()
     r = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",
                "--invocation", "manual", "--supersede-capture",
                "--reason", "partial paste; full reply recaptured")
     if r.returncode != 0:
-        failures.append(f"a reasoned supersession was refused:\n{r.stdout}{r.stderr}")
+        failures.append(f"an authorized supersession was refused:\n{r.stdout}{r.stderr}")
     else:
         log = json.loads((cyc / "capture-log.json").read_text(encoding="utf-8"))
         kept = all((cyc / "captures" / f"attempt-{i:02d}" / "raw.md").is_file()
                    for i in (1, 2, 3))
+        inv = (log.get("invalidated") or [{}])[-1]
         if log["authoritative"] != 3:
             failures.append("supersession did not move the designation")
         elif not kept:
@@ -657,8 +720,13 @@ def main() -> int:
                             "preserved")
         elif not log.get("invalidated"):
             failures.append("supersession did not record the invalidation")
+        elif inv.get("authorized_by") != "Alex Zamurko":
+            failures.append("the invalidation record does not carry the "
+                            "authority, so deleting the approval file would "
+                            f"leave an unattributed supersession: {inv}")
         else:
-            print("  [ok] supersession moves the designation and keeps every attempt")
+            print("  [ok] an authorized supersession moves the designation, "
+                  "keeps every attempt and records who authorized it")
 
     # ---- B01-F08: the gate must hold at freeze, not only at init ----
     # A run can sit for days between init and its first cycle, and every cycle is

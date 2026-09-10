@@ -62,7 +62,7 @@ def build_repo() -> tuple[Path, str]:
     (tmp / "scripts").mkdir()
     for n in ("validate_cycle.py", "run_review.py", "ledger.py", "loop_state.py",
               "bootstrap_gate.py", "findings_format.py",
-              "cycle_projection.py"):
+              "cycle_projection.py", "authority.py"):
         shutil.copy2(SRC / n, tmp / "scripts" / n)
     (tmp / "specs").mkdir()
     # The parser reads the canonical Finding ID grammar out of the schema, so a

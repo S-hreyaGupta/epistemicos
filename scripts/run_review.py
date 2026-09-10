@@ -50,6 +50,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import authority  # noqa: E402
+
 VALIDATOR = REPO / "scripts" / "validate_cycle.py"
 
 MAX_CYCLES = 4
@@ -84,6 +86,10 @@ def sha256_file(p: Path) -> str:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def sha256_bytes(b: bytes) -> str:
+    return hashlib.sha256(b).hexdigest()
 
 
 def write_lf(p: Path, text: str) -> None:
@@ -665,9 +671,10 @@ def cmd_record(args: argparse.Namespace) -> int:
             f"attempt-{log['authoritative']:02d} is already the authoritative "
             "capture for this cycle.\n"
             "  The first capture meeting the validity requirements governs, and "
-            "later ones do\n  not displace it silently. To replace it, pass "
-            "--supersede-capture with\n  --reason explaining why the current "
-            "one is being invalidated. Both are kept.")
+            "later ones do\n  not displace it silently. Replacing it takes both "
+            "--supersede-capture with\n  --reason, and an approval recorded by "
+            "someone other than the implementing\n  agent. Both captures are "
+            "kept either way; only the designation would move.")
     if args.supersede_capture and not log.get("authoritative"):
         raise Refused("--supersede-capture passed but no authoritative capture "
                       "exists to supersede")
@@ -681,6 +688,26 @@ def cmd_record(args: argparse.Namespace) -> int:
     src = require_file(Path(args.output).resolve(), "reviewer output")
     body = src.read_text(encoding="utf-8", errors="replace")
     raw = cycle / "codex-output-raw.md"
+
+    # Alex Zamurko, ruling 3, 9 September 2026: supersession needs "an authority
+    # outside the implementer plus an auditable reason". --reason was neither. It
+    # is a string I type, in a command I run, so the party the control constrains
+    # was operating the control. Preserving every attempt does not help if the
+    # same party still picks which one governs.
+    #
+    # Checked here, after the replacement's bytes are known and before anything
+    # on disk moves, because the approval has to bind to those exact bytes.
+    if args.supersede_capture:
+        approval_path = cycle / "capture-supersession-approval.json"
+        try:
+            approval = authority.require_approval(
+                approval_path, "capture-supersession",
+                {"cycle": cycle.name,
+                 "superseded_sha256": log["authoritative_sha256"],
+                 "superseding_sha256": sha256_bytes(src.read_bytes())})
+        except authority.NotAuthorized as e:
+            raise Refused(f"supersession is not authorized.\n\n{e}")
+        args._approval = approval
 
     # ---- preserve this attempt, whatever comes of it ----
     # Written before validity is judged, so a failed capture leaves a record
@@ -722,11 +749,18 @@ def cmd_record(args: argparse.Namespace) -> int:
 
     if args.supersede_capture:
         prior = log["authoritative"]
+        approval = getattr(args, "_approval", {})
         log.setdefault("invalidated", []).append({
             "attempt": prior,
             "invalidated_at": now(),
             "reason": args.reason,
             "superseded_by": n,
+            # The authority is recorded alongside the act, not only in the
+            # approval file, so removing that file later does not leave a
+            # supersession in the log with nobody's name on it.
+            "authorized_by": approval.get("authorized_by", ""),
+            "authority_reason": approval.get("reason", ""),
+            "authorized_at": approval.get("at", ""),
         })
         # The prior attempt stays on disk. Only the designation moves.
         raw.unlink(missing_ok=True)
@@ -867,8 +901,11 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--note", default="")
     r.add_argument("--supersede-capture", dest="supersede_capture",
                    action="store_true",
-                   help="replace the authoritative capture. Requires --reason. "
-                        "Both attempts are preserved; only the designation moves.")
+                   help="replace the authoritative capture. Requires --reason "
+                        "AND an approval record from outside the implementing "
+                        "agent at <cycle>/capture-supersession-approval.json, "
+                        "bound by hash to both captures. Both attempts are "
+                        "preserved; only the designation moves.")
     r.add_argument("--reason", default="",
                    help="why the current authoritative capture is being "
                         "invalidated, or why this attempt was retried.")

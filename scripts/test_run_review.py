@@ -54,7 +54,7 @@ def make_repo() -> Path:
     (tmp / "scripts").mkdir()
     for name in ("run_review.py", "validate_cycle.py", "bootstrap_gate.py",
                  "ledger.py", "loop_state.py", "findings_format.py",
-                 "cycle_projection.py", "authority.py"):
+                 "cycle_projection.py", "authority.py", "run_pins.py"):
         shutil.copy2(SRC / name, tmp / "scripts" / name)
     (tmp / "specs").mkdir()
     # Copied rather than stubbed: it is a covered component now (B01-F10), so
@@ -727,6 +727,149 @@ def main() -> int:
         else:
             print("  [ok] an authorized supersession moves the designation, "
                   "keeps every attempt and records who authorized it")
+
+    # ---- run-pin and review-target separation, 10 September ----
+    # "No review process may require an artifact to remain byte-invariant for
+    # the duration of a run while simultaneously requiring that same artifact
+    # version to change in order to resolve review findings."
+    #
+    # BOOTSTRAP-001 required exactly that and deadlocked between cycles 01 and
+    # 02. Nothing compared the pin set against the target list, so the
+    # contradiction was only discoverable by hitting it.
+    print()
+    print("run pins and review targets are disjoint")
+
+    tp = make_repo(); made.append(tp)
+    do_init(tp)
+    # Freeze a cycle whose review target IS the run's pinned spec.
+    r = runner(tp, "freeze", "--run", "T-001", "--type", "plan",
+               "--prompt", "specs/prompt.md", "--file", "specs/spec.md")
+    if r.returncode == 0:
+        failures.append("a cycle was frozen with the run's pinned spec as its "
+                        "own review target; the governing invariant is not "
+                        "enforced")
+    elif "exactly one role" not in (r.stdout + r.stderr):
+        failures.append(f"freeze refused, but not for the separation rule\n"
+                        f"{r.stdout}{r.stderr}")
+    elif (tp / "runs/T-001/plan-review/cycle-01").exists():
+        failures.append("freeze refused but left a cycle directory behind")
+    else:
+        print("  [ok] refused: an artifact that is both a run pin and a review "
+              "target")
+
+    # The ordinary case still works, or the check above is just breaking freeze.
+    if do_freeze(tp).returncode != 0:
+        failures.append("freeze of an ordinary cycle was refused by the "
+                        "separation check")
+    else:
+        print("  [ok] a cycle whose target is not a pinned artifact still freezes")
+
+    # ---- the amendment history ----
+    def amend(root: Path, **over) -> None:
+        rec = {
+            "effective_cycle": 2,
+            "reason": "the pinned spec is also a review target, which the "
+                      "separation specification forbids",
+            "affected_artifacts": ["specs/spec.md"],
+            "prior_pin_set": ["specs/protocol.md", "specs/spec.md"],
+            "new_pin_set": ["specs/protocol.md"],
+            "authorized_by": "Alex Zamurko",
+            "at": "2026-09-10T00:00:00Z",
+        }
+        rec.update(over)
+        write_lf(root / "runs" / "T-001" / "pin-amendments.json", json.dumps({
+            "schema": "run-pin-amendments/1", "amendments": [rec]}, indent=2) + "\n")
+
+    def amend_refuses(label: str, needle: str, **over) -> None:
+        # These refuse inside check_pins_still_hold, before the loop controller
+        # is consulted, so cycle 01 does not need closing here. The control
+        # asserts the amendment chain is rejected, and the message it matches on
+        # says which rule rejected it.
+        root = make_repo(); made.append(root)
+        do_init(root); do_freeze(root)
+        amend(root, **over)
+        rr = do_freeze(root)
+        if rr.returncode == 0:
+            failures.append(f"{label}: accepted")
+        elif needle.lower() not in (rr.stdout + rr.stderr).lower():
+            failures.append(f"{label}: refused for the wrong reason\n"
+                            f"  wanted {needle!r}\n"
+                            f"  got {(rr.stderr + rr.stdout)[:300]}")
+        else:
+            print(f"  [ok] refused: {label}")
+
+    amend_refuses("an amendment that starts from a pin set that never existed",
+                  "does not follow the pin history",
+                  prior_pin_set=["specs/protocol.md"])
+    amend_refuses("an amendment with nobody's name on it", "missing",
+                  authorized_by="")
+    amend_refuses("an amendment whose reason is a placeholder", "at least",
+                  reason="because")
+    amend_refuses("an amendment whose declared artifacts are not what changed",
+                  "do not match what it changes",
+                  affected_artifacts=["specs/protocol.md"])
+
+    # And the amendment actually releases the pin, or the whole exercise is a
+    # record of a change that did not take effect.
+    # Cycle 01 is closed through the real record path rather than by writing raw
+    # output by hand. A hand-written cycle has no findings.json, and the loop
+    # controller then refuses to say whether another cycle is permitted, so
+    # freeze would be blocked by B01-F02's check and this control would report a
+    # pin failure that never happened. The finding is also raised in the ledger,
+    # because the controller refuses when a recorded finding is unaccounted for,
+    # and one open finding is what makes the loop CONTINUE rather than converge.
+    tr = make_repo(); made.append(tr)
+    do_init(tr); do_freeze(tr)
+    write_lf(tr / "reply.md", with_target(tr, GOOD))
+    rec = runner(tr, "record", "--cycle", "runs/T-001/plan-review/cycle-01",
+                 "--output", "reply.md", "--invocation", "manual")
+    if rec.returncode != 0:
+        failures.append(f"fixture: could not record cycle 01\n{rec.stdout}{rec.stderr}")
+    rl = sh(sys.executable, str(tr / "scripts" / "ledger.py"), "raise",
+            "--review", "runs/T-001/plan-review", "--cycle", "1",
+            "--id", "C01-F01", "--class", "UNTESTED RULE", cwd=tr)
+    if rl.returncode != 0:
+        failures.append(f"fixture: could not raise the finding\n{rl.stdout}{rl.stderr}")
+    spec_p = tr / "specs" / "spec.md"
+    spec_p.write_text(spec_p.read_text(encoding="utf-8") + "\nrepaired\n",
+                      encoding="utf-8")
+    r = do_freeze(tr)
+    if r.returncode == 0:
+        failures.append("cycle 02 froze with the pinned spec edited and no "
+                        "amendment recorded")
+    elif "run pins no longer hold" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the pin drift\n{r.stdout}{r.stderr}")
+    else:
+        print("  [ok] editing a pinned spec still blocks the next cycle")
+
+    amend(tr)
+    r = do_freeze(tr)
+    if r.returncode != 0:
+        failures.append("the recorded amendment did not release the pin, so the "
+                        f"loop is still deadlocked\n{r.stdout}{r.stderr}")
+    elif not (tr / "runs/T-001/plan-review/cycle-02").is_dir():
+        failures.append("freeze reported success but opened no cycle 02")
+    else:
+        print("  [ok] a recorded amendment releases the pin from cycle 02 onward")
+
+    # Cycle 01 must still be checked against what it was conducted under. An
+    # amendment that reached backwards would rewrite the conditions of a review
+    # that already happened.
+    import importlib.util as _ilu
+    _s = _ilu.spec_from_file_location("_rp", tr / "scripts" / "run_pins.py")
+    _m = _ilu.module_from_spec(_s); _s.loader.exec_module(_m)
+    run_obj = json.loads((tr / "runs/T-001/run.json").read_text(encoding="utf-8"))
+    items = _m.load_amendments(tr / "runs" / "T-001")
+    at1 = _m.pins_for_cycle(run_obj, items, 1)
+    at2 = _m.pins_for_cycle(run_obj, items, 2)
+    if "specs/spec.md" not in at1:
+        failures.append("the amendment reached back into cycle 01, rewriting the "
+                        f"conditions of a review that already happened: {at1}")
+    elif "specs/spec.md" in at2:
+        failures.append(f"the amendment did not take effect at cycle 02: {at2}")
+    else:
+        print("  [ok] the amendment applies forward only; cycle 01 keeps its own "
+              "pins")
 
     # ---- B01-F08: the gate must hold at freeze, not only at init ----
     # A run can sit for days between init and its first cycle, and every cycle is

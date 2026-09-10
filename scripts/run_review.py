@@ -51,6 +51,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import authority  # noqa: E402
+import run_pins  # noqa: E402
 
 VALIDATOR = REPO / "scripts" / "validate_cycle.py"
 
@@ -249,24 +250,49 @@ def load_run(run_id: str) -> dict:
         raise Refused(f"run.json is not valid JSON: {e}")
 
 
-def check_pins_still_hold(run: dict) -> None:
-    """The protocol and specs must not have moved since init.
+def check_pins_still_hold(run: dict, run_dir: Path | None = None,
+                          cycle_n: int | None = None) -> None:
+    """The governing artifacts must not have moved since init.
 
     A run whose spec changed underneath it is not four cycles against one spec;
     it is four cycles against whatever happened to be on disk each time. This is
     the check that makes the run.json pin mean something.
+
+    Alex Zamurko's Run-Pin and Review-Target Separation Specification, 10
+    September, narrows what belongs in that set: "A run-level pin may include
+    only artifacts that are required to remain invariant for the entire run." An
+    artifact under review is not one of those, and pinning one anyway is what
+    stopped BOOTSTRAP-001 between cycles 01 and 02.
+
+    So the set checked here is the one in force for the cycle being frozen,
+    replayed from the amendment history, rather than whatever run.json listed at
+    init. Cycle 01 is still checked against cycle 01's pins.
     """
+    pins = None
+    if run_dir is not None and cycle_n is not None:
+        try:
+            pins = set(run_pins.governing_pins(run, run_dir, cycle_n))
+        except run_pins.PinError as e:
+            raise Refused(f"the run's pin history cannot be read, so what "
+                          f"governs this cycle is undeterminable:\n  {e}")
+
     drift: list[str] = []
 
-    proto = REPO / run["protocol"]["path"]
-    if not proto.is_file():
-        drift.append(f"protocol file is gone: {run['protocol']['path']}")
-    elif sha256_file(proto) != run["protocol"]["sha256"]:
-        drift.append(f"protocol changed since init: {run['protocol']['path']}\n"
-                     f"    pinned {run['protocol']['sha256']}\n"
-                     f"    actual {sha256_file(proto)}")
+    def still_pinned(rel_path: str) -> bool:
+        return pins is None or rel_path in pins
+
+    if still_pinned(run["protocol"]["path"]):
+        proto = REPO / run["protocol"]["path"]
+        if not proto.is_file():
+            drift.append(f"protocol file is gone: {run['protocol']['path']}")
+        elif sha256_file(proto) != run["protocol"]["sha256"]:
+            drift.append(f"protocol changed since init: {run['protocol']['path']}\n"
+                         f"    pinned {run['protocol']['sha256']}\n"
+                         f"    actual {sha256_file(proto)}")
 
     for e in run["spec_files"]:
+        if not still_pinned(e["path"]):
+            continue
         p = REPO / e["path"]
         if not p.is_file():
             drift.append(f"spec file is gone: {e['path']}")
@@ -280,6 +306,40 @@ def check_pins_still_hold(run: dict) -> None:
                       "\n\nEither restore the pinned bytes or start a new run. "
                       "Continuing would produce cycles that cite a spec version "
                       "nobody reviewed.")
+
+
+def check_pin_target_separation(run: dict, run_dir: Path, cycle_n: int,
+                                target_paths: list[str]) -> None:
+    """§2's governing invariant, refused rather than described.
+
+    "No review process may require an artifact to remain byte-invariant for the
+    duration of a run while simultaneously requiring that same artifact version
+    to change in order to resolve review findings."
+
+    Checked at freeze, where both sides are known for the first time: the pin set
+    comes from the run and the target list from this cycle's arguments. Nothing
+    checked it before, which is why the contradiction was only discovered by the
+    loop deadlocking on it two cycles later.
+    """
+    try:
+        pins = run_pins.governing_pins(run, run_dir, cycle_n)
+    except run_pins.PinError as e:
+        raise Refused(f"the run's pin history cannot be read:\n  {e}")
+    clash = run_pins.separation_violations(pins, target_paths)
+    if not clash:
+        return
+    raise Refused(
+        "an artifact cannot be both a run-level governing pin and a review "
+        "target:\n  " + "\n  ".join(clash) +
+        "\n\n  It would have to stay byte-identical for the whole run and also "
+        "change to\n  resolve any finding raised about it. The first repair "
+        "would break the run's own\n  pin and stop the cycle that was meant to "
+        "demonstrate the repair.\n\n"
+        "  Alex Zamurko, 10 September: an artifact belongs to exactly one role, "
+        "RUN-GOVERNING\n  or REVIEW-TARGET, unless explicit ACTIVE/CANDIDATE "
+        "version separation is in place.\n"
+        "  Amend the run's pin set, recording reason, affected artifacts, prior "
+        "set, new set\n  and effective cycle in pin-amendments.json.")
 
 
 def load_gate():
@@ -464,19 +524,23 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         raise Refused(f"--type must be one of {REVIEW_TYPES}, got {args.type!r}")
 
     run = load_run(args.run)
-    check_pins_still_hold(run)
     check_bootstrap_still_holds(run)
 
     prompt_path = require_file(Path(args.prompt).resolve(), "prompt file")
     prompt = prompt_path.read_text(encoding="utf-8")
 
     review_dir = REPO / "runs" / args.run / f"{args.type}-review"
+    run_dir = REPO / "runs" / args.run
     n = next_cycle(review_dir)
     if n > MAX_CYCLES:
         raise Refused(f"cycle {n} would exceed the {MAX_CYCLES}-cycle budget for "
                       f"{args.run} {args.type} review.\n"
                       "MAX_4_REACHED is an exit, not an obstacle to route around. "
                       "Escalate to human review.")
+    # After n is known, because the pin set in force is a property of the cycle
+    # rather than of the run: an amendment effective at cycle k governs k onward
+    # and leaves earlier cycles checked against what they were conducted under.
+    check_pins_still_hold(run, run_dir, n)
     check_previous_cycle_closed(review_dir, n)
     check_loop_not_terminated(review_dir, n)
 
@@ -501,6 +565,11 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         if not args.file:
             raise Refused("plan review needs at least one --file")
         refs = [hashed_ref(require_file(Path(f).resolve(), "plan file")) for f in args.file]
+        # Both sides are known for the first time here: the pin set from the run,
+        # the target list from this cycle's arguments. Nothing compared them
+        # before, which is why the contradiction surfaced only when the loop
+        # deadlocked on it a cycle later.
+        check_pin_target_separation(run, run_dir, n, [r["path"] for r in refs])
         target["plan_files"] = refs
         artifacts = [(r, (REPO / r["path"]).read_text(encoding="utf-8", errors="replace"))
                      for r in refs]

@@ -52,7 +52,7 @@ def build(with_evidence: bool = True) -> Path:
     (tmp / "specs").mkdir()
     for n in ("bootstrap_gate.py", "validate_cycle.py", "run_review.py",
               "ledger.py", "loop_state.py", "findings_format.py",
-              "cycle_projection.py", "authority.py"):
+              "cycle_projection.py", "authority.py", "run_pins.py"):
         shutil.copy2(SRC / n, tmp / "scripts" / n)
     shutil.copy2(REPO / "specs" / "evidence-schema-v1.0.md",
                  tmp / "specs" / "evidence-schema-v1.0.md")

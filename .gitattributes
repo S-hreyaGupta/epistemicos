@@ -32,6 +32,23 @@ internal/core/domain/segment/testdata/expected.json -text
 # and the offsets read as an extraction bug rather than as a checkout artefact.
 specs/** -text
 
+# Review evidence. This is the directory the whole protocol is about, and it was
+# the one directory not pinned. Every file under it is hashed by something:
+# target.sha256 over target.json, capture-log.json's authoritative_sha256 over
+# codex-output-raw.md, MC-2 check 10 binding codex-input.md to the frozen target,
+# and each cycle's artifacts/ snapshot against the values recorded at freeze.
+#
+# Under core.autocrlf=true a checkout rewrites LF to CRLF and every one of those
+# hashes stops matching at once. Cycle 01 would go INVALID and its eighteen
+# findings would disappear from the loop state, which is the same failure the
+# snapshot-at-freeze repair exists to prevent, arriving by a different route.
+# Nothing would say "line endings"; it would read as fabricated or corrupted
+# evidence.
+#
+# Found by git itself, warning on the first write into runs/ after this file was
+# last edited: "LF will be replaced by CRLF the next time Git touches it".
+runs/** -text
+
 # Orchestration scripts are normalised to LF for the same reason go.mod and
 # go.sum are: they get hashed. The bootstrap review freezes validate_cycle.py
 # and its negative controls as a review target with a recorded SHA-256, and

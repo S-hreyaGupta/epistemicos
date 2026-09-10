@@ -550,6 +550,56 @@ def main() -> int:
     else:
         ok("nothing open, one dispute -> HUMAN_ADJUDICATION_REQUIRED (protocol v1.1)")
 
+    # ---------------------------------------------------------- seam 8
+    print()
+    print("seam 8  recorded hashes <-> what git hands back")
+
+    # Every hash in this repository is taken over bytes on disk, and git decides
+    # what those bytes are at checkout. Under core.autocrlf=true it rewrites LF
+    # to CRLF, and then target.sha256 stops matching target.json, the capture
+    # log stops matching codex-output-raw.md, MC-2 check 10 stops binding
+    # codex-input.md to the target, and each cycle's artifacts/ snapshot stops
+    # matching the values recorded at freeze. All at once, and none of it says
+    # "line endings": it reads as fabricated or corrupted evidence.
+    #
+    # .gitattributes pinned specs/ and scripts/ for exactly this reason and left
+    # runs/ unpinned, which is the directory the protocol is actually about. git
+    # itself reported it, warning on a write into runs/ that LF would be
+    # replaced by CRLF next time it touched the file.
+    #
+    # git check-attr is asked rather than .gitattributes parsed. The precedence
+    # rules are git's, and a check that reimplements them is a check that can
+    # disagree with the thing it is checking.
+    hashed = [
+        "runs/BOOTSTRAP-001/plan-review/cycle-01/target.json",
+        "runs/BOOTSTRAP-001/plan-review/cycle-01/codex-input.md",
+        "runs/BOOTSTRAP-001/plan-review/cycle-01/codex-output-raw.md",
+        "runs/BOOTSTRAP-001/plan-review/cycle-01/capture-log.json",
+        "specs/evidence-schema-v1.0.md",
+        "specs/implementation-review-protocol-v1.1.md",
+        "scripts/validate_cycle.py",
+        "scripts/run_review.py",
+    ]
+    unpinned = []
+    for rel_p in hashed:
+        if not (REPO / rel_p).exists():
+            continue
+        t = sh("git", "-C", str(REPO), "check-attr", "text", "eol", "--", rel_p,
+               cwd=REPO)
+        attrs = t.stdout
+        # Either conversion is disabled (-text -> "text: unset") or the ending
+        # is pinned to lf. Anything else and checkout may rewrite the bytes.
+        safe = ("text: unset" in attrs) or ("eol: lf" in attrs)
+        if not safe:
+            unpinned.append(f"{rel_p} -> {attrs.strip().splitlines()}")
+    if unpinned:
+        bad("files whose bytes are hashed are not pinned against line-ending "
+            "conversion:\n    " + "\n    ".join(unpinned) +
+            "\n    A checkout would rewrite them and every recorded hash over "
+            "them would stop\n    matching at once.")
+    else:
+        ok(f"all {len(hashed)} hashed paths survive checkout unaltered")
+
     for p in made:
         shutil.rmtree(p, ignore_errors=True)
 

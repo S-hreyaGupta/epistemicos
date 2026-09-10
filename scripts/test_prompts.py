@@ -257,30 +257,90 @@ def main() -> int:
         failures.append("specs/prompts/bootstrap-review.md is missing; the "
                         "bootstrap review has no prompt to run against")
     else:
+        # Every bootstrap prompt, not only the first. Cycle 02 has its own, and a
+        # count checked in one file and typed freely in another is the same drift
+        # this check exists to stop, just moved.
+        #
+        # The suites are run once each and compared against every prompt that
+        # names them. Running them per prompt would double an already slow check
+        # and would still be one call per claim.
+        import subprocess
+        # The checks after this one still read `text`, and they mean the first
+        # bootstrap prompt specifically. Bound here rather than left to fall
+        # through from an earlier section: when it did, the component-naming
+        # check below silently graded a different prompt and reported all six
+        # components missing from a file that names every one of them.
         text = boot.read_text(encoding="utf-8")
-        claimed = {f"scripts/{m}": int(n) for m, n in
-                   re.findall(r"scripts/(\w+\.py)\s+(\d+)\s+controls", text)}
-        if not claimed:
+        boots = sorted(PROMPTS.glob("bootstrap-review*.md"))
+        claims: dict[str, dict[str, int]] = {}
+        for b in boots:
+            text_b = b.read_text(encoding="utf-8")
+            claims[b.name] = {f"scripts/{m}": int(n) for m, n in
+                              re.findall(r"scripts/(\w+\.py)\s+(\d+)\s+controls",
+                                         text_b)}
+        if not claims.get("bootstrap-review.md"):
             failures.append("bootstrap-review.md no longer states any control "
                             "counts, so nothing tells the reviewer whether these "
                             "components are controlled at all")
-        wrong = []
-        for rel, n in sorted(claimed.items()):
+
+        wanted = sorted({rel for c in claims.values() for rel in c})
+        actual_counts: dict[str, int | None] = {}
+        for rel in wanted:
             p = REPO / rel
             if not p.is_file():
-                wrong.append(f"{rel} is named but does not exist")
+                actual_counts[rel] = None
                 continue
-            import subprocess
             out = subprocess.run([sys.executable, str(p)], cwd=str(REPO),
                                  capture_output=True, text=True)
-            actual = (out.stdout + out.stderr).count("[ok]")
-            if actual != n:
-                wrong.append(f"{rel}: prompt claims {n}, suite reports {actual}")
-        if wrong:
-            failures.append("bootstrap-review.md misstates its control counts:\n      "
-                            + "\n      ".join(wrong))
-        elif claimed:
-            ok(f"all {len(claimed)} stated control counts match the suites")
+            actual_counts[rel] = (out.stdout + out.stderr).count("[ok]")
+
+        total = 0
+        any_wrong = False
+        for name, claimed in sorted(claims.items()):
+            wrong = []
+            for rel, n in sorted(claimed.items()):
+                got = actual_counts.get(rel)
+                if got is None:
+                    wrong.append(f"{rel} is named but does not exist")
+                elif got != n:
+                    wrong.append(f"{rel}: prompt claims {n}, suite reports {got}")
+            if wrong:
+                any_wrong = True
+                failures.append(f"{name} misstates its control counts:\n      "
+                                + "\n      ".join(wrong))
+            total += len(claimed)
+        if not any_wrong:
+            ok(f"all {total} stated control counts across {len(claims)} bootstrap "
+               "prompt(s) match the suites")
+
+        # A cycle-02 prompt that reused cycle 01's finding-ID grammar would ask
+        # the reviewer to raise B01 identifiers in cycle 02, and the ledger
+        # refuses those: check_id requires the digits to match the cycle. The
+        # review would be unrecordable, and nobody would find out until the
+        # transcription.
+        for b in boots:
+            m_cycle = re.search(r"cycle-(\d+)\.md$", b.name)
+            if not m_cycle:
+                continue
+            n_cycle = int(m_cycle.group(1))
+            grammars = set(re.findall(r"Finding ID: ([A-Z]\d{2})-F\d{2}",
+                                      b.read_text(encoding="utf-8")))
+            expected = f"B{n_cycle:02d}"
+            stray = sorted(g for g in grammars if g != expected)
+            # A prompt may legitimately show an earlier identifier when telling
+            # the reviewer how to report an unrepaired finding against its
+            # persistent id, so this only fails on a LATER or absent one.
+            if expected not in grammars:
+                failures.append(
+                    f"{b.name} never shows the {expected}-Fnn identifier its "
+                    "cycle requires, so findings raised from it would be refused "
+                    "by the ledger")
+            elif any(int(g[1:]) > n_cycle for g in stray):
+                failures.append(
+                    f"{b.name} shows identifiers from a later cycle: "
+                    f"{', '.join(stray)}")
+            else:
+                ok(f"{b.name} uses the finding-ID grammar its cycle requires")
 
         # The prompt states how many artifacts are under review, in prose, in two
         # places. They disagreed: "Six artifacts" in the list and "these five
@@ -351,7 +411,41 @@ def main() -> int:
                     "prompt is one the reviewer is never asked about, while the "
                     "gate still treats it as reviewed.")
             else:
-                ok(f"the prompt names all {len(required)} components the gate covers")
+                ok(f"the prompt names all {len(required)} declared roots")
+
+            # The declared roots are not the covered set. `covered()` adds every
+            # file reached through the import closure, and those are the ones
+            # most easily forgotten, because nobody wrote them down anywhere:
+            # cycle_projection.py and authority.py entered the gate's coverage
+            # by being imported, not by being declared. Checking only the roots
+            # left the check looking like it covered the component set while
+            # covering the declared part of it, which is the defect this suite
+            # exists to catch, one level up.
+            #
+            # Applied to the current prompt only. An earlier cycle's prompt is a
+            # record of what was reviewed then, and grading it against files that
+            # did not exist yet would demand it name the future.
+            numbered = sorted(
+                (int(mm.group(1)), b) for b in boots
+                for mm in [re.search(r"cycle-(\d+)\.md$", b.name)] if mm)
+            current = numbered[-1][1] if numbered else boot
+            try:
+                covered_now = sorted(m_.covered(REPO))
+            except Exception as e:
+                failures.append(f"could not compute the gate's covered set: {e}")
+                covered_now = []
+            cur_text = current.read_text(encoding="utf-8")
+            missing_cov = [c for c in covered_now if c not in cur_text]
+            if missing_cov:
+                failures.append(
+                    f"{current.name} does not name every file the gate covers: "
+                    f"{', '.join(missing_cov)}. These reached coverage through "
+                    "the import closure rather than by being declared, so a "
+                    "reviewer is never asked about them while the gate treats "
+                    "them as reviewed.")
+            elif covered_now:
+                ok(f"{current.name} names all {len(covered_now)} files the gate "
+                   "covers, closure included")
 
     print()
     if failures:

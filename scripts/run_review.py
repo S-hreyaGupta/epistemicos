@@ -251,7 +251,8 @@ def load_run(run_id: str) -> dict:
 
 
 def check_pins_still_hold(run: dict, run_dir: Path | None = None,
-                          cycle_n: int | None = None) -> None:
+                          cycle_n: int | None = None,
+                          review_dir: Path | None = None) -> None:
     """The governing artifacts must not have moved since init.
 
     A run whose spec changed underneath it is not four cycles against one spec;
@@ -268,20 +269,33 @@ def check_pins_still_hold(run: dict, run_dir: Path | None = None,
     replayed from the amendment history, rather than whatever run.json listed at
     init. Cycle 01 is still checked against cycle 01's pins.
     """
-    pins = None
+    drift: list[str] = []
+
     if run_dir is not None and cycle_n is not None:
+        # B02-F05. The whole effective set, with each artifact's hash resolved
+        # from run.json or from the amendment that introduced it. Walking
+        # run["spec_files"] alone left an amendment-added pin governing the run
+        # and checked by nothing, so declaring a pin was enough to satisfy the
+        # check that was supposed to enforce it.
         try:
-            pins = set(run_pins.governing_pins(run, run_dir, cycle_n))
+            items = run_pins.load_amendments(run_dir)
+            run_pins.validate_chain(run, items)
+            if review_dir is not None:
+                run_pins.check_frozen_assignments(
+                    run, items, run_pins.frozen_assignments(review_dir))
+            effective = run_pins.pin_hashes_for_cycle(run, items, cycle_n)
         except run_pins.PinError as e:
             raise Refused(f"the run's pin history cannot be read, so what "
                           f"governs this cycle is undeterminable:\n  {e}")
-
-    drift: list[str] = []
-
-    def still_pinned(rel_path: str) -> bool:
-        return pins is None or rel_path in pins
-
-    if still_pinned(run["protocol"]["path"]):
+        for rel_path, want in sorted(effective.items()):
+            p = REPO / rel_path
+            if not p.is_file():
+                drift.append(f"governing artifact is gone: {rel_path}")
+            elif sha256_file(p) != want:
+                drift.append(f"governing artifact changed: {rel_path}\n"
+                             f"    pinned {want}\n"
+                             f"    actual {sha256_file(p)}")
+    else:
         proto = REPO / run["protocol"]["path"]
         if not proto.is_file():
             drift.append(f"protocol file is gone: {run['protocol']['path']}")
@@ -289,17 +303,14 @@ def check_pins_still_hold(run: dict, run_dir: Path | None = None,
             drift.append(f"protocol changed since init: {run['protocol']['path']}\n"
                          f"    pinned {run['protocol']['sha256']}\n"
                          f"    actual {sha256_file(proto)}")
-
-    for e in run["spec_files"]:
-        if not still_pinned(e["path"]):
-            continue
-        p = REPO / e["path"]
-        if not p.is_file():
-            drift.append(f"spec file is gone: {e['path']}")
-        elif sha256_file(p) != e["sha256"]:
-            drift.append(f"spec changed since init: {e['path']}\n"
-                         f"    pinned {e['sha256']}\n"
-                         f"    actual {sha256_file(p)}")
+        for e in run["spec_files"]:
+            p = REPO / e["path"]
+            if not p.is_file():
+                drift.append(f"spec file is gone: {e['path']}")
+            elif sha256_file(p) != e["sha256"]:
+                drift.append(f"spec changed since init: {e['path']}\n"
+                             f"    pinned {e['sha256']}\n"
+                             f"    actual {sha256_file(p)}")
 
     if drift:
         raise Refused("run pins no longer hold:\n  " + "\n  ".join(drift) +
@@ -540,7 +551,7 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     # After n is known, because the pin set in force is a property of the cycle
     # rather than of the run: an amendment effective at cycle k governs k onward
     # and leaves earlier cycles checked against what they were conducted under.
-    check_pins_still_hold(run, run_dir, n)
+    check_pins_still_hold(run, run_dir, n, review_dir)
     check_previous_cycle_closed(review_dir, n)
     check_loop_not_terminated(review_dir, n)
 
@@ -549,10 +560,25 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         raise Refused(f"cycle directory already exists: {rel(cycle)}\n"
                       "Frozen evidence is write-once.")
 
+    # B02-F06. What governed this cycle, recorded in the cycle itself. Without
+    # it "amendments apply forward" meant only that their numbers increased, and
+    # an amendment appended after a review could still change what that review
+    # had been conducted under. The assignment becomes a fact in the frozen
+    # evidence rather than something replayed from a file that can still change.
+    try:
+        _items = run_pins.load_amendments(run_dir)
+        _gov = run_pins.pins_for_cycle(run, _items, n)
+        _gov_hashes = run_pins.pin_hashes_for_cycle(run, _items, n)
+    except run_pins.PinError as e:
+        raise Refused(f"cannot determine the governing pin set for cycle "
+                      f"{n:02d}:\n  {e}")
+
     target = {
         "review_type": args.type,
         "run_id": run["run_id"],
         "cycle": n,
+        "governing_pins": _gov,
+        "governing_pin_hashes": _gov_hashes,
         "protocol_commit": run["protocol_commit"],
         "protocol_sha256": run["protocol_sha256"],
         "spec_sha256": run["spec_sha256"],

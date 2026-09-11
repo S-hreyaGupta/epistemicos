@@ -265,13 +265,20 @@ def main() -> int:
         do_init(t)
         write_lf(t / "specs" / "protocol.md", PROTOCOL_BODY + "V22 added later\n")
         return do_freeze(t)
-    expect_refused("protocol edited after init", "protocol changed since init", protocol_drift)
+    # The message changed with B02-F05: the pin check now walks the effective
+    # governing set rather than run.json's protocol and spec_files separately,
+    # so one refusal covers both and names the path. The needle asserts the
+    # path, which is what a reader needs, rather than which branch produced it.
+    expect_refused("protocol edited after init",
+                   "governing artifact changed: specs/protocol.md",
+                   protocol_drift)
 
     def spec_drift(t: Path):
         do_init(t)
         write_lf(t / "specs" / "spec.md", SPEC_BODY + "rule G8\n")
         return do_freeze(t)
-    expect_refused("spec edited after init", "spec changed since init", spec_drift)
+    expect_refused("spec edited after init",
+                   "governing artifact changed: specs/spec.md", spec_drift)
 
     def missing_prompt(t: Path):
         do_init(t)
@@ -1047,6 +1054,54 @@ def main() -> int:
     amend_refuses("an amendment that starts from a pin set that never existed",
                   "does not follow the pin history",
                   prior_pin_set=["specs/protocol.md"])
+
+    # ---- B02-F05: amendments are constrained by role ----
+    # "The governing protocol cannot be removed; added pins must be validated."
+    # The first version accepted any structurally valid edit, so an inconvenient
+    # mandatory pin could simply be dropped and a new one declared without ever
+    # being checked.
+    amend_refuses("an amendment that removes the governing protocol",
+                  "removes the governing protocol",
+                  affected_artifacts=["specs/protocol.md"],
+                  new_pin_set=["specs/spec.md"])
+    amend_refuses("an amendment adding a pin with no hash",
+                  "without binding them to their bytes",
+                  affected_artifacts=["specs/extra.md"],
+                  new_pin_set=["specs/protocol.md", "specs/spec.md",
+                               "specs/extra.md"])
+    amend_refuses("an amendment adding a pin with something other than a sha256",
+                  "other than a sha256",
+                  affected_artifacts=["specs/extra.md"],
+                  new_pin_set=["specs/protocol.md", "specs/spec.md",
+                               "specs/extra.md"],
+                  added_pin_hashes={"specs/extra.md": "not-a-hash"})
+
+    # An added pin, properly bound, must then actually be checked. Codex's
+    # finding was that the pin check walked run.json's original entries only,
+    # so a newly declared governing artifact was never hashed at all.
+    tx = make_repo(); made.append(tx)
+    do_init(tx); do_freeze(tx)
+    write_lf(tx / "runs/T-001/plan-review/cycle-01/codex-output-raw.md", "x\n")
+    write_lf(tx / "specs" / "extra.md", "an added governing artifact\n")
+    extra_hash = hashlib.sha256(
+        (tx / "specs" / "extra.md").read_bytes()).hexdigest()
+    amend(tx, affected_artifacts=["specs/extra.md"],
+          new_pin_set=["specs/protocol.md", "specs/spec.md", "specs/extra.md"],
+          added_pin_hashes={"specs/extra.md": extra_hash})
+    p_extra = tx / "specs" / "extra.md"
+    p_extra.write_text(p_extra.read_text(encoding="utf-8") + "edited\n",
+                       encoding="utf-8")
+    r = do_freeze(tx)
+    if r.returncode == 0:
+        failures.append("an amendment-added governing artifact was edited and "
+                        "the freeze accepted it; added pins are declared but "
+                        "not checked")
+    elif "governing artifact changed" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the added pin's drift\n"
+                        f"{r.stdout}{r.stderr}")
+    else:
+        print("  [ok] refused: an artifact added by amendment is checked like "
+              "any other governing pin")
     amend_refuses("an amendment with nobody's name on it", "missing",
                   authorized_by="")
     amend_refuses("an amendment whose reason is a placeholder", "at least",
@@ -1097,6 +1152,35 @@ def main() -> int:
         failures.append("freeze reported success but opened no cycle 02")
     else:
         print("  [ok] a recorded amendment releases the pin from cycle 02 onward")
+
+    # ---- B02-F06: an amendment cannot rewrite a completed cycle ----
+    # Codex: "An amendment appended after review can retroactively change what
+    # governed an already completed cycle." The old forward-only control only
+    # showed that effective_cycle=2 gave different answers for cycles 1 and 2.
+    # It never appended a backdated amendment after a cycle existed.
+    tb = make_repo(); made.append(tb)
+    do_init(tb); do_freeze(tb)
+    tgt1 = json.loads((tb / "runs/T-001/plan-review/cycle-01/target.json")
+                      .read_text(encoding="utf-8"))
+    if "governing_pins" not in tgt1:
+        failures.append("the frozen cycle does not record what governed it, so "
+                        "nothing can be checked against it")
+    else:
+        print(f"  [ok] a frozen cycle records its governing pin set "
+              f"({len(tgt1['governing_pins'])} artifacts)")
+        write_lf(tb / "runs/T-001/plan-review/cycle-01/codex-output-raw.md", "x\n")
+        # Effective at cycle 1, which already exists and recorded both pins.
+        amend(tb, effective_cycle=1)
+        r = do_freeze(tb)
+        if r.returncode == 0:
+            failures.append("a backdated amendment was accepted after the cycle "
+                            "it affects had already been frozen")
+        elif "already happened" not in (r.stdout + r.stderr):
+            failures.append(f"refused, but not for the retroactive change\n"
+                            f"{r.stdout}{r.stderr}")
+        else:
+            print("  [ok] refused: an amendment that would change what a "
+                  "completed cycle ran under")
 
     # Cycle 01 must still be checked against what it was conducted under. An
     # amendment that reached backwards would rewrite the conditions of a review

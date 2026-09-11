@@ -578,15 +578,24 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         if not args.candidate_commit:
             raise Refused("implementation review requires --candidate-commit")
 
-        # B01-F05. Alex Zamurko, 10 September: "resolve any mutable reference
-        # such as HEAD to an immutable commit SHA at freeze time and verify the
-        # corresponding tree hash. Reject unresolved/mutable refs."
+        # B01-F05. Alex Zamurko, 10 September, ruled that a mutable reference
+        # such as HEAD is resolved to a specific commit SHA at freeze time, the
+        # corresponding tree hash is verified, and anything that will not
+        # resolve is refused.
         #
         # The reference was previously stored exactly as typed. `HEAD` recorded
         # as `HEAD` names whatever the branch points at whenever anyone looks,
         # so the reviewed implementation could move after the freeze while
         # checks 11 and 12 kept passing against the new commit. The freeze
         # recorded a pointer, not an object.
+        #
+        # What resolving establishes, and what it does not. A SHA names one
+        # object, so the target stops following a branch and a later commit does
+        # not silently become the reviewed one. It is not a guarantee that the
+        # object cannot be replaced: under MC1_ENFORCEMENT: CONVENTION_ONLY a
+        # history rewrite still reaches it. That is a loud act which leaves the
+        # reflog and every clone disagreeing, where a branch moving on is
+        # ordinary work.
         rc = subprocess.run(
             ["git", "-C", str(REPO), "rev-parse", "--verify",
              f"{args.candidate_commit}^{{commit}}"],
@@ -601,8 +610,8 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         if not re.fullmatch(r"[0-9a-f]{40}", resolved):
             raise Refused(
                 f"--candidate-commit resolved to {resolved!r}, which is not a "
-                "full commit SHA.\n  The target records an immutable object, "
-                "never an abbreviation or a name.")
+                "full commit SHA.\n  The target records the full identifier of "
+                "one object, never an abbreviation or a name.")
 
         # The tree is derived from the RESOLVED commit, not from the reference.
         # Deriving it from the reference would re-read the mutable name a second

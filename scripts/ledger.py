@@ -165,6 +165,33 @@ def get(data: dict, fid: str) -> dict:
     return f
 
 
+def check_not_before_raise(f: dict, fid: str, cycle: int, event: str) -> None:
+    """B01-F12. No event may predate the cycle that raised the finding.
+
+    Alex Zamurko, 10 September: "require every ACCEPT, RESOLVE, or DISPUTE event
+    to occur in the raising cycle or a later valid cycle. Reject any
+    earlier-dated event. Why it works: the ledger cannot contain impossible
+    causal history."
+
+    Nothing checked this. A finding raised in cycle 3 could be accepted in cycle
+    1 and resolved in cycle 2, and the history would read as a decision taken
+    about something that had not been found yet. §6 then measures those sets at
+    boundaries where the finding did not exist.
+
+    Ordering only. Whether the cycle is VALID is the projection's question, and
+    asking it here would put a second opinion on validity in the ledger, which
+    is the divergence B01-F11 was about.
+    """
+    raised = int(f.get("cycle_raised", cycle))
+    if cycle < raised:
+        raise Refused(
+            f"{fid} was raised in cycle {raised:02d} and cannot be "
+            f"{event}ed in cycle {cycle:02d}.\n"
+            "  An event earlier than the finding it acts on is not a late "
+            "record, it is a\n  history that could not have happened. Record it "
+            "in the raising cycle or later.")
+
+
 def last_event(f: dict, event: str) -> dict | None:
     """Unfiltered. Kept for reporting; never for authority. See `authorized`."""
     for e in reversed(f["history"]):
@@ -265,6 +292,7 @@ def cmd_respond(a: argparse.Namespace) -> int:
     f = get(data, a.id)
     proj = projection(review)
     state = effective_state(f, proj)
+    check_not_before_raise(f, a.id, a.cycle, "respond")
 
     if state == RESOLVED:
         raise Refused(f"{a.id} is RESOLVED. Responding again is not how a "
@@ -339,6 +367,7 @@ def cmd_reopen(a: argparse.Namespace) -> int:
     f = get(data, a.id)
     proj = projection(review)
     state = effective_state(f, proj)
+    check_not_before_raise(f, a.id, a.cycle, "reopen")
 
     if state != RESOLVED:
         raise Refused(f"{a.id} is {state}, not RESOLVED. Reopening applies "
@@ -374,6 +403,7 @@ def cmd_resolve(a: argparse.Namespace) -> int:
     f = get(data, a.id)
     proj = projection(review)
     state = effective_state(f, proj)
+    check_not_before_raise(f, a.id, a.cycle, "resolv")
 
     if state == RESOLVED:
         raise Refused(f"{a.id} is already RESOLVED.")

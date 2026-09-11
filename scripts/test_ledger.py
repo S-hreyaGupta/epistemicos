@@ -239,6 +239,47 @@ def main() -> int:
                                   "--cycle", "2", "--id", "C01-F01",
                                   "--evidence", "x"))
 
+    # ---- B01-F12: no event may predate the finding it acts on ----
+    # "Require every ACCEPT, RESOLVE, or DISPUTE event to occur in the raising
+    # cycle or a later valid cycle. Reject any earlier-dated event." Nothing
+    # checked this, so a finding raised in cycle 3 could be accepted in cycle 1
+    # and resolved in cycle 2, and §6 would measure those sets at boundaries
+    # where the finding did not yet exist.
+    print()
+    print("events cannot predate the finding they act on (B01-F12)")
+
+    rootF, commitF, revF = fresh()
+    revF.mkdir(parents=True)
+    ledger(rootF, "raise", "--review", str(revF), "--cycle", "3",
+           "--id", "C03-F01", "--class", "UNTESTED RULE")
+
+    expect_refused("ACCEPT dated before the raising cycle", "could not have happened",
+                   lambda: ledger(rootF, "respond", "--review", str(revF),
+                                  "--cycle", "1", "--id", "C03-F01",
+                                  "--disposition", "ACCEPT", "--note", "early"))
+    expect_refused("REJECT_WITH_REASON dated before the raising cycle",
+                   "could not have happened",
+                   lambda: ledger(rootF, "respond", "--review", str(revF),
+                                  "--cycle", "2", "--id", "C03-F01",
+                                  "--disposition", "REJECT_WITH_REASON",
+                                  "--note", "disagree",
+                                  "--spec-evidence", "§4 does not apply"))
+    expect_refused("RESOLVE dated before the raising cycle",
+                   "could not have happened",
+                   lambda: ledger(rootF, "resolve", "--review", str(revF),
+                                  "--cycle", "1", "--id", "C03-F01",
+                                  "--evidence", "early"))
+
+    # The same cycle as the raise is permitted: §5 places the disposition in the
+    # cycle the finding was raised in. Only earlier is impossible.
+    r = ledger(rootF, "respond", "--review", str(revF), "--cycle", "3",
+               "--id", "C03-F01", "--disposition", "ACCEPT", "--note", "fix")
+    if r.returncode != 0:
+        failures.append(f"an ACCEPT in the raising cycle was refused:\n"
+                        f"{r.stderr}{r.stdout}")
+    else:
+        print("  [ok] a disposition in the raising cycle itself is permitted")
+
     # The duplicate-id refusal must now point at reopen rather than instruct a
     # rename, which is what B01-F13 was about.
     root4, rev4 = resolved_fixture()

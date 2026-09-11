@@ -146,7 +146,13 @@ def reply_for(tmp: Path, body: str, run: str = "T-001",
 
 
 def fake_cycles(tmp: Path, n: int, close_last: bool = True) -> None:
-    """n cycle directories, each with raw output unless the last is left open."""
+    """n cycle directories, each with raw output unless the last is left open.
+
+    These deliberately do NOT pass MC-2 — they carry a target.json with only a
+    cycle number and no hashed artifacts. That makes them the right fixture for
+    "a directory exists" questions and the wrong one for anything about the
+    four-cycle budget, which counts cycles that pass the gate. See B01-F01.
+    """
     rd = tmp / "runs" / "T-001" / "plan-review"
     for i in range(1, n + 1):
         c = rd / f"cycle-{i:02d}"
@@ -298,11 +304,80 @@ def main() -> int:
                       "--prompt", "specs/prompt.md")
     expect_refused("plan review with no artifact", "needs at least one --file", no_plan_file)
 
-    def budget(t: Path):
-        do_init(t)
-        fake_cycles(t, 4)
-        return do_freeze(t)
-    expect_refused("fifth cycle exceeds the budget", "exceed the 4-cycle budget", budget)
+    # ---- B01-F01: the budget counts valid cycles, not directories ----
+    # This control used to call fake_cycles(4), which builds directories that
+    # fail MC-2, and assert the fifth freeze was refused. So it asserted that
+    # four INVALID cycles exhaust the budget — the finding itself, written down
+    # as expected behaviour and passing for weeks.
+    #
+    # §2: "Only cycles that pass the MC-2 conformance gate count toward this
+    # maximum." §3: an invalid cycle "cannot consume one of the four valid
+    # review cycles."
+    print()
+    print("the four-cycle budget counts valid cycles")
+
+    tbud = make_repo(); made.append(tbud)
+    do_init(tbud)
+    fake_cycles(tbud, 4)
+    r = do_freeze(tbud)
+    if r.returncode != 0 and "budget" in (r.stdout + r.stderr):
+        failures.append("four cycles that fail MC-2 exhausted the budget; "
+                        "invalid cycles cannot consume it")
+    else:
+        print("  [ok] four cycles that fail MC-2 do not consume the budget")
+
+    # And four that pass it do. Built through the real freeze and record path,
+    # because a fixture that hand-writes cycles is how the control above came to
+    # assert the wrong thing.
+    tfull = make_repo(); made.append(tfull)
+    do_init(tfull)
+
+    def close_cycle(root: Path, n: int) -> bool:
+        c = root / "runs" / "T-001" / "plan-review" / f"cycle-{n:02d}"
+        th = (c / "target.sha256").read_text(encoding="utf-8").strip()
+        write_lf(root / f"reply{n}.md",
+                 f"TARGET_SHA256 {th}\n\nNo findings in any category.\n")
+        rr = runner(root, "record", "--cycle",
+                    f"runs/T-001/plan-review/cycle-{n:02d}",
+                    "--output", f"reply{n}.md", "--invocation", "manual",
+                    "--zero-findings")
+        return rr.returncode == 0
+
+    def led(root: Path, *a: str) -> subprocess.CompletedProcess:
+        return sh(sys.executable, str(root / "scripts" / "ledger.py"), *a,
+                  "--review", "runs/T-001/plan-review", cwd=root)
+
+    built = 0
+    for i in range(1, 5):
+        if do_freeze(tfull).returncode != 0:
+            break
+        if not close_cycle(tfull, i):
+            break
+        built = i
+        # The loop has to stay on CONTINUE for four cycles, which means each one
+        # must show progress. A cycle that only adds an open finding is STALLED
+        # by §6 at n=2 — correctly — and the freeze after it is refused before
+        # the budget is ever consulted. So each cycle resolves the previous
+        # finding and raises its own.
+        if i > 1:
+            led(tfull, "resolve", "--cycle", str(i), "--id", f"C{i-1:02d}-F01",
+                "--evidence", "repaired and demonstrated in this cycle")
+        led(tfull, "raise", "--cycle", str(i), "--id", f"C{i:02d}-F01",
+            "--class", "UNTESTED RULE")
+        led(tfull, "respond", "--cycle", str(i), "--id", f"C{i:02d}-F01",
+            "--disposition", "ACCEPT", "--note", "will repair next cycle")
+
+    if built < 4:
+        failures.append(f"fixture: only built {built} valid cycle(s), cannot "
+                        "test the budget")
+    else:
+        r = do_freeze(tfull)
+        if r.returncode == 0:
+            failures.append("a fifth cycle was frozen after four valid ones")
+        elif "budget" not in (r.stdout + r.stderr):
+            failures.append(f"refused, but not for the budget\n{r.stdout}{r.stderr}")
+        else:
+            print("  [ok] four cycles that pass MC-2 do consume the budget")
 
     def prev_open(t: Path):
         do_init(t)
@@ -769,6 +844,24 @@ def main() -> int:
                 cycle="cycle-09")
     refuse_with("an approval of the wrong kind", "schema",
                 schema="runner-approval/1")
+
+    # B02-F10, second half. Alex Zamurko: "Add negative controls for every
+    # claimed refusal, including malformed JSON and absent timestamp cases."
+    # Both refusals existed in require_approval and neither was exercised, while
+    # the suite's closing line reported every refusal as reachable.
+    refuse_with("an approval with no timestamp", "no `at` timestamp", at="")
+
+    write_lf(approval_path, "{ this is not json\n")
+    r = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",
+               "--invocation", "manual", "--supersede-capture",
+               "--reason", "partial paste; full reply recaptured")
+    if r.returncode == 0:
+        failures.append("a malformed approval record was accepted")
+    elif "not valid JSON" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the malformed record\n"
+                        f"{r.stdout}{r.stderr}")
+    else:
+        print("  [ok] refused: an approval record that is not valid JSON")
 
     # ---- B02-F04: a refused supersession must leave the cycle intact ----
     # Codex's reproduction, exactly: a valid authoritative capture, a correctly

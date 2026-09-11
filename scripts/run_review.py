@@ -51,6 +51,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import authority  # noqa: E402
+import cycle_projection  # noqa: E402
 import run_pins  # noqa: E402
 
 VALIDATOR = REPO / "scripts" / "validate_cycle.py"
@@ -543,11 +544,26 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     review_dir = REPO / "runs" / args.run / f"{args.type}-review"
     run_dir = REPO / "runs" / args.run
     n = next_cycle(review_dir)
-    if n > MAX_CYCLES:
-        raise Refused(f"cycle {n} would exceed the {MAX_CYCLES}-cycle budget for "
-                      f"{args.run} {args.type} review.\n"
-                      "MAX_4_REACHED is an exit, not an obstacle to route around. "
-                      "Escalate to human review.")
+
+    # B01-F01. §2: "Only cycles that pass the MC-2 conformance gate count toward
+    # this maximum", and §3: an invalid cycle "cannot consume one of the four
+    # valid review cycles". This compared the next DIRECTORY number against the
+    # budget, so four cycles that failed the gate exhausted a budget the
+    # protocol says they cannot touch, and the loop was closed by evidence that
+    # was never authoritative.
+    #
+    # Alex Zamurko, 10 September: "count only VALID review cycles toward the
+    # maximum of four. Keep directory/attempt numbering separate from
+    # valid-cycle count." So n remains the directory name and the budget is
+    # measured by running the gate, the same way the loop controller measures it.
+    valid_used = len(cycle_projection.project(review_dir).valid)
+    if valid_used >= MAX_CYCLES:
+        raise Refused(
+            f"{args.run} {args.type} review has already used its "
+            f"{MAX_CYCLES}-cycle budget:\n"
+            f"  {valid_used} cycle(s) have passed MC-2.\n"
+            "MAX_4_REACHED is an exit, not an obstacle to route around. "
+            "Escalate to human review.")
     # After n is known, because the pin set in force is a property of the cycle
     # rather than of the run: an amendment effective at cycle k governs k onward
     # and leaves earlier cycles checked against what they were conducted under.

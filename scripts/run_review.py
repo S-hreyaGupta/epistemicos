@@ -975,85 +975,36 @@ def cmd_record(args: argparse.Namespace) -> int:
             "authority_reason": approval.get("reason", ""),
             "authorized_at": approval.get("at", ""),
         })
-        # The prior attempt stays on disk. Only the designation moves.
-        #
-        # Reached only after every refusal above has been cleared. B02-F04: this
-        # deletion used to run before the zero-findings consistency check, so
-        # `--supersede-capture --zero-findings` against a reply that did contain
-        # findings deleted the working authoritative evidence and then refused
-        # with "Nothing written." The message was true of the replacement and
-        # false of the cycle, which had just been broken.
-        #
-        # Preserving every attempt is not the same as keeping the cycle intact.
-        # The bytes survived in captures/; the designation pointed at a capture
-        # whose raw.md and findings.json no longer existed.
-        raw.unlink(missing_ok=True)
-        (cycle / "findings.json").unlink(missing_ok=True)
+        # The prior attempt stays on disk in captures/. Only the designation
+        # moves, and nothing is unlinked: the staged write below replaces both
+        # files in place.
 
     log["authoritative"] = n
     log["authoritative_sha256"] = entry["sha256"]
-    if problems:
-        raise Refused(
-            "the reviewer output does not parse as review evidence:\n  "
-            + "\n  ".join(problems) +
-            "\n\n  Nothing has been written. The raw output is captured only "
-            "alongside an\n  authoritative findings record, so a cycle cannot "
-            "exist with evidence nobody\n  could read.")
 
-    # Zero has to be asserted, never inferred. "No blocks found" is equally
-    # consistent with a clean review and with a capture that went wrong — which
-    # happened four times before this cycle was recorded — so the operator
-    # states which, and the record says a human said so.
-    if not found and not args.zero_findings:
-        raise Refused(
-            "no finding blocks found in the reviewer output.\n"
-            "  That is either a clean review or a capture that went wrong, and "
-            "the two are\n  indistinguishable from here. If the reviewer "
-            "genuinely reported none, pass\n  --zero-findings to assert it. "
-            "Absence is not permitted to mean zero.")
-    if found and args.zero_findings:
-        raise Refused(
-            f"--zero-findings was passed but {len(found)} finding block(s) are "
-            "present:\n  " + ", ".join(f["id"] for f in found) +
-            "\n  Nothing written.")
-
-    # B02-F02. A recurrence names a persistent identifier and deliberately does
-    # not restate its class, so the class is looked up here, in the one place
-    # that knows what was raised. Asking the reviewer to re-assert it would
-    # permit two records claiming different classes for one identifier.
+    # ---- stage, then swap ----
+    # Alex Zamurko, 10 September, on B02-F04: "make supersession transactional.
+    # Fully validate and stage the replacement first; only then change the
+    # authoritative pointer."
     #
-    # An identifier the ledger has never seen is refused rather than recorded
-    # with an empty class: a repair cannot fail to be demonstrated for a finding
-    # that was never raised, and a typo in an identifier must not create one.
-    recurrences = [f for f in found if f.get("kind") == "recurrence"]
-    if recurrences:
-        led = cycle.parent / "ledger.json"
-        known: dict[str, str] = {}
-        if led.is_file():
-            try:
-                known = {k: v.get("class", "")
-                         for k, v in json.loads(
-                             led.read_text(encoding="utf-8"))["findings"].items()}
-            except (json.JSONDecodeError, KeyError, AttributeError) as e:
-                raise Refused(
-                    f"the review reports recurrences but {rel(led)} cannot be "
-                    f"read, so their classes\n  cannot be resolved: {e}")
-        unknown = [f["id"] for f in recurrences if f["id"] not in known]
-        if unknown:
-            raise Refused(
-                "the review reports a repair as not demonstrated for "
-                f"identifier(s) the ledger has never\n  seen: "
-                + ", ".join(unknown) +
-                "\n  A recurrence keeps the identifier of a finding that was "
-                "raised. If this is a new\n  finding it needs its own "
-                "identifier and a class from §4.")
-        for f in recurrences:
-            f["class"] = known[f["id"]]
+    # The first repair moved every refusal above this point, which stopped a
+    # refused command destroying the cycle. It was not enough. The path still
+    # unlinked codex-output-raw.md and findings.json and then wrote them again,
+    # so an interruption between the two left a designated capture whose files
+    # did not exist. Deleting is now removed entirely; both files are written to
+    # staging names and moved into place with os.replace.
+    #
+    # What this does not claim: two files are not swapped atomically. If the
+    # process dies between the two replaces, the raw capture is new and
+    # findings.json is old. Both staged files are written and closed before
+    # either move, so the window is two rename calls wide and both sources
+    # survive on disk, but it is a narrowed window rather than a transaction.
+    # Saying otherwise here would be B02-F09 in a new place.
+    staged_raw = cycle / ".codex-output-raw.md.staged"
+    staged_fj = cycle / ".findings.json.staged"
+    staged_raw.write_bytes(src.read_bytes())
 
-    # Bytes, not text. Whatever the reviewer returned is what gets stored.
-    raw.write_bytes(src.read_bytes())
-
-    write_lf(cycle / "findings.json", json.dumps({
+    write_lf(staged_fj, json.dumps({
         "schema": "cycle-findings/1",
         # Requirement 2: a review that cannot be parsed deterministically is
         # INVALID, and INVALID is not zero. Nothing reaches this line unless the
@@ -1070,11 +1021,20 @@ def cmd_record(args: argparse.Namespace) -> int:
         # recapture cannot leave a findings file describing different bytes.
         "source": f"captures/attempt-{n:02d}/raw.md",
         "source_attempt": n,
-        "source_sha256": sha256_file(raw),
+        # The attempt's own hash, not sha256_file(raw). Nothing unlinks the live
+        # capture any more, so hashing it here would record the digest of the
+        # file being replaced rather than the one replacing it — correct only
+        # while the old file happened to be absent.
+        "source_sha256": entry["sha256"],
         "count": len(found),
         "zero_findings_asserted": bool(args.zero_findings),
         "findings": found,
     }, indent=2) + "\n")
+
+    # Both staged files are complete and closed. Move them into place.
+    import os as _os
+    _os.replace(staged_raw, raw)
+    _os.replace(staged_fj, cycle / "findings.json")
 
     write_lf(cycle / "capture-log.json", json.dumps(log, indent=2) + "\n")
 

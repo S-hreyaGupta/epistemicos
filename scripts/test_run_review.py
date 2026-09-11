@@ -849,6 +849,18 @@ def main() -> int:
             print("  [ok] an authorized supersession moves the designation, "
                   "keeps every attempt and records who authorized it")
 
+    # The staged files are an implementation detail of the swap and must never
+    # outlive it. A leftover .staged file is a half-written record sitting in a
+    # cycle directory, which is the kind of thing a later reader treats as
+    # evidence.
+    debris = sorted(p.name for p in cyc.glob("*.staged")) + \
+             sorted(p.name for p in cyc.glob(".*.staged"))
+    if debris:
+        failures.append(f"staging files survived in the cycle directory: "
+                        f"{debris}")
+    else:
+        print("  [ok] no staging files are left behind in the cycle")
+
     # ---- B02-F01 and B02-F02: the parser reads what the prompt asks for ----
     # Two defects found by cycle 02, in the module that exists to stop the
     # prompt, the parser and the ledger from disagreeing.

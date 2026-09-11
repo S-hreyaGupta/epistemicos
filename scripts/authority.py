@@ -26,16 +26,33 @@ What it does establish is narrower and still worth having:
   * it must name a person and a reason, so the record is attributable;
   * it must bind to the exact bytes it approves, by hash, so an approval cannot
     be recycled for a different action later. This is the mechanical part, and
-    it is the part that holds regardless of who wrote the file;
-  * the hashes it must name are not knowable until the action has been attempted
-    and refused once, so obtaining one is an out-of-band step rather than a
-    flag the implementing agent can add to its own command.
+    it is the part that holds regardless of who wrote the file.
 
-Under CONVENTION_ONLY a determined implementing agent can still write the
-approval itself. The change is that doing so is a deliberate forgery naming a
-specific person, rather than passing a flag. That is a real difference in kind,
-and it is the most this environment supports. A write boundary would give more,
-and needs a second machine.
+B02-F09: what this module used to claim
+----------------------------------------
+An earlier version of this docstring said the required hashes were "not knowable
+until the action has been attempted and refused once", and concluded that
+obtaining an approval was therefore a step outside the command. Codex checked it
+in cycle 02 and it is false. Both values are ordinary facts available in advance:
+the capture being displaced is named in capture-log.json as authoritative_sha256,
+and the replacement is the sha256 of a file the caller already holds. The cycle
+name is known too. No refusal is recorded anywhere and no nonce is involved, so a
+valid approval can be written before any attempt is made. The probe that
+demonstrated a successful supersession used exactly that construction.
+
+Alex Zamurko, 10 September: "remove the claim that the external-authority step is
+technically forced. Describe the current control as procedural / CONVENTION_ONLY,
+and upgrade the claim only after a genuine independent write boundary exists."
+
+So, stated at its real strength: this is a procedural control with deterministic
+byte matching. It does not force a sequence, does not prove authorship, and does
+not establish that the approval came from another actor. It requires the decision
+to exist as a separate, attributable artifact bound to specific bytes. Under
+CONVENTION_ONLY the implementing agent can write that artifact itself, and the
+honest description of the difference is that doing so means composing a record in
+someone else's name rather than passing a flag. How much that is worth depends on
+the people involved, which is what "procedural" means. A write boundary would
+make it structural, and needs a second machine.
 """
 
 from __future__ import annotations
@@ -63,10 +80,16 @@ def _fail(path: Path, why: str, bindings: dict[str, str], kind: str) -> None:
         lines.append(f"    {k:<15} {v}")
     lines += ["",
               "  The hashes above are what bind the approval to this exact "
-              "action. They are",
-              "  printed here because they are not knowable until now, which is "
-              "what makes",
-              "  obtaining the approval a step outside this command."]
+              "action, so an approval",
+              "  written for one supersession cannot be reused for another. "
+              "They are printed",
+              "  because you need them to write the record, not because they "
+              "were secret: both",
+              "  are derivable from the capture log and the replacement file. "
+              "This is a",
+              "  procedural control under MC1_ENFORCEMENT: CONVENTION_ONLY. It "
+              "does not force a",
+              "  sequence and does not establish who wrote the approval."]
     raise NotAuthorized("\n".join(lines))
 
 

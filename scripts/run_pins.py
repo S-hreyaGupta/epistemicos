@@ -218,10 +218,17 @@ def check_frozen_assignments(run: dict, items: list[dict],
                              frozen: dict[int, list[str]]) -> None:
     """Refuse amendments that would change what a completed cycle ran under.
 
-    Alex Zamurko: "Once a cycle exists, its effective pin set is immutable;
-    later amendments apply only prospectively." Comparing each amendment against
-    the previous one, as the first version did, only ensured the numbers
+    Alex Zamurko ruled that once a cycle exists its effective pin set is fixed
+    and later amendments apply only prospectively. Comparing each amendment
+    against the previous one, as the first version did, only ensured the numbers
     increased. It said nothing about cycles that had already happened.
+
+    Stated at its real strength: the frozen cycle records what governed it, and
+    an amendment whose replay contradicts that record is refused. That is
+    detection, and it holds while the checks run faithfully. It is not
+    protection — under MC1_ENFORCEMENT: CONVENTION_ONLY nothing stops someone
+    editing the recorded set in target.json, at which point the two agree again
+    and this check has nothing to say.
     """
     for n, recorded in sorted(frozen.items()):
         replayed = pins_for_cycle(run, items, n)

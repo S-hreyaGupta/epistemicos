@@ -437,11 +437,26 @@ def main() -> int:
         r"\b(?:not|never|no|nothing|cannot|rather than|instead of|without|"
         r"neither|nor|unsupportable|forbid)", re.I)
 
-    scanned = [REPO / "specs" / "evidence-schema-v1.0.md"]
-    scanned += [REPO / c for c in
-                ("scripts/validate_cycle.py", "scripts/run_review.py",
-                 "scripts/ledger.py", "scripts/loop_state.py",
-                 "scripts/bootstrap_gate.py")]
+    # B02-F10. Derived from the gate's actual covered set, not a list typed
+    # here. The hard-coded six omitted findings_format.py, cycle_projection.py,
+    # authority.py and run_pins.py — every module added since the list was
+    # written — and reported success for the six it did read. The over-claim
+    # Codex found as B02-F09 was in authority.py, which is to say it was in the
+    # one file this check was supposed to cover and did not.
+    #
+    # Alex Zamurko, 10 September: "derive the prose/over-claim and enforcement
+    # test scope from the actual reviewed/dependency set, not a hard-coded
+    # list." So when a covered module appears, it is scanned because it is
+    # covered, and the scope cannot silently stay fixed while the review scope
+    # grows.
+    import importlib.util as _ilu
+    _s = _ilu.spec_from_file_location("_bg_scope", REPO / "scripts" / "bootstrap_gate.py")
+    _bg = _ilu.module_from_spec(_s); _s.loader.exec_module(_bg)
+    scanned = [REPO / rel for rel in sorted(_bg.covered(REPO))]
+    if len(scanned) < 6:
+        failures.append(f"the covered set resolved to {len(scanned)} files, "
+                        "which is fewer than the declared roots; the scan scope "
+                        "is not being derived from the gate")
 
     def sentences(text: str):
         """(sentence, first line number). Prose here wraps, so a sentence is the

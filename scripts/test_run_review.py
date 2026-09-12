@@ -267,6 +267,41 @@ def main() -> int:
 
     expect_refused("freeze without init", "no run.json", do_freeze)
 
+    # ---- B01-F14: the enforcement status is required, not just written ----
+    # cmd_init wrote mc1_enforcement, but nothing required it when a run was
+    # consumed, so the rule held only for runs that already satisfied it. The
+    # actual BOOTSTRAP-001 run lacked the field and was accepted for cycle 02.
+    def strip_mc1(t: Path):
+        do_init(t)
+        rj = t / "runs" / "T-001" / "run.json"
+        d = json.loads(rj.read_text(encoding="utf-8"))
+        d.pop("mc1_enforcement", None)
+        write_lf(rj, json.dumps(d, indent=2) + "\n")
+        return do_freeze(t)
+    expect_refused("a run with no mc1_enforcement", "records no mc1_enforcement",
+                   strip_mc1)
+
+    def bad_mc1(t: Path):
+        do_init(t)
+        rj = t / "runs" / "T-001" / "run.json"
+        d = json.loads(rj.read_text(encoding="utf-8"))
+        d["mc1_enforcement"] = "ENFORCED"
+        write_lf(rj, json.dumps(d, indent=2) + "\n")
+        return do_freeze(t)
+    expect_refused("a run claiming an unrecognised enforcement status",
+                   "not a recognised status", bad_mc1)
+
+    # A new run writes it, so the positive side is covered too: a refusal-only
+    # pair would pass just as well if init had stopped writing the field.
+    tmc = make_repo(); made.append(tmc)
+    do_init(tmc)
+    _rj = json.loads((tmc / "runs/T-001/run.json").read_text(encoding="utf-8"))
+    if _rj.get("mc1_enforcement") != "CONVENTION_ONLY":
+        failures.append(f"init did not record the enforcement status: "
+                        f"{_rj.get('mc1_enforcement')!r}")
+    else:
+        print("  [ok] a new run records its enforcement status")
+
     def protocol_drift(t: Path):
         do_init(t)
         write_lf(t / "specs" / "protocol.md", PROTOCOL_BODY + "V22 added later\n")

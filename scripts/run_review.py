@@ -241,14 +241,44 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 # ---------------------------------------------------------------- freeze
 
+# MC-1 names the status; these are the values it can take. Enumerated so a typo
+# or an invented reassurance is refused rather than recorded: a run claiming
+# "ENFORCED" would read as a stronger guarantee than anything here supports.
+MC1_VALUES = ("CONVENTION_ONLY", "TECHNICALLY_ENFORCED")
+
+
 def load_run(run_id: str) -> dict:
     run_json = REPO / "runs" / run_id / "run.json"
     if not run_json.is_file():
         raise Refused(f"no run.json for {run_id}; run `init` first")
     try:
-        return json.loads(run_json.read_text(encoding="utf-8"))
+        run = json.loads(run_json.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         raise Refused(f"run.json is not valid JSON: {e}")
+
+    # B01-F14. MC-1: "Each run records: MC1_ENFORCEMENT:". cmd_init writes the
+    # field for new runs, but nothing required it when a run was consumed, so a
+    # run created before the field existed was accepted without it and the
+    # requirement held only for runs that already met it.
+    #
+    # Alex Zamurko, 10 September: "make MC1_ENFORCEMENT mandatory and validated
+    # for every protocol run."
+    status = str(run.get("mc1_enforcement", "")).strip()
+    if not status:
+        raise Refused(
+            f"{run_id}/run.json records no mc1_enforcement.\n"
+            "  MC-1 requires every run to record the enforcement status it was "
+            "conducted under.\n  A reader of this evidence would have to go "
+            "looking elsewhere, and the answer\n  would be today's rather than "
+            "the run's.\n"
+            "  If this run predates the field, add it with a note saying it was "
+            "reconstructed,\n  rather than writing it as though it had always "
+            "been there.")
+    if status not in MC1_VALUES:
+        raise Refused(
+            f"{run_id}/run.json records mc1_enforcement {status!r}, which is not "
+            f"a recognised status.\n  Expected one of: {', '.join(MC1_VALUES)}")
+    return run
 
 
 def check_pins_still_hold(run: dict, run_dir: Path | None = None,

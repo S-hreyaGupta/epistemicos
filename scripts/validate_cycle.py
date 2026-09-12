@@ -156,8 +156,24 @@ def _approval_plan_path(approval: Path) -> str | None:
 
 
 def _hash_of_declared_file(target: dict, hash_field: str, path_field: str,
-                           repo_root: Path) -> tuple[bool, str]:
-    """Recorded hash present, its artifact resolvable, and the two agree."""
+                           repo_root: Path,
+                           cycle_dir: Path | None = None) -> tuple[bool, str]:
+    """Recorded hash present, its artifact resolvable, and the two agree.
+
+    B02-F07. This hashed repo_root/<path> — the live file — while freeze had
+    already preserved a copy in artifacts/. Codex: "An implementation fixture
+    passed initially with preserved copies present. Changing only its live diff
+    and test-result files made checks 14 and 15 fail while the preserved copies
+    were unchanged."
+
+    So the snapshot-at-freeze repair was built and then two checks kept reading
+    past it. Ordinary later work — a rerun of the tests, a regenerated diff —
+    retroactively invalidated a completed cycle, which is the exact failure that
+    repair exists to prevent, surviving in the two places it was not applied.
+
+    The preserved copy is authoritative where it exists. Falling back to the
+    live file is only for cycles frozen before snapshotting, and it says so.
+    """
     recorded = target.get(hash_field)
     if not recorded:
         return False, f"{hash_field} is absent; §10.1 makes it mandatory"
@@ -168,13 +184,27 @@ def _hash_of_declared_file(target: dict, hash_field: str, path_field: str,
         return False, (f"{path_field} is absent, so {hash_field} cannot be checked "
                        f"against anything. The protocol requires the hash to match "
                        f"the artifact; the schema records where that artifact is.")
+    snap = (cycle_dir / "artifacts" / rel) if cycle_dir else None
+    if snap is not None and snap.is_file():
+        actual = sha256_file(snap)
+        if actual != recorded:
+            return False, (
+                f"the preserved copy of {rel} does not match its record\n"
+                f"          recorded {recorded}\n          actual   {actual}\n"
+                "          The snapshot has been altered since the freeze.")
+        return True, f"{rel} (preserved copy)"
+
     p = repo_root / rel
     if not p.is_file():
         return False, f"{path_field} not found: {rel}"
     actual = sha256_file(p)
     if actual != recorded:
-        return False, f"{rel}\n          recorded {recorded}\n          actual   {actual}"
-    return True, ""
+        return False, (
+            f"{rel}\n          recorded {recorded}\n          actual   {actual}\n"
+            "          No preserved copy exists, so this was checked against "
+            "the live file.\n          A cycle frozen by the current runner "
+            "would have one.")
+    return True, f"{rel} (live; no preserved copy)"
 
 
 def validate(cycle_dir: Path, repo_root: Path) -> Result:
@@ -310,7 +340,21 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
 
     # 13. approved-plan hash present and matches the frozen approved plan
     ap = target.get("approved_plan_hash")
-    approval = cycle_dir.parent.parent / "plan-approval" / "approval.json"
+    # B02-F07. This read the run-level record directly, so a later approval
+    # version changed what an already-completed cycle was validated against.
+    # Codex: "Check 13 also depends on the current run-level approval record."
+    #
+    # The preserved copy is authoritative where it exists, for the same reason
+    # the diff and test results are: a cycle is validated against the bytes that
+    # were reviewed, not against whatever has replaced them since.
+    # The path comes from the target, which is what freeze recorded when it took
+    # the snapshot. Deriving it here independently is how the two sides end up
+    # looking in different places.
+    _appr_rel = target.get("approval_record_path")
+    _snap_approval = (cycle_dir / "artifacts" / _appr_rel) if _appr_rel else None
+    approval = (_snap_approval
+                if _snap_approval is not None and _snap_approval.is_file()
+                else cycle_dir.parent.parent / "plan-approval" / "approval.json")
     if not ap:
         r.add(13, "approved-plan hash matches the frozen approved plan", False,
               "approved_plan_hash absent")
@@ -379,10 +423,11 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
                   not problems13, "; ".join(problems13))
 
     # 14-15. diff and test results
-    ok14, d14 = _hash_of_declared_file(target, "diff_hash", "diff_path", repo_root)
+    ok14, d14 = _hash_of_declared_file(target, "diff_hash", "diff_path",
+                                       repo_root, cycle_dir)
     r.add(14, "diff hash matches the reviewed diff", ok14, d14)
     ok15, d15 = _hash_of_declared_file(target, "test_result_hash", "test_result_path",
-                                       repo_root)
+                                       repo_root, cycle_dir)
     r.add(15, "test-result hash matches the supplied test results", ok15, d15)
 
     return r

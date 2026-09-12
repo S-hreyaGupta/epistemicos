@@ -122,6 +122,35 @@ def approve_bootstrap(tmp: Path) -> subprocess.CompletedProcess:
               "--target", rel_target, cwd=tmp)
 
 
+def impl_approval(tmp: Path, run_id: str = "T-001") -> str:
+    """Write §7.3's plan approval record and return the approved plan's hash.
+
+    B02-F07 made the approval record mandatory for an implementation freeze,
+    because the whole implementation evidence set is now preserved and validated
+    from the preserved copies — and you cannot preserve an approved plan that
+    nothing names. Decision F already said check 13 refuses without the record
+    rather than passing vacuously; this makes freeze refuse at the same point
+    instead of leaving the cycle to fail the gate afterwards.
+
+    Returns the real hash rather than a dummy: freeze verifies that the supplied
+    --approved-plan-hash matches the artifact the approval names, so a fixture
+    passing an arbitrary digest is now refused, correctly.
+
+    Module level on purpose. Four controls tonight crashed as NameErrors because
+    helpers defined part-way through main() were not yet bound where they were
+    used, and a crash reads as a pass.
+    """
+    plan = tmp / "plan" / "01-PLAN.md"
+    digest = hashlib.sha256(plan.read_bytes()).hexdigest()
+    write_lf(tmp / "runs" / run_id / "plan-approval" / "approval.json",
+             json.dumps({"decision": "APPROVE",
+                         "approved_plan_hash": digest,
+                         "approved_plan_path": "plan/01-PLAN.md",
+                         "decided_by": "Alex Zamurko",
+                         "decided_at": "2026-09-12T00:00:00Z"}, indent=2) + "\n")
+    return digest
+
+
 def do_freeze(tmp: Path, *extra: str) -> subprocess.CompletedProcess:
     return runner(tmp, "freeze", "--run", "T-001", "--type", "plan",
                   "--prompt", "specs/prompt.md", "--file", "plan/01-PLAN.md", *extra)
@@ -588,9 +617,10 @@ def main() -> int:
     write_lf(t4c / "diff.txt", "diff --git a/x b/x\n")
     write_lf(t4c / "results.txt", "3 passed\n")
     head4 = sh("git", "rev-parse", "HEAD", cwd=t4c).stdout.strip()
+    plan4 = impl_approval(t4c)
     r = runner(t4c, "freeze", "--run", "T-001", "--type", "implementation",
                "--prompt", "specs/prompt.md", "--candidate-commit", head4,
-               "--approved-plan-hash", GOOD_HASH, "--diff", "diff.txt",
+               "--approved-plan-hash", plan4, "--diff", "diff.txt",
                "--test-results", "results.txt")
     if r.returncode != 0:
         failures.append(f"implementation freeze failed\n{r.stdout}{r.stderr}")
@@ -600,7 +630,7 @@ def main() -> int:
         # The field names are the target's own, not invented here. Writing
         # test_result_sha256 when the target records test_result_hash is how a
         # control asserts something the system never claimed.
-        missing = [f for f in (head4, GOOD_HASH, "candidate_tree_hash",
+        missing = [f for f in (head4, plan4, "candidate_tree_hash",
                                "test_result_hash", "diff_hash") if f not in ci]
         if missing:
             failures.append(
@@ -624,9 +654,10 @@ def main() -> int:
     write_lf(t5 / "diff.txt", "diff --git a/x b/x\n")
     write_lf(t5 / "results.txt", "ok\n")
     head = sh("git", "rev-parse", "HEAD", cwd=t5).stdout.strip()
+    plan5 = impl_approval(t5)
     r = runner(t5, "freeze", "--run", "T-001", "--type", "implementation",
                "--prompt", "specs/prompt.md", "--candidate-commit", "HEAD",
-               "--approved-plan-hash", GOOD_HASH, "--diff", "diff.txt",
+               "--approved-plan-hash", plan5, "--diff", "diff.txt",
                "--test-results", "results.txt")
     if r.returncode != 0:
         failures.append(f"freezing with HEAD was refused outright; the decision "

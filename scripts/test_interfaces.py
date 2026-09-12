@@ -634,6 +634,101 @@ def main() -> int:
     else:
         ok("nothing open, one dispute -> HUMAN_ADJUDICATION_REQUIRED (protocol v1.1)")
 
+    # ---------------------------------------------------------- seam 11
+    print()
+    print("seam 11  implementation evidence <-> later work  (B02-F07)")
+
+    # Codex: "An implementation fixture passed initially with preserved copies
+    # present. Changing only its live diff and test-result files made checks 14
+    # and 15 fail while the preserved copies were unchanged."
+    #
+    # Built through the runner, because the whole claim is about what freeze
+    # preserves. A hand-laid cycle would prove nothing about the runner.
+    root11, commit11 = build_repo()
+    made.append(root11)
+    run(root11, "run_review.py", "init", "--run", "I-001",
+        "--bootstrap-exempt", "--protocol", "specs/protocol.md",
+        "--spec", "specs/spec.md")
+    write_lf(root11 / "diff.txt", "diff --git a/x b/x\n+one\n")
+    write_lf(root11 / "results.txt", "3 passed, 0 failed\n")
+    head11 = sh("git", "rev-parse", "HEAD", cwd=root11).stdout.strip()
+    plan_hash11 = sha256_file(root11 / "plan" / "01-PLAN.md")
+    # §7.3's approval record. Check 13 refuses without it rather than passing
+    # vacuously, which is decision F — the first run of this control failed on
+    # exactly that and was right to.
+    write_lf(root11 / "runs" / "I-001" / "plan-approval" / "approval.json",
+             json.dumps({"decision": "APPROVE",
+                         "approved_plan_hash": plan_hash11,
+                         "approved_plan_path": "plan/01-PLAN.md",
+                         "decided_by": "Alex Zamurko",
+                         "decided_at": "2026-09-12T00:00:00Z"}, indent=2) + "\n")
+    r = run(root11, "run_review.py", "freeze", "--run", "I-001",
+            "--type", "implementation", "--prompt", "specs/prompt.md",
+            "--candidate-commit", head11,
+            "--approved-plan-hash", plan_hash11,
+            "--diff", "diff.txt", "--test-results", "results.txt")
+    c11 = root11 / "runs" / "I-001" / "implementation-review" / "cycle-01"
+    if r.returncode != 0:
+        bad(f"seam 11 fixture: implementation freeze failed\n{r.stderr}{r.stdout}")
+    else:
+        # Recorded, not just frozen. A frozen-only cycle has no
+        # codex-output-raw.md, so check 4 fails and checks 5 to 15 cascade from
+        # it — the first run of this control reported all twelve as failures and
+        # said nothing about the snapshot.
+        _th11 = (c11 / "target.sha256").read_text(encoding="utf-8").strip()
+        write_lf(root11 / "reply11.md",
+                 f"TARGET_SHA256 {_th11}\n\nNo findings in any category.\n")
+        _rec11 = run(root11, "run_review.py", "record", "--cycle", str(c11),
+                     "--output", "reply11.md", "--invocation", "manual",
+                     "--zero-findings")
+        if _rec11.returncode != 0:
+            bad(f"seam 11 fixture: record failed\n{_rec11.stderr}{_rec11.stdout}")
+
+        # The preserved copies must exist, or nothing below tests anything.
+        for f in ("diff.txt", "results.txt"):
+            if not (c11 / "artifacts" / f).is_file():
+                bad(f"freeze did not preserve {f} for an implementation review")
+
+        # Ordinary later work: the tests are rerun, the diff regenerated, the
+        # plan revised and re-approved. Every live artifact the checks look at
+        # moves. A completed cycle must survive all of it — that is the whole
+        # claim of snapshot-at-freeze, and B02-F07 is the places it was not
+        # applied.
+        write_lf(root11 / "diff.txt", "diff --git a/x b/x\n+one\n+two\n")
+        write_lf(root11 / "results.txt", "4 passed, 0 failed\n")
+        _p11 = root11 / "plan" / "01-PLAN.md"
+        _p11.write_text(_p11.read_text(encoding="utf-8") + "\n## revised\n",
+                        encoding="utf-8")
+        write_lf(root11 / "runs" / "I-001" / "plan-approval" / "approval.json",
+                 json.dumps({"decision": "APPROVE",
+                             "approved_plan_hash": sha256_file(_p11),
+                             "approved_plan_path": "plan/01-PLAN.md",
+                             "decided_by": "Alex Zamurko",
+                             "decided_at": "2026-09-13T00:00:00Z"}, indent=2) + "\n")
+        rv = run(root11, "validate_cycle.py", str(c11))
+        failed = failed_checks_of(rv)
+        if {14, 15} & failed:
+            bad("checks 14 and 15 failed after the live diff and test results "
+                "changed, so a completed implementation cycle is invalidated by "
+                f"ordinary later work: {sorted(failed)}\n{rv.stdout}")
+        elif failed:
+            bad(f"unexpected checks failed: {sorted(failed)}\n{rv.stdout}")
+        else:
+            ok("an implementation cycle survives later changes to the live diff "
+               "and test results")
+
+        # And tampering with the snapshot itself must still fail, or the check
+        # has simply stopped looking at anything.
+        write_lf(c11 / "artifacts" / "results.txt", "99 passed, 0 failed\n")
+        rv = run(root11, "validate_cycle.py", str(c11))
+        if 15 not in failed_checks_of(rv):
+            bad("altering the preserved test results did not fail check 15; the "
+                f"check is reading neither copy\n{rv.stdout}")
+        elif "altered since the freeze" not in rv.stdout:
+            bad(f"check 15 failed without naming the altered snapshot\n{rv.stdout}")
+        else:
+            ok("altering a preserved copy still fails its check")
+
     # ---------------------------------------------------------- seam 10
     print()
     print("seam 10  authorized continuation <-> the runner  (B01-F02)")

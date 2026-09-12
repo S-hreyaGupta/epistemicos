@@ -849,6 +849,61 @@ def cmd_freeze(args: argparse.Namespace) -> int:
             artifacts.append((ref, (REPO / ref["path"]).read_text(encoding="utf-8",
                                                                  errors="replace")))
 
+        # B02-F07. The approved plan and the record approving it are part of the
+        # implementation evidence set and were not preserved, so check 13 read
+        # the live run-level approval and the live plan. A later approval
+        # version, or ordinary work on the plan, retroactively invalidated a
+        # completed cycle.
+        #
+        # Alex Zamurko, 10 September: "snapshot every implementation-review
+        # artifact required by checks 11–15 at freeze time, including the exact
+        # diff, test results, and approved plan, and validate those preserved
+        # copies instead of live artifacts."
+        _appr = REPO / "runs" / args.run / "plan-approval" / "approval.json"
+        if not _appr.is_file():
+            raise Refused(
+                f"implementation review requires the plan approval record:\n  "
+                f"{rel(_appr)}\n"
+                "  §7.3 freezes APPROVED_PLAN_HASH on approval. Check 13 has "
+                "nothing authoritative\n  to match without it, and the cycle "
+                "would be frozen against a hash that only\n  matches another "
+                "copy of itself.")
+        _appr_ref = {"path": rel(_appr).replace("\\", "/"),
+                     "sha256": sha256_file(_appr)}
+        artifacts.append((_appr_ref, _appr.read_text(encoding="utf-8")))
+        # Where the preserved copy lives, recorded rather than reconstructed.
+        # The snapshot is keyed by repo-relative path, and check 13 was guessing
+        # at artifacts/plan-approval/approval.json while freeze wrote
+        # artifacts/runs/<run>/plan-approval/approval.json. Two sides deriving
+        # the same path independently is how they disagree.
+        target["approval_record_path"] = _appr_ref["path"]
+
+        # The plan the approval names, read from the record rather than supplied
+        # on the command line: an operator-supplied path could name a different
+        # plan from the one that was approved.
+        try:
+            _plan_rel = json.loads(_appr.read_text(encoding="utf-8")) \
+                .get("approved_plan_path")
+        except json.JSONDecodeError as e:
+            raise Refused(f"the plan approval record is not valid JSON: {e}")
+        if not _plan_rel:
+            raise Refused(
+                "the approval record does not say which artifact it approved "
+                "(approved_plan_path).\n  Without it the approved-plan hash can "
+                "only be compared against another copy\n  of itself, which is "
+                "B01-F06.")
+        _plan = REPO / _plan_rel
+        if not _plan.is_file():
+            raise Refused(f"the approved plan is gone: {_plan_rel}")
+        if sha256_file(_plan) != str(args.approved_plan_hash).lower():
+            raise Refused(
+                f"the approved plan does not hash to --approved-plan-hash:\n"
+                f"  {_plan_rel}\n    supplied {args.approved_plan_hash}\n"
+                f"    actual   {sha256_file(_plan)}")
+        target["approved_plan_path"] = _plan_rel
+        artifacts.append(({"path": _plan_rel, "sha256": sha256_file(_plan)},
+                          _plan.read_text(encoding="utf-8", errors="replace")))
+
     cycle.mkdir(parents=True)
 
     # ---- snapshot the reviewed bytes ----

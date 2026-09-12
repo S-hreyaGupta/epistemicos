@@ -390,7 +390,12 @@ def main() -> int:
     rev = root2 / "runs" / "A1E-001" / "plan-review"
     run(root2, "ledger.py", "raise", "--review", str(rev), "--cycle", "1",
         "--id", "C01-F01", "--class", "UNTESTED RULE", "--requirement", "R-B7")
-    r = run(root2, "loop_state.py", "--review", str(rev))
+    # --development throughout these seams: root2 was initialised with
+    # --bootstrap-exempt, so its cycles are development evidence and B01-F08
+    # makes the controller refuse to read them as anything else. The flag is
+    # the seam being exercised, not a workaround for it — a fixture that had to
+    # drop it would mean the distinction had stopped travelling.
+    r = run(root2, "loop_state.py", "--review", str(rev), "--development")
     if "C01-F01" not in r.stdout:
         bad("the controller did not see a finding the ledger wrote; the two "
             f"disagree about findings.json\n{r.stdout}")
@@ -407,12 +412,14 @@ def main() -> int:
     print()
     print("seam 5  controller <-> live MC-2 result")
 
-    before = run(root2, "loop_state.py", "--review", str(rev)).stdout
+    before = run(root2, "loop_state.py", "--review", str(rev),
+                 "--development").stdout
     if "cycle-01  VALID" not in before:
         bad(f"expected cycle-01 valid before tampering\n{before}")
     # Break the evidence AFTER the controller has already run once.
     (cyc / "codex-output-raw.md").write_text("", encoding="utf-8")
-    after = run(root2, "loop_state.py", "--review", str(rev)).stdout
+    after = run(root2, "loop_state.py", "--review", str(rev),
+                "--development").stdout
     if "cycle-01  INVALID" not in after:
         bad("the controller still reported the cycle valid after its evidence "
             f"was broken; it is not re-running the gate\n{after}")
@@ -448,7 +455,8 @@ def main() -> int:
             "--output", "reply.md", "--invocation", "manual", "--zero-findings")
     if r.returncode != 0:
         bad(f"seam 7 fixture: record failed\n{r.stderr}{r.stdout}")
-    r = run(root3, "loop_state.py", "--review", str(rev3), "--quiet")
+    r = run(root3, "loop_state.py", "--review", str(rev3), "--quiet",
+            "--development")
     if "CONVERGED" not in r.stdout:
         bad(f"seam 7 fixture: expected a converged loop, got\n{r.stdout}")
 
@@ -479,6 +487,82 @@ def main() -> int:
     else:
         ok("an undeterminable loop state refuses the next cycle rather than "
            "assuming CONTINUE")
+
+    # ---------------------------------------------------------- seam 9
+    print()
+    print("seam 9  run classification <-> loop outcome  (B01-F08)")
+
+    # Codex, cycle 02: "An isolated run initialized with --bootstrap-exempt,
+    # frozen and recorded through the runner with explicit zero findings
+    # returned LOOP_STATUS: CONVERGED through the ordinary controller
+    # interface." The runner labelled the run; nothing stopped the controller
+    # handing out an outcome indistinguishable from a protocol result.
+    #
+    # Its own fixture rather than root3's. Seam 7 deliberately unlinks that
+    # run's findings.json to test the undeterminable path, and a later seam
+    # reusing it inherits the damage — the controls below failed first time for
+    # exactly that reason and said nothing about B01-F08.
+    root8, commit8 = build_repo()
+    made.append(root8)
+    rev8 = root8 / "runs" / "D-001" / "plan-review"
+    run(root8, "run_review.py", "init", "--run", "D-001", "--bootstrap-exempt",
+        "--protocol", "specs/protocol.md", "--spec", "specs/spec.md")
+    run(root8, "run_review.py", "freeze", "--run", "D-001", "--type", "plan",
+        "--prompt", "specs/prompt.md", "--file", "plan/01-PLAN.md")
+    c8 = rev8 / "cycle-01"
+    th8 = (c8 / "target.sha256").read_text(encoding="utf-8").strip()
+    write_lf(root8 / "reply.md",
+             f"TARGET_SHA256 {th8}\n\nNo findings in any category.\n")
+    r = run(root8, "run_review.py", "record", "--cycle", str(c8),
+            "--output", "reply.md", "--invocation", "manual", "--zero-findings")
+    if r.returncode != 0:
+        bad(f"seam 9 fixture: record failed\n{r.stderr}{r.stdout}")
+
+    r = run(root8, "loop_state.py", "--review", str(rev8), "--quiet")
+    if r.returncode == 0:
+        bad("the controller computed a loop state for a NOT_A_PROTOCOL_CYCLE "
+            f"run without being told it was development evidence\n{r.stdout}")
+    elif "development evidence" not in (r.stdout + r.stderr).lower():
+        bad(f"refused, but not for the run's classification\n{r.stderr}")
+    else:
+        ok("the controller refuses an exempt run by default")
+
+    r = run(root8, "loop_state.py", "--review", str(rev8), "--quiet",
+            "--development")
+    if r.returncode != 0:
+        bad(f"--development did not let the exempt run be analysed\n{r.stderr}")
+    elif "DEVELOPMENT EVIDENCE" not in r.stdout:
+        bad("the status line carries no label, so a caller parsing it gets a "
+            f"bare outcome off development evidence\n{r.stdout}")
+    else:
+        ok("--development computes it and labels the status line itself")
+
+    # The label has to survive --quiet, which prints that line and nothing else.
+    # A preamble-only label would vanish at exactly the interface where it
+    # matters most.
+    if r.stdout.strip().count("\n") == 0 and "DEVELOPMENT EVIDENCE" in r.stdout:
+        ok("the label survives --quiet, where the status line travels alone")
+    else:
+        bad(f"--quiet output is not a single labelled line\n{r.stdout!r}")
+
+    # And the reverse: a protocol run must not be dressed as development
+    # evidence. Understating an outcome is as much a misreport as overstating.
+    # The label is flipped after the cycle is built, not before. Freezing a run
+    # marked APPROVED makes the gate demand a real bootstrap approval, which
+    # this fixture has no reason to have — the first attempt failed there and
+    # the control reported a missing directory instead of the thing it tests.
+    rj = root8 / "runs" / "D-001" / "run.json"
+    _r = json.loads(rj.read_text(encoding="utf-8"))
+    _r["bootstrap_review"] = "APPROVED"
+    write_lf(rj, json.dumps(_r, indent=2) + "\n")
+    r = run(root8, "loop_state.py", "--review", str(rev8), "--quiet",
+            "--development")
+    if r.returncode == 0:
+        bad("a protocol run was labelled development evidence on request")
+    elif "does not apply" not in (r.stdout + r.stderr):
+        bad(f"refused, but not for the misapplied flag\n{r.stderr}")
+    else:
+        ok("a protocol run cannot be relabelled as development evidence")
 
     # ---------------------------------------------------------- seam 6
     print()

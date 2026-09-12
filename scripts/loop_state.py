@@ -271,6 +271,11 @@ def main(argv: list[str]) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--review", required=True)
     ap.add_argument("--quiet", action="store_true", help="print LOOP_STATUS only")
+    ap.add_argument("--development", action="store_true",
+                    help="compute the loop state of a run marked "
+                         "NOT_A_PROTOCOL_CYCLE. The result is labelled "
+                         "development evidence and is not an authoritative "
+                         "protocol outcome. B01-F08.")
     a = ap.parse_args(argv[1:])
     try:
         return _run(a)
@@ -283,18 +288,83 @@ def main(argv: list[str]) -> int:
         return 2
 
 
+def run_classification(review: Path) -> tuple[str, str]:
+    """(label, bootstrap_review) for the run this review belongs to.
+
+    B01-F08. Codex, cycle 02: "scripts/loop_state.py and
+    scripts/cycle_projection.py still do not read the run's bootstrap
+    classification. An isolated run initialized with --bootstrap-exempt, frozen
+    and recorded through the runner with explicit zero findings returned
+    LOOP_STATUS: CONVERGED through the ordinary controller interface."
+
+    The runner has labelled exempt runs since B01-F14, and the gate refuses to
+    let them become real cycles. But nothing stopped the controller reading one
+    and emitting an outcome indistinguishable from a protocol result, which is
+    the half of the finding that stayed open: development evidence reaching
+    authoritative loop state.
+    """
+    run_json = review.parent / "run.json"
+    if not run_json.is_file():
+        return "UNKNOWN", ""
+    try:
+        run = json.loads(run_json.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise CannotCalculate(f"{run_json} is not valid JSON: {e}")
+    label = str(run.get("bootstrap_review", "")).strip()
+    return ("DEVELOPMENT" if label.startswith("EXEMPT") else "PROTOCOL"), label
+
+
 def _run(a) -> int:
     review = Path(a.review).resolve()
     if not review.is_dir():
         print(f"not a directory: {review}", file=sys.stderr)
         return 2
 
+    # Alex Zamurko, 10 September: "make the controller explicitly reject/exclude
+    # any run marked NOT_A_PROTOCOL_CYCLE from authoritative loop-state
+    # calculation ... bootstrap/development evidence can still exist and be
+    # tested, but it can never accidentally count as authoritative protocol
+    # evidence."
+    #
+    # So the refusal is against the DEFAULT reading, not against the evidence.
+    # --development still computes it, and says on every line of output what it
+    # is. Removing the ability to analyse bootstrap evidence would break the
+    # bootstrap review itself, which is the one loop that has to run before any
+    # protocol run exists.
+    kind, label = run_classification(review)
+    if kind == "DEVELOPMENT" and not a.development:
+        print(f"REFUSED: {review.parent.name} is marked {label}\n\n"
+              "  Its cycles are development evidence. A loop state computed "
+              "over them is not a\n  protocol outcome, and nothing in the "
+              "output would have said so.\n\n"
+              "  Pass --development to compute it anyway. The result is "
+              "labelled and must not be\n  cited as an authoritative protocol "
+              "result.", file=sys.stderr)
+        return 2
+    if kind == "PROTOCOL" and a.development:
+        print(f"REFUSED: {review.parent.name} is a protocol run, so "
+              "--development does not apply.\n"
+              "  Labelling a protocol outcome as development evidence would "
+              "understate it just as\n  badly as the reverse overstates it.",
+              file=sys.stderr)
+        return 2
+
+    lines: list[str] = [f"loop state — {review}"]
+    if kind == "DEVELOPMENT":
+        lines += ["",
+                  "DEVELOPMENT EVIDENCE — NOT A PROTOCOL OUTCOME",
+                  f"  {label}",
+                  "  The status below describes bootstrap evidence and does "
+                  "not establish a protocol",
+                  "  result. §2 and §3 reserve authoritative outcomes to valid "
+                  "protocol cycles."]
+
     dirs = cycle_dirs(review)
     if not dirs:
         print(f"no cycle directories in {review}", file=sys.stderr)
         return 2
 
-    lines: list[str] = [f"loop state — {review}", "", "cycles"]
+    lines += ["", "cycles"]
     valid: list[int] = []
     for num, d in dirs:
         ok, why = gate(d)
@@ -414,7 +484,19 @@ def _run(a) -> int:
         lines.append("§7 requires disputes and unresolved findings to reach the human "
                      "as separate lists.")
 
-    print(f"LOOP_STATUS: {status}" if a.quiet else "\n".join(lines))
+    # The label travels with the status itself, not only in the preamble.
+    # --quiet prints this line alone, and a caller parsing it would otherwise
+    # get a bare CONVERGED off development evidence with nothing to mark it.
+    # That is the finding restated: the distinction has to survive the
+    # interface, not just appear in the report.
+    status_line = (f"LOOP_STATUS: {status}" if kind != "DEVELOPMENT"
+                   else f"LOOP_STATUS: {status}  [DEVELOPMENT EVIDENCE — "
+                        "NOT A PROTOCOL OUTCOME]")
+    if a.quiet:
+        print(status_line)
+    else:
+        lines[lines.index(f"LOOP_STATUS: {status}")] = status_line
+        print("\n".join(lines))
     return 0
 
 

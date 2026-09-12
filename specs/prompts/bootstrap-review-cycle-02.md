@@ -88,7 +88,7 @@ scripts/test_validate_cycle.py   24 controls
 scripts/test_run_review.py       89 controls
 scripts/test_ledger.py           64 controls, covering the ledger and controller
 scripts/test_bootstrap_gate.py   36 controls
-scripts/test_interfaces.py       20 controls, across seven component seams
+scripts/test_interfaces.py       24 controls, across seven component seams
 ```
 
 Those counts are asserted here and checked by `scripts/test_prompts.py` against

@@ -450,7 +450,7 @@ def check_previous_cycle_closed(review_dir: Path, n: int) -> None:
                       "Two open cycles means the budget count is guesswork.")
 
 
-def check_loop_not_terminated(review_dir: Path, n: int) -> None:
+def check_loop_not_terminated(review_dir: Path, n: int, run: dict) -> None:
     """Refuse to open a cycle after the loop has already exited.
 
     B01-F02: "The runner checks previous output existence, not the previous loop
@@ -469,10 +469,15 @@ def check_loop_not_terminated(review_dir: Path, n: int) -> None:
     """
     if n <= 1:
         return
-    r = subprocess.run(
-        [sys.executable, str(REPO / "scripts" / "loop_state.py"),
-         "--review", str(review_dir), "--quiet"],
-        capture_output=True, text=True)
+    # B01-F08. The controller now refuses to read an exempt run's cycles
+    # without being told they are development evidence, so the runner has to
+    # say which it is. Derived from the run's own label rather than passed in:
+    # a caller that could choose would be choosing what its evidence counts as.
+    argv = [sys.executable, str(REPO / "scripts" / "loop_state.py"),
+            "--review", str(review_dir), "--quiet"]
+    if str(run.get("bootstrap_review", "")).startswith("EXEMPT"):
+        argv.append("--development")
+    r = subprocess.run(argv, capture_output=True, text=True)
     if r.returncode == 2:
         raise Refused(
             "the loop state cannot be determined, so whether another cycle is "
@@ -483,7 +488,16 @@ def check_loop_not_terminated(review_dir: Path, n: int) -> None:
     status = ""
     for line in r.stdout.splitlines():
         if line.startswith("LOOP_STATUS:"):
-            status = line.split(":", 1)[1].strip()
+            # The status token only. B01-F08 appends a development-evidence
+            # label to this line, and taking the whole remainder produced
+            # "CONVERGED  [DEVELOPMENT EVIDENCE — ...]", which matched no member
+            # of TERMINAL_EXITS — so a converged development loop read as
+            # non-terminal and the runner opened another cycle on it.
+            #
+            # Adding prose to a line something else parses is how that happens.
+            # Split on the first token rather than the first colon.
+            status = line.split(":", 1)[1].strip().split()[0] \
+                if line.split(":", 1)[1].strip() else ""
     if status in TERMINAL_EXITS:
         raise Refused(
             f"the loop has already exited: LOOP_STATUS is {status}.\n"
@@ -599,7 +613,7 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     # and leaves earlier cycles checked against what they were conducted under.
     check_pins_still_hold(run, run_dir, n, review_dir)
     check_previous_cycle_closed(review_dir, n)
-    check_loop_not_terminated(review_dir, n)
+    check_loop_not_terminated(review_dir, n, run)
 
     cycle = review_dir / f"cycle-{n:02d}"
     if cycle.exists():

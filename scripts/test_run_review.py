@@ -142,6 +142,11 @@ def impl_approval(tmp: Path, run_id: str = "T-001") -> str:
     """
     plan = tmp / "plan" / "01-PLAN.md"
     digest = hashlib.sha256(plan.read_bytes()).hexdigest()
+    # write_lf does not create parents. Without this the helper raised
+    # FileNotFoundError, which killed the suite two thirds of the way through
+    # and produced no FAIL line — so the grep read clean and the count refresh
+    # recorded 29 controls where there are 95.
+    (tmp / "runs" / run_id / "plan-approval").mkdir(parents=True, exist_ok=True)
     write_lf(tmp / "runs" / run_id / "plan-approval" / "approval.json",
              json.dumps({"decision": "APPROVE",
                          "approved_plan_hash": digest,

@@ -518,6 +518,65 @@ def main() -> int:
         ok(f"{len(scanned)} covered files carry no unqualified proof, "
            "immutability or prevention claim")
 
+    # ---- B01-F09: an approval does not outlive its own evidence ----
+    # Codex, cycle 02: "evaluate still checks only the decision and component
+    # hashes, ignoring the recorded evidence and reviewed_target hashes. After
+    # recording approval in a fixture, deleting all four bootstrap evidence
+    # files left evaluate returning (True, [])."
+    print()
+    print("an approval is bound to the review it rests on (B01-F09)")
+
+    def approved_repo() -> Path:
+        root = build(); made.append(root)
+        if approve(root).returncode != 0:
+            failures.append("fixture: could not record the approval")
+        return root
+
+    t = approved_repo()
+    if gate(t, "check").returncode != 0:
+        failures.append("fixture: a fresh approval does not pass check")
+    else:
+        ok("a fresh approval passes")
+
+    # Delete the evidence. The components are untouched, so the old check had
+    # nothing to say and returned approved.
+    t = approved_repo()
+    for n in EVIDENCE:
+        (t / "bootstrap-review" / n).unlink()
+    r = gate(t, "check")
+    if r.returncode == 0:
+        failures.append("the approval survived deletion of every piece of "
+                        "review evidence it rests on")
+    elif "nobody can now read" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the missing evidence\n{r.stdout}")
+    else:
+        ok("refused: the review evidence the approval rests on is gone")
+
+    # Edit one file rather than removing it. An approval covers the review that
+    # happened, not a later revision of it.
+    t = approved_repo()
+    p = t / "bootstrap-review" / "codex-output-raw.md"
+    write_lf(p, p.read_text(encoding="utf-8") + "\nan extra finding\n")
+    r = gate(t, "check")
+    if r.returncode == 0:
+        failures.append("the approval survived an edit to the raw review output")
+    elif "has changed since the decision" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the altered evidence\n{r.stdout}")
+    else:
+        ok("refused: the recorded review output was edited after the decision")
+
+    # And the frozen target it was bound to.
+    t = approved_repo()
+    tp = t / TARGET
+    write_lf(tp, tp.read_text(encoding="utf-8").replace('"cycle": 1', '"cycle": 2'))
+    r = gate(t, "check")
+    if r.returncode == 0:
+        failures.append("the approval survived an edit to the reviewed target")
+    elif "reviewed target has changed" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the altered target\n{r.stdout}")
+    else:
+        ok("refused: the reviewed target was edited after the decision")
+
     # ---- rulings 1 and 2: the exception is bounded, and ends one way ----
     # "Without a precise termination point, 'bootstrap' can become an indefinite
     # exemption." The termination is the first runner approval, so these ask

@@ -427,6 +427,59 @@ def evaluate(root: Path) -> tuple[bool, list[str]]:
             reasons.append("  Repair the components, rerun the review, record a "
                            "new decision.")
 
+    # B01-F09, the half cycle 02 found still open. This checked the decision and
+    # the component hashes and stopped, so the evidence the decision rests on
+    # was recorded and then never looked at again. Codex: "After recording
+    # approval in a fixture, deleting all four bootstrap evidence files left
+    # evaluate returning (True, [])."
+    #
+    # Alex Zamurko, 10 September: "bind each approval to the exact review
+    # evidence and hashes it depends on, and recheck that evidence whenever the
+    # approval is used. Why it works: an approval remains valid only while the
+    # evidence it was based on still exists unchanged."
+    #
+    # An approval is a statement about a review. If the review is gone, the
+    # statement has no subject, and "a decision was recorded once" is not the
+    # same claim as "this decision is about evidence you can still read".
+    recorded_evidence = d.get("evidence") or {}
+    if not recorded_evidence:
+        reasons.append(
+            "the decision record pins no review evidence, so nothing ties it to "
+            "the review it\n    was made about. Re-record it.")
+    for name, want in sorted(recorded_evidence.items()):
+        p = root / "bootstrap-review" / name
+        if not p.is_file():
+            reasons.append(
+                f"the review evidence this approval rests on is gone: {name}\n"
+                "    The decision stands on a review nobody can now read.")
+        elif sha256_file(p) != want:
+            reasons.append(
+                f"{name} has changed since the decision was recorded.\n"
+                f"    recorded  {want}\n"
+                f"    on disk   {sha256_file(p)}\n"
+                "    The approval covers the review that was actually "
+                "conducted, not a later edit\n    of it.")
+
+    # The frozen target the review was run against, checked the same way. B01-F09
+    # required the decision to be bound to what was reviewed; recording that
+    # binding and never verifying it is the binding existing only on paper.
+    rt = d.get("reviewed_target") or {}
+    if rt.get("path") and rt.get("sha256"):
+        tp = root / rt["path"]
+        if not tp.is_file():
+            reasons.append(f"the reviewed target is gone: {rt['path']}")
+        elif sha256_file(tp) != rt["sha256"]:
+            reasons.append(
+                f"the reviewed target has changed since the decision: "
+                f"{rt['path']}\n"
+                f"    recorded  {rt['sha256']}\n"
+                f"    on disk   {sha256_file(tp)}")
+    else:
+        reasons.append(
+            "the decision record names no reviewed target, so it is not bound "
+            "to the artifacts\n    a reviewer actually saw. This is B01-F09; "
+            "re-record with --target.")
+
     pinned = d.get("components") or {}
 
     # Required now, which may be more than was required when the decision was

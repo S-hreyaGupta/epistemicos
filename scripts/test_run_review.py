@@ -458,6 +458,96 @@ def main() -> int:
     expect_refused("candidate commit that does not resolve",
                    "does not resolve", impl_unresolvable_commit)
 
+    # ---- B01-F07: the recorded hashes describe THIS cycle's pin set ----
+    # Codex: "protocol_sha256 and spec_sha256 are checked for presence only; no
+    # check ties them to the pinned artifacts or to run.json." They were copied
+    # verbatim from run.json, so they described the set as it stood at init.
+    #
+    # BOOTSTRAP-001 shows the consequence: its cycle 02 records the digest of a
+    # spec set that the amendment effective at cycle 2 had already released.
+    print()
+    print("recorded hashes follow the cycle's own pin set (B01-F07)")
+
+    t7 = make_repo(); made.append(t7)
+    do_init(t7); do_freeze(t7)
+    run7 = json.loads((t7 / "runs/T-001/run.json").read_text(encoding="utf-8"))
+    tgt7a = json.loads((t7 / "runs/T-001/plan-review/cycle-01/target.json")
+                       .read_text(encoding="utf-8"))
+    if tgt7a["protocol_sha256"] != run7["protocol_sha256"]:
+        failures.append("cycle 01 records a protocol hash that is not the "
+                        "pinned one")
+    elif tgt7a["spec_sha256"] != run7["spec_sha256"]:
+        failures.append("with no amendment in force the recorded spec digest "
+                        "should equal the run's")
+    else:
+        print("  [ok] with no amendment, the recorded hashes match the run")
+
+    # Now release the spec from the governing set, effective cycle 2. The next
+    # cycle must record a different spec digest, because a different set governs
+    # it. Copying run.json forward would leave both cycles claiming the same one.
+    # Cycle 01 closed through the real record path. Writing codex-output-raw.md
+    # by hand leaves no findings.json, the controller then refuses to say
+    # whether another cycle is permitted, and B01-F02's check blocks the freeze
+    # — so this control would report a pin failure that never happened. One open
+    # finding, raised in the ledger, keeps the loop on CONTINUE.
+    _th7 = (t7 / "runs/T-001/plan-review/cycle-01/target.sha256") \
+        .read_text(encoding="utf-8").strip()
+    write_lf(t7 / "reply7.md",
+             f"TARGET_SHA256 {_th7}\n\nFinding ID: C01-F01\n"
+             "Class: UNTESTED RULE\nEvidence: x\n")
+    _r7 = runner(t7, "record", "--cycle", "runs/T-001/plan-review/cycle-01",
+                 "--output", "reply7.md", "--invocation", "manual")
+    if _r7.returncode != 0:
+        failures.append(f"fixture: could not record cycle 01\n{_r7.stderr}{_r7.stdout}")
+    _l7 = sh(sys.executable, str(t7 / "scripts" / "ledger.py"), "raise",
+             "--review", "runs/T-001/plan-review", "--cycle", "1",
+             "--id", "C01-F01", "--class", "UNTESTED RULE", cwd=t7)
+    if _l7.returncode != 0:
+        failures.append(f"fixture: could not raise the finding\n{_l7.stderr}{_l7.stdout}")
+
+    # Written here rather than calling amend(), which is defined further down in
+    # this function and was therefore not yet bound: the block crashed on a
+    # NameError after the first assertion, printing one [ok] and no failure.
+    # A control that never runs is indistinguishable from one that passed.
+    write_lf(t7 / "runs" / "T-001" / "pin-amendments.json", json.dumps({
+        "schema": "run-pin-amendments/1",
+        "amendments": [{
+            "effective_cycle": 2,
+            "reason": "the pinned spec is also a review target, which the "
+                      "separation specification forbids",
+            "affected_artifacts": ["specs/spec.md"],
+            "prior_pin_set": ["specs/protocol.md", "specs/spec.md"],
+            "new_pin_set": ["specs/protocol.md"],
+            "authorized_by": "Alex Zamurko",
+            "at": "2026-09-10T00:00:00Z",
+        }]}, indent=2) + "\n")
+    r = do_freeze(t7)
+    if r.returncode != 0:
+        failures.append(f"freeze after the amendment failed\n{r.stdout}{r.stderr}")
+    else:
+        tgt7b = json.loads((t7 / "runs/T-001/plan-review/cycle-02/target.json")
+                           .read_text(encoding="utf-8"))
+        if tgt7b["spec_sha256"] == tgt7a["spec_sha256"]:
+            failures.append(
+                "cycle 02 records the same spec digest as cycle 01 despite an "
+                "amendment releasing the spec; the field is copied from "
+                "run.json rather than derived from what governs the cycle")
+        elif "specs/spec.md" in tgt7b.get("governing_pins", []):
+            failures.append("the released spec is still in the governing set")
+        else:
+            print("  [ok] releasing a spec changes what the next cycle records")
+
+        # And cycle 01 is untouched: its record still describes the set it was
+        # actually conducted under. "Never validate historical cycles against
+        # the latest pin set" applies to what they recorded, too.
+        again = json.loads((t7 / "runs/T-001/plan-review/cycle-01/target.json")
+                           .read_text(encoding="utf-8"))
+        if again["spec_sha256"] != tgt7a["spec_sha256"]:
+            failures.append("the amendment changed what cycle 01 recorded")
+        else:
+            print("  [ok] the earlier cycle's record is unchanged by the "
+                  "amendment")
+
     # ---- B01-F04: the reviewer is given what it is asked to judge against ----
     # Codex: "compose_input carries the protocol but not the pinned spec, and
     # for implementation review omits the target identifiers entirely." A hash

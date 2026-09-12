@@ -731,8 +731,30 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         "governing_pins": _gov,
         "governing_pin_hashes": _gov_hashes,
         "protocol_commit": run["protocol_commit"],
-        "protocol_sha256": run["protocol_sha256"],
-        "spec_sha256": run["spec_sha256"],
+        # B01-F07. These were copied verbatim from run.json, so they described
+        # the pin set as it stood at init and not the one governing this cycle.
+        # Codex: "protocol_sha256 and spec_sha256 are checked for presence only;
+        # no check ties them to the pinned artifacts or to run.json."
+        #
+        # BOOTSTRAP-001 shows what that produces. Its cycle 02 records
+        # spec_sha256 ad7f1099…, the digest of a spec set the amendment
+        # effective at cycle 2 had already released. The field named a
+        # governing document that was no longer governing.
+        #
+        # Alex Zamurko, 10 September: "validate protocol_sha256 and spec_sha256
+        # against the effective pin set for that specific cycle, including any
+        # valid prospective amendments. Never validate historical cycles against
+        # the latest pin set."
+        #
+        # Derived here rather than checked later, because the value a cycle
+        # records is the thing later readers rely on. target.sha256 already
+        # covers target.json, so a value that is correct when written cannot be
+        # altered afterwards without failing check 10.
+        "protocol_sha256": _gov_hashes.get(run["protocol"]["path"],
+                                           run["protocol_sha256"]),
+        "spec_sha256": spec_digest(
+            [{"path": p, "sha256": h} for p, h in sorted(_gov_hashes.items())
+             if p != run["protocol"]["path"]]),
         "frozen_at": now(),
     }
 

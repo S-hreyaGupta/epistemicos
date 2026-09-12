@@ -239,6 +239,70 @@ def main() -> int:
                                   "--cycle", "2", "--id", "C01-F01",
                                   "--evidence", "x"))
 
+    # ---- B02-F03: one grammar, consumed rather than copied ----
+    # Codex: "The schema permits zero to two capital prefix letters. The parser
+    # accepted `AB02-F01` with class UNTESTED RULE without problems. The ledger
+    # rejected the same identifier because its independently hard-coded
+    # expression permits at most one capital letter." A finding valid at capture
+    # could not be entered unchanged, which is the divergence the single-grammar
+    # ruling exists to close — inside the module built to close it.
+    print()
+    print("one Finding ID grammar, parser and ledger (B02-F03)")
+
+    import importlib.util as _iu2
+    _sp2 = _iu2.spec_from_file_location("_ff2", SRC / "findings_format.py")
+    _ff2 = _iu2.module_from_spec(_sp2); _sp2.loader.exec_module(_ff2)
+    _grammar = _ff2.canonical_id_grammar()
+
+    rootG, commitG, revG = fresh()
+    revG.mkdir(parents=True)
+
+    # Every prefix length the schema allows, end to end: parsed, then recorded.
+    for fid, label in (("02-F01", "no prefix"),
+                       ("B02-F01", "one letter"),
+                       ("AB02-F01", "two letters")):
+        parsed, probs = _ff2.extract(
+            f"Finding ID: {fid}\nClass: UNTESTED RULE\nEvidence: x\n")
+        if probs or [p["id"] for p in parsed] != [fid]:
+            failures.append(f"the parser rejected {fid} ({label}): {probs}")
+            continue
+        r = ledger(rootG, "raise", "--review", str(revG), "--cycle", "2",
+                   "--id", fid, "--class", "UNTESTED RULE")
+        if r.returncode != 0:
+            failures.append(
+                f"the parser accepted {fid} ({label}) and the ledger refused "
+                f"it; a finding valid at capture cannot be recorded\n{r.stderr}")
+        else:
+            print(f"  [ok] {fid} ({label}) parses and records unchanged")
+
+    # An identifier outside the grammar is still refused, and for that reason.
+    expect_refused("an identifier outside the canonical grammar",
+                   "canonical grammar",
+                   lambda: ledger(rootG, "raise", "--review", str(revG),
+                                  "--cycle", "2", "--id", "ABC02-F01",
+                                  "--class", "UNTESTED RULE"))
+
+    # The cycle rule still holds, and holds independently of prefix length —
+    # which is the part that made the ledger keep its own pattern.
+    expect_refused("a two-letter identifier whose cycle digits disagree",
+                   "declares cycle",
+                   lambda: ledger(rootG, "raise", "--review", str(revG),
+                                  "--cycle", "3", "--id", "AB02-F09",
+                                  "--class", "UNTESTED RULE"))
+
+    # And the ledger reads the grammar rather than carrying a copy: with the
+    # declaration gone it refuses outright instead of falling back.
+    rootH, commitH, revH = fresh()
+    revH.mkdir(parents=True)
+    schemaH = rootH / "specs" / "evidence-schema-v1.0.md"
+    write_lf(schemaH, schemaH.read_text(encoding="utf-8")
+             .replace("FINDING_ID_GRAMMAR", "REMOVED_GRAMMAR"))
+    expect_refused("the ledger with no canonical grammar to read",
+                   "cannot be read",
+                   lambda: ledger(rootH, "raise", "--review", str(revH),
+                                  "--cycle", "1", "--id", "C01-F01",
+                                  "--class", "UNTESTED RULE"))
+
     # ---- B01-F12: no event may predate the finding it acts on ----
     # "Require every ACCEPT, RESOLVE, or DISPUTE event to occur in the raising
     # cycle or a later valid cycle. Reject any earlier-dated event." Nothing

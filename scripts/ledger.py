@@ -67,13 +67,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cycle_projection  # noqa: E402
 
-# An optional single-letter prefix, then the cycle, then the finding number.
-# §4's example is C02-F03; the bootstrap review used B01-F01 because the prompt
-# said so. Identifiers are the reviewer's and are persistent (V40), so the
-# ledger records what was issued rather than renaming it — renaming a finding
-# during transcription is exactly what B01-F13 is about. The digits still have
-# to match the cycle, which is the part that carries meaning.
-FINDING_ID = re.compile(r"\A[A-Z]?(\d{2})-F(\d{2,3})\Z")
+# B02-F03. This was `\A[A-Z]?(\d{2})-F(\d{2,3})\Z` — one optional letter, where
+# the schema's FINDING_ID_GRAMMAR allows up to two. So `AB02-F01` parsed cleanly
+# and the ledger then refused it, and a finding that was valid at capture could
+# not be recorded unchanged. A second grammar, inside the component whose
+# purpose is to stop there being more than one.
+#
+# Alex Zamurko, 9 September: "Prompt, parser, and ledger must not independently
+# impose different grammars." And 10 September: "Have the ledger consume the
+# canonical grammar and preserve every valid identifier. Keep any origin-cycle
+# validation separate from prefix-length assumptions."
+#
+# Which is why the local copy existed at all: the ledger needed a capture group
+# for the cycle digits, and the canonical pattern has none. The two jobs are now
+# separate. Validity is the schema's question; the cycle digits are found by
+# their position relative to the -F, which holds for any prefix length.
+CYCLE_DIGITS = re.compile(r"(\d{2})-F\d{2,3}\Z")
 
 # §4, and the vocabulary "remains unchanged across cycles so that finding sets
 # remain comparable". Anything outside it is refused rather than recorded.
@@ -148,10 +157,28 @@ def save(review: Path, data: dict) -> None:
 
 
 def check_id(fid: str, cycle: int) -> None:
-    m = FINDING_ID.match(fid)
+    # Validity from the one authoritative declaration, read at the point of use
+    # rather than copied. A copy is what B02-F03 was.
+    try:
+        import findings_format
+        grammar = findings_format.canonical_id_grammar()
+    except Exception as e:
+        raise Refused(
+            f"the canonical Finding ID grammar cannot be read, so no identifier "
+            f"can be judged: {e}\n"
+            "  Refusing rather than falling back to a local pattern. A fallback "
+            "grammar is a\n  second grammar, which is the defect.")
+    if not grammar.fullmatch(fid):
+        raise Refused(f"finding id {fid!r} does not match the canonical grammar "
+                      f"{grammar.pattern}\n"
+                      "  Declared in specs/evidence-schema-v1.0.md as "
+                      "FINDING_ID_GRAMMAR.")
+    m = CYCLE_DIGITS.search(fid)
     if not m:
-        raise Refused(f"finding id must look like C02-F03 or B01-F01, "
-                      f"got {fid!r}")
+        raise Refused(
+            f"{fid} matches the canonical grammar but carries no readable cycle "
+            "digits.\n  The grammar and the cycle rule disagree, which is a "
+            "defect in one of them.")
     if int(m.group(1)) != cycle:
         raise Refused(f"{fid} declares cycle {int(m.group(1))} but was raised in "
                       f"cycle {cycle}. The identifier is persistent and carries the "

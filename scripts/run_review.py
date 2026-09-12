@@ -417,6 +417,25 @@ def check_bootstrap_still_holds(run: dict) -> None:
     exempt run stays exempt at both.
     """
     if str(run.get("bootstrap_review", "")).startswith("EXEMPT"):
+        # B02-F08. Returning here was the whole check for an exempt run, so a
+        # run created under the exception kept freezing cycles after the
+        # exception had ended. Codex: "The expiry check is performed only when
+        # init receives --bootstrap-exempt ... the implementation blocks new
+        # exempt initialization but leaves existing exemptions usable."
+        #
+        # Alex Zamurko, 10 September: "check bootstrap-expiry at every operation
+        # that can open, continue, or freeze a run. Once an approved runner
+        # exists, mechanically refuse further bootstrap exemption."
+        available, why = load_gate().bootstrap_exception_available(REPO)
+        if not available:
+            raise Refused(
+                "this run was created under the bootstrap exception, and the "
+                "exception has ended:\n  " + "\n  ".join(why) +
+                "\n\n  The run is not retrospectively invalid — its existing "
+                "cycles stand as the\n  development evidence they always were. "
+                "But no further cycle may be frozen\n  under an exemption that "
+                "no longer exists. Start a run without "
+                "--bootstrap-exempt.")
         return
     ok, reasons = load_gate().evaluate(REPO)
     if not ok:

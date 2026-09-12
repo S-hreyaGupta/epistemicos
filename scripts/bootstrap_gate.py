@@ -671,7 +671,44 @@ def cmd_approve_runner(a: argparse.Namespace) -> int:
                      "runner.",
     }
     write_lf(out, json.dumps(record, indent=2) + "\n")
-    print(f"recorded {out.relative_to(REPO).as_posix()}")
+
+    # B02-F08, the half that was mine. This used to print "commit this file"
+    # and stop, which left a window where the termination could be undone by
+    # deleting an uncommitted record. Worse, test_bootstrap_gate asserted that
+    # the window existed and called it correct, and the cycle-02 prompt then
+    # described the arrangement as enforcement. Codex: "do not present the
+    # latter bypass as successful enforcement."
+    #
+    # So the record is committed here, in the same action that writes it. The
+    # durability of this boundary rests on git history, and a boundary that
+    # depends on someone remembering a second step is a convention with extra
+    # stages, not a termination.
+    rel_out = out.relative_to(REPO).as_posix()
+    add = subprocess.run(["git", "-C", str(REPO), "add", "--", rel_out],
+                         capture_output=True, text=True)
+    if add.returncode != 0:
+        out.unlink(missing_ok=True)
+        raise Refused(
+            f"the approval could not be staged, so it was not written:\n  "
+            f"{add.stderr.strip()}\n"
+            "  This boundary is durable only once git has the record. Leaving "
+            "the file behind\n  uncommitted would recreate the deletion bypass "
+            "this closes.")
+    # --only so that unrelated staged work is not swept into this commit.
+    msg = (f"Runner approved: {rel_runner} ({digest[:12]}), by "
+           f"{record['approved_by']}. Ends the bootstrap exception.")
+    com = subprocess.run(
+        ["git", "-C", str(REPO), "commit", "--only", "-m", msg, "--", rel_out],
+        capture_output=True, text=True)
+    if com.returncode != 0:
+        out.unlink(missing_ok=True)
+        subprocess.run(["git", "-C", str(REPO), "reset", "--", rel_out],
+                       capture_output=True, text=True)
+        raise Refused(
+            f"the approval could not be committed, so it was not written:\n  "
+            f"{(com.stderr or com.stdout).strip()}")
+
+    print(f"recorded and committed {rel_out}")
     print(f"  runner      {rel_runner}  {digest[:16]}…")
     print(f"  approved by {record['approved_by']}")
     if available:
@@ -681,9 +718,11 @@ def cmd_approve_runner(a: argparse.Namespace) -> int:
         print("and every candidate runner is reviewed by the prior approved "
               "runner.")
         print()
-        print("Commit this file. The termination is one-way, and git history is "
-              "what makes it")
-        print("one-way; an uncommitted approval can be undone by deleting it.")
+        print("The record is in git history, so deleting the file does not "
+              "reopen the exception.")
+        print("A history rewrite still reaches it; that is a louder act and is "
+              "the limit of what")
+        print("MC1_ENFORCEMENT: CONVENTION_ONLY supports.")
     return 0
 
 

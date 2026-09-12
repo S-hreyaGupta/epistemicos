@@ -587,20 +587,66 @@ def main() -> int:
         ok("deleting the approval does not reopen the exception, and the "
            "deletion is named")
 
-    # An approval that was never committed is exactly the case the command warns
-    # about, and the warning has to be true.
+    # B02-F08. This control used to assert the opposite: that an uncommitted
+    # approval could be deleted and the exception would reopen. It passed, and
+    # it was documenting the bypass as correct behaviour while the cycle-02
+    # prompt described the arrangement as enforcement. Codex found both.
+    #
+    # approve-runner now commits the record in the same action that writes it,
+    # so there is no uncommitted window to exploit. The control asserts that.
     t2 = git_repo()
     approve(t2)
-    approve_runner(t2)
+    r = approve_runner(t2)
+    if r.returncode != 0:
+        failures.append(f"approve-runner failed: {r.stdout}{r.stderr}")
+    elif "committed" not in r.stdout:
+        failures.append(f"approve-runner did not commit the record\n{r.stdout}")
+    else:
+        st = git(t2, "status", "--porcelain", "--", "runner-approvals")
+        if st.stdout.strip():
+            failures.append("the approval is still uncommitted after "
+                            f"approve-runner: {st.stdout.strip()!r}")
+        else:
+            ok("approve-runner commits the record, leaving no uncommitted "
+               "window to delete")
+
     shutil.rmtree(t2 / "runner-approvals")
     r = gate(t2, "exception")
-    if "BOOTSTRAP_EXCEPTION: AVAILABLE" not in r.stdout:
-        failures.append("an uncommitted approval survived deletion, so the "
-                        "instruction to commit it is wrong and the control that "
-                        f"passed above proves nothing\n{r.stdout}")
+    if "BOOTSTRAP_EXCEPTION: ENDED" not in r.stdout:
+        failures.append("deleting the approval written by approve-runner "
+                        f"reopened the exception\n{r.stdout}")
     else:
-        ok("an uncommitted approval does not survive deletion, which is why "
-           "approve-runner says to commit it")
+        ok("an approval written by approve-runner survives deletion")
+
+    # And a run created under the exception cannot keep freezing cycles once it
+    # has ended. Returning early for any EXEMPT run was the other half of
+    # B02-F08: new exempt runs were blocked, existing ones went on working.
+    def runner(root: Path, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(root / "scripts" / "run_review.py"), *args],
+            cwd=str(root), capture_output=True, text=True)
+
+    t2b = git_repo()
+    r = runner(t2b, "init", "--run", "E-001", "--bootstrap-exempt",
+               "--protocol", "specs/evidence-schema-v1.0.md",
+               "--spec", "specs/evidence-schema-v1.0.md")
+    if r.returncode != 0:
+        failures.append(f"fixture: exempt init failed\n{r.stderr}{r.stdout}")
+    else:
+        approve(t2b)
+        approve_runner(t2b)
+        r = runner(t2b, "freeze", "--run", "E-001", "--type", "plan",
+                   "--prompt", "specs/evidence-schema-v1.0.md",
+                   "--file", "specs/evidence-schema-v1.0.md")
+        if r.returncode == 0:
+            failures.append("an existing exempt run froze a cycle after the "
+                            "bootstrap exception had ended")
+        elif "exception has ended" not in (r.stdout + r.stderr):
+            failures.append(f"refused, but not for the ended exception\n"
+                            f"{r.stderr}{r.stdout}")
+        else:
+            ok("an existing exempt run cannot freeze once the exception has "
+               "ended")
 
     # And the flag itself has to stop working, not merely be discouraged.
     t3 = git_repo()

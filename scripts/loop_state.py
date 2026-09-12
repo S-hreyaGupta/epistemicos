@@ -417,6 +417,10 @@ def _run(a) -> int:
     auths = load_authorizations(review)
     governing = None          # (n, status, detail, cur)
     overridden: list[str] = []
+    # (status, authorization) when the LATEST boundary's exit was cleared. The
+    # distinction matters: clearing a historical boundary lets evaluation move
+    # past it, clearing the latest one is permission for the next cycle.
+    cleared_latest: tuple[str, dict] | None = None
     lines += ["", "boundaries, in order"]
 
     for n in range(1, len(valid) + 1):
@@ -435,6 +439,8 @@ def _run(a) -> int:
                      f"authorization: {auth['authorized_by']}")
         lines.append(f"        reason: {auth['reason']}")
         overridden.append(f"n={n} {status} (authorized by {auth['authorized_by']})")
+        if n == len(valid):
+            cleared_latest = (status, auth)
 
     n_latest = len(valid)
     if governing is None:
@@ -442,6 +448,36 @@ def _run(a) -> int:
             ledger, valid, n_latest)
         status, detail, shown = decide(cur, prev, resolved_new, disputed_new,
                                        n_latest)
+        if cleared_latest is not None:
+            # B01-F02, the half cycle 02 found still broken. The loop above
+            # cleared the exit at the latest boundary, then this fallback called
+            # decide() again — and decide() knows nothing about authorizations,
+            # so it returned the very exit that had just been cleared. The output
+            # said "STALLED at n=2 cleared by recorded authorization" and then
+            # "LOOP_STATUS: STALLED", and the runner refused the next cycle.
+            #
+            # Codex: "the explicitly authorized continuation required by the
+            # original correction and decision I does not work at the point the
+            # runner needs it." My own control never caught it because it only
+            # authorized historical boundaries, never the latest one.
+            #
+            # A cleared latest boundary is permission to continue, not the exit
+            # re-imposed. Resumed-loop semantics, stated rather than implied:
+            # the authorization clears one named exit at one named boundary, so
+            # the next cycle is permitted and the budget is whatever the cleared
+            # exit allowed. Clearing MAX_4_REACHED is therefore a human decision
+            # to spend more than four valid cycles, and it has to name that exit
+            # explicitly — cleared_by matches on the outcome, so an
+            # authorization for STALLED cannot quietly extend the budget.
+            _st, _auth = cleared_latest
+            status = "CONTINUE"
+            detail = (
+                f"The {_st} at n={n_latest} was cleared by a recorded human "
+                f"authorization from {_auth['authorized_by']}.\n"
+                f"Reason given: {_auth['reason']}\n"
+                "The loop continues on that authority. Repair the plan, produce "
+                "a new version, and\nopen the next cycle with a new frozen "
+                "target.")
         governing = (n_latest, status, detail, cur, shown)
 
     n, status, detail, cur, shown = governing
@@ -451,7 +487,12 @@ def _run(a) -> int:
 
     lines += ["", f"§6 sets and exits at the governing boundary, n={n}"] + shown
 
-    if status == "CONTINUE":
+    # Only when nothing has already explained the CONTINUE. decide() returns an
+    # empty detail for an ordinary continuation, whereas a continuation resting
+    # on a cleared exit arrives here carrying the authorization it rests on —
+    # and this used to overwrite it with the generic text, so the output named
+    # no authority for a decision that existed only because of one.
+    if status == "CONTINUE" and not detail:
         detail = (f"Repair the plan, produce a new version, and open cycle "
                   f"{dirs[-1][0] + 1:02d} with a new frozen target.")
 

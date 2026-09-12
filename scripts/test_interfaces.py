@@ -634,6 +634,102 @@ def main() -> int:
     else:
         ok("nothing open, one dispute -> HUMAN_ADJUDICATION_REQUIRED (protocol v1.1)")
 
+    # ---------------------------------------------------------- seam 10
+    print()
+    print("seam 10  authorized continuation <-> the runner  (B01-F02)")
+
+    # Codex: "the explicitly authorized continuation required by the original
+    # correction and decision I does not work at the point the runner needs it
+    # ... Add a runner/controller test that stops, records the matching
+    # authorization, and then successfully freezes the next permitted cycle;
+    # mismatched or absent authorization must still refuse."
+    #
+    # The controller reporting CONTINUE is not the same claim. This drives the
+    # actual sequence: freeze, record, hit a terminal exit, be refused, record
+    # the authorization, freeze successfully.
+    root10, commit10 = build_repo()
+    made.append(root10)
+    rev10 = root10 / "runs" / "A1E-001" / "plan-review"
+    run(root10, "run_review.py", "init", "--run", "A1E-001",
+        "--bootstrap-exempt", "--protocol", "specs/protocol.md",
+        "--spec", "specs/spec.md")
+
+    def cycle10(n: int, findings: str) -> bool:
+        if run(root10, "run_review.py", "freeze", "--run", "A1E-001",
+               "--type", "plan", "--prompt", "specs/prompt.md",
+               "--file", "plan/01-PLAN.md").returncode != 0:
+            return False
+        c = rev10 / f"cycle-{n:02d}"
+        th = (c / "target.sha256").read_text(encoding="utf-8").strip()
+        write_lf(root10 / f"r{n}.md", f"TARGET_SHA256 {th}\n\n{findings}")
+        return run(root10, "run_review.py", "record", "--cycle", str(c),
+                   "--output", f"r{n}.md", "--invocation", "manual").returncode == 0
+
+    ok10 = cycle10(1, "Finding ID: C01-F01\nClass: UNTESTED RULE\nEvidence: x\n")
+    run(root10, "ledger.py", "raise", "--review", str(rev10), "--cycle", "1",
+        "--id", "C01-F01", "--class", "UNTESTED RULE")
+    run(root10, "ledger.py", "respond", "--review", str(rev10), "--cycle", "1",
+        "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "will repair")
+    ok10 = ok10 and cycle10(2, "Finding ID: C01-F01\nClass: UNTESTED RULE\n"
+                               "Evidence: still here\n")
+    if not ok10:
+        bad("seam 10 fixture: could not build two recorded cycles")
+    else:
+        # Nothing changed across cycle 02, so §6 requires STALLED.
+        r = run(root10, "loop_state.py", "--review", str(rev10), "--quiet",
+                "--development")
+        if "STALLED" not in r.stdout:
+            bad(f"seam 10 fixture: expected STALLED at n=2, got\n{r.stdout}")
+        else:
+            r = run(root10, "run_review.py", "freeze", "--run", "A1E-001",
+                    "--type", "plan", "--prompt", "specs/prompt.md",
+                    "--file", "plan/01-PLAN.md")
+            if r.returncode == 0:
+                bad("the runner opened a cycle on a stalled loop")
+            elif "already exited" not in (r.stdout + r.stderr):
+                bad(f"refused, but not for the loop exit\n{r.stderr}")
+            else:
+                ok("the runner refuses the next cycle at a terminal exit")
+
+            # An authorization for the wrong outcome must not unlock it.
+            write_lf(rev10 / "loop-authorizations.json", json.dumps({
+                "schema": "loop-authorization/1",
+                "authorizations": [{
+                    "after_valid_cycle": 2, "outcome": "CONVERGED",
+                    "authorized_by": "Alex Zamurko",
+                    "reason": "names an outcome that did not occur here",
+                    "at": "2026-09-12T00:00:00Z"}]}, indent=2) + "\n")
+            r = run(root10, "run_review.py", "freeze", "--run", "A1E-001",
+                    "--type", "plan", "--prompt", "specs/prompt.md",
+                    "--file", "plan/01-PLAN.md")
+            if r.returncode == 0:
+                bad("an authorization naming a different outcome unlocked the "
+                    "next cycle")
+            else:
+                ok("an authorization for the wrong outcome still refuses")
+
+            # The matching one must let it through. This is the case that was
+            # broken: the controller announced the exit as cleared and then
+            # reported it anyway, so the runner refused.
+            write_lf(rev10 / "loop-authorizations.json", json.dumps({
+                "schema": "loop-authorization/1",
+                "authorizations": [{
+                    "after_valid_cycle": 2, "outcome": "STALLED",
+                    "authorized_by": "Alex Zamurko",
+                    "reason": "another loop approved at the human gate",
+                    "at": "2026-09-12T00:00:00Z"}]}, indent=2) + "\n")
+            r = run(root10, "run_review.py", "freeze", "--run", "A1E-001",
+                    "--type", "plan", "--prompt", "specs/prompt.md",
+                    "--file", "plan/01-PLAN.md")
+            if r.returncode != 0:
+                bad("a matching authorization did not permit the next cycle, "
+                    f"which is B01-F02 unrepaired\n{r.stderr}{r.stdout}")
+            elif not (rev10 / "cycle-03").is_dir():
+                bad("freeze reported success but opened no cycle 03")
+            else:
+                ok("a matching authorization lets the runner open the next "
+                   "cycle")
+
     # ---------------------------------------------------------- seam 8
     print()
     print("seam 8  recorded hashes <-> what git hands back")

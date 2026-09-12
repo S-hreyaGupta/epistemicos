@@ -879,6 +879,39 @@ def main() -> int:
     scenario("clearing one boundary does not clear the next", 4,
              authorized_only_once, "STALLED")
 
+    # ---- B01-F02, the half cycle 02 found still broken ----
+    # Codex: "The supplied authorization control pre-creates four cycles and
+    # authorizes historical boundaries; it never tests resuming immediately
+    # after authorizing the latest exit." Which is exactly where the runner
+    # needs it: you stop at a terminal exit, record an authorization, and open
+    # the next cycle. The fallback re-imposed the cleared exit, so the loop
+    # reported STALLED after announcing it had been cleared.
+    #
+    # Two valid cycles, an authorization naming the exit at n=2 — the latest —
+    # and nothing beyond it.
+    def cleared_at_the_latest(root, rev):
+        ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--class", "UNTESTED RULE")
+        ledger(root, "respond", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "fix")
+        auth_record(rev, 2)
+    scenario("an authorization at the latest boundary permits continuation", 2,
+             cleared_at_the_latest, "CONTINUE")
+
+    scenario_out("the continuation names the authority it rests on", 2,
+                 cleared_at_the_latest,
+                 "cleared by a recorded human authorization", "Alex Zamurko")
+
+    # And without it, the same fixture stops. Otherwise the control above would
+    # pass equally well if the exit had simply stopped being detected.
+    def not_cleared_at_the_latest(root, rev):
+        ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--class", "UNTESTED RULE")
+        ledger(root, "respond", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "fix")
+    scenario("the same loop stops when nothing authorizes the latest exit", 2,
+             not_cleared_at_the_latest, "STALLED")
+
     def authorization_for_another_exit(root, rev):
         four_then_resolved(root, rev)
         write_lf(rev / "loop-authorizations.json", json.dumps({

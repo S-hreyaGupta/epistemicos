@@ -458,6 +458,68 @@ def main() -> int:
     expect_refused("candidate commit that does not resolve",
                    "does not resolve", impl_unresolvable_commit)
 
+    # ---- B01-F04: the reviewer is given what it is asked to judge against ----
+    # Codex: "compose_input carries the protocol but not the pinned spec, and
+    # for implementation review omits the target identifiers entirely." A hash
+    # in a header is not a document a reviewer can read.
+    print()
+    print("the review input carries the spec and the target identity")
+
+    t4 = make_repo(); made.append(t4)
+    do_init(t4); do_freeze(t4)
+    ci4 = (t4 / "runs/T-001/plan-review/cycle-01/codex-input.md") \
+        .read_text(encoding="utf-8")
+    spec_body = (t4 / "specs" / "spec.md").read_text(encoding="utf-8").strip()
+    if spec_body.splitlines()[0] not in ci4:
+        failures.append("the composed input does not contain the pinned spec "
+                        "text, only its hash")
+    elif "The pinned specification" not in ci4:
+        failures.append("the spec is present but not identified as the pinned "
+                        "specification")
+    else:
+        print("  [ok] the pinned spec is embedded, not merely hashed")
+
+    # Editing a pinned spec must not silently reach the reviewer: the text
+    # embedded has to be the text the header names.
+    t4b = make_repo(); made.append(t4b)
+    do_init(t4b)
+    sp = t4b / "specs" / "spec.md"
+    sp.write_text(sp.read_text(encoding="utf-8") + "\nrule G9\n", encoding="utf-8")
+    r = do_freeze(t4b)
+    if r.returncode == 0:
+        failures.append("a cycle was frozen embedding a spec that no longer "
+                        "matches the hash in its own header")
+    else:
+        print("  [ok] refused: a drifted spec is not embedded under its old hash")
+
+    # Implementation review: the §10.1 fields have to reach the reviewer.
+    t4c = make_repo(); made.append(t4c)
+    do_init(t4c)
+    write_lf(t4c / "diff.txt", "diff --git a/x b/x\n")
+    write_lf(t4c / "results.txt", "3 passed\n")
+    head4 = sh("git", "rev-parse", "HEAD", cwd=t4c).stdout.strip()
+    r = runner(t4c, "freeze", "--run", "T-001", "--type", "implementation",
+               "--prompt", "specs/prompt.md", "--candidate-commit", head4,
+               "--approved-plan-hash", GOOD_HASH, "--diff", "diff.txt",
+               "--test-results", "results.txt")
+    if r.returncode != 0:
+        failures.append(f"implementation freeze failed\n{r.stdout}{r.stderr}")
+    else:
+        ci = (t4c / "runs/T-001/implementation-review/cycle-01/codex-input.md") \
+            .read_text(encoding="utf-8")
+        # The field names are the target's own, not invented here. Writing
+        # test_result_sha256 when the target records test_result_hash is how a
+        # control asserts something the system never claimed.
+        missing = [f for f in (head4, GOOD_HASH, "candidate_tree_hash",
+                               "test_result_hash", "diff_hash") if f not in ci]
+        if missing:
+            failures.append(
+                "the implementation review input omits target identifiers the "
+                f"reviewer needs: {missing}")
+        else:
+            print("  [ok] an implementation review input carries the §10.1 "
+                  "target identity")
+
     # ---- B01-F05: a mutable reference is resolved before it is recorded ----
     # Alex Zamurko, 10 September: "resolve any mutable reference such as HEAD to
     # an immutable commit SHA at freeze time and verify the corresponding tree

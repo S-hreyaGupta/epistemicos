@@ -531,7 +531,9 @@ def check_loop_not_terminated(review_dir: Path, n: int, run: dict) -> None:
 
 def compose_input(prompt: str, target_hash: str, run: dict, rtype: str,
                   cycle_n: int, artifacts: list[tuple[dict, str]],
-                  protocol_text: str = "") -> str:
+                  protocol_text: str = "",
+                  spec_texts: list[tuple[dict, str]] | None = None,
+                  target: dict | None = None) -> str:
     """Everything the reviewer needs, in the file the target hash binds.
 
     The protocol text is included, not merely hashed. Every review is *against*
@@ -548,6 +550,25 @@ def compose_input(prompt: str, target_hash: str, run: dict, rtype: str,
     codex-input.md is what MC-2 check 10 binds to the frozen target. Anything
     supplied next to it is outside the evidence and cannot be shown to have been
     what the reviewer saw.
+
+    B01-F04: the same reasoning, applied twice more
+    ------------------------------------------------
+    That argument was made for the protocol and then not carried through.
+
+    Codex: "compose_input carries the protocol but not the pinned spec, and for
+    implementation review omits the target identifiers entirely."
+
+    The spec was named by SPEC_SHA256 in the header and never included, so a
+    reviewer asked whether a plan satisfies the specification had the hash of a
+    document it could not read. And an implementation review was handed the
+    artifacts with no candidate commit, tree hash, approved plan hash, diff or
+    test results — the §10.1 fields that say WHICH implementation is under
+    review. Both are the pilot's failure in a new place: a hash detects a later
+    change and says nothing about whether anyone read the thing.
+
+    Alex Zamurko, 10 September: "make codex-input.md include the exact pinned
+    specification and, for implementation review, all required target
+    identifiers/content bound by the frozen target."
     """
     lines = [
         f"# Review input — {run['run_id']} / {rtype} review / cycle {cycle_n:02d}",
@@ -584,6 +605,57 @@ def compose_input(prompt: str, target_hash: str, run: dict, rtype: str,
             "---",
             "",
         ]
+    # The pinned specification, included rather than named. Same argument as the
+    # protocol above: a reviewer cannot read a hash.
+    for ref, body in (spec_texts or []):
+        lines += [
+            "# The pinned specification",
+            "",
+            f"`{ref['path']}`, sha256 `{ref['sha256']}`.",
+            "",
+            "Pinned by this run. The artifacts below are judged against it as "
+            "well as against",
+            "the protocol.",
+            "",
+            "```",
+            body.rstrip("\n"),
+            "```",
+            "",
+            "---",
+            "",
+        ]
+
+    # §10.1's target fields for an implementation review. Without these the
+    # reviewer is shown code and not told which commit it is, what plan approved
+    # it, or what the tests did — it can judge the artifacts in front of it but
+    # not whether they are the ones the target froze.
+    if target and rtype == "implementation":
+        rows = [("candidate_commit", target.get("candidate_commit", "")),
+                ("candidate_tree_hash", target.get("candidate_tree_hash", "")),
+                ("approved_plan_hash", target.get("approved_plan_hash", "")),
+                ("diff_path", target.get("diff_path", "")),
+                ("diff_hash", target.get("diff_hash", "")),
+                ("test_result_path", target.get("test_result_path", "")),
+                ("test_result_hash", target.get("test_result_hash", ""))]
+        named = [f"{k:<20}{v}" for k, v in rows if v]
+        if target.get("candidate_commit_supplied"):
+            named.append(f"{'supplied as':<20}"
+                         f"{target['candidate_commit_supplied']} (resolved above)")
+        lines += [
+            "# What is under review, by identity",
+            "",
+            "The §10.1 fields from the frozen target. These say which "
+            "implementation this is;",
+            "the artifacts below are its contents.",
+            "",
+            "```text",
+            *named,
+            "```",
+            "",
+            "---",
+            "",
+        ]
+
     lines += [
         "# Artifacts under review",
         "",
@@ -793,8 +865,34 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     # file hashes to run.json's protocol_sha256, so the text embedded below is
     # the text the header names rather than whatever is on disk under that name.
     protocol_text = (REPO / run["protocol"]["path"]).read_text(encoding="utf-8")
+
+    # B01-F04. The specs pinned by this run, read from their pinned paths and
+    # verified against the hashes recorded at init before being embedded. The
+    # same discipline the protocol gets: the text included must be the text the
+    # header names, or the reviewer is reading one document and citing another.
+    #
+    # Only the specs still governing THIS cycle. B02-F05 made the pin set
+    # per-cycle, and reading run["spec_files"] unconditionally re-imposed the
+    # original set: an amendment could release a spec from governance and this
+    # would still refuse on its drift, deadlocking the loop the amendment
+    # existed to unblock. Found by the B02-F06 control, which does exactly that.
+    spec_texts: list[tuple[dict, str]] = []
+    for e in run.get("spec_files", []):
+        if e["path"] not in _gov:
+            continue
+        sp = REPO / e["path"]
+        if not sp.is_file():
+            raise Refused(f"pinned spec is gone, so it cannot be given to the "
+                          f"reviewer: {e['path']}")
+        if sha256_file(sp) != e["sha256"]:
+            raise Refused(
+                f"pinned spec has changed and would be embedded in the review "
+                f"input:\n  {e['path']}\n    pinned {e['sha256']}\n"
+                f"    actual {sha256_file(sp)}")
+        spec_texts.append((e, sp.read_text(encoding="utf-8")))
+
     write_lf(ci, compose_input(prompt, digest, run, args.type, n, artifacts,
-                               protocol_text))
+                               protocol_text, spec_texts, target))
 
     # Self-checks, not assumptions, on what was just written.
     if digest not in ci.read_text(encoding="utf-8"):

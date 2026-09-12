@@ -513,6 +513,71 @@ def main() -> int:
         failures.append("the invalid-cycle event was not preserved and marked\n"
                         + r.stdout)
 
+    # ---- B01-F11 as cycle 02 found it still broken ----
+    # The first repair filtered which events were MEMBERS of the projection and
+    # then copied the state the surviving event recorded. Codex's reproduction:
+    # RAISED in valid 01, ACCEPT in then-valid 02, DEMONSTRATED in valid 03.
+    # Invalidate 02 afterwards and `show` marked the ACCEPT as having no
+    # authority while the finding stayed RESOLVED and the controller returned
+    # CONVERGED. A resolution survived on an acceptance that had been withdrawn.
+    root, rev = review_with({1: True, 2: True, 3: True})
+    ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--class", "UNTESTED RULE")
+    ledger(root, "respond", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
+           "--disposition", "ACCEPT", "--note", "accepted while cycle 2 passed")
+    ledger(root, "resolve", "--review", str(rev), "--cycle", "3", "--id", "C01-F01",
+           "--evidence", "demonstrated in cycle 3")
+    # Everything so far is legitimate. Now the acceptance's cycle fails the gate.
+    write_lf(rev / "cycle-02" / "codex-output-raw.md", "")
+
+    r = ledger(root, "show", "--review", str(rev))
+    if "[RESOLVED]" in r.stdout:
+        failures.append(
+            "the finding is still RESOLVED after the ACCEPT its resolution "
+            "depended on was invalidated; state is being copied from the last "
+            f"retained event rather than replayed\n{r.stdout}")
+    elif "[OPEN]" not in r.stdout:
+        failures.append(f"unexpected state after invalidating the prerequisite\n"
+                        f"{r.stdout}")
+    else:
+        print("  [ok] invalidating an ACCEPT withdraws the resolution that "
+              "rested on it")
+
+    r = loop(root, rev)
+    if status_of(r.stdout) == "CONVERGED":
+        failures.append("the controller still reports CONVERGED on a resolution "
+                        "whose acceptance was invalidated")
+    else:
+        print(f"  [ok] the controller does not converge on it "
+              f"({status_of(r.stdout)})")
+
+    # And the refusal has to explain itself: the operator can see a
+    # DEMONSTRATED in the history and needs to know why it did not take.
+    r = ledger(root, "reopen", "--review", str(rev), "--cycle", "3",
+               "--id", "C01-F01", "--evidence", "x")
+    if "never took effect" not in (r.stderr + r.stdout):
+        failures.append(f"the refusal does not say which event failed to take "
+                        f"effect\n{r.stderr}{r.stdout}")
+    else:
+        print("  [ok] the refusal names the transition that never took effect")
+
+    # An event naming a cycle that does not exist cannot authorize anything.
+    root, rev = review_with({1: True})
+    ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--class", "UNTESTED RULE")
+    r = ledger(root, "respond", "--review", str(rev), "--cycle", "99",
+               "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "from nowhere")
+    if r.returncode == 0:
+        r2 = ledger(root, "resolve", "--review", str(rev), "--cycle", "99",
+                    "--id", "C01-F01", "--evidence", "also from nowhere")
+        if r2.returncode == 0:
+            failures.append("an event in a cycle that does not exist authorized "
+                            "a resolution")
+        else:
+            print("  [ok] an event in a nonexistent cycle authorizes nothing")
+    else:
+        print("  [ok] an event in a nonexistent cycle authorizes nothing")
+
     # Direction two: a DEMONSTRATED recorded in an invalid cycle must not leave
     # the finding permanently RESOLVED. Before the projection the ledger refused
     # every later resolution while the controller still counted the finding

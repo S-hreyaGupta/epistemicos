@@ -222,19 +222,37 @@ def authorized(f: dict, event: str,
 
 
 def note_ignored(f: dict, proj: cycle_projection.Projection) -> str:
-    """A line naming the events being disregarded, so a refusal is legible.
+    """The events being disregarded, so a refusal is legible.
 
     Without this, a resolve that is refused for want of an ACCEPT looks wrong to
     an operator who can see an ACCEPT sitting in the history.
+
+    Two separate reasons an event can fail to count, and they need different
+    remedies, so they are reported separately (B01-F11):
+
+      * it sits in a cycle that fails MC-2, or names a cycle that does not
+        exist. Repair the evidence and it counts again.
+      * it carries authority, but the move it describes was not available from
+        the state that actually obtained — usually because a prerequisite was
+        invalidated. Repairing that cycle is what brings it back.
     """
-    ignored = [f"cycle {e['cycle']:02d} {e['event']}"
+    parts = []
+    ignored = [f"cycle {e['cycle']:02d} {e.get('event')}"
                for e in f["history"] if not proj.authorizes(e["cycle"])]
-    if not ignored:
-        return ""
-    return ("\n  Disregarded, recorded in a cycle that fails MC-2: "
+    if ignored:
+        parts.append(
+            "\n  Disregarded, recorded in a cycle that does not count: "
             + "; ".join(ignored)
             + "\n  They remain in the history as evidence. Repair the cycle's "
             "evidence and they\n  count again.")
+    skipped = cycle_projection.skipped_events(f["history"], proj)
+    if skipped:
+        parts.append(
+            "\n  In a cycle that counts, but never took effect: "
+            + "; ".join(skipped)
+            + "\n  The transition was not available from the state that "
+            "obtained at the time.")
+    return "".join(parts)
 
 
 def restate(f: dict, proj: cycle_projection.Projection) -> None:

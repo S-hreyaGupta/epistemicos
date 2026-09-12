@@ -203,8 +203,13 @@ def state_after(f: dict, valid_upto: set[int]) -> str | None:
     replay itself lives in cycle_projection so the ledger applies the identical
     rule when it decides whether a transition is permitted (B01-F11).
     """
-    allow_all = cycle_projection.Projection([], {})
-    return cycle_projection.replay(f["history"], allow_all, upto=valid_upto)
+    # The projection here authorizes exactly the cycles being asked about: the
+    # `upto` set has already established that they are valid, so nothing further
+    # needs disqualifying. Built from that set rather than left empty, because
+    # an empty projection now has a horizon of 1 (B01-F11's nonexistent-cycle
+    # half) and would silently refuse authority to every cycle above the first.
+    scoped = cycle_projection.Projection(sorted(valid_upto), {})
+    return cycle_projection.replay(f["history"], scoped, upto=valid_upto)
 
 
 def load_authorizations(review: Path) -> list[dict]:

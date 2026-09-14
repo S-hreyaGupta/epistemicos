@@ -17,10 +17,17 @@
           "event": "ACCEPT",
           "note": "next_cycle counts directories, not valid cycles, so four invalid cycles exhaust a budget MC-2 says they cannot consume. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T10:33:59Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03: repair verdict demonstrated",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-2",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F01 on 9 September; corrected to B01-F01, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F02": {
@@ -116,10 +123,17 @@
           "event": "ACCEPT",
           "note": "candidate_commit is stored verbatim, so HEAD is accepted and stays mutable while checks 11 and 12 keep passing. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T10:33:59Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03: repair verdict demonstrated",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "S10.1",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F05 on 9 September; corrected to B01-F05, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F06": {
@@ -192,10 +206,17 @@
           "event": "ACCEPT",
           "note": "The bootstrap gate runs at init and never again, so components can change before freeze; and loop_state never reads the exempt label, so development evidence can reach authoritative loop state. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T10:34:00Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03: repair verdict demonstrated",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-2",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F08 on 9 September; corrected to B01-F08, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F09": {
@@ -215,10 +236,17 @@
           "event": "ACCEPT",
           "note": "cmd_record hashes whatever is on disk at decision time and never compares it to the frozen review target, so approval can cover code the review never saw. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T10:34:01Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03: repair verdict demonstrated",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-1",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F09 on 9 September; corrected to B01-F09, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F10": {
@@ -291,10 +319,17 @@
           "event": "ACCEPT",
           "note": "No event is checked against the finding's raising cycle, so a finding can be accepted and resolved in cycles earlier than the one that raised it. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T10:34:01Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03: repair verdict demonstrated",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "S5",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F12 on 9 September; corrected to B01-F12, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F13": {

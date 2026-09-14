@@ -64,6 +64,13 @@ REVIEW_TYPES = ("plan", "implementation")
 # another cycle.
 TERMINAL_EXITS = ("CONVERGED", "HUMAN_ADJUDICATION_REQUIRED", "STALLED",
                   "MAX_4_REACHED")
+
+# The only status that is permission to open another cycle. B03-F01: the comment
+# above described this intent and the code did not implement it. Refusing the
+# four exits and permitting everything else means permitting the empty string a
+# crashed controller leaves behind, an unrecognised status from a newer
+# controller, and a line that never arrived at all.
+PERMITS_ANOTHER_CYCLE = ("CONTINUE",)
 INVOCATIONS = ("manual", "automated")
 HEX64 = re.compile(r"\A[0-9a-f]{64}\Z")
 
@@ -497,26 +504,57 @@ def check_loop_not_terminated(review_dir: Path, n: int, run: dict) -> None:
     if str(run.get("bootstrap_review", "")).startswith("EXEMPT"):
         argv.append("--development")
     r = subprocess.run(argv, capture_output=True, text=True)
-    if r.returncode == 2:
+
+    # B03-F01. This tested for exit code 2 alone. The replay added for B01-F11
+    # raises UnknownEvent, loop_state caught only CannotCalculate, so an
+    # unrecognised event in the ledger exited 1 with a traceback and no
+    # LOOP_STATUS line. The empty status that left behind is not in
+    # TERMINAL_EXITS, so the check fell through and the freeze proceeded.
+    #
+    # Codex reproduced exactly that and opened cycle-02 on a controller that had
+    # crashed. The rule is now the plain one: nothing but a completed run
+    # reporting CONTINUE is permission. Non-zero is refused whatever the number,
+    # so this does not depend on loop_state translating its own exceptions
+    # correctly — that translation exists for the operator's benefit, not this
+    # check's.
+    if r.returncode != 0:
+        reason = (r.stderr.strip().splitlines() or ["(no reason given)"])[0]
         raise Refused(
-            "the loop state cannot be determined, so whether another cycle is "
-            "permitted cannot be\ndetermined either:\n  "
-            + (r.stderr.strip().splitlines() or ["(no reason given)"])[0]
-            + "\nRepair the evidence and rerun. Opening a cycle on an "
-              "undeterminable loop is how a\nterminated loop keeps running.")
-    status = ""
+            f"the loop state could not be determined (controller exit "
+            f"{r.returncode}), so whether\nanother cycle is permitted cannot be "
+            f"determined either:\n  {reason}\n"
+            "Repair the evidence and rerun. Opening a cycle on an "
+            "undeterminable loop is how a\nterminated loop keeps running.")
+
+    # The status token only. B01-F08 appends a development-evidence label to
+    # this line, and taking the whole remainder produced
+    # "CONVERGED  [DEVELOPMENT EVIDENCE — ...]", which matched no member of
+    # TERMINAL_EXITS, so a converged development loop read as non-terminal and
+    # the runner opened another cycle on it. Adding prose to a line something
+    # else parses is how that happens.
+    statuses = []
     for line in r.stdout.splitlines():
-        if line.startswith("LOOP_STATUS:"):
-            # The status token only. B01-F08 appends a development-evidence
-            # label to this line, and taking the whole remainder produced
-            # "CONVERGED  [DEVELOPMENT EVIDENCE — ...]", which matched no member
-            # of TERMINAL_EXITS — so a converged development loop read as
-            # non-terminal and the runner opened another cycle on it.
-            #
-            # Adding prose to a line something else parses is how that happens.
-            # Split on the first token rather than the first colon.
-            status = line.split(":", 1)[1].strip().split()[0] \
-                if line.split(":", 1)[1].strip() else ""
+        if not line.startswith("LOOP_STATUS:"):
+            continue
+        rest = line.split(":", 1)[1].strip()
+        if rest:
+            statuses.append(rest.split()[0])
+
+    # Exactly one. None means the controller exited 0 without saying anything,
+    # which is not agreement; more than one means the caller would be choosing
+    # which to believe, and the last-one-wins loop this replaced would have
+    # chosen silently.
+    if len(statuses) != 1:
+        what = ("no LOOP_STATUS line" if not statuses
+                else f"{len(statuses)} LOOP_STATUS lines: "
+                     + ", ".join(statuses))
+        raise Refused(
+            f"the controller exited 0 but reported {what}.\n"
+            "Exactly one recognised status is required before another cycle "
+            "opens. Silence is not\npermission, and two answers are not an "
+            "answer.")
+
+    status = statuses[0]
     if status in TERMINAL_EXITS:
         raise Refused(
             f"the loop has already exited: LOOP_STATUS is {status}.\n"
@@ -527,6 +565,19 @@ def check_loop_not_terminated(review_dir: Path, n: int, run: dict) -> None:
             f"{rel(review_dir / 'loop-authorizations.json')}\n"
             "naming the boundary, the outcome it clears, who authorized it and "
             "why. Otherwise\ntake the outcome to human review.")
+
+    # Everything else. A status this runner does not recognise may well be a
+    # perfectly good exit from a newer controller, and treating it as permission
+    # would be deciding, on no information, that it is not. The listed exits are
+    # the ones whose meaning is known; CONTINUE is the only one that permits.
+    if status not in PERMITS_ANOTHER_CYCLE:
+        raise Refused(
+            f"the controller reported LOOP_STATUS: {status}, which this runner "
+            f"does not recognise.\n"
+            f"  permits another cycle: {', '.join(PERMITS_ANOTHER_CYCLE)}\n"
+            f"  known exits:           {', '.join(TERMINAL_EXITS)}\n"
+            "An unrecognised status is not permission. If the controller has "
+            "learned a new one,\nteach this check about it deliberately.")
 
 
 def compose_input(prompt: str, target_hash: str, run: dict, rtype: str,

@@ -279,7 +279,22 @@ def main(argv: list[str]) -> int:
     a = ap.parse_args(argv[1:])
     try:
         return _run(a)
-    except CannotCalculate as e:
+    except (CannotCalculate, cycle_projection.UnknownEvent) as e:
+        # B03-F01, first half. replay() refuses an event it has no transition
+        # for, which is right: silently skipping one would make the state a
+        # function of whatever this version happens to recognise. But the
+        # refusal escaped main() as a traceback, so the controller exited 1 with
+        # no LOOP_STATUS, and the runner's check read that as neither terminal
+        # nor undeterminable and opened the next cycle.
+        #
+        # Translated here so the operator gets the reason rather than a stack
+        # trace, and so the exit code says "cannot calculate" rather than
+        # "crashed". The runner refuses on any non-zero exit regardless, because
+        # a caller that relies on this translation existing fails open the
+        # moment a new exception type appears above it.
+        e = (CannotCalculate(f"the ledger contains an event replay has no "
+                             f"transition for: {e}")
+             if isinstance(e, cycle_projection.UnknownEvent) else e)
         print(f"CANNOT CALCULATE LOOP STATE: {e}", file=sys.stderr)
         print()
         print("No LOOP_STATUS is emitted. An undeterminable state is not "

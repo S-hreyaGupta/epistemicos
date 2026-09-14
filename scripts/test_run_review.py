@@ -1567,6 +1567,106 @@ def main() -> int:
     else:
         print("  [ok] --bootstrap-exempt labels the run NOT_A_PROTOCOL_CYCLE")
 
+    # ---- B03-F01: nothing but a completed CONTINUE is permission ----
+    # The check tested for controller exit code 2 and the four terminal
+    # statuses, and permitted everything else. The replay added for B01-F11
+    # raises UnknownEvent; loop_state caught only CannotCalculate; so an
+    # unrecognised event exited 1 with a traceback and no LOOP_STATUS, and the
+    # empty status fell straight through to permission. Codex reproduced it and
+    # opened cycle-02 on a controller that had crashed.
+    print()
+    print("an undeterminable loop state is not permission (B03-F01)")
+
+    tB = make_repo(); made.append(tB)
+    do_init(tB); do_freeze(tB)
+    write_lf(tB / "replyB.md",
+             reply_for(tB, "Finding ID: C01-F01\nClass: UNTESTED RULE\n"
+                           "Evidence: x\n"))
+    _rb = runner(tB, "record", "--cycle", "runs/T-001/plan-review/cycle-01",
+                 "--output", "replyB.md", "--invocation", "manual")
+    if _rb.returncode != 0:
+        failures.append(f"fixture: could not record cycle 01\n{_rb.stderr}{_rb.stdout}")
+    _lb = sh(sys.executable, str(tB / "scripts" / "ledger.py"), "raise",
+             "--review", "runs/T-001/plan-review", "--cycle", "1",
+             "--id", "C01-F01", "--class", "UNTESTED RULE", cwd=tB)
+    if _lb.returncode != 0:
+        failures.append(f"fixture: could not raise the finding\n{_lb.stderr}{_lb.stdout}")
+
+    cyc2 = tB / "runs" / "T-001" / "plan-review" / "cycle-02"
+
+    # First that the next cycle opens at all. Without this every refusal below
+    # could be refusing for some unrelated reason and the control would pass
+    # while proving nothing, which is B01-F11's control exactly.
+    if do_freeze(tB).returncode != 0:
+        failures.append("fixture: cycle 02 would not open even with a healthy "
+                        "ledger, so the refusals below establish nothing")
+    else:
+        shutil.rmtree(cyc2)
+        print("  [ok] with a healthy ledger and CONTINUE, the next cycle opens")
+
+    led = tB / "runs" / "T-001" / "plan-review" / "ledger.json"
+    healthy = led.read_text(encoding="utf-8")
+
+    # The reproduction: an event replay has no transition for.
+    doc = json.loads(healthy)
+    doc["findings"]["C01-F01"]["history"].append(
+        {"at": "2026-09-14T00:00:00Z", "cycle": 1, "event": "BANANA",
+         "note": "an event no version of replay knows", "state": "OPEN"})
+    write_lf(led, json.dumps(doc, indent=2) + "\n")
+
+    _rb2 = do_freeze(tB)
+    if _rb2.returncode == 0:
+        failures.append("an unrecognised ledger event stopped the controller "
+                        "calculating and the runner opened the next cycle "
+                        "anyway. B03-F01 unrepaired.")
+        if cyc2.exists():
+            shutil.rmtree(cyc2)
+    elif cyc2.exists():
+        failures.append("the freeze refused the unknown event but left a "
+                        "cycle-02 directory behind")
+    else:
+        print("  [ok] refused: a controller that cannot calculate is not "
+              "permission")
+
+    write_lf(led, healthy)
+
+    # The rest of the boundary, driven by stubbing the controller. The finding
+    # is about what this runner accepts as an answer, so the cases worth testing
+    # are the answers a controller can give, not only the one bug that exposed
+    # them. Replacing a covered component is why the fixture is exempt.
+    for label, body, expect in (
+        ("a controller that exits non-zero saying nothing",
+         "import sys\nsys.exit(3)\n", "exit 3"),
+        # The decisive one. Every other non-zero case also trips the
+        # missing-status check, so they would still refuse even if the exit code
+        # were ignored, just for the wrong reason. This one says CONTINUE on its
+        # way out: only a check that reads the exit code refuses it.
+        ("a controller that says CONTINUE and then fails",
+         "import sys\nprint('LOOP_STATUS: CONTINUE')\nsys.exit(1)\n", "exit 1"),
+        ("a controller that exits 0 and reports no status",
+         "print('all quiet')\n", "no LOOP_STATUS line"),
+        ("a status this runner does not recognise",
+         "print('LOOP_STATUS: BANANA')\n", "does not recognise"),
+        ("two statuses in one run",
+         "print('LOOP_STATUS: CONTINUE')\nprint('LOOP_STATUS: CONVERGED')\n",
+         "2 LOOP_STATUS lines"),
+    ):
+        write_lf(tB / "scripts" / "loop_state.py", body)
+        res = do_freeze(tB)
+        out = res.stdout + res.stderr
+        if res.returncode == 0:
+            failures.append(f"the runner treated {label} as permission to open "
+                            f"another cycle")
+            if cyc2.exists():
+                shutil.rmtree(cyc2)
+        elif expect not in out:
+            failures.append(f"refused {label}, but not for that reason:\n"
+                            f"      {out.strip().splitlines()[:1]}")
+        elif cyc2.exists():
+            failures.append(f"refused {label} but left a cycle-02 directory")
+        else:
+            print(f"  [ok] refused: {label}")
+
     # ---- B03-F02: the controls are recorded beside the target, not in it ----
     # Cycle 03's prompt said "the suites are in the target". They were not, and
     # cycle 02 had already said so in prose that no Finding ID block carried, so

@@ -613,13 +613,34 @@ def compose_input(prompt: str, target_hash: str, run: dict, rtype: str,
     specification and, for implementation review, all required target
     identifiers/content bound by the frozen target."
     """
+    # B01-F07, the half cycle 03 found still open. cmd_freeze was repaired to
+    # derive target.json's digests from the pin set governing THAT cycle, and
+    # this header went on quoting run.json's, which describe the set as it stood
+    # at init. Cycle 03 of BOOTSTRAP-001 demonstrates it with no mutation at
+    # all: target.json records spec_sha256 e3b0c442… for its empty non-protocol
+    # governing set, and the header above it says ad7f1099… from the run.
+    #
+    # Two answers to the same question inside one frozen cycle, and the one the
+    # reviewer actually reads was the wrong one. Taken from the target, which is
+    # what target.sha256 covers and what MC-2 checks, so the header and the
+    # record cannot disagree.
+    #
+    # No fallback to the run's values. The single caller always supplies the
+    # target, and a fallback would quietly restore exactly the behaviour being
+    # repaired the first time someone called this without one.
+    if target is None:
+        raise Refused(
+            "compose_input was called without the frozen target, so the digests "
+            "in the input header\n  could only come from run.json, which "
+            "describes the pin set at init rather than\n  the one governing "
+            "this cycle. That is B01-F07.")
     lines = [
         f"# Review input — {run['run_id']} / {rtype} review / cycle {cycle_n:02d}",
         "",
         "```text",
         f"TARGET_SHA256   {target_hash}",
-        f"PROTOCOL_SHA256 {run['protocol_sha256']}",
-        f"SPEC_SHA256     {run['spec_sha256']}",
+        f"PROTOCOL_SHA256 {target['protocol_sha256']}",
+        f"SPEC_SHA256     {target['spec_sha256']}",
         "```",
         "",
         "The target hash above is the binding between the frozen artifact and this",

@@ -582,6 +582,43 @@ def main() -> int:
             print("  [ok] the earlier cycle's record is unchanged by the "
                   "amendment")
 
+        # The half cycle 03 found still open. Everything above checks what the
+        # cycle RECORDS. The reviewer never reads target.json; it reads the
+        # header of codex-input.md, and that was still quoting run.json. So the
+        # repair was demonstrably present in the record and absent from the only
+        # copy anyone acts on.
+        #
+        # BOOTSTRAP-001's own cycle 03 shows it with no fixture at all:
+        # target.json records spec_sha256 e3b0c442… and the header says
+        # ad7f1099…. Compared here rather than asserted against a literal,
+        # because the point is that the two agree, not that either equals some
+        # value this control also had to know.
+        _hdr = (t7 / "runs/T-001/plan-review/cycle-02/codex-input.md") \
+            .read_text(encoding="utf-8")
+        # Parsed rather than string-matched: the header pads the key out for
+        # alignment, so looking for "KEY value" with one space between them
+        # fails on a header that is perfectly correct. The first version of this
+        # control did that and reported the repair broken when it was not.
+        _got = {}
+        for _line in _hdr.splitlines():
+            _p = _line.split()
+            if len(_p) == 2 and _p[0].endswith("_SHA256"):
+                _got[_p[0]] = _p[1]
+        _want = [("PROTOCOL_SHA256", tgt7b["protocol_sha256"]),
+                 ("SPEC_SHA256", tgt7b["spec_sha256"])]
+        _wrong = [f"{k}: target says {v}, header says {_got.get(k, '(absent)')}"
+                  for k, v in _want if _got.get(k) != v]
+        if _wrong:
+            failures.append(
+                "the composed input's header disagrees with the target it is "
+                "bound to:\n      " + "\n      ".join(_wrong) +
+                "\n      The reviewer reads the header, so the digests it was "
+                "given describe a\n      pin set other than the one governing "
+                "this cycle. That is B01-F07.")
+        else:
+            print("  [ok] the input header quotes the cycle's own digests, not "
+                  "the run's")
+
     # ---- B01-F04: the reviewer is given what it is asked to judge against ----
     # Codex: "compose_input carries the protocol but not the pinned spec, and
     # for implementation review omits the target identifiers entirely." A hash

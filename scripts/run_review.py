@@ -932,6 +932,50 @@ def cmd_freeze(args: argparse.Namespace) -> int:
                           "recorded for it; refusing to freeze a cycle whose "
                           "preserved copy already disagrees with its own record")
 
+    # ---- auxiliary evidence: the controls, recorded but not targeted ----
+    # B03-F02. Cycle 03's prompt told the reviewer "the suites are in the
+    # target". They never were. target.json binds ten production artifacts and
+    # no control suites, so the reviewer was asked to weigh control counts whose
+    # exact versions this cycle did not preserve.
+    #
+    # Cycle 02 said so first, in the prose above its findings: "The test suites
+    # are supporting working-tree evidence, not hashed entries in this
+    # target.json." That sat outside a Finding ID block, so nothing transcribed
+    # it, and the same sentence went into the next prompt four days later.
+    #
+    # They cannot simply join the target. The gate refuses a target carrying
+    # artifacts outside its covered set, and widening the covered set to the
+    # controls would mean every control edit invalidates the bootstrap approval
+    # of the production code. So they are recorded beside the target instead:
+    # hashed at freeze, bound to the cycle through one scalar in target.json, and
+    # never presented as reviewed artifacts.
+    #
+    # Discovered by glob rather than listed. A list here would name each suite,
+    # and bootstrap_gate's PY_REF treats any `name.py` token in a covered file as
+    # a dependency, so naming them would pull all of them into the covered set
+    # and do exactly the damage described above. `test_*.py` does not match that
+    # pattern. Deriving also avoids the hand-maintained list the gate's own
+    # closure docstring warns about.
+    aux = [{"path": rel(p).replace("\\", "/"), "sha256": sha256_file(p)}
+           for p in sorted((REPO / "scripts").glob("test_*.py"))]
+    am = cycle / "auxiliary-evidence.json"
+    write_lf(am, json.dumps({
+        "note": "Control suites as they stood at freeze. NOT members of the "
+                "review target: these bytes were not reviewed, and their "
+                "presence here is a record of which controls the stated counts "
+                "came from, not a claim that any of them was examined. "
+                "target.json records this file's SHA-256 and target.sha256 "
+                "covers target.json, so a change here is detectable by anyone "
+                "who compares the two. No MC-2 check performs that comparison: "
+                "this is a record, not an enforced binding.",
+        "suites": aux,
+    }, indent=2) + "\n")
+    # Recorded in the target so target.sha256 covers it. A scalar rather than an
+    # artifact entry, because check 9 and the gate's drift check both read the
+    # artifact lists and would treat a sixth kind of entry as an unreviewed file
+    # in the target.
+    target["auxiliary_evidence_sha256"] = sha256_file(am)
+
     tj = cycle / "target.json"
     write_lf(tj, json.dumps(target, indent=2) + "\n")
     digest = sha256_file(tj)

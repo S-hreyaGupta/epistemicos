@@ -1567,6 +1567,85 @@ def main() -> int:
     else:
         print("  [ok] --bootstrap-exempt labels the run NOT_A_PROTOCOL_CYCLE")
 
+    # ---- B03-F02: the controls are recorded beside the target, not in it ----
+    # Cycle 03's prompt said "the suites are in the target". They were not, and
+    # cycle 02 had already said so in prose that no Finding ID block carried, so
+    # nothing transcribed it and the sentence survived into the next prompt.
+    #
+    # The repair records them instead of pretending they were reviewed. This
+    # control exists to keep both halves true: the manifest is written and
+    # accurate, and the suites still do not appear as target artifacts. A repair
+    # that quietly added them to plan_files would satisfy the first half and
+    # reintroduce the defect, so the second assertion is the load-bearing one.
+    print()
+    print("control suites are recorded, not targeted (B03-F02)")
+
+    def _sha(p: Path) -> str:
+        return hashlib.sha256(p.read_bytes()).hexdigest()
+
+    tA = make_repo(); made.append(tA)
+    # The fixture copies no suites, so plant two. Their names only have to match
+    # the glob; their contents are never executed.
+    write_lf(tA / "scripts" / "test_alpha.py", "# alpha\nprint('[ok] a')\n")
+    write_lf(tA / "scripts" / "test_beta.py", "# beta\nprint('[ok] b')\n")
+    sh("git", "add", "-A", cwd=tA)
+    sh("git", "commit", "-qm", "suites", cwd=tA)
+    do_init(tA); do_freeze(tA)
+
+    cycA = tA / "runs/T-001/plan-review/cycle-01"
+    amA = cycA / "auxiliary-evidence.json"
+    tgtA = json.loads((cycA / "target.json").read_text(encoding="utf-8"))
+
+    if not amA.is_file():
+        failures.append("freeze wrote no auxiliary-evidence.json, so the "
+                        "control versions behind the stated counts are not "
+                        "recorded anywhere in the cycle")
+    else:
+        manA = json.loads(amA.read_text(encoding="utf-8"))
+        listed = {s["path"]: s["sha256"] for s in manA["suites"]}
+        want = {f"scripts/test_{n}.py": _sha(tA / "scripts" / f"test_{n}.py")
+                for n in ("alpha", "beta")}
+        if listed != want:
+            failures.append(f"the manifest does not record the suites as they "
+                            f"stood at freeze:\n    listed {listed}\n"
+                            f"    actual {want}")
+        else:
+            print(f"  [ok] the manifest records every suite at freeze "
+                  f"({len(listed)} of them)")
+
+        if tgtA.get("auxiliary_evidence_sha256") != _sha(amA):
+            failures.append("target.json does not record the manifest's digest, "
+                            "so a later change to it would leave nothing to "
+                            "compare against")
+        else:
+            print("  [ok] target.json records the manifest digest, and "
+                  "target.sha256 covers target.json")
+
+        # The whole point. Recording must not become membership.
+        targeted = {r["path"] for r in tgtA.get("plan_files", [])}
+        if targeted & set(listed):
+            failures.append(
+                "a control suite appears in plan_files. Recording the suites "
+                "must not put them in the target: the gate refuses a target "
+                "carrying artifacts outside its covered set, and the claim "
+                "B03-F02 was raised about would be true again.")
+        else:
+            print("  [ok] no control suite appears in the review target")
+
+        # The record is of freeze-time bytes. Later edits are ordinary work and
+        # must not rewrite what the cycle says it measured.
+        write_lf(tA / "scripts" / "test_alpha.py", "# alpha changed\n")
+        after = json.loads(amA.read_text(encoding="utf-8"))
+        if after != manA:
+            failures.append("editing a suite after freeze changed the frozen "
+                            "manifest")
+        elif listed.get("scripts/test_alpha.py") == _sha(
+                tA / "scripts" / "test_alpha.py"):
+            failures.append("the manifest still matches the edited suite, so it "
+                            "is not recording freeze-time bytes")
+        else:
+            print("  [ok] a later suite edit leaves the frozen record unchanged")
+
     for t in made:
         shutil.rmtree(t, ignore_errors=True)
 

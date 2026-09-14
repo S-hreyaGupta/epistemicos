@@ -90,13 +90,40 @@ def main() -> int:
         print("  failure, so nothing else would notice.")
         return 1
 
+    new_total = sum(counts.values())
     changed = []
     for p in sorted((REPO / "specs" / "prompts").glob("bootstrap-review*.md")):
         original = p.read_text(encoding="utf-8")
         text = original
+
+        # The total this file states, read from the file rather than inferred.
+        #
+        # On 14 September this step did not exist, the five numbers moved to
+        # 24/99/73/42/29, and the sentence two lines below still read "Those
+        # counts total 263". test_prompts.py checked the five and not the prose,
+        # so it passed while the page contradicted itself.
+        #
+        # The first attempt at this repair inferred the old total by summing the
+        # per-suite numbers already in the file. That only works when both go
+        # stale in the same run. They had not: an earlier refresh had updated
+        # the five, so the sum came to 267, matched the new total, and the
+        # orphaned 263 was left untouched. Reading the stated number instead
+        # makes the repair independent of how many times it has run before.
+        m_total = re.search(r"\btotals?\s+(\d+)\b", text)
+        stale = int(m_total.group(1)) if m_total else 0
+
         for rel, n in counts.items():
             text = re.sub(rf"^({re.escape(rel)}\s+)\d+( controls)",
                           rf"\g<1>{n}\g<2>", text, flags=re.M)
+
+        # Replace it wherever it appears as a standalone number, not only in the
+        # sentence that happens to say "total". The cycle-03 prompt states it
+        # twice, in different words, and a rewriter that knew only the first
+        # phrasing would leave the second stale and silent, which is the shape
+        # of the defect this whole file exists to prevent.
+        if stale and stale != new_total:
+            text = re.sub(rf"\b{stale}\b", str(new_total), text)
+
         if text != original:
             with open(p, "w", encoding="utf-8", newline="\n") as fh:
                 fh.write(text)

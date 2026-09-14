@@ -515,6 +515,13 @@
           "event": "RAISED",
           "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T11:01:55Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
+          "state": "OPEN"
         }
       ],
       "requirement_id": "",
@@ -529,6 +536,13 @@
           "cycle": 2,
           "event": "RAISED",
           "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T11:01:55Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
         }
       ],
@@ -545,6 +559,13 @@
           "event": "RAISED",
           "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T11:01:56Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
+          "state": "OPEN"
         }
       ],
       "requirement_id": "",
@@ -559,6 +580,13 @@
           "cycle": 2,
           "event": "RAISED",
           "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T11:01:56Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
         }
       ],
@@ -575,6 +603,13 @@
           "event": "RAISED",
           "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T11:01:57Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
+          "state": "OPEN"
         }
       ],
       "requirement_id": "",
@@ -589,6 +624,13 @@
           "cycle": 2,
           "event": "RAISED",
           "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T11:01:58Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
         }
       ],
@@ -605,6 +647,13 @@
           "event": "RAISED",
           "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T11:01:58Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
+          "state": "OPEN"
         }
       ],
       "requirement_id": "",
@@ -619,6 +668,13 @@
           "cycle": 2,
           "event": "RAISED",
           "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T11:01:59Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
         }
       ],
@@ -635,6 +691,13 @@
           "event": "RAISED",
           "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T11:02:00Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
+          "state": "OPEN"
         }
       ],
       "requirement_id": "",
@@ -649,6 +712,13 @@
           "cycle": 2,
           "event": "RAISED",
           "note": "transcribed from cycle-02 findings.json by identifier and class, not by hand",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-14T11:02:00Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
         }
       ],

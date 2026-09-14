@@ -313,6 +313,31 @@ def main() -> int:
             ok(f"all {total} stated control counts across {len(claims)} bootstrap "
                "prompt(s) match the suites")
 
+        # A prompt that states the five numbers and then sums them in prose can
+        # be right about the five and wrong about the sum. On 14 September it
+        # was: refresh_counts.py updated test_run_review.py to 99 and left
+        # "Those counts total 263" two lines below, where the truth was 267. The
+        # check above passed, because it reads the five and not the sentence.
+        #
+        # This reads the sentence. It covers a stated total in the form
+        # "total <n>"; it does not parse every way a document could restate the
+        # number in words, so it narrows the gap rather than closing it.
+        for name, claimed in sorted(claims.items()):
+            if not claimed:
+                continue
+            want = sum(claimed.values())
+            stated = [int(n) for n in re.findall(
+                r"\btotals?\s+(\d+)\b",
+                (PROMPTS / name).read_text(encoding="utf-8"))]
+            bad = [n for n in stated if n != want]
+            if bad:
+                failures.append(
+                    f"{name} states a total of {bad[0]} but its own five counts "
+                    f"sum to {want}. The per-suite numbers and the total are "
+                    f"written by different steps, and only one of them ran.")
+            elif stated:
+                ok(f"{name} states a total that matches its own counts ({want})")
+
         # A cycle-02 prompt that reused cycle 01's finding-ID grammar would ask
         # the reviewer to raise B01 identifiers in cycle 02, and the ledger
         # refuses those: check_id requires the digits to match the cycle. The

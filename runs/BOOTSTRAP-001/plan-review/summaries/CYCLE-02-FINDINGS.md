@@ -5,7 +5,13 @@ finding set is `cycle-02/findings.json`, extracted from `cycle-02/codex-output-r
 state lives in `ledger.json`. Where this file and those disagree, they govern and
 this is wrong.
 
-Status as at commit `2c2c17c`. `LOOP_STATUS: CONTINUE`, two of four cycles used.
+Status as at commit `c2d5c4e`. `LOOP_STATUS: CONTINUE`, two of four cycles used.
+
+All fifteen have been worked on since the cycle 02 capture: the ten new
+findings below, and the five rejected repairs whose work is recorded in the
+cycle 01 summary. None of them has changed state. §5 gives `RESOLVED` only on
+demonstration in the next review target, so the ledger still reads `OPEN` for
+every one. See **Repairs claimed, awaiting cycle 03** at the end of this file.
 
 ## What cycle 02 was, and how it differs from cycle 01
 
@@ -60,16 +66,16 @@ A finding block indented by one space is invisible to the strict parser, and the
 safeguard that would have caught it only ran when nothing parsed at all. One
 successful block switched off the protection for the rest. Both extraction and
 the controller's reconciliation use the same parser, so both agree on the same
-incomplete list. **Fixed 10 September.**
+incomplete list. *Repair claimed 10 September, not yet demonstrated.*
 
 **B02-F02** CONTRADICTORY IMPLEMENTATION MAPPING · `cycle-02/codex-input.md`, `findings_format.py`
 The cycle 02 prompt specified a recurrence block with no `Class:` line, and the
 parser requires one on every block. Following the review instructions exactly
 produced a response the capture runner refused. Codex reported the
 incompatibility as the finding rather than reformatting to make it pass.
-**Fixed 10 September:** the parser accepts the recurrence form and resolves the
-class from the ledger, so the reviewer never re-asserts a classification it is
-not making.
+*Repair claimed 10 September, not yet demonstrated:* the parser accepts the
+recurrence form and resolves the class from the ledger, so the reviewer never
+re-asserts a classification it is not making.
 
 **B02-F03** CONTRADICTORY IMPLEMENTATION MAPPING · schema, `findings_format.py`, `ledger.py`
 The schema permits zero to two capital letters at the start of a finding
@@ -123,6 +129,52 @@ The no-over-claim scanner reads a hard-coded list of six files and omits all fou
 newly reviewed modules, including the one containing B02-F09. Two of the
 authority refusals, malformed JSON and absent timestamp, have no control at all.
 The review scope was broadened; its prose control was not.
+
+---
+
+## Repairs claimed, awaiting cycle 03 — ten
+
+**Read this as a claim, not a status.** Written by the implementing agent
+about its own work. Cycle 02 rejected five of the thirteen repair claims it
+examined; that is the rate this section should be read against. Each repair
+was checked by mutation, meaning the fix was deliberately broken and the named
+control confirmed to fail.
+
+| ID | Commit | What changed | Control that fails without it |
+|----|--------|--------------|-------------------------------|
+| B02-F01 | `0743baa` | the strict parser sees an indented block, and the safeguard runs on every block rather than only when nothing parsed | `test_run_review.py` · "recurrence blocks, and blocks the strict parser cannot see" |
+| B02-F02 | `0743baa` | the parser accepts the recurrence form with no `Class:` line and resolves the class from the ledger | `test_run_review.py` · "a recurrence takes its class from the ledger, not the review" |
+| B02-F03 | `b6ea13a` | the ledger consumes the canonical Finding ID grammar instead of carrying a second copy of it | `test_ledger.py` · "one Finding ID grammar, parser and ledger (B02-F03)" |
+| B02-F04 | `f6e9016`, then `a0b9893` and `f95ada5` | every refusal a supersession can trigger runs before anything is deleted; then the records are staged and swapped rather than unlinked | `test_run_review.py` · "a refused supersession leaves the authoritative capture, findings and designation intact" and "no staging files are left behind in the cycle" |
+| B02-F05 | `6871d65` | amendments are constrained by role, and added pins are hash-bound and actually checked rather than iterated from what `run.json` first recorded | `test_run_review.py` · "refused: an artifact added by amendment is checked like any other governing pin" |
+| B02-F06 | `6871d65` | a frozen cycle records what governed it, so a later amendment cannot retroactively change a completed cycle | `test_run_review.py` · "a frozen cycle records its governing pin set" and "refused: an amendment that would change what a completed cycle ran under" |
+| B02-F07 | `604467d` | the whole implementation evidence set is snapshotted at freeze, and checks 13, 14 and 15 read the preserved copies | `test_interfaces.py` · seam 11 "implementation evidence <-> later work (B02-F07)" |
+| B02-F08 | `da0f833` | the bootstrap exception expires at every operation rather than only at `init`, and `approve-runner` commits its own record | `test_bootstrap_gate.py` · "the bootstrap exception ends at the first approved runner" |
+| B02-F09 | `870912a` | `authority.py` states its control at its real strength: the separate-artifact and byte-binding checks, with no claim of a forced out-of-band step | `test_bootstrap_gate.py` · "no claim stronger than CONVENTION_ONLY" |
+| B02-F10 | `870912a` | the over-claim scan derives its file list from the gate's actual covered set instead of a hard-coded six, and the two uncontrolled authority refusals gained controls | `test_bootstrap_gate.py` · "no claim stronger than CONVENTION_ONLY"; `test_run_review.py` · "refused: an approval record that is not valid JSON" |
+
+**On B02-F09 and B02-F10 sharing a commit.** F10 is the reason F09 was
+invisible: the scanner that should have caught the over-claim did not read the
+file containing it. Repairing the scan without repairing what it now sees
+would leave a control that fires on the next commit rather than this one.
+
+**On B02-F04's three commits.** `f6e9016` moved the refusals ahead of the
+deletions. That was not enough, because a refusal between the two writes still
+left one record replaced and one not, so `a0b9893` and `f95ada5` replaced
+deletion with staging and an atomic swap.
+
+---
+
+## Raised here, not by a reviewer — one
+
+**B02-F11** A refused capture attempt was recorded on disk but not in the
+capture log, so the log and the directory disagreed about what had been
+attempted. Addressed in `0629bbd`. This was found by the implementing agent
+rather than by Codex, so it carries no cycle 02 identifier from the reviewer
+and is not in the authoritative finding set. It is listed here so the record
+is complete. **Awaiting a decision from Alex Zamurko** on whether it should be
+entered into the ledger as a finding or left as a repair with no finding
+attached.
 
 ---
 

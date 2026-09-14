@@ -25,6 +25,25 @@ would misrepresent how well controlled these components are to the reviewer
 being asked to trust them" — and the same is true of a deflated one.
 
 Nothing is written unless every suite exits 0.
+
+Why SUITES is five and not eight
+--------------------------------
+There are eight `test_*.py` files. Three are deliberately outside this count,
+and the omission is written here rather than left to be inferred.
+
+`test_prompts.py` is excluded because it is the consumer of this number. It
+reads the counts these five produce and compares them against the prompts. A
+suite that checked its own count would agree with itself, which is the defect
+this script exists to prevent.
+
+`test_convert_protocol.py` and `test_protocol_pin.py` are excluded because they
+control protocol document handling — conversion fidelity, version pinning,
+reference consistency — and none of those files are in the review target. The
+number the prompts assert is a count of controls over the execution layer being
+reviewed, not over the repository. Both were run by hand on 14 September and
+both were green; they simply are not what this number measures.
+
+If either ever covers a file in the review target, it belongs in SUITES.
 """
 
 from __future__ import annotations

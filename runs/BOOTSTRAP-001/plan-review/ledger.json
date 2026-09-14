@@ -654,6 +654,36 @@
       ],
       "requirement_id": "",
       "state": "OPEN"
+    },
+    "B03-F01": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 3,
+      "history": [
+        {
+          "at": "2026-09-14T10:53:30Z",
+          "cycle": 3,
+          "event": "RAISED",
+          "note": "failure to calculate loop state is read as permission to open another cycle; UnknownEvent from replay escapes loop_state.main and the runner does not require a recognised CONTINUE",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
+    },
+    "B03-F02": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 3,
+      "history": [
+        {
+          "at": "2026-09-14T10:53:32Z",
+          "cycle": 3,
+          "event": "RAISED",
+          "note": "the cycle-03 prompt states the suites are in the target; target.json binds ten production artifacts and no test suites",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "state": "OPEN"
     }
   },
   "review": "plan-review"

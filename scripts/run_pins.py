@@ -58,6 +58,56 @@ class PinError(Exception):
     """The pin history cannot be read, or does not describe a coherent chain."""
 
 
+# ---------------------------------------------------------------- run metadata
+
+# MC-1 names the status; these are the values it can take. Enumerated so a typo
+# or an invented reassurance is refused rather than recorded: a run claiming
+# "ENFORCED" would read as a stronger guarantee than anything here supports.
+MC1_VALUES = ("CONVENTION_ONLY", "TECHNICALLY_ENFORCED")
+
+
+def mc1_enforcement_problem(run: dict) -> str | None:
+    """None if run.json records a usable MC1_ENFORCEMENT, else why not.
+
+    B01-F14, the half cycle 03 found still open. The runner validated this in
+    load_run, and the controller read run.json separately through
+    run_classification and looked only at the bootstrap label. Codex removed
+    mc1_enforcement from a normal approved run after a valid cycle and the
+    controller printed an unqualified "LOOP_STATUS: CONVERGED". The field was
+    mandatory to create and freeze a run, and optional to conclude one.
+
+    Codex asked for the rule to be SHARED rather than implemented twice:
+    "Share mandatory run-metadata validation across authoritative consumers."
+    Two copies of a rule is B02-F03, where the schema and the ledger each had
+    their own idea of a valid identifier and disagreed.
+
+    It returns a message instead of raising because the two callers report
+    differently: the runner refuses an operation, the controller refuses to
+    state an outcome. Sharing the rule should not mean sharing an exception
+    type.
+
+    It lives here rather than in a module of its own because a new file would
+    join the gate's covered set and invalidate the standing bootstrap approval.
+    If the run-metadata rules grow past this one field, they deserve their own
+    home and that re-approval.
+    """
+    status = str(run.get("mc1_enforcement", "")).strip()
+    if not status:
+        return ("run.json records no mc1_enforcement.\n"
+                "  MC-1 requires every run to record the enforcement status it "
+                "was conducted under.\n  A reader of this evidence would have to "
+                "go looking elsewhere, and the answer\n  would be today's rather "
+                "than the run's.\n"
+                "  If this run predates the field, add it with a note saying it "
+                "was reconstructed,\n  rather than writing it as though it had "
+                "always been there.")
+    if status not in MC1_VALUES:
+        return (f"run.json records mc1_enforcement {status!r}, which is not a "
+                f"recognised status.\n  Expected one of: "
+                f"{', '.join(MC1_VALUES)}")
+    return None
+
+
 def amendments_path(run_dir: Path) -> Path:
     return run_dir / "pin-amendments.json"
 

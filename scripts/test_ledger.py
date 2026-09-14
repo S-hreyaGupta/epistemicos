@@ -39,8 +39,13 @@ def sh(*args: str, cwd: Path) -> subprocess.CompletedProcess:
 def make_repo() -> tuple[Path, str]:
     tmp = Path(tempfile.mkdtemp(prefix="ledger-")).resolve()
     (tmp / "scripts").mkdir()
+    # run_pins is here because loop_state imports it for the shared
+    # run-metadata rule (B01-F14). Without it the controller fails at import,
+    # emits no LOOP_STATUS, and every control in this suite that expects an
+    # outcome reports the wrong thing. The suite exited 1 at 49 of 73 controls
+    # when this list was five names long.
     for n in ("ledger.py", "loop_state.py", "validate_cycle.py",
-              "findings_format.py", "cycle_projection.py"):
+              "findings_format.py", "cycle_projection.py", "run_pins.py"):
         shutil.copy2(SRC / n, tmp / "scripts" / n)
     # The parser reads the canonical Finding ID grammar from the schema, and the
     # controller reparses the raw review, so a fixture without it cannot compute

@@ -248,10 +248,10 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 # ---------------------------------------------------------------- freeze
 
-# MC-1 names the status; these are the values it can take. Enumerated so a typo
-# or an invented reassurance is refused rather than recorded: a run claiming
-# "ENFORCED" would read as a stronger guarantee than anything here supports.
-MC1_VALUES = ("CONVENTION_ONLY", "TECHNICALLY_ENFORCED")
+# B01-F14. The enumeration and the rule moved to run_pins.mc1_enforcement_problem
+# so the controller applies the same one. Re-exported under the old name because
+# the controls and the prompts refer to it.
+MC1_VALUES = run_pins.MC1_VALUES
 
 
 def load_run(run_id: str) -> dict:
@@ -270,21 +270,13 @@ def load_run(run_id: str) -> dict:
     #
     # Alex Zamurko, 10 September: "make MC1_ENFORCEMENT mandatory and validated
     # for every protocol run."
-    status = str(run.get("mc1_enforcement", "")).strip()
-    if not status:
-        raise Refused(
-            f"{run_id}/run.json records no mc1_enforcement.\n"
-            "  MC-1 requires every run to record the enforcement status it was "
-            "conducted under.\n  A reader of this evidence would have to go "
-            "looking elsewhere, and the answer\n  would be today's rather than "
-            "the run's.\n"
-            "  If this run predates the field, add it with a note saying it was "
-            "reconstructed,\n  rather than writing it as though it had always "
-            "been there.")
-    if status not in MC1_VALUES:
-        raise Refused(
-            f"{run_id}/run.json records mc1_enforcement {status!r}, which is not "
-            f"a recognised status.\n  Expected one of: {', '.join(MC1_VALUES)}")
+    #
+    # The rule itself now lives in run_pins, because cycle 03 found this half
+    # repaired: the runner enforced it and the controller, reading the same file
+    # for its own purposes, did not.
+    problem = run_pins.mc1_enforcement_problem(run)
+    if problem:
+        raise Refused(f"{run_id}/{problem}")
     return run
 
 

@@ -54,6 +54,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cycle_projection  # noqa: E402
+# B01-F14: the shared run-metadata rule, so the controller and the runner refuse
+# the same thing rather than each having their own idea of a usable run.
+import run_pins  # noqa: E402
 
 VALIDATOR = REPO / "scripts" / "validate_cycle.py"
 MAX_VALID_CYCLES = 4
@@ -326,7 +329,30 @@ def run_classification(review: Path) -> tuple[str, str]:
     except json.JSONDecodeError as e:
         raise CannotCalculate(f"{run_json} is not valid JSON: {e}")
     label = str(run.get("bootstrap_review", "")).strip()
-    return ("DEVELOPMENT" if label.startswith("EXEMPT") else "PROTOCOL"), label
+    kind = "DEVELOPMENT" if label.startswith("EXEMPT") else "PROTOCOL"
+
+    # B01-F14, the half cycle 03 found still open. This function already read
+    # run.json and already decided whether the run is authoritative, and then
+    # asked nothing about whether the run is fit to produce an outcome. Codex
+    # removed mc1_enforcement from a normal approved run with a completed valid
+    # cycle; this printed an unqualified "LOOP_STATUS: CONVERGED".
+    #
+    # The rule is run_pins', not a second copy: the runner refuses the same
+    # thing at freeze, and two implementations of one requirement is how they
+    # come to disagree.
+    #
+    # Applied to PROTOCOL runs only. A development run's outcome is already
+    # labelled as not a protocol result, so refusing it would be refusing
+    # something that claims nothing. BOOTSTRAP-001 carries the field as
+    # reconstructed and passes either way.
+    if kind == "PROTOCOL":
+        problem = run_pins.mc1_enforcement_problem(run)
+        if problem:
+            raise CannotCalculate(
+                f"{run_json} cannot support an authoritative outcome:\n  "
+                + problem)
+
+    return kind, label
 
 
 def _run(a) -> int:

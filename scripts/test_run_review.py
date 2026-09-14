@@ -1633,6 +1633,89 @@ def main() -> int:
     else:
         print("  [ok] --bootstrap-exempt labels the run NOT_A_PROTOCOL_CYCLE")
 
+    # ---- B01-F14: a run unfit to be concluded cannot be concluded ----
+    # The runner refused a missing or unrecognised mc1_enforcement at freeze.
+    # The controller read the same run.json for its own purposes and asked
+    # nothing about it, so a protocol run could lose the field after freezing
+    # and still be handed an unqualified LOOP_STATUS. Codex reproduced exactly
+    # that and got "CONVERGED".
+    #
+    # A real run, not an exempt one: the finding is about authoritative outcomes,
+    # and a development run's outcome already says it is not one.
+    print()
+    print("a protocol run must be fit to be concluded (B01-F14)")
+
+    tM = make_repo(); made.append(tM)
+    if approve_bootstrap(tM).returncode != 0:
+        failures.append("fixture: could not approve the bootstrap for B01-F14")
+    else:
+        _ri = runner(tM, "init", "--run", "A1E-001", "--protocol",
+                     "specs/protocol.md", "--spec", "specs/spec.md")
+        _rf = runner(tM, "freeze", "--run", "A1E-001", "--type", "plan",
+                     "--prompt", "specs/prompt.md", "--file", "plan/01-PLAN.md")
+        revM = tM / "runs" / "A1E-001" / "plan-review"
+        cM = revM / "cycle-01"
+        if _ri.returncode != 0 or _rf.returncode != 0:
+            failures.append(f"fixture: could not open a protocol cycle\n"
+                            f"{_ri.stderr}{_rf.stderr}")
+        else:
+            thM = (cM / "target.sha256").read_text(encoding="utf-8").strip()
+            write_lf(tM / "replyM.md",
+                     f"TARGET_SHA256 {thM}\n\nNo findings in any category.\n")
+            _rr = runner(tM, "record", "--cycle",
+                         "runs/A1E-001/plan-review/cycle-01",
+                         "--output", "replyM.md", "--invocation", "manual",
+                         "--zero-findings")
+            if _rr.returncode != 0:
+                failures.append(f"fixture: could not record the protocol cycle\n"
+                                f"{_rr.stderr}{_rr.stdout}")
+
+            def controller(t: Path) -> subprocess.CompletedProcess:
+                return sh(sys.executable, str(t / "scripts" / "loop_state.py"),
+                          "--review", "runs/A1E-001/plan-review", "--quiet",
+                          cwd=t)
+
+            # The baseline. Without it the refusals below could be refusing for
+            # any reason at all and the control would still look green.
+            _b = controller(tM)
+            if _b.returncode != 0 or "LOOP_STATUS" not in _b.stdout:
+                failures.append(f"fixture: a healthy protocol run produced no "
+                                f"loop status, so the refusals below establish "
+                                f"nothing\n{_b.stderr}{_b.stdout}")
+            else:
+                print("  [ok] a protocol run recording its enforcement status "
+                      "is concluded normally")
+
+            rj = tM / "runs" / "A1E-001" / "run.json"
+            healthy_run = rj.read_text(encoding="utf-8")
+
+            for label, mutate in (
+                ("a protocol run that has lost its enforcement status",
+                 lambda d: d.pop("mc1_enforcement", None)),
+                ("a protocol run claiming an enforcement status that means "
+                 "nothing", lambda d: d.__setitem__("mc1_enforcement",
+                                                    "FULLY_ENFORCED")),
+            ):
+                doc = json.loads(healthy_run)
+                mutate(doc)
+                write_lf(rj, json.dumps(doc, indent=2) + "\n")
+                res = controller(tM)
+                out = res.stdout + res.stderr
+                if res.returncode == 0:
+                    failures.append(f"the controller concluded {label}")
+                elif "LOOP_STATUS" in res.stdout:
+                    failures.append(
+                        f"the controller refused {label} but still printed a "
+                        f"LOOP_STATUS line, which is the thing callers read\n"
+                        f"      {res.stdout.strip()[:160]}")
+                elif "mc1_enforcement" not in out:
+                    failures.append(f"refused {label}, but not for that reason\n"
+                                    f"      {out.strip()[:160]}")
+                else:
+                    print(f"  [ok] refused: {label}")
+
+            write_lf(rj, healthy_run)
+
     # ---- B03-F01: nothing but a completed CONTINUE is permission ----
     # The check tested for controller exit code 2 and the four terminal
     # statuses, and permitted everything else. The replay added for B01-F11

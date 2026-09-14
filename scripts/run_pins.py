@@ -184,6 +184,27 @@ def validate_chain(run: dict, items: list[dict],
                 f"amendment {i} supplies something other than a sha256 for: "
                 + ", ".join(bad_hash))
 
+        # B02-F05, the half cycle 03 found still open. Both checks above look
+        # only at `added`, so any other key in the map went unexamined, and
+        # pin_hashes_for_cycle applied the whole dictionary. Codex: "An
+        # amendment can change the protocol bytes accepted by the pin checker
+        # without declaring a protocol change, without removing the protocol
+        # path and without changing run.json."
+        #
+        # Keeping the protocol's PATH is not keeping its version. The role
+        # constraint this file exists to enforce was bypassable through the very
+        # hash mechanism added to enforce it.
+        stray = sorted(set(hashes) - set(added))
+        if stray:
+            raise PinError(
+                f"amendment {i} supplies hashes for artifact(s) it does not "
+                "add:\n    " + "\n    ".join(stray) +
+                "\n  added_pin_hashes binds the bytes of NEW pins only. A hash "
+                "for a retained artifact\n  is a version change arriving as a "
+                "dictionary key rather than being declared as one.\n"
+                "  If the intent is to change what governs, say so in "
+                "affected_artifacts and let the\n  role constraints apply to it.")
+
         current = sorted(set(a["new_pin_set"]))
         last_cycle = int(a["effective_cycle"])
 
@@ -278,9 +299,25 @@ def pin_hashes_for_cycle(run: dict, items: list[dict],
     out = {run["protocol"]["path"]: run["protocol"]["sha256"]}
     for e in run.get("spec_files", []):
         out[e["path"]] = e["sha256"]
+
+    # B02-F05. `out.update(...)` applied every key the amendment carried, which
+    # is what turned an unvalidated dictionary entry into a governing hash.
+    # Only the paths an amendment actually adds are taken from it.
+    #
+    # Deliberately not relying on validate_chain having refused the stray keys
+    # first. Replay is reachable from callers that have not validated, and a
+    # function that is safe only because something else ran is the shape of most
+    # of the findings in this ledger.
+    seen = set(initial_pin_set(run))
     for a in items:
+        proposed = set(a["new_pin_set"])
         if int(a["effective_cycle"]) <= cycle_n:
-            out.update(a.get("added_pin_hashes") or {})
+            added = proposed - seen
+            out.update({p: h
+                        for p, h in (a.get("added_pin_hashes") or {}).items()
+                        if p in added})
+        seen = proposed
+
     return {p: h for p, h in out.items()
             if p in set(pins_for_cycle(run, items, cycle_n))}
 

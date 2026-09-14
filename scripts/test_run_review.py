@@ -1380,6 +1380,72 @@ def main() -> int:
                   "removes the governing protocol",
                   affected_artifacts=["specs/protocol.md"],
                   new_pin_set=["specs/spec.md"])
+
+    # The half cycle 03 found still open. Removing the protocol path was
+    # refused; changing the protocol's BYTES through the added-hash map was not.
+    # added_pin_hashes was validated for the paths being added and then applied
+    # wholesale, so this amendment declares only specs/extra.md, keeps every
+    # existing path, and replaces the governing protocol's hash on the way
+    # through. Codex reproduced it against the real functions.
+    # Written out rather than going through amend_refuses, because the amendment
+    # has to be legitimate in every other respect. specs/extra.md must exist and
+    # hash correctly, or the freeze refuses on a missing governing pin and the
+    # control passes without ever reaching the defect. The first version of this
+    # control did exactly that, and the mutation probe is what exposed it.
+    tP = make_repo(); made.append(tP)
+    write_lf(tP / "specs" / "extra.md", "# extra\n\nan added governing spec\n")
+    sh("git", "add", "-A", cwd=tP)
+    sh("git", "commit", "-qm", "extra", cwd=tP)
+    do_init(tP); do_freeze(tP)
+
+    # Cycle 01 has to be genuinely closed. amend_refuses gets away without this
+    # because its amendments fail inside check_pins_still_hold, which runs
+    # first. This one is meant to REACH the pin machinery and be accepted by it
+    # when the repair is absent, so anything refusing later would mask the
+    # result: the mutation probe showed the freeze failing on an unrecorded
+    # cycle 01 and the control reporting "wrong reason" when the truth was that
+    # the override had been accepted.
+    write_lf(tP / "replyP.md",
+             reply_for(tP, "Finding ID: C01-F01\nClass: UNTESTED RULE\n"
+                           "Evidence: x\n"))
+    _rp0 = runner(tP, "record", "--cycle", "runs/T-001/plan-review/cycle-01",
+                  "--output", "replyP.md", "--invocation", "manual")
+    if _rp0.returncode != 0:
+        failures.append(f"fixture: could not close cycle 01 for the retained-pin "
+                        f"control\n{_rp0.stderr}{_rp0.stdout}")
+    _lp0 = sh(sys.executable, str(tP / "scripts" / "ledger.py"), "raise",
+              "--review", "runs/T-001/plan-review", "--cycle", "1",
+              "--id", "C01-F01", "--class", "UNTESTED RULE", cwd=tP)
+    if _lp0.returncode != 0:
+        failures.append(f"fixture: could not raise the finding\n{_lp0.stderr}{_lp0.stdout}")
+
+    _xh = hashlib.sha256((tP / "specs" / "extra.md").read_bytes()).hexdigest()
+    amend(tP,
+          affected_artifacts=["specs/extra.md"],
+          new_pin_set=["specs/protocol.md", "specs/spec.md", "specs/extra.md"],
+          added_pin_hashes={"specs/extra.md": _xh,
+                            "specs/protocol.md": "b" * 64})
+    _rp = do_freeze(tP)
+    _out = (_rp.stdout + _rp.stderr).lower()
+    if _rp.returncode == 0:
+        failures.append(
+            "an amendment declaring only specs/extra.md replaced the governing "
+            "protocol's hash and was accepted. Keeping the protocol's path is "
+            "not keeping its version, which is B02-F05 unrepaired.")
+    elif "does not add" not in _out:
+        failures.append(
+            "an amendment that rewrites a retained pin's hash: refused for the "
+            f"wrong reason\n      wanted 'does not add'\n      got "
+            f"{(_rp.stderr + _rp.stdout)[:200]}")
+    else:
+        print("  [ok] refused: an amendment that rewrites a retained pin's hash")
+    # What this does NOT cover, stated rather than left to be assumed: the
+    # repair has a second half, a filter in pin_hashes_for_cycle that applies
+    # only an amendment's own additions even when validate_chain has not run.
+    # This control reaches that function through the runner, which always
+    # validates first, so the filter is never the thing refusing here. It is
+    # defence for callers that skip validation, and it has no control of its
+    # own. Claiming otherwise would be the defect this finding is about.
     amend_refuses("an amendment adding a pin with no hash",
                   "without binding them to their bytes",
                   affected_artifacts=["specs/extra.md"],

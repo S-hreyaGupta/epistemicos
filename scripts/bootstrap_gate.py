@@ -318,7 +318,7 @@ def runner_approvals_on_disk(root: Path) -> list[Path]:
     return sorted(d.glob("*.json")) if d.is_dir() else []
 
 
-def runner_approvals_in_history(root: Path) -> list[str]:
+def runner_approvals_in_history(root: Path) -> tuple[list[str], str | None]:
     """Runner approvals git has ever seen added, whether or not they exist now.
 
     This is what makes the termination one-way, and it is the part that took a
@@ -339,16 +339,29 @@ def runner_approvals_in_history(root: Path) -> list[str]:
     exemption and subjects every later runner to review by a prior approved one.
     The direction that would benefit the implementing agent is removing one, and
     that is the direction this closes.
+
+    B02-F08. This returned [] when git failed, which is the same value it
+    returns for a successful search that found nothing. So "no approval has ever
+    been recorded" and "I could not find out" were indistinguishable, and the
+    second one read as the first. Codex injected exit 128 and the exception came
+    back available.
+
+    That is the one-way termination failing open at exactly the point it is
+    supposed to be hardest: an unreadable history is not evidence of absence,
+    and the whole mechanism rests on history being readable. So the error
+    travels back with the result and the caller decides, rather than being
+    handed an empty list and no way to tell what it means.
     """
     r = subprocess.run(
         ["git", "-C", str(root), "log", "--all", "--diff-filter=A",
          "--format=%H", "--name-only", "--", f"{RUNNER_APPROVAL_DIR}/"],
         capture_output=True, text=True)
     if r.returncode != 0:
-        return []
+        detail = (r.stderr.strip().splitlines() or ["(no reason given)"])[0]
+        return [], f"git log exited {r.returncode}: {detail}"
     return sorted({l.strip() for l in r.stdout.splitlines()
                    if l.strip().startswith(f"{RUNNER_APPROVAL_DIR}/")
-                   and l.strip().endswith(".json")})
+                   and l.strip().endswith(".json")}), None
 
 
 def bootstrap_exception_available(root: Path) -> tuple[bool, list[str]]:
@@ -360,7 +373,29 @@ def bootstrap_exception_available(root: Path) -> tuple[bool, list[str]]:
     cycle 02 and it stops being true the moment the first approval exists.
     """
     live = runner_approvals_on_disk(root)
-    historic = runner_approvals_in_history(root)
+    historic, hist_error = runner_approvals_in_history(root)
+
+    # B02-F08. Checked before the historic list is consulted, because an empty
+    # list from a failed query looks exactly like an empty list from a clean
+    # one. Deletion resistance rests entirely on that query; if it cannot run,
+    # the mechanism is not operating and saying "available" would be reporting
+    # its own blindness as a clean bill of health.
+    #
+    # Fails closed. Refusing the exception when the check cannot run costs a
+    # development run that has to be explained; granting it when the check
+    # cannot run costs the termination that ruling 2 exists to make one-way.
+    if hist_error:
+        return False, [
+            "whether a runner has ever been approved cannot be determined:",
+            f"    {hist_error}",
+            "  The bootstrap exception ends at the first approval, and that is "
+            "established from",
+            "  git history. An unreadable history is not evidence that no "
+            "approval exists, so the",
+            "  exception is not available while this check cannot run.",
+            "  Repair the repository, or record the decision out of band and "
+            "say so.",
+        ]
 
     if live:
         return False, [

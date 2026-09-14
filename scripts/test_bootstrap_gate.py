@@ -629,6 +629,32 @@ def main() -> int:
     else:
         ok("the first runner approval ends the exception")
 
+    # B02-F08. runner_approvals_in_history returned [] when git failed, the same
+    # value it returns for a clean search that found nothing, so an unreadable
+    # history read as "no approval was ever recorded" and the exception came
+    # back available. Codex proved it by injecting exit 128; a directory that
+    # was never a git repository reaches the same code by an honest route.
+    #
+    # The control immediately above this section is what makes this one mean
+    # something: in a real repository with no approvals the exception IS
+    # available, so a refusal here is about the unreadable history and not about
+    # fixtures generally being refused.
+    tng = build(); made.append(tng)
+    r = gate(tng, "exception")
+    blob = r.stdout + r.stderr
+    if "BOOTSTRAP_EXCEPTION: AVAILABLE" in r.stdout:
+        failures.append(
+            "the exception was reported available in a repository whose history "
+            "cannot be read. Deletion resistance rests entirely on that query, "
+            "so this grants the exception on the strength of not having "
+            "checked.")
+    elif "cannot be determined" not in blob:
+        failures.append(f"the exception was withheld, but not because the "
+                        f"history could not be read\n      "
+                        f"{blob.strip()[:200]}")
+    else:
+        ok("the exception is withheld when the history cannot be read")
+
     # The one that matters. If the gate decided by listing a directory, deleting
     # the directory would reopen the exception and nothing would show it had ever
     # ended. Ruling 2 ends it at the first approval, not at the last surviving

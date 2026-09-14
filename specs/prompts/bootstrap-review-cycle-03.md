@@ -74,13 +74,13 @@ falsifiable:
 
 ```text
 scripts/test_validate_cycle.py   24 controls
-scripts/test_run_review.py       110 controls
+scripts/test_run_review.py       111 controls
 scripts/test_ledger.py           73 controls, covering the ledger and controller
 scripts/test_bootstrap_gate.py   43 controls
 scripts/test_interfaces.py       29 controls, across eleven component seams
 ```
 
-Those counts total 279. They are asserted here, produced by
+Those counts total 280. They are asserted here, produced by
 `scripts/refresh_counts.py`, and checked by `scripts/test_prompts.py` against
 the suites themselves.
 
@@ -98,7 +98,7 @@ be inside the reviewed set is an open question for Alex Zamurko, not a decision
 taken here. If you think a count supplied from outside the target is not
 evidence you can use, say so as a finding.
 
-Three further test suites exist and are deliberately outside that 279:
+Three further test suites exist and are deliberately outside that 280:
 `test_prompts.py`, which consumes the number and would otherwise be agreeing
 with itself; and `test_convert_protocol.py` and `test_protocol_pin.py`, which
 control protocol document handling rather than the execution layer. The reason

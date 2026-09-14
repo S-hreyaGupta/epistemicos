@@ -1446,6 +1446,70 @@ def main() -> int:
     # validates first, so the filter is never the thing refusing here. It is
     # defence for callers that skip validation, and it has no control of its
     # own. Claiming otherwise would be the defect this finding is about.
+
+    # ---- B01-F04: an added spec reaches the reviewer, not just the target ----
+    # compose_input built the embedded specs from run["spec_files"], the set as
+    # it stood at init, filtered through the cycle's governing set. Filtering a
+    # stale list can only remove entries, never add them, so a spec introduced
+    # by amendment was in governing_pins, was hashed into the target, and was
+    # never given to the reviewer. Codex reproduced it end to end.
+    #
+    # The drift half of Codex's requested pair already exists above, as
+    # "an artifact added by amendment is checked like any other governing pin".
+    # This is the successful-addition half it asked for alongside it.
+    print()
+    print("a spec added by amendment is embedded, not only hashed (B01-F04)")
+
+    tS = make_repo(); made.append(tS)
+    UNIQUE = "GOVERNING-RULE-ADDED-BY-AMENDMENT-9F2A"
+    write_lf(tS / "specs" / "extra.md", f"# extra\n\n{UNIQUE}\n")
+    sh("git", "add", "-A", cwd=tS)
+    sh("git", "commit", "-qm", "extra", cwd=tS)
+    do_init(tS); do_freeze(tS)
+
+    write_lf(tS / "replyS.md",
+             reply_for(tS, "Finding ID: C01-F01\nClass: UNTESTED RULE\n"
+                           "Evidence: x\n"))
+    _rs = runner(tS, "record", "--cycle", "runs/T-001/plan-review/cycle-01",
+                 "--output", "replyS.md", "--invocation", "manual")
+    _ls = sh(sys.executable, str(tS / "scripts" / "ledger.py"), "raise",
+             "--review", "runs/T-001/plan-review", "--cycle", "1",
+             "--id", "C01-F01", "--class", "UNTESTED RULE", cwd=tS)
+    if _rs.returncode != 0 or _ls.returncode != 0:
+        failures.append(f"fixture: could not close cycle 01 for B01-F04\n"
+                        f"{_rs.stderr}{_ls.stderr}")
+    else:
+        _xs = hashlib.sha256(
+            (tS / "specs" / "extra.md").read_bytes()).hexdigest()
+        amend(tS, affected_artifacts=["specs/extra.md"],
+              new_pin_set=["specs/protocol.md", "specs/spec.md",
+                           "specs/extra.md"],
+              added_pin_hashes={"specs/extra.md": _xs})
+        _rf2 = do_freeze(tS)
+        _ci2 = tS / "runs/T-001/plan-review/cycle-02/codex-input.md"
+        if _rf2.returncode != 0:
+            failures.append(f"fixture: cycle 02 would not freeze with a "
+                            f"legitimate added spec\n{_rf2.stderr}{_rf2.stdout}")
+        elif not _ci2.is_file():
+            failures.append("cycle 02 froze but wrote no codex-input.md")
+        else:
+            _body = _ci2.read_text(encoding="utf-8")
+            _tgt2 = json.loads(
+                (tS / "runs/T-001/plan-review/cycle-02/target.json")
+                .read_text(encoding="utf-8"))
+            if "specs/extra.md" not in _tgt2.get("governing_pins", []):
+                failures.append("fixture: the amendment did not put the added "
+                                "spec in the governing set, so this control "
+                                "cannot show anything")
+            elif UNIQUE not in _body:
+                failures.append(
+                    "the added spec is in governing_pins and hashed into the "
+                    "target, but its text is absent from the review input. The "
+                    "reviewer is asked to judge against a document it was "
+                    "never given, which is B01-F04 unrepaired.")
+            else:
+                print("  [ok] a spec added by amendment appears in the "
+                      "composed input")
     amend_refuses("an amendment adding a pin with no hash",
                   "without binding them to their bytes",
                   affected_artifacts=["specs/extra.md"],

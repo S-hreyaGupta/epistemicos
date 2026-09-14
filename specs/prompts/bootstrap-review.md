@@ -38,7 +38,7 @@ they contain are falsifiable:
 
 ```text
 scripts/test_validate_cycle.py   24 controls
-scripts/test_run_review.py       110 controls
+scripts/test_run_review.py       111 controls
 scripts/test_ledger.py           73 controls, covering the ledger and controller
 scripts/test_bootstrap_gate.py   43 controls
 scripts/test_interfaces.py       29 controls, across seven component seams

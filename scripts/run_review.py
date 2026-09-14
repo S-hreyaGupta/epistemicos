@@ -1040,20 +1040,39 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     # original set: an amendment could release a spec from governance and this
     # would still refuse on its drift, deadlocking the loop the amendment
     # existed to unblock. Found by the B02-F06 control, which does exactly that.
+    # B01-F04, the half cycle 03 found still open. This iterated
+    # run["spec_files"] — the set as it stood at init — and filtered it through
+    # the cycle's governing set. Filtering a stale list can only ever remove
+    # entries from it, so a spec ADDED by amendment was in governing_pins, was
+    # hashed into the target, and was never embedded. Codex added specs/extra.md
+    # at cycle 02, froze successfully, and found its text absent from the input.
+    #
+    # The reviewer was then asked to judge against a document it had not been
+    # given, which is the original finding surviving on the path the repairs
+    # introduced.
+    #
+    # Driven from the effective path-to-hash map instead, so the set embedded
+    # and the set recorded are the same set by construction rather than by two
+    # pieces of code agreeing. The protocol is excluded because it is supplied
+    # separately above, and the hash compared against is this cycle's, not
+    # init's: an amendment that legitimately releases and re-pins a spec would
+    # otherwise be checked against a digest no longer in force.
+    _protocol_path = run["protocol"]["path"]
     spec_texts: list[tuple[dict, str]] = []
-    for e in run.get("spec_files", []):
-        if e["path"] not in _gov:
+    for _path, _want in sorted(_gov_hashes.items()):
+        if _path == _protocol_path:
             continue
-        sp = REPO / e["path"]
+        sp = REPO / _path
         if not sp.is_file():
             raise Refused(f"pinned spec is gone, so it cannot be given to the "
-                          f"reviewer: {e['path']}")
-        if sha256_file(sp) != e["sha256"]:
+                          f"reviewer: {_path}")
+        if sha256_file(sp) != _want:
             raise Refused(
                 f"pinned spec has changed and would be embedded in the review "
-                f"input:\n  {e['path']}\n    pinned {e['sha256']}\n"
+                f"input:\n  {_path}\n    pinned {_want}\n"
                 f"    actual {sha256_file(sp)}")
-        spec_texts.append((e, sp.read_text(encoding="utf-8")))
+        spec_texts.append(({"path": _path, "sha256": _want},
+                           sp.read_text(encoding="utf-8")))
 
     write_lf(ci, compose_input(prompt, digest, run, args.type, n, artifacts,
                                protocol_text, spec_texts, target))

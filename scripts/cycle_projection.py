@@ -116,24 +116,58 @@ class Projection:
         arithmetic runs over cycles that exist. Beyond the horizon there is no
         cycle to have recorded anything.
 
-        The limit of that second rule, stated rather than glossed: it applies
-        only where some cycle directory exists to establish what the plausible
-        range is. With none at all, horizon is None and every cycle number is
-        allowed, because there is no evidence about which are real. In a live
-        run freeze creates the directory before anything is recorded against the
-        cycle, so the rule is in force whenever it can be.
+        B01-F11 again, and the part cycle 03 found still open. The horizon rule
+        above admitted every number up to max(known)+1, so an INTERIOR gap
+        authorized: Projection([1, 3], {}) has horizon 4 and returned True for
+        cycle 02, which never existed. Codex recorded RAISED in 01, ACCEPT in a
+        nonexistent 02, and DEMONSTRATED in 03; the ledger reported RESOLVED
+        while the controller, which counts only cycles that exist, kept the
+        finding OPEN and returned STALLED. Two components disagreeing about one
+        finding is the whole of B01-F11.
+
+        What is closed here is the INTERIOR gap, which is what Codex
+        reproduced. A cycle number below the frontier that is in neither the
+        valid nor the invalid set has no evidence directory at all; it is not a
+        cycle awaiting judgement, it is a cycle that never happened.
+
+        What is deliberately NOT changed is the frontier, and the case where no
+        cycle exists yet. Alex Zamurko's decision H:
+
+            cycle_projection distinguishes three states, not two: VALID,
+            INVALID and UNJUDGED. Only INVALID strips authority. A cycle with
+            no directory yet is the one being assembled, and a ledger that
+            refused to record into it would be unusable.
+
+        Making UNJUDGED strip authority outright would close the rest of what
+        Codex asked for and would contradict that decision, so it is his to
+        make rather than one to take here while repairing a finding. The
+        remaining exposure is stated in the cycle-04 prompt rather than left to
+        be rediscovered: an event in the cycle currently being assembled carries
+        authority before that cycle has passed MC-2.
         """
         if cycle in self.invalid:
             return False
-        return self.horizon is None or cycle <= self.horizon
+        if cycle in self.valid:
+            return True
+        # Neither judged nor passed: no directory exists for this cycle.
+        # Decision H keeps the frontier, and the no-evidence case, permissive.
+        if self.horizon is None:
+            return True
+        return cycle == self.horizon
 
     def why_not(self, cycle: int) -> str:
         if cycle in self.invalid:
             return self.invalid[cycle]
+        if cycle in self.valid:
+            return ""
         if self.horizon is not None and cycle > self.horizon:
             return (f"cycle {cycle:02d} does not exist; the highest cycle that "
                     f"can carry an event is {self.horizon:02d}")
-        return ""
+        if self.valid or self.invalid:
+            return (f"cycle {cycle:02d} has no evidence directory, so nothing "
+                    f"recorded against it has passed MC-2")
+        return ("no cycle has passed MC-2 yet, so no event carries authority "
+                "in this review")
 
 
 def project(review: Path) -> Projection:
@@ -294,7 +328,20 @@ def last_authorized(history: list[dict], event: str,
     """
     state: str | None = None
     accepted = False
-    found = None
+    # The most recent event of each kind whose effect STILL obtains, rather than
+    # the most recent one that was applied at the time.
+    #
+    # B01-F11, the third part cycle 03 found still open. This kept one `found`
+    # and never cleared it, so an event undone later was still returned as a
+    # prerequisite. Codex's sequence: RAISED(1), ACCEPT(1), DEMONSTRATED(2),
+    # REOPENED(3). Replay ends OPEN with accepted False, because REOPENED
+    # disarms acceptance; this function still handed back the cycle-01 ACCEPT,
+    # and `resolve` used it as its precondition. So a finding could be resolved
+    # on an acceptance that the same history had already withdrawn.
+    #
+    # Reopening is exactly when a fresh ACCEPT should be required: the finding
+    # came back, and whoever accepts the new repair should have to say so.
+    live: dict[str, dict] = {}
     for e in history:
         c = e["cycle"]
         if not proj.authorizes(c):
@@ -305,6 +352,8 @@ def last_authorized(history: list[dict], event: str,
         applied = False
         if ev == "RAISED":
             state, accepted, applied = OPEN, False, True
+            # A finding starting over carries nothing forward.
+            live.clear()
         elif ev == "ACCEPT":
             if state == OPEN:
                 accepted, applied = True, True
@@ -317,6 +366,11 @@ def last_authorized(history: list[dict], event: str,
         elif ev == "REOPENED":
             if state == RESOLVED:
                 state, accepted, applied = OPEN, False, True
-        if applied and ev == event:
-            found = e
-    return found
+                # The acceptance and the demonstration it produced are both
+                # spent. Their events remain in the history and in `show`; they
+                # are simply no longer the prerequisite for anything.
+                live.pop("ACCEPT", None)
+                live.pop("DEMONSTRATED", None)
+        if applied:
+            live[ev] = e
+    return live.get(event)

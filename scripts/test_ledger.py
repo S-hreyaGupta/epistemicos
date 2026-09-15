@@ -631,21 +631,110 @@ def main() -> int:
         print("  [ok] the refusal names the transition that never took effect")
 
     # An event naming a cycle that does not exist cannot authorize anything.
-    root, rev = review_with({1: True})
+    #
+    # This control used to accept in cycle 99 and resolve in cycle 99. Codex
+    # took it apart in cycle 03: it replaced the membership rule with
+    # unconditional True and the control still passed, because resolution was
+    # refused for accept-and-resolve-being-the-same-cycle, which has nothing to
+    # do with the cycle existing. Both branches printed [ok] besides, so it
+    # reported success whatever happened. It was decorative.
+    #
+    # Rebuilt as the case Codex actually reproduced: cycles 01 and 03 exist and
+    # pass, cycle 02 never did. RAISED in 01, ACCEPT in the gap, resolution from
+    # a LATER cycle. The ordering is legal, the evidence is present, and the
+    # only thing wrong is that the acceptance sits in a cycle that never
+    # happened. Nothing but the membership rule can refuse this.
+    root, rev = review_with({1: True, 3: True})
     ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
            "--class", "UNTESTED RULE")
-    r = ledger(root, "respond", "--review", str(rev), "--cycle", "99",
-               "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "from nowhere")
-    if r.returncode == 0:
-        r2 = ledger(root, "resolve", "--review", str(rev), "--cycle", "99",
-                    "--id", "C01-F01", "--evidence", "also from nowhere")
-        if r2.returncode == 0:
-            failures.append("an event in a cycle that does not exist authorized "
-                            "a resolution")
-        else:
-            print("  [ok] an event in a nonexistent cycle authorizes nothing")
+    _acc = ledger(root, "respond", "--review", str(rev), "--cycle", "2",
+                  "--id", "C01-F01", "--disposition", "ACCEPT",
+                  "--note", "recorded against a cycle that never existed")
+    if _acc.returncode != 0:
+        # Storing it is allowed; only its authority is in question. If the write
+        # is refused this control cannot reach what it exists to test.
+        failures.append(f"fixture: the ACCEPT could not be recorded at all, so "
+                        f"the resolution below proves nothing\n{_acc.stderr}")
     else:
-        print("  [ok] an event in a nonexistent cycle authorizes nothing")
+        _res = ledger(root, "resolve", "--review", str(rev), "--cycle", "3",
+                      "--id", "C01-F01", "--evidence", "repaired")
+        _blob = (_res.stderr + _res.stdout).lower()
+        if _res.returncode == 0:
+            failures.append(
+                "a finding was resolved on an acceptance recorded against cycle "
+                "02, which never existed. The ledger would report RESOLVED while "
+                "the controller, which counts only cycles that exist, keeps it "
+                "OPEN. That disagreement is B01-F11.")
+        elif "no accept" not in _blob:
+            failures.append(f"the resolution was refused, but not for want of an "
+                            f"authoritative acceptance\n      {_blob[:200]}")
+        else:
+            print("  [ok] an acceptance in a gap between real cycles authorizes "
+                  "nothing")
+
+        # The other half of the finding: the two components must now agree. A
+        # ledger that refuses while the controller counts the finding closed
+        # would be the same disagreement pointing the other way.
+        _st = json.loads((rev / "ledger.json").read_text(encoding="utf-8"))
+        _state = _st["findings"]["C01-F01"]["state"]
+        _loop = loop(root, rev)
+        if _state != "OPEN":
+            failures.append(f"the ledger records {_state} for a finding whose "
+                            f"only acceptance has no authority")
+        elif status_of(_loop.stdout) == "CONVERGED":
+            failures.append("the controller converged on a finding the ledger "
+                            "still holds OPEN")
+        else:
+            print("  [ok] ledger and controller agree the finding is still open")
+
+    # A reopened finding needs a NEW acceptance before it can close again.
+    #
+    # B01-F11's third part, which cycle 03 found still open. `replay` disarms
+    # acceptance on REOPENED, but `last_authorized` kept its earlier answer and
+    # handed the spent ACCEPT back as a prerequisite. Codex's sequence exactly:
+    # RAISED(1), ACCEPT(1), DEMONSTRATED(2), REOPENED(3). The finding is OPEN
+    # again and the acceptance that closed it the first time has been withdrawn
+    # by the same history, so resolving on it would be closing a finding on an
+    # agreement nobody made about the second repair.
+    root, rev = review_with({1: True, 2: True, 3: True, 4: True})
+    ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--class", "UNTESTED RULE")
+    ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--disposition", "ACCEPT", "--note", "will fix")
+    ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
+           "--evidence", "repaired")
+    _re = ledger(root, "reopen", "--review", str(rev), "--cycle", "3",
+                 "--id", "C01-F01", "--evidence", "it came back")
+    if _re.returncode != 0:
+        failures.append(f"fixture: could not reopen a resolved finding, so the "
+                        f"control below proves nothing\n{_re.stderr}")
+    else:
+        _again = ledger(root, "resolve", "--review", str(rev), "--cycle", "4",
+                        "--id", "C01-F01", "--evidence", "repaired again")
+        _blob = (_again.stderr + _again.stdout).lower()
+        if _again.returncode == 0:
+            failures.append(
+                "a reopened finding was closed again on the acceptance from "
+                "before it recurred. That acceptance was withdrawn by the "
+                "reopen; nobody has agreed to the second repair.")
+        elif "no accept" not in _blob:
+            failures.append(f"the second resolution was refused, but not for "
+                            f"want of a fresh acceptance\n      {_blob[:200]}")
+        else:
+            print("  [ok] a reopened finding needs a new acceptance, not the "
+                  "spent one")
+        # And the ordinary path still works: accept again, close again.
+        ledger(root, "respond", "--review", str(rev), "--cycle", "3",
+               "--id", "C01-F01", "--disposition", "ACCEPT",
+               "--note", "accepted the second time too")
+        _ok = ledger(root, "resolve", "--review", str(rev), "--cycle", "4",
+                     "--id", "C01-F01", "--evidence", "repaired again")
+        if _ok.returncode != 0:
+            failures.append(f"a reopened finding could not be closed even with a "
+                            f"fresh acceptance, so the rule above is not a rule "
+                            f"but a dead end\n{_ok.stderr}")
+        else:
+            print("  [ok] with a fresh acceptance it closes normally")
 
     # Direction two: a DEMONSTRATED recorded in an invalid cycle must not leave
     # the finding permanently RESOLVED. Before the projection the ledger refused

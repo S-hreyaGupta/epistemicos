@@ -85,7 +85,7 @@ falsifiable:
 
 ```text
 scripts/test_validate_cycle.py   30 controls
-scripts/test_run_review.py       112 controls
+scripts/test_run_review.py       115 controls
 scripts/test_ledger.py           76 controls, covering the ledger and controller
 scripts/test_bootstrap_gate.py   43 controls
 scripts/test_interfaces.py       29 controls, across seven component seams

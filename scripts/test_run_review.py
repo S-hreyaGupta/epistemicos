@@ -1221,6 +1221,70 @@ def main() -> int:
     else:
         print("  [ok] no staging files are left behind in the cycle")
 
+    # ---- B02-F04: interruption at the publication boundary ----
+    # Cycle 03: "the required transactional supersession is not implemented. A
+    # partial replacement still leaves the authoritative representation
+    # internally inconsistent." Codex injected a failure between the two
+    # renames and got a cycle whose raw capture was new and whose findings were
+    # old, with the designation still on the previous attempt.
+    #
+    # There is now one commit point, the rename of capture-log.json, and
+    # everything at the top of the cycle is published from whatever it
+    # designates. These two controls are the two sides of that line.
+    _log = json.loads((cyc / "capture-log.json").read_text(encoding="utf-8"))
+    _n = _log["authoritative"]
+    _gen = cyc / "captures" / f"attempt-{_n:02d}"
+
+    if not (_gen / "findings.json").is_file():
+        failures.append(
+            "the designated attempt carries no findings.json, so the generation "
+            "is not self-contained and there is nothing to republish from")
+    else:
+        print("  [ok] the designated attempt holds its own findings, not just "
+              "raw bytes")
+
+        # After the commit, before publication. The log designates the new
+        # generation; the working copies are still the old one. This is exactly
+        # the state Codex produced, and it must heal deterministically rather
+        # than needing a human.
+        _stale = "stale contents from a generation that no longer governs\n"
+        write_lf(cyc / "codex-output-raw.md", _stale)
+        write_lf(cyc / "findings.json", '{"schema": "cycle-findings/1"}\n')
+
+        # Recording without --supersede-capture, which this cycle refuses. The
+        # point is that recovery happens BEFORE the refusal: even a command that
+        # is turned away must not leave a half-published cycle sitting there.
+        _rec = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",
+                      "--invocation", "manual")
+        _out = _rec.stdout + _rec.stderr
+        if "recovered" not in _out:
+            failures.append(
+                "a half-published cycle was not recovered, or the recovery was "
+                f"silent. A repair nobody can see is not auditable:\n{_out[:300]}")
+        elif _rec.returncode == 0:
+            failures.append("recording without --supersede-capture was accepted "
+                            "on a cycle that already has a designated capture")
+        else:
+            print("  [ok] a half-published cycle is recovered even by a command "
+                  "that is then refused")
+
+        def _h(p: Path) -> str:
+            return hashlib.sha256(p.read_bytes()).hexdigest()
+
+        # Read back from disk rather than trusting the command's account of
+        # itself. The cycle must now be whole: working copies equal to the
+        # generation the log designates.
+        _log2 = json.loads((cyc / "capture-log.json").read_text(encoding="utf-8"))
+        _g2 = cyc / "captures" / f"attempt-{_log2['authoritative']:02d}"
+        if (_h(cyc / "codex-output-raw.md") != _h(_g2 / "raw.md")
+                or _h(cyc / "findings.json") != _h(_g2 / "findings.json")):
+            failures.append(
+                "the cycle's working copies do not match the generation the "
+                "capture log designates. That is the mixed state B02-F04 is "
+                "about, still reachable.")
+        else:
+            print("  [ok] the working copies match the designated generation")
+
     # ---- B02-F01 and B02-F02: the parser reads what the prompt asks for ----
     # Two defects found by cycle 02, in the module that exists to stop the
     # prompt, the parser and the ledger from disagreeing.

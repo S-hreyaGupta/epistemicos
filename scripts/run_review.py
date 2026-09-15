@@ -1189,6 +1189,70 @@ def next_attempt(cycle: Path) -> int:
     return max(used) + 1 if used else 1
 
 
+def write_lf_atomic(p: Path, text: str) -> None:
+    """Write via a staging name and one rename.
+
+    B02-F04. A plain write is not a commit point: a reader arriving mid-write
+    sees a truncated file, and a process that dies mid-write leaves one. A
+    rename on the same filesystem replaces the whole file or none of it, which
+    is what lets a single file be the moment a change takes effect.
+    """
+    staged = p.with_name(f".{p.name}.staged")
+    write_lf(staged, text)
+    import os as _os
+    _os.replace(staged, p)
+
+
+def publish_from_designation(cycle: Path) -> list[str]:
+    """Rewrite the cycle's working review files from the designated attempt.
+
+    B02-F04, the half cycle 03 found still open. Recording replaced
+    codex-output-raw.md, then findings.json, then the capture log: three writes
+    with no moment at which the change took effect. Codex injected a failure
+    between the first two and got a cycle whose raw capture was new, whose
+    findings were old, and whose log still designated the previous attempt.
+
+    The generation is now the attempt directory, which holds raw.md, its
+    findings.json and capture.json and is never modified after it is written.
+    The commit point is one rename of capture-log.json. Everything at the top
+    level of the cycle is a working copy published from whatever that log
+    designates, and this function is what publishes it.
+
+    Idempotent, so it is also the recovery. If a run dies after the commit and
+    before publishing, the next call republishes from the designation and the
+    cycle is whole again; if it dies before the commit, the previous generation
+    is still designated and still published, and nothing was lost. Either way
+    the outcome is determined by the log rather than by how far the last run
+    happened to get.
+
+    Returns the names it had to rewrite, which is empty in the ordinary case.
+
+    Cycles recorded before the attempt carried its own findings.json have
+    nothing to publish from. They are left exactly as they are: this returns
+    early rather than treating older evidence as damaged.
+    """
+    log = load_capture_log(cycle)
+    n = log.get("authoritative")
+    if not n:
+        return []
+    adir = cycle / "captures" / f"attempt-{n:02d}"
+    src_raw, src_fj = adir / "raw.md", adir / "findings.json"
+    if not (src_raw.is_file() and src_fj.is_file()):
+        return []
+
+    repaired: list[str] = []
+    for src, dest in ((src_raw, cycle / "codex-output-raw.md"),
+                      (src_fj, cycle / "findings.json")):
+        if dest.is_file() and sha256_file(dest) == sha256_file(src):
+            continue
+        staged = dest.with_name(f".{dest.name}.staged")
+        staged.write_bytes(src.read_bytes())
+        import os as _os
+        _os.replace(staged, dest)
+        repaired.append(dest.name)
+    return repaired
+
+
 def load_capture_log(cycle: Path) -> dict:
     p = cycle / "capture-log.json"
     if not p.is_file():
@@ -1206,6 +1270,17 @@ def cmd_record(args: argparse.Namespace) -> int:
     cycle = Path(args.cycle).resolve()
     if not (cycle / "target.json").is_file():
         raise Refused(f"not a frozen cycle directory: {cycle}")
+
+    # B02-F04. Recovery runs before any new work, not only after a successful
+    # one. A previous run that died between the commit and the publication left
+    # working copies that disagree with the designation; healing that first
+    # means this command starts from a whole cycle rather than adding a second
+    # generation on top of a half-published one. Says so out loud, because a
+    # repair that happens silently is one nobody can audit.
+    _healed = publish_from_designation(cycle)
+    if _healed:
+        print(f"recovered {', '.join(_healed)} from the designated capture "
+              f"before recording; a previous run did not finish publishing")
 
     log = load_capture_log(cycle)
     if log.get("authoritative") and not args.supersede_capture:
@@ -1407,17 +1482,21 @@ def cmd_record(args: argparse.Namespace) -> int:
     # did not exist. Deleting is now removed entirely; both files are written to
     # staging names and moved into place with os.replace.
     #
-    # What this does not claim: two files are not swapped atomically. If the
-    # process dies between the two replaces, the raw capture is new and
-    # findings.json is old. Both staged files are written and closed before
-    # either move, so the window is two rename calls wide and both sources
-    # survive on disk, but it is a narrowed window rather than a transaction.
-    # Saying otherwise here would be B02-F09 in a new place.
-    staged_raw = cycle / ".codex-output-raw.md.staged"
-    staged_fj = cycle / ".findings.json.staged"
-    staged_raw.write_bytes(src.read_bytes())
-
-    write_lf(staged_fj, json.dumps({
+    # Cycle 03 found that not to be enough either, and said so plainly: "the
+    # required transactional supersession is not implemented. A partial
+    # replacement still leaves the authoritative representation internally
+    # inconsistent." Two renames and a log write are three moments, and a
+    # failure between any of them leaves a cycle that is part new and part old.
+    #
+    # There is now one moment. The attempt directory is the generation: raw.md,
+    # findings.json and capture.json, written before anything at the top level
+    # is touched and never modified afterwards. capture-log.json names which
+    # generation governs, and replacing it is a single rename. Before that
+    # rename the old generation governs; after it the new one does. The files at
+    # the top of the cycle are working copies published from the designation,
+    # and republishing them is idempotent, so an interruption anywhere is
+    # repaired by doing it again rather than by hand.
+    findings_doc = json.dumps({
         "schema": "cycle-findings/1",
         # Requirement 2: a review that cannot be parsed deterministically is
         # INVALID, and INVALID is not zero. Nothing reaches this line unless the
@@ -1442,14 +1521,23 @@ def cmd_record(args: argparse.Namespace) -> int:
         "count": len(found),
         "zero_findings_asserted": bool(args.zero_findings),
         "findings": found,
-    }, indent=2) + "\n")
+    }, indent=2) + "\n"
 
-    # Both staged files are complete and closed. Move them into place.
-    import os as _os
-    _os.replace(staged_raw, raw)
-    _os.replace(staged_fj, cycle / "findings.json")
+    # Into the generation, before the commit. Writing it here rather than at the
+    # top of the cycle is what makes the attempt directory self-contained: the
+    # raw bytes and the findings read out of them sit together and are never
+    # edited again, so "which findings belong to this capture" stops being a
+    # question anyone has to answer by comparing timestamps.
+    write_lf(adir / "findings.json", findings_doc)
 
-    write_lf(cycle / "capture-log.json", json.dumps(log, indent=2) + "\n")
+    # ---- the commit point ----
+    # One rename. Everything above this line is preparation that changes nothing
+    # a consumer reads; everything below is publication that can be repeated.
+    write_lf_atomic(cycle / "capture-log.json",
+                    json.dumps(log, indent=2) + "\n")
+
+    # Publication. Idempotent, and the same call recovers an interrupted run.
+    publish_from_designation(cycle)
 
     write_lf(cycle / "invocation.json", json.dumps({
         "authoritative_attempt": n,

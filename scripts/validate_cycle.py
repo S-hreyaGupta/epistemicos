@@ -31,6 +31,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+# B01-F07: one definition of the spec-set digest, shared with the runner that
+# writes it rather than reimplemented here.
+import run_pins  # noqa: E402
+
 REQUIRED_FILES = ("target.json", "target.sha256", "codex-input.md", "codex-output-raw.md")
 HEX64 = re.compile(r"\A[0-9a-f]{64}\Z")
 HEX40 = re.compile(r"\A[0-9a-f]{40}\Z")
@@ -285,6 +290,71 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
 
     # 9. mandatory hashed artifacts for that review type
     problems: list[str] = []
+
+    # B01-F07, the half cycle 03 found still open. The protocol's check 9 is
+    # "all mandatory hashed artifacts for that review type are present and their
+    # recorded hashes match the referenced artifacts". protocol_sha256 and
+    # spec_sha256 are recorded hashes of referenced artifacts, and nothing
+    # checked them: check 7 confirmed the fields EXIST and stopped. Codex set
+    # both to the literal "not-a-hash", recomputed target.sha256, and the gate
+    # returned PASS.
+    #
+    # Checked against governing_pin_hashes, which the same freeze recorded. What
+    # that establishes and what it does not, stated plainly:
+    #
+    #   it catches a digest that is not a digest, and a digest edited to
+    #   something other than what this cycle's pin set produces;
+    #
+    #   it does NOT independently establish that governing_pin_hashes is itself
+    #   right, because both fields are written by one function in one moment.
+    #   Doing that needs the gate to replay run.json and the amendment history,
+    #   which would make MC-2 depend on run-level state it does not currently
+    #   read. That is a larger change than this finding, and it is not claimed
+    #   here.
+    # Historical handling, which Codex asked for by name. governing_pins and
+    # governing_pin_hashes arrived with B02-F06 on 11 September. BOOTSTRAP-001's
+    # cycles 01 and 02 were frozen before that and carry neither. Failing them
+    # now would invalidate two completed cycles, drop the valid-cycle count, and
+    # strip authority from the events recorded in them — the retroactive
+    # invalidation Alex Zamurko ruled out on 10 September, arriving through a
+    # check rather than through an amendment.
+    #
+    # Both absent is the signature of evidence older than the field. One present
+    # without the other is not old evidence, it is an incoherent record, and
+    # that still fails.
+    #
+    # The weakness, stated rather than left to be found: deleting both fields
+    # from a modern target buys a pass. This check cannot tell that from genuine
+    # age, because nothing in the target says which version of the freezer wrote
+    # it. Closing that needs the gate to know when the field was introduced, or
+    # the target to record its own schema version, and neither exists yet.
+    _gph = target.get("governing_pin_hashes")
+    _gp = target.get("governing_pins")
+    if _gph is None and _gp is None:
+        pass
+    elif not isinstance(_gph, dict) or not _gph:
+        problems.append(
+            "target declares governing_pins but records no "
+            "governing_pin_hashes, so the protocol and spec digests it states "
+            "cannot be checked against anything")
+    else:
+        _p = str(target.get("protocol_sha256", ""))
+        _owner = [path for path, h in _gph.items() if h == _p]
+        if not _owner:
+            problems.append(
+                f"protocol_sha256 {_p!r} is not the recorded hash of any "
+                f"governing pin in this cycle")
+        else:
+            _rest = [{"path": path, "sha256": h} for path, h in _gph.items()
+                     if path != _owner[0]]
+            _want = run_pins.spec_digest(_rest)
+            if str(target.get("spec_sha256", "")) != _want:
+                problems.append(
+                    f"spec_sha256 does not describe this cycle's governing set\n"
+                    f"      recorded {target.get('spec_sha256')!r}\n"
+                    f"      derived  {_want!r} over {len(_rest)} non-protocol "
+                    f"pin(s)")
+
     if rtype == "plan":
         files = target.get("plan_files")
         if not files:

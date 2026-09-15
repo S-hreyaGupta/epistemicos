@@ -124,14 +124,11 @@ def hashed_ref(p: Path) -> dict:
     return {"path": rel(p), "sha256": sha256_file(p)}
 
 
-def spec_digest(entries: list[dict]) -> str:
-    """One digest over the spec set.
-
-    SHA-256 of "path:sha256\\n" lines, sorted by path. Defined here because it
-    has to be reproducible by anyone auditing a run, not just by this script.
-    """
-    body = "".join(f"{e['path']}:{e['sha256']}\n" for e in sorted(entries, key=lambda e: e["path"]))
-    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+# B01-F07. Moved to run_pins so the MC-2 gate can check a recorded spec digest
+# without importing the runner that invokes it, and without a second copy of the
+# format. Re-exported under the old name: this module's callers and the controls
+# both refer to it.
+spec_digest = run_pins.spec_digest
 
 
 def git_head() -> str | None:

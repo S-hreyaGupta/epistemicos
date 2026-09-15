@@ -31,6 +31,13 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parent
 
+sys.path.insert(0, str(SRC))
+# B01-F07: the control derives the expected spec digest from the same function
+# the gate and the runner use. Computing it here by hand would make this suite a
+# third implementation of the format, and three copies of a rule disagree even
+# more readily than two.
+import run_pins  # noqa: E402
+
 
 def write_lf(p: Path, text: str) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -50,7 +57,12 @@ def make_repo() -> tuple[Path, str, str]:
     """A throwaway repo so REPO resolves to the fixture. Returns (root, commit, tree)."""
     tmp = Path(tempfile.mkdtemp(prefix="mc2-")).resolve()
     (tmp / "scripts").mkdir()
-    shutil.copy2(SRC / "validate_cycle.py", tmp / "scripts" / "validate_cycle.py")
+    # run_pins comes too: the gate imports it for the shared spec-digest format
+    # (B01-F07). Without it validate_cycle dies at import, emits no check marks,
+    # and every control in this suite reports the wrong thing. test_ledger.py
+    # was broken in exactly this way on 14 September by the same kind of change.
+    for _n in ("validate_cycle.py", "run_pins.py"):
+        shutil.copy2(SRC / _n, tmp / "scripts" / _n)
     write_lf(tmp / "plan.md", "# plan\n\nbody\n")
     write_lf(tmp / "candidate.diff", "--- a\n+++ b\n@@ -1 +1 @@\n-x\n+y\n")
     write_lf(tmp / "tests.txt", "ok 1 - everything\n")
@@ -162,6 +174,75 @@ def main() -> int:
                             f"it was {got.get(check)!r}")
             return
         print(f"  [ok] check {check:>2} fails on: {label}")
+
+    # ---- B01-F07: the governing digests are checked, not merely present ----
+    # Check 7 confirmed protocol_sha256 and spec_sha256 EXIST and stopped there.
+    # Codex set both to the literal "not-a-hash", recomputed target.sha256, and
+    # MC-2 returned PASS. The protocol's check 9 is "recorded hashes match the
+    # referenced artifacts", so that is where this belongs; it needed no new
+    # check and no change to the schema.
+    def _governed(protocol_hash: str, spec_hash: str | None = None,
+                  drop_hashes: bool = False):
+        """A target carrying a governing pin set, as freeze writes since B02-F06."""
+        pins = {"specs/protocol.md": "a" * 64, "specs/spec.md": "b" * 64}
+
+        def _m(target, cycle, root):
+            target["governing_pins"] = sorted(pins)
+            if not drop_hashes:
+                target["governing_pin_hashes"] = pins
+            target["protocol_sha256"] = protocol_hash
+            target["spec_sha256"] = (
+                spec_hash if spec_hash is not None
+                else run_pins.spec_digest([{"path": "specs/spec.md",
+                                            "sha256": "b" * 64}]))
+            return target
+        return _m
+
+    # What these controls do NOT cover, found by probing rather than assumed:
+    # changing the digest FORMAT in run_pins leaves every control here green,
+    # because they ask that same function for the expected value. They test that
+    # the gate and the writer share one definition, not that the definition is
+    # the documented one. The control that pins the format is in
+    # test_run_review.py, "spec_sha256 is not reproducible from its documented
+    # definition", which recomputes it by hand. Both roles are needed; neither
+    # substitutes for the other.
+    #
+    # The baseline first. Without it every refusal below could be refusing for
+    # some unrelated reason and the controls would look green while proving
+    # nothing, which is what cycle 03 caught in B01-F11's control.
+    root, commit, tree = fresh()
+    rc, out = run(root, build(root, commit, tree, "plan",
+                              mutate=_governed("a" * 64)))
+    if rc != 0 or marks(out).get(9) != "PASS":
+        failures.append(f"a cycle whose digests DO describe its governing set "
+                        f"was refused, so the refusals below establish "
+                        f"nothing:\n{out}")
+    else:
+        print("  [ok] check  9 passes on digests that match the governing set")
+
+    expect_fail("a protocol digest that is not a digest", 9, "plan",
+                mutate=_governed("not-a-hash"))
+    expect_fail("a protocol digest that is well formed but not this cycle's",
+                9, "plan", mutate=_governed("c" * 64))
+    expect_fail("a spec digest that does not describe the governing set",
+                9, "plan", mutate=_governed("a" * 64, spec_hash="d" * 64))
+    expect_fail("governing pins declared with no hashes to check them against",
+                9, "plan", mutate=_governed("a" * 64, drop_hashes=True))
+
+    # And the historical case, which must NOT fail. Cycles 01 and 02 of
+    # BOOTSTRAP-001 were frozen before governing_pin_hashes existed. Failing
+    # them now would invalidate two completed cycles and strip authority from
+    # every event recorded in them, which is the retroactive invalidation Alex
+    # Zamurko ruled out on 10 September arriving through a check instead of an
+    # amendment.
+    root, commit, tree = fresh()
+    rc, out = run(root, build(root, commit, tree, "plan"))
+    if rc != 0 or marks(out).get(9) != "PASS":
+        failures.append(
+            "a cycle frozen before governing_pin_hashes existed was refused. "
+            f"That invalidates completed history through a new check:\n{out}")
+    else:
+        print("  [ok] check  9 does not invalidate cycles older than the field")
 
     # ---- clean fixtures ----
     root, commit, tree = fresh()

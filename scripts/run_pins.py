@@ -46,6 +46,7 @@ prevention.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -56,6 +57,26 @@ MIN_REASON = 30
 
 class PinError(Exception):
     """The pin history cannot be read, or does not describe a coherent chain."""
+
+
+def spec_digest(entries: list[dict]) -> str:
+    """One digest over a set of pinned artifacts.
+
+    SHA-256 of "path:sha256\\n" lines, sorted by path. Defined so it is
+    reproducible by anyone auditing a run rather than only by the script that
+    happened to write it.
+
+    B01-F07. It lived in run_review.py, which meant the MC-2 gate could not
+    check a recorded spec digest without either importing the runner it is
+    invoked by, or growing a second implementation of this format. Two
+    implementations of one rule is B02-F03, where the schema and the ledger each
+    had their own idea of a valid identifier and quietly disagreed.
+
+    Here because a digest over a pin set is a fact about the pin set.
+    """
+    body = "".join(f"{e['path']}:{e['sha256']}\n"
+                   for e in sorted(entries, key=lambda e: e["path"]))
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
 # ---------------------------------------------------------------- run metadata

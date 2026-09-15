@@ -22,6 +22,12 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+# One rule for which prompts belong to finished cycles, shared with the tool
+# that refreshes them. A second copy here would be free to disagree, and the two
+# of them disagreeing is the whole subject of the check below.
+import refresh_counts  # noqa: E402
+
 # The governing protocol, not a superseded one. This pin was left at v1.0 when
 # v1.1 landed, which is precisely the drift this file exists to catch: it kept
 # passing because the vocabulary happened not to change between versions.
@@ -294,10 +300,44 @@ def main() -> int:
                                  capture_output=True, text=True)
             actual_counts[rel] = (out.stdout + out.stderr).count("[ok]")
 
+        # A finished cycle's prompt is checked against that cycle, not against
+        # today. It used to be checked against today, and the tool that writes
+        # the numbers used to rewrite every prompt on every run, so the two of
+        # them moved together and agreed: cycle 03's prompt asserted 298
+        # controls for a review conducted against 263, and this check confirmed
+        # it. Both were measuring the same afternoon.
+        #
+        # The live comparison is still right for the prompt of a cycle that has
+        # not been frozen, because that one is a claim about the code a reviewer
+        # is about to be handed.
         total = 0
         any_wrong = False
+        live = 0
         for name, claimed in sorted(claims.items()):
             wrong = []
+            ci = refresh_counts.frozen_input(PROMPTS / name)
+            if ci is not None:
+                was = {f"scripts/{m}": int(n) for m, n in re.findall(
+                    r"scripts/(\w+\.py)\s+(\d+)\s+controls",
+                    ci.read_text(encoding="utf-8"))}
+                for rel in sorted(set(was) | set(claimed)):
+                    if claimed.get(rel) != was.get(rel):
+                        wrong.append(
+                            f"{rel}: prompt says {claimed.get(rel, '(absent)')}, "
+                            f"the frozen input says {was.get(rel, '(absent)')}")
+                if wrong:
+                    any_wrong = True
+                    failures.append(
+                        f"{name} no longer states what its own cycle was run "
+                        f"against:\n      " + "\n      ".join(wrong) +
+                        "\n      A finished cycle's prompt describes a review "
+                        "that already happened.\n      Editing it to agree with "
+                        "the present rewrites what the reviewer was told.")
+                else:
+                    ok(f"{name} still states what its own frozen cycle was run "
+                       f"against ({sum(was.values())})")
+                continue
+
             for rel, n in sorted(claimed.items()):
                 got = actual_counts.get(rel)
                 if got is None:
@@ -309,9 +349,10 @@ def main() -> int:
                 failures.append(f"{name} misstates its control counts:\n      "
                                 + "\n      ".join(wrong))
             total += len(claimed)
-        if not any_wrong:
-            ok(f"all {total} stated control counts across {len(claims)} bootstrap "
-               "prompt(s) match the suites")
+            live += 1
+        if not any_wrong and live:
+            ok(f"all {total} stated control counts across {live} unfrozen "
+               "bootstrap prompt(s) match the suites")
 
         # A prompt that states the five numbers and then sums them in prose can
         # be right about the five and wrong about the sum. On 14 September it

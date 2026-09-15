@@ -73,14 +73,14 @@ Their negative-control suites are supplied as evidence that the checks are
 falsifiable:
 
 ```text
-scripts/test_validate_cycle.py   30 controls
-scripts/test_run_review.py       120 controls
-scripts/test_ledger.py           76 controls, covering the ledger and controller
-scripts/test_bootstrap_gate.py   43 controls
+scripts/test_validate_cycle.py   24 controls
+scripts/test_run_review.py       95 controls
+scripts/test_ledger.py           73 controls, covering the ledger and controller
+scripts/test_bootstrap_gate.py   42 controls
 scripts/test_interfaces.py       29 controls, across eleven component seams
 ```
 
-Those counts total 298. They are asserted here, produced by
+Those counts total 263. They are asserted here, produced by
 `scripts/refresh_counts.py`, and checked by `scripts/test_prompts.py` against
 the suites themselves.
 

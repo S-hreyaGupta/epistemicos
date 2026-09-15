@@ -58,6 +58,40 @@ SUITES = ("test_validate_cycle", "test_run_review", "test_ledger",
           "test_bootstrap_gate", "test_interfaces")
 
 
+def cycle_for_prompt(p: Path) -> int:
+    """Which review cycle a bootstrap prompt was written for.
+
+    The unnumbered `bootstrap-review.md` is cycle 01's; the rest say so in the
+    filename.
+    """
+    m = re.search(r"bootstrap-review-cycle-(\d+)\.md$", p.name)
+    return int(m.group(1)) if m else 1
+
+
+def frozen_input(p: Path) -> Path | None:
+    """That cycle's composed input, if the cycle has been frozen.
+
+    A frozen cycle is finished. Its prompt describes a review that has already
+    happened, and the number of controls that existed at the time is part of
+    what happened.
+
+    This existed for a day without it, and rewrote all three prompts on every
+    run. `bootstrap-review-cycle-03.md` ended up asserting 298 controls for a
+    cycle conducted against 263, and `test_prompts.py` confirmed the new figure
+    because it compared the rewritten document against the same suites that had
+    just been rewritten into it. Two checks agreeing, both measuring today.
+
+    That is the 12 September incident in the docstring above, with the crash
+    swapped for a clock. Editing a finished cycle's prompt to agree with the
+    present is the same act as backdating an amendment: it makes the record
+    describe now rather than then.
+    """
+    n = cycle_for_prompt(p)
+    for ci in sorted(REPO.glob(f"runs/*/plan-review/cycle-{n:02d}/codex-input.md")):
+        return ci
+    return None
+
+
 def main() -> int:
     counts: dict[str, int] = {}
     broken: list[str] = []
@@ -92,7 +126,12 @@ def main() -> int:
 
     new_total = sum(counts.values())
     changed = []
+    kept: list[str] = []
     for p in sorted((REPO / "specs" / "prompts").glob("bootstrap-review*.md")):
+        ci = frozen_input(p)
+        if ci is not None:
+            kept.append(f"{p.name} (cycle {cycle_for_prompt(p):02d} is frozen)")
+            continue
         original = p.read_text(encoding="utf-8")
         text = original
 
@@ -131,6 +170,10 @@ def main() -> int:
 
     print()
     print(f"updated: {', '.join(changed) if changed else 'nothing to change'}")
+    if kept:
+        print(f"left alone: {', '.join(kept)}")
+        print("  A finished cycle's prompt states the controls that existed "
+              "when it ran.")
     return 0
 
 

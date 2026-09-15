@@ -56,7 +56,11 @@ import run_pins  # noqa: E402
 
 VALIDATOR = REPO / "scripts" / "validate_cycle.py"
 
-MAX_CYCLES = 4
+# B01-F02. This was its own `4` and the controller had another one. Two copies
+# of a rule is B02-F03, where the schema and the ledger each held their own idea
+# of a valid identifier and disagreed without either being obviously wrong. The
+# budget is counted in valid cycles, so it lives where valid cycles are decided.
+MAX_CYCLES = cycle_projection.MAX_VALID_CYCLES
 REVIEW_TYPES = ("plan", "implementation")
 
 # §6's four exits. Named here rather than "not CONTINUE" so that a future status
@@ -761,7 +765,11 @@ def cmd_freeze(args: argparse.Namespace) -> int:
             f"{MAX_CYCLES}-cycle budget:\n"
             f"  {valid_used} cycle(s) have passed MC-2.\n"
             "MAX_4_REACHED is an exit, not an obstacle to route around. "
-            "Escalate to human review.")
+            "Escalate to human review.\n"
+            "  No recorded authorization clears it. Alex Zamurko ruled on 15 "
+            "September that the\n  four-valid-cycle maximum is not clearable, "
+            "which is why the controller no longer\n  offers a continuation "
+            "this refusal would then have to contradict. B01-F02.")
     # After n is known, because the pin set in force is a property of the cycle
     # rather than of the run: an amendment effective at cycle k governs k onward
     # and leaves earlier cycles checked against what they were conducted under.

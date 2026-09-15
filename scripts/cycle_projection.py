@@ -51,6 +51,17 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 VALIDATOR = REPO / "scripts" / "validate_cycle.py"
 
+# §2's four-valid-cycle maximum, held once. The runner and the controller each
+# carried their own `4`, which is B02-F03's defect class: the schema and the
+# ledger each had their own idea of a valid identifier and quietly disagreed.
+# Nothing had gone wrong with these two yet, and that is the only reason it
+# looked harmless.
+#
+# It belongs beside the projection because the budget is counted in valid
+# cycles, and this file is what decides which cycles those are. Both components
+# import the count and the rule that counts it from the same place.
+MAX_VALID_CYCLES = 4
+
 
 def cycle_dirs(review: Path) -> list[tuple[int, Path]]:
     out = []

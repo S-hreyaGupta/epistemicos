@@ -59,9 +59,23 @@ import cycle_projection  # noqa: E402
 import run_pins  # noqa: E402
 
 VALIDATOR = REPO / "scripts" / "validate_cycle.py"
-MAX_VALID_CYCLES = 4
+# One copy, in cycle_projection, where the valid cycles it counts are decided.
+MAX_VALID_CYCLES = cycle_projection.MAX_VALID_CYCLES
 TERMINAL = ("CONVERGED", "HUMAN_ADJUDICATION_REQUIRED", "STALLED",
             "MAX_4_REACHED")
+
+# B01-F02, Alex Zamurko's ruling of 15 September. This controller offered a
+# human authorization that cleared MAX_4_REACHED and continued the loop; the
+# runner refused any cycle past the budget before it ever consulted the
+# controller. Both behaviours were defensible on their own and they contradicted
+# each other, so the system announced a permission it could not honour. Codex
+# reproduced it: LOOP_STATUS: CONTINUE, then freeze exiting 1 on the budget.
+#
+# He chose the reading that keeps §2's sentence literal. Four valid cycles is
+# the maximum and no authorization extends it. The other exits stay clearable,
+# because STALLED and the adjudication outcomes are judgements about progress
+# that a human can reasonably overrule; the budget is not a judgement.
+UNCLEARABLE = ("MAX_4_REACHED",)
 
 OPEN, RESOLVED, DISPUTED = "OPEN", "RESOLVED", "DISPUTED"
 
@@ -225,6 +239,11 @@ def load_authorizations(review: Path) -> list[dict]:
     blanket "keep going" would restore the defect under a different spelling: it
     would let any later cycle override any earlier mandatory termination, which
     is the finding.
+
+    MAX_4_REACHED is not among the outcomes an authorization can clear. One
+    naming it is still readable and still recorded, and the controller says out
+    loud that it is not being honoured, rather than dropping it without comment.
+    See UNCLEARABLE.
     """
     p = review / "loop-authorizations.json"
     if not p.is_file():
@@ -472,6 +491,22 @@ def _run(a) -> int:
                      f"   -> {status}")
         if status == "CONTINUE":
             continue
+        if status in UNCLEARABLE:
+            # Named, not silently skipped. An authorization sitting in the file
+            # with no effect and nothing said about it is how a reader concludes
+            # the loop is continuing on an authority it does not have, which is
+            # the finding in a quieter form.
+            _ignored = cleared_by(auths, n, status)
+            if _ignored is not None:
+                lines.append(
+                    f"        an authorization for {status} at n={n} from "
+                    f"{_ignored['authorized_by']} is on record and is NOT "
+                    f"honoured")
+                lines.append(
+                    "        Alex Zamurko, 15 September: the four-valid-cycle "
+                    "maximum is an exit, not an obstacle to route around.")
+            governing = (n, status, detail, cur, shown)
+            break
         auth = cleared_by(auths, n, status)
         if auth is None:
             governing = (n, status, detail, cur, shown)
@@ -505,11 +540,14 @@ def _run(a) -> int:
             # A cleared latest boundary is permission to continue, not the exit
             # re-imposed. Resumed-loop semantics, stated rather than implied:
             # the authorization clears one named exit at one named boundary, so
-            # the next cycle is permitted and the budget is whatever the cleared
-            # exit allowed. Clearing MAX_4_REACHED is therefore a human decision
-            # to spend more than four valid cycles, and it has to name that exit
-            # explicitly — cleared_by matches on the outcome, so an
-            # authorization for STALLED cannot quietly extend the budget.
+            # the next cycle is permitted within the four-valid-cycle budget.
+            #
+            # It cannot extend that budget. This comment used to say the
+            # opposite, that clearing MAX_4_REACHED was a human decision to
+            # spend a fifth cycle, and the runner had never agreed to that. The
+            # loop above now breaks on an unclearable exit before reaching here,
+            # so cleared_latest can only ever hold an outcome the runner will
+            # honour. Alex Zamurko's ruling, 15 September.
             _st, _auth = cleared_latest
             status = "CONTINUE"
             detail = (

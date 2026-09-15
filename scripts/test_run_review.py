@@ -448,6 +448,63 @@ def main() -> int:
         else:
             print("  [ok] four cycles that pass MC-2 do consume the budget")
 
+        # ---- B01-F02, on Alex Zamurko's ruling of 15 September ----
+        # Codex recorded an authorization naming MAX_4_REACHED at n=4 in a
+        # fixture like this one. The controller exited 0 with LOOP_STATUS:
+        # CONTINUE and freeze exited 1 on the budget: two components announcing
+        # different things about the same boundary, and the runner refusing a
+        # permission the controller said it had granted.
+        #
+        # He ruled that the four-valid-cycle maximum is not clearable, so the
+        # offer goes rather than the refusal. Matching, missing and mismatched
+        # authorization, end to end, as the correction asked.
+        def authorize(root: Path, outcome: str, n: int = 4) -> None:
+            write_lf(root / "runs/T-001/plan-review/loop-authorizations.json",
+                     json.dumps({"schema": "loop-authorization/1",
+                                 "authorizations": [{
+                                     "after_valid_cycle": n,
+                                     "outcome": outcome,
+                                     "authorized_by": "Alex Zamurko",
+                                     "reason": "fixture: a recorded human "
+                                               "authorization at the budget "
+                                               "boundary"}]}, indent=2) + "\n")
+
+        def loop_status(root: Path) -> subprocess.CompletedProcess:
+            return sh(sys.executable, str(root / "scripts" / "loop_state.py"),
+                      "--review", "runs/T-001/plan-review", "--development",
+                      cwd=root)
+
+        def boundary(label: str, needle: str) -> None:
+            c = loop_status(tfull)
+            cb = c.stdout + c.stderr
+            f = do_freeze(tfull)
+            fb = f.stdout + f.stderr
+            if "LOOP_STATUS: MAX_4_REACHED" not in cb:
+                failures.append(f"{label}: the controller did not report "
+                                f"MAX_4_REACHED at the budget boundary\n"
+                                f"{cb[-400:]}")
+            elif needle and needle not in cb:
+                failures.append(f"{label}: MAX_4_REACHED was reported but the "
+                                f"output never says {needle!r}, so a reader "
+                                f"cannot tell the authorization was seen\n"
+                                f"{cb[-400:]}")
+            elif f.returncode == 0:
+                failures.append(f"{label}: a fifth cycle was frozen")
+            elif "budget" not in fb:
+                failures.append(f"{label}: freeze refused, but not for the "
+                                f"budget\n{fb[:300]}")
+            else:
+                print(f"  [ok] {label}")
+
+        boundary("no authorization: controller and runner agree the loop is "
+                 "over", "")
+        authorize(tfull, "MAX_4_REACHED")
+        boundary("an authorization naming MAX_4_REACHED is read, refused, and "
+                 "said out loud", "is NOT honoured")
+        authorize(tfull, "STALLED")
+        boundary("an authorization for a different exit does not reach the "
+                 "budget", "")
+
     def prev_open(t: Path):
         do_init(t)
         fake_cycles(t, 1, close_last=False)

@@ -1748,6 +1748,60 @@ def main() -> int:
         print("  [ok] the amendment applies forward only; cycle 01 keeps its own "
               "pins")
 
+    # ---- B02-F06, the half cycle 03 found still open: the other loop ----
+    # The check took a single review directory and freeze handed it the one it
+    # was working in, while the amendment history belongs to the whole run.
+    # Codex froze a plan cycle under protocol plus spec, backdated an amendment
+    # to cycle 1 removing the spec, froze the implementation cycle, and the
+    # implementation freeze exited 0. The plan cycle's record was never read.
+    tx = make_repo(); made.append(tx)
+    do_init(tx); do_freeze(tx)
+    amend(tx, effective_cycle=1)
+    r = runner(tx, "freeze", "--run", "T-001", "--type", "implementation",
+               "--prompt", "specs/prompt.md", "--file", "plan/01-PLAN.md")
+    blob = r.stdout + r.stderr
+    if r.returncode == 0:
+        failures.append("the implementation loop froze against an amendment "
+                        "backdated past a completed plan cycle; the other "
+                        "review directory was never examined")
+    elif "plan-review/cycle-01" not in blob:
+        failures.append("the implementation freeze refused, but not for the "
+                        f"plan cycle its history contradicts\n{blob[:300]}")
+    else:
+        print("  [ok] refused: one loop freezing against history that "
+              "contradicts the other loop's completed cycle")
+
+    # The other half: same paths, different bytes. frozen_assignments kept only
+    # governing_pins and the comparison dropped governing_pin_hashes, so a
+    # changed digest with unchanged membership was invisible. run.json is an
+    # ordinary file under CONVENTION_ONLY; editing the version it records for a
+    # retained pin changes what replay says governed cycle 01 without changing
+    # which paths did.
+    th = make_repo(); made.append(th)
+    do_init(th); do_freeze(th)
+    rp = th / "runs" / "T-001" / "run.json"
+    run_h = json.loads(rp.read_text(encoding="utf-8"))
+    tgt_h = json.loads((th / "runs/T-001/plan-review/cycle-01/target.json")
+                       .read_text(encoding="utf-8"))
+    if "governing_pin_hashes" not in tgt_h:
+        failures.append("the frozen cycle records its governing paths but not "
+                        "their versions, so nothing can be compared against")
+    else:
+        run_h["spec_files"][0]["sha256"] = "b" * 64
+        write_lf(rp, json.dumps(run_h, indent=2) + "\n")
+        r = do_freeze(th)
+        blob = r.stdout + r.stderr
+        if r.returncode == 0:
+            failures.append("a governing artifact's recorded version changed "
+                            "under a completed cycle and freeze accepted it; "
+                            "only the path list was compared")
+        elif "governing paths but not its versions" not in blob:
+            failures.append("refused, but not for the version change; the "
+                            f"membership check is doing the work\n{blob[:300]}")
+        else:
+            print("  [ok] refused: same governing paths under a completed "
+                  "cycle, different versions")
+
     # ---- B01-F08: the gate must hold at freeze, not only at init ----
     # A run can sit for days between init and its first cycle, and every cycle is
     # where the tooling is actually relied upon. Checking only at init let a

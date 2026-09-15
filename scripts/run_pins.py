@@ -157,8 +157,7 @@ def load_amendments(run_dir: Path) -> list[dict]:
     return items
 
 
-def validate_chain(run: dict, items: list[dict],
-                   frozen: dict[int, list[str]] | None = None) -> None:
+def validate_chain(run: dict, items: list[dict]) -> None:
     """Each amendment must name the five required fields and follow the last.
 
     The prior_pin_set check is the load-bearing one. Without it an amendment
@@ -173,11 +172,11 @@ def validate_chain(run: dict, items: list[dict],
     the governing set entirely, or add a path that no check ever looked at
     because the pin check iterated only what run.json originally recorded.
 
-    B02-F06: `frozen` maps an existing cycle number to the pin set recorded in
-    its target.json at freeze. An amendment that would change one of those is
-    refused. Comparing amendments only against each other made "applies forward"
-    mean nothing more than "the numbers increase", so an amendment appended
-    after a review could still rewrite what governed it.
+    It does NOT check amendments against cycles that have already been frozen.
+    It took a `frozen` argument that promised exactly that and then ignored it,
+    so the docstring described a check the body did not perform. The real one is
+    check_frozen_assignments, and the argument is gone rather than left here
+    looking like coverage.
     """
     required = ("reason", "affected_artifacts", "prior_pin_set", "new_pin_set",
                 "effective_cycle", "authorized_by", "at")
@@ -280,40 +279,77 @@ def validate_chain(run: dict, items: list[dict],
         last_cycle = int(a["effective_cycle"])
 
 
-def frozen_assignments(review_dir: Path) -> dict[int, list[str]]:
-    """What each already-frozen cycle recorded as governing it.
+def frozen_assignments(run_dir: Path) -> list[dict]:
+    """What every already-frozen cycle in the RUN recorded as governing it.
 
-    B02-F06. Written into target.json at freeze from this point on. Cycles
-    frozen before the field existed are absent from this map and are not
-    retro-checked: an amendment cannot be judged against a record nobody kept.
-    That gap is real and shrinks to nothing as cycles accumulate, but it is a
-    gap, and saying otherwise would overstate what this establishes.
+    B02-F06, the half cycle 03 found still open. This used to take one review
+    directory, and freeze handed it the directory it happened to be working in.
+    The amendment history is a property of the whole run, so freezing
+    implementation-review/cycle-01 never looked at plan-review/cycle-01. Codex
+    froze a plan cycle under protocol plus spec, appended an amendment effective
+    at cycle 1 removing the spec, froze the implementation cycle, and the
+    implementation freeze exited 0. The earlier frozen assignment was never
+    examined on that path.
+
+    Each record keeps the review it came from. A map keyed by cycle number would
+    let implementation-review/cycle-01 overwrite plan-review/cycle-01 and
+    silently discard one of the two records this check exists to compare
+    against — and those two are precisely the pair that disagree when an
+    amendment has been backdated across loops.
+
+    The recorded hashes come back as well as the paths. Cycles frozen before
+    either field existed have neither, and are absent here rather than
+    retro-checked: an amendment cannot be judged against a record nobody kept. A
+    cycle that recorded paths but not hashes is checked on paths alone. Both
+    gaps are real, they shrink as cycles accumulate, and saying otherwise would
+    overstate what this establishes.
     """
-    out: dict[int, list[str]] = {}
-    if not review_dir.is_dir():
+    out: list[dict] = []
+    if not run_dir.is_dir():
         return out
-    for d in sorted(review_dir.glob("cycle-*")):
-        t = d / "target.json"
-        if not t.is_file():
+    for review in sorted(run_dir.glob("*-review")):
+        if not review.is_dir():
             continue
-        try:
-            data = json.loads(t.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            continue
-        pins = data.get("governing_pins")
-        if isinstance(pins, list) and data.get("cycle") is not None:
-            out[int(data["cycle"])] = sorted(pins)
+        for d in sorted(review.glob("cycle-*")):
+            t = d / "target.json"
+            if not t.is_file():
+                continue
+            try:
+                data = json.loads(t.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                continue
+            pins = data.get("governing_pins")
+            if not isinstance(pins, list) or data.get("cycle") is None:
+                continue
+            h = data.get("governing_pin_hashes")
+            out.append({
+                "review": review.name,
+                "cycle": int(data["cycle"]),
+                "where": f"{review.name}/{d.name}",
+                "paths": sorted(pins),
+                "hashes": dict(h) if isinstance(h, dict) and h else None,
+            })
     return out
 
 
 def check_frozen_assignments(run: dict, items: list[dict],
-                             frozen: dict[int, list[str]]) -> None:
+                             frozen: list[dict]) -> None:
     """Refuse amendments that would change what a completed cycle ran under.
 
     Alex Zamurko ruled that once a cycle exists its effective pin set is fixed
     and later amendments apply only prospectively. Comparing each amendment
     against the previous one, as the first version did, only ensured the numbers
     increased. It said nothing about cycles that had already happened.
+
+    The effective-cycle coordinate, written down because cycle 03 found it
+    undefined across the two loops. `effective_cycle` is a RUN-level ordinal.
+    Nothing in an amendment names a review type, and the history lives at the
+    run root, so an amendment effective at cycle k governs cycle k onward in
+    every review directory the run has. Reading it as "plan-review's cycle k"
+    is what let the implementation loop freeze against a history contradicting a
+    plan cycle already conducted. One consequence follows and is worth stating:
+    two review directories that recorded different sets for the same cycle
+    number cannot both be right, and at least one of them is refused here.
 
     Stated at its real strength: the frozen cycle records what governed it, and
     an amendment whose replay contradicts that record is refused. That is
@@ -322,18 +358,43 @@ def check_frozen_assignments(run: dict, items: list[dict],
     editing the recorded set in target.json, at which point the two agree again
     and this check has nothing to say.
     """
-    for n, recorded in sorted(frozen.items()):
+    for rec in sorted(frozen, key=lambda r: (r["cycle"], r["review"])):
+        n, where = rec["cycle"], rec["where"]
         replayed = pins_for_cycle(run, items, n)
-        if replayed != recorded:
+        if replayed != rec["paths"]:
             raise PinError(
-                f"the amendment history no longer reproduces what cycle "
-                f"{n:02d} recorded as governing it.\n"
-                f"    cycle {n:02d} recorded  {recorded}\n"
-                f"    replay now gives    {replayed}\n"
+                f"the amendment history no longer reproduces what "
+                f"{where} recorded as governing it.\n"
+                f"    {where} recorded  {rec['paths']}\n"
+                f"    replay now gives  {replayed}\n"
                 "  A completed cycle was conducted under a specific set. An "
                 "amendment that changes\n  it is rewriting the conditions of a "
                 "review that already happened, which is what\n  the effective "
                 "cycle boundary exists to prevent.")
+
+        recorded = rec["hashes"]
+        if recorded is None:
+            continue
+
+        # The second half of B02-F06. This compared path lists and dropped
+        # governing_pin_hashes on the floor, so a changed digest with unchanged
+        # membership passed: same names, different documents. A pin set is a set
+        # of versions, and checking only the names checks the easier thing.
+        now = pin_hashes_for_cycle(run, items, n)
+        moved = [p for p in sorted(recorded)
+                 if str(now.get(p, "")) != str(recorded[p])]
+        if moved:
+            lines = "\n".join(
+                f"    {p}\n      {where} recorded  {recorded[p]}\n"
+                f"      replay now gives  {now.get(p) or '(absent)'}"
+                for p in moved)
+            raise PinError(
+                f"the amendment history reproduces {where}'s governing paths "
+                f"but not its versions.\n" + lines +
+                "\n  Membership is unchanged, which is why the path check above "
+                "passed. Same names and\n  different bytes is a different set "
+                "of documents to have reviewed against, and the\n  cycle that "
+                "already happened cannot be re-conducted against them.")
 
 
 def pins_for_cycle(run: dict, items: list[dict], cycle_n: int) -> list[str]:
@@ -349,12 +410,17 @@ def pins_for_cycle(run: dict, items: list[dict], cycle_n: int) -> list[str]:
     return pins
 
 
-def governing_pins(run: dict, run_dir: Path, cycle_n: int,
-                   review_dir: Path | None = None) -> list[str]:
+def governing_pins(run: dict, run_dir: Path, cycle_n: int) -> list[str]:
+    """The effective pin set, with the whole history checked before it is used.
+
+    The frozen check is no longer optional. It was reachable only when a caller
+    remembered to pass a review directory, and the caller that forgot is how
+    B02-F06 survived its first repair. A history that contradicts a completed
+    cycle is not a history any caller should be handed an answer from.
+    """
     items = load_amendments(run_dir)
     validate_chain(run, items)
-    if review_dir is not None:
-        check_frozen_assignments(run, items, frozen_assignments(review_dir))
+    check_frozen_assignments(run, items, frozen_assignments(run_dir))
     return pins_for_cycle(run, items, cycle_n)
 
 

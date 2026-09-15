@@ -278,8 +278,7 @@ def load_run(run_id: str) -> dict:
 
 
 def check_pins_still_hold(run: dict, run_dir: Path | None = None,
-                          cycle_n: int | None = None,
-                          review_dir: Path | None = None) -> None:
+                          cycle_n: int | None = None) -> None:
     """The governing artifacts must not have moved since init.
 
     A run whose spec changed underneath it is not four cycles against one spec;
@@ -307,9 +306,12 @@ def check_pins_still_hold(run: dict, run_dir: Path | None = None,
         try:
             items = run_pins.load_amendments(run_dir)
             run_pins.validate_chain(run, items)
-            if review_dir is not None:
-                run_pins.check_frozen_assignments(
-                    run, items, run_pins.frozen_assignments(review_dir))
+            # B02-F06, the half cycle 03 found still open. This was scoped to
+            # the review directory freeze was working in, and the amendment
+            # history belongs to the run. Freezing one loop's cycle could accept
+            # a history that contradicted the other loop's completed cycle.
+            run_pins.check_frozen_assignments(
+                run, items, run_pins.frozen_assignments(run_dir))
             effective = run_pins.pin_hashes_for_cycle(run, items, cycle_n)
         except run_pins.PinError as e:
             raise Refused(f"the run's pin history cannot be read, so what "
@@ -763,7 +765,7 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     # After n is known, because the pin set in force is a property of the cycle
     # rather than of the run: an amendment effective at cycle k governs k onward
     # and leaves earlier cycles checked against what they were conducted under.
-    check_pins_still_hold(run, run_dir, n, review_dir)
+    check_pins_still_hold(run, run_dir, n)
     check_previous_cycle_closed(review_dir, n)
     check_loop_not_terminated(review_dir, n, run)
 

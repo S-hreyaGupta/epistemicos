@@ -21,12 +21,22 @@ separation is a convention this script follows. It is not something the script
 can enforce: the implementing agent holds write access to these paths. No claim
 of technical protection may be made while MC1_ENFORCEMENT is CONVENTION_ONLY.
 
-Write-once evidence
--------------------
-target.json, target.sha256, codex-input.md and codex-output-raw.md are never
-overwritten. A cycle that went wrong is repaired by opening a new cycle, not by
-editing the old one. `freeze` refuses on an existing cycle directory; `record`
-refuses when raw output is already present.
+Write-once, except where supersession is recorded
+-------------------------------------------------
+target.json, target.sha256 and codex-input.md are never overwritten. A cycle that
+went wrong there is repaired by opening a new cycle, not by editing the old one,
+and `freeze` refuses on an existing cycle directory.
+
+codex-output-raw.md is not in that list, and this section used to say it was.
+Codex, cycle 03: the old wording "does not describe the current capture-log-based
+replacement behavior". A capture can be superseded through the capture log, and
+the cycle's working copies are then republished from whichever attempt the log
+designates. What is write-once is the attempt directory. Every attempt is kept,
+with its own bytes and its own findings, and none is edited after it is written;
+the file a consumer reads is a published copy of one of them.
+
+Neither half is technical immutability. Under MC1_ENFORCEMENT: CONVENTION_ONLY
+the same writable code performs the check.
 
 What this runner does not establish
 -----------------------------------

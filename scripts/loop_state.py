@@ -32,8 +32,15 @@ differently:
 2. Events recorded in an invalid cycle are ignored entirely, including
    resolutions. A finding accepted in valid cycle 1 and marked demonstrated in
    invalid cycle 2 stays OPEN, because the cycle that would demonstrate it
-   cannot support an authoritative anything. This is the conservative reading
-   and it can only ever delay an exit, never manufacture one.
+   cannot support an authoritative anything.
+
+   What that establishes is narrow: the calculation excludes invalid-cycle
+   events. This paragraph used to add that the exclusion "can only ever delay an
+   exit, never manufacture one", and Codex refused the claim in cycle 03.
+   Ignoring an invalid resolution does delay an exit. Ignoring an invalid RAISED
+   or REOPENED removes an actionable finding, and a smaller OPEN set is how
+   CONVERGED arrives early. The exclusion is not conservative in one direction,
+   and calling it conservative made it sound safe in both.
 
 What this does not do
 ---------------------

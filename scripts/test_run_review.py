@@ -1965,16 +1965,38 @@ def main() -> int:
             rj = tM / "runs" / "A1E-001" / "run.json"
             healthy_run = rj.read_text(encoding="utf-8")
 
-            for label, mutate in (
+            # The third case is B01-F14's remaining half, found by cycle 04.
+            # Removing the field refused; removing the whole file exited 0 with
+            # an unqualified CONVERGED, because a missing run.json returned
+            # classification UNKNOWN before the metadata check was reached.
+            #
+            # The two field controls sat here on their own and looked like
+            # coverage. They tested the careful mistake and not the careless
+            # one, which is the shape cycle 04 found in all five of its
+            # findings. The deletion case belongs beside them, not in a file of
+            # its own where nobody compares the two.
+            def _lost() -> None:
+                d = json.loads(healthy_run)
+                d.pop("mc1_enforcement", None)
+                write_lf(rj, json.dumps(d, indent=2) + "\n")
+
+            def _nonsense() -> None:
+                d = json.loads(healthy_run)
+                d["mc1_enforcement"] = "FULLY_ENFORCED"
+                write_lf(rj, json.dumps(d, indent=2) + "\n")
+
+            def _gone() -> None:
+                rj.unlink()
+
+            for label, break_it, needle in (
                 ("a protocol run that has lost its enforcement status",
-                 lambda d: d.pop("mc1_enforcement", None)),
+                 _lost, "mc1_enforcement"),
                 ("a protocol run claiming an enforcement status that means "
-                 "nothing", lambda d: d.__setitem__("mc1_enforcement",
-                                                    "FULLY_ENFORCED")),
+                 "nothing", _nonsense, "mc1_enforcement"),
+                ("a run whose whole metadata record is gone",
+                 _gone, "run.json"),
             ):
-                doc = json.loads(healthy_run)
-                mutate(doc)
-                write_lf(rj, json.dumps(doc, indent=2) + "\n")
+                break_it()
                 res = controller(tM)
                 out = res.stdout + res.stderr
                 if res.returncode == 0:
@@ -1984,7 +2006,7 @@ def main() -> int:
                         f"the controller refused {label} but still printed a "
                         f"LOOP_STATUS line, which is the thing callers read\n"
                         f"      {res.stdout.strip()[:160]}")
-                elif "mc1_enforcement" not in out:
+                elif needle not in out:
                     failures.append(f"refused {label}, but not for that reason\n"
                                     f"      {out.strip()[:160]}")
                 else:

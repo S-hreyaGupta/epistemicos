@@ -53,6 +53,22 @@ def make_repo() -> tuple[Path, str]:
     (tmp / "specs").mkdir()
     shutil.copy2(SRC.parent / "specs" / "evidence-schema-v1.0.md",
                  tmp / "specs" / "evidence-schema-v1.0.md")
+    # B01-F14, the half cycle 04 found still open. These fixtures had no
+    # run.json at all, and every loop control in this suite passed because of
+    # the defect they should have caught: run_classification returned UNKNOWN
+    # for a missing file, UNKNOWN matched neither branch in main, and the
+    # controller printed an unqualified outcome for a run it could not identify.
+    #
+    # A run directory without run.json is not something the runner can produce.
+    # The fixture now looks like what it is meant to represent: an approved
+    # protocol run, which also means these controls exercise the PROTOCOL path
+    # rather than a gap in it.
+    (tmp / "runs" / "T-001").mkdir(parents=True)
+    write_lf(tmp / "runs" / "T-001" / "run.json", json.dumps({
+        "run_id": "T-001",
+        "bootstrap_review": "APPROVED",
+        "mc1_enforcement": "CONVENTION_ONLY",
+    }, indent=2) + "\n")
     write_lf(tmp / "plan.md", "# plan\n\nbody\n")
     sh("git", "init", "-q", cwd=tmp)
     sh("git", "config", "user.email", "t@t", cwd=tmp)

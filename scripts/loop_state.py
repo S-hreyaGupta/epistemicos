@@ -349,7 +349,28 @@ def run_classification(review: Path) -> tuple[str, str]:
     """
     run_json = review.parent / "run.json"
     if not run_json.is_file():
-        return "UNKNOWN", ""
+        # B01-F14, the half cycle 04 found still open. This returned
+        # ("UNKNOWN", "") and UNKNOWN matched neither branch in main: not
+        # DEVELOPMENT, so no refusal and no label; not PROTOCOL, so the metadata
+        # check below never ran. The outcome printed with no qualification at
+        # all.
+        #
+        # Codex: removing mc1_enforcement from run.json exits 2, and removing
+        # run.json entirely exits 0 with CONVERGED. Taking away one field
+        # stopped it and taking away everything waved it through, which is the
+        # shape of a check that guards the careful mistake and not the careless
+        # one.
+        #
+        # There is no labelled fallback here. Labelling this "development
+        # evidence" would itself be a claim about a run we cannot read, and the
+        # honest statement is that we do not know what this is.
+        raise CannotCalculate(
+            f"there is no {run_json.name} beside this review, so what kind of "
+            f"run it belongs to\n  cannot be established:\n    {run_json}\n\n"
+            "  A loop state is an outcome about a run. Without the run's own "
+            "record there is\n  nothing to say whether its cycles are protocol "
+            "cycles or development evidence,\n  and an unlabelled outcome reads "
+            "as the stronger of the two.")
     try:
         run = json.loads(run_json.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:

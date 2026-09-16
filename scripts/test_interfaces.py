@@ -52,6 +52,25 @@ def write_lf(p: Path, text: str) -> None:
         f.write(text)
 
 
+def lay_run(run_dir: Path, run_id: str) -> None:
+    """The run record a hand-built fixture needs to be a run at all.
+
+    B01-F14, the half cycle 04 found still open. The controller used to classify
+    a missing run.json as UNKNOWN and carry on, so seams that build a review
+    directory by hand never needed one. It now refuses, because a loop state is
+    an outcome about a run and there is nothing to say what kind of run this is.
+
+    These fixtures were exercising the seam through a gap in it. Giving them a
+    run makes them exercise the PROTOCOL path, which is the path the seam is
+    about.
+    """
+    write_lf(run_dir / "run.json", json.dumps({
+        "run_id": run_id,
+        "bootstrap_review": "APPROVED",
+        "mc1_enforcement": "CONVENTION_ONLY",
+    }, indent=2) + "\n")
+
+
 def sh(*args: str, cwd: Path) -> subprocess.CompletedProcess:
     return subprocess.run(args, cwd=str(cwd), capture_output=True, text=True)
 
@@ -583,6 +602,7 @@ def main() -> int:
         root3, commit3 = build_repo()
         made.append(root3)
         rv = root3 / "runs" / "T" / "plan-review"
+        lay_run(rv.parent, "T")
         for n in range(1, ncycles + 1):
             d = rv / f"cycle-{n:02d}"
             d.mkdir(parents=True)
@@ -614,6 +634,7 @@ def main() -> int:
     root3, commit3 = build_repo()
     made.append(root3)
     rv = root3 / "runs" / "T" / "plan-review"
+    lay_run(rv.parent, "T")
     d = rv / "cycle-01"
     d.mkdir(parents=True)
     lay_cycle(d, {"review_type": "plan", "run_id": "T", "cycle": 1,

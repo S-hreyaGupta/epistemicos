@@ -187,7 +187,7 @@ now, because refusing to write one is not refusing to use one: the ledger will
 not record a disposition dated before the reopening it answers, and replay will
 not honour one already in the history.
 
-**B02-F04**, commit `1d0b1e4`. Recording rewrote `capture-log.json` twice during
+**B02-F04**, commit `5201396`. Recording rewrote `capture-log.json` twice during
 preparation, before the atomic rename called the commit point. Truncating it
 there left the previous generation on disk with nothing able to say which
 attempt it was. Every write to that file is atomic now.

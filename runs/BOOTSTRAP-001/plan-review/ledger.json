@@ -100,10 +100,17 @@
           "event": "ACCEPT",
           "note": "compose_input carries the protocol but not the pinned spec, and for implementation review omits the target identifiers entirely. I fixed the protocol omission last night and stopped one step short. Verified.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:51:31Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 04: amended specifications enter the composed input",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "S2.2",
-      "state": "OPEN",
+      "state": "RESOLVED",
       "transcription_note": "recorded as C01-F04 on 9 September; corrected to B01-F04, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
     },
     "B01-F05": {
@@ -522,10 +529,17 @@
           "event": "ACCEPT",
           "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:49:49Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 03: the reconciliation runs regardless of whether another block parsed, and the indented block is refused rather than silently omitted. Recorded at cycle 4 because the ACCEPT sits at cycle 3 and section 5 puts the demonstration in a later cycle. Alex Zamurko's ruling, 15 September.",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "B02-F02": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -544,10 +558,17 @@
           "event": "ACCEPT",
           "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:49:50Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 03: the parser accepts the recurrence form without Class, and record resolves its class from the ledger. Recorded at cycle 4 because the ACCEPT sits at cycle 3 and section 5 puts the demonstration in a later cycle. Alex Zamurko's ruling, 15 September.",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "B02-F03": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -566,10 +587,17 @@
           "event": "ACCEPT",
           "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:49:53Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 03: ledger identifier validity comes from the canonical grammar; cycle extraction is separate. Recorded at cycle 4 because the ACCEPT sits at cycle 3 and section 5 puts the demonstration in a later cycle. Alex Zamurko's ruling, 15 September.",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "B02-F04": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -610,10 +638,17 @@
           "event": "ACCEPT",
           "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:51:33Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 04: retained-pin hash overrides are rejected and excluded from replay",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "B02-F06": {
       "class": "MISSING REQUIREMENT",
@@ -632,10 +667,17 @@
           "event": "ACCEPT",
           "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:51:34Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 04: demonstrated for recorded assignments: both loops and recorded versions are checked",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "B02-F07": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -654,10 +696,17 @@
           "event": "ACCEPT",
           "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:49:52Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 03: freeze preserves the diff, results, approved plan and approval record, and checks 13 to 15 use those copies. Limit: the legacy live-file fallback remains. Recorded at cycle 4 because the ACCEPT sits at cycle 3 and section 5 puts the demonstration in a later cycle. Alex Zamurko's ruling, 15 September.",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "B02-F08": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -676,10 +725,17 @@
           "event": "ACCEPT",
           "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:51:31Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 04: failed history queries withhold the exception",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "B02-F09": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -698,10 +754,17 @@
           "event": "ACCEPT",
           "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:49:52Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 03: the module disclaims forced sequencing, proven authorship and an independent write boundary, and identifies the former claim as false. Recorded at cycle 4 because the ACCEPT sits at cycle 3 and section 5 puts the demonstration in a later cycle. Alex Zamurko's ruling, 15 September.",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "B02-F10": {
       "class": "UNTESTED RULE",
@@ -720,10 +783,17 @@
           "event": "ACCEPT",
           "note": "accepted by Alex Zamurko 14 September; recorded at cycle 3 rather than backdated to cycle 2, on his ruling",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:49:51Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 03: the prose scan takes its file list from covered(), including the four formerly omitted modules. Limit: scope and added controls only. Recorded at cycle 4 because the ACCEPT sits at cycle 3 and section 5 puts the demonstration in a later cycle. Alex Zamurko's ruling, 15 September.",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "B03-F01": {
       "class": "MISSING REQUIREMENT",
@@ -735,10 +805,24 @@
           "event": "RAISED",
           "note": "failure to calculate loop state is read as permission to open another cycle; UnknownEvent from replay escapes loop_state.main and the runner does not require a recognised CONTINUE",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:48:32Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted on 15 September by repairing it while cycle 3 was the live cycle and cycle 4 did not exist; recorded at cycle 3 where the acceptance happened",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:51:30Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 04: demonstrated for the reported controller failures and conflicting statuses",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "B03-F02": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -750,10 +834,24 @@
           "event": "RAISED",
           "note": "the cycle-03 prompt states the suites are in the target; target.json binds ten production artifacts and no test suites",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:48:33Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted on 15 September by repairing it while cycle 3 was the live cycle and cycle 4 did not exist; recorded at cycle 3 where the acceptance happened",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-16T07:51:32Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "demonstrated by cycle 04: demonstrated as an auxiliary evidence record; it is not an MC-2-enforced binding",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
-      "state": "OPEN"
+      "state": "RESOLVED"
     }
   },
   "review": "plan-review"

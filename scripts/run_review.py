@@ -1381,12 +1381,24 @@ def cmd_record(args: argparse.Namespace) -> int:
     # Found by the B02-F04 control: moving the validation earlier created
     # exactly that window. Issue 6 exists so the count of attempts is never
     # understated, and a refusal is the case where that matters most.
-    write_lf(cycle / "capture-log.json", json.dumps(log, indent=2) + "\n")
+    #
+    # B02-F04, the half cycle 04 found still open. These two were ordinary
+    # write_lf, and they run BEFORE the atomic commit point below. Codex opened
+    # and truncated the file at this boundary: the log held partial JSON, the
+    # old generation was still on disk, and recovery could no longer read which
+    # attempt it designated. A single atomic rename at the end is worth nothing
+    # if the same pointer is destructively rewritten on the way there.
+    #
+    # Every write to this file is atomic now, not just the one called the commit
+    # point. The file either holds the previous designation or the next one.
+    write_lf_atomic(cycle / "capture-log.json",
+                    json.dumps(log, indent=2) + "\n")
 
     if invalid:
         if args.supersede_capture:
             log["attempts"][-1]["superseded_nothing"] = True
-        write_lf(cycle / "capture-log.json", json.dumps(log, indent=2) + "\n")
+        write_lf_atomic(cycle / "capture-log.json",
+                        json.dumps(log, indent=2) + "\n")
         raise Refused(
             f"attempt-{n:02d} does not meet the capture validity requirements:\n  "
             + "\n  ".join(invalid) +

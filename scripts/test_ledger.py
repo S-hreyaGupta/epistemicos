@@ -752,6 +752,77 @@ def main() -> int:
         else:
             print("  [ok] with a fresh acceptance it closes normally")
 
+    # B01-F11, the part cycle 04 found still open. The control above proves a
+    # reopened finding needs a NEW acceptance. It says nothing about whether
+    # that acceptance has to come after the reopening, and it did not: Codex
+    # appended one dated cycle 2 to a finding reopened in cycle 3 and resolved
+    # on it in cycle 4, every command exiting 0.
+    #
+    # Codex: "The named reopening control demonstrates refusal when no
+    # additional ACCEPT exists. It does not test whether a subsequently appended
+    # ACCEPT is causally eligible." A fresh row is not a fresh agreement.
+    root, rev = review_with({1: True, 2: True, 3: True, 4: True})
+    ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--class", "UNTESTED RULE")
+    ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--disposition", "ACCEPT", "--note", "will fix")
+    ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
+           "--evidence", "repaired")
+    ledger(root, "reopen", "--review", str(rev), "--cycle", "3", "--id", "C01-F01",
+           "--evidence", "it came back")
+    _back = ledger(root, "respond", "--review", str(rev), "--cycle", "2",
+                   "--id", "C01-F01", "--disposition", "ACCEPT",
+                   "--note", "dated before the reopening it claims to answer")
+    _bblob = (_back.stderr + _back.stdout).lower()
+    if _back.returncode == 0:
+        failures.append(
+            "an acceptance dated before the reopening was recorded. It answers "
+            "the repair the reopening undid, and it re-arms the finding for a "
+            "second repair nobody agreed to.")
+    elif "reopened in cycle" not in _bblob:
+        failures.append(f"the backdated acceptance was refused, but not for "
+                        f"predating the reopening\n      {_bblob[:200]}")
+    else:
+        print("  [ok] refused: an acceptance dated before the reopening it "
+              "answers")
+
+    # The other half, and the one that tests replay rather than the command.
+    # Refusing to WRITE a backdated acceptance does nothing about a history that
+    # already holds one, and Codex asked for both: "Make replay validate cycle
+    # ordering and prerequisites consistently, including existing out-of-order
+    # histories." ledger.json is an ordinary file under CONVENTION_ONLY, so this
+    # writes the row directly and then asks whether it can still close anything.
+    root, rev = review_with({1: True, 2: True, 3: True, 4: True})
+    ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--class", "UNTESTED RULE")
+    ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--disposition", "ACCEPT", "--note", "will fix")
+    ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
+           "--evidence", "repaired")
+    ledger(root, "reopen", "--review", str(rev), "--cycle", "3", "--id", "C01-F01",
+           "--evidence", "it came back")
+    _lp = rev / "ledger.json"
+    _doc = json.loads(_lp.read_text(encoding="utf-8"))
+    _doc["findings"]["C01-F01"]["history"].append({
+        "cycle": 2, "event": "ACCEPT", "state": "OPEN",
+        "at": "2026-09-16T00:00:00Z",
+        "note": "written straight into the file, dated before the reopening"})
+    write_lf(_lp, json.dumps(_doc, indent=2) + "\n")
+    _r = ledger(root, "resolve", "--review", str(rev), "--cycle", "4",
+                "--id", "C01-F01", "--evidence", "repaired again")
+    _rblob = (_r.stderr + _r.stdout).lower()
+    if _r.returncode == 0:
+        failures.append(
+            "replay honoured an acceptance already in the history whose cycle "
+            "predates the reopening, and closed the finding on it. Refusing to "
+            "write one is not the same as refusing to use one.")
+    elif "no accept" not in _rblob:
+        failures.append(f"the resolution was refused, but not for want of an "
+                        f"eligible acceptance\n      {_rblob[:200]}")
+    else:
+        print("  [ok] replay does not honour a backdated acceptance already in "
+              "the history")
+
     # Direction two: a DEMONSTRATED recorded in an invalid cycle must not leave
     # the finding permanently RESOLVED. Before the projection the ledger refused
     # every later resolution while the controller still counted the finding

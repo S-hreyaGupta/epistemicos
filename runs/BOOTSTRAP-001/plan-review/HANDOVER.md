@@ -165,11 +165,37 @@ Open since 10 September. Two instances make it policy rather than incident.
 
 ---
 
-## Addendum, 16 September: two of the five are repaired
+## Addendum, 16 September: all five are repaired
 
 On your instruction, B01-F07 and B01-F14 were repaired the same day this was
-handed over. The five findings above are left as written, because that is what
-the loop produced.
+handed over, and the remaining three followed. The five findings above are left
+as written, because that is what the loop produced.
+
+### The three that followed
+
+**B01-F02**, commit `76e102b`. Your ruling made `MAX_4_REACHED` unclearable, and
+that was not enough: §6 evaluates `STALLED` before the budget, so a fourth
+boundary that genuinely stalls never met the unclearable list at all, and
+clearing it returned `CONTINUE` with the ceiling never consulted. The check now
+sits on the way out rather than trusting the shape of whichever exit was
+cleared.
+
+**B01-F11**, commit `4b36083`. A reopening spends the acceptance before it, and
+nothing required the replacement to come after. An acceptance dated cycle 2,
+appended to a finding reopened in cycle 3, resolved it in cycle 4. Two guards
+now, because refusing to write one is not refusing to use one: the ledger will
+not record a disposition dated before the reopening it answers, and replay will
+not honour one already in the history.
+
+**B02-F04**, commit `1d0b1e4`. Recording rewrote `capture-log.json` twice during
+preparation, before the atomic rename called the commit point. Truncating it
+there left the previous generation on disk with nothing able to say which
+attempt it was. Every write to that file is atomic now.
+
+*One honest note on B02-F04's control.* It reads the source and requires every
+write to that file to use the atomic path, rather than injecting a crash, which
+a suite driving the runner as a subprocess cannot do. That is a weaker kind of
+control than the others here and it is marked as such in the code.
 
 **B01-F14**, commit `c617333`. A missing `run.json` no longer classifies as
 UNKNOWN and carry on. It refuses, and there is no labelled fallback: calling a
@@ -188,13 +214,18 @@ consistent throughout — its only defect is a spec the run never pinned, which
 nothing but the run's history can see. Breaking the replay turns that control red
 and leaves the others green.
 
-**Neither can be demonstrated, and that is worth understanding.** §5 gives
-`RESOLVED` only once a repair is demonstrated in the next review target. The loop
-closed at `MAX_4_REACHED` and there is no next target. So both of these sit
+**None of the five can be demonstrated, and that is worth understanding.** §5
+gives `RESOLVED` only once a repair is demonstrated in the next review target.
+The loop closed at `MAX_4_REACHED` and there is no next target. So all five sit
 `OPEN` in the ledger for as long as the ledger exists, however thoroughly they
 are fixed. Closing them needs either a new run or a ruling from you. This is the
 same collision as the six cycle-02 findings, arriving at the other end of the
 loop.
+
+**The ledger therefore now understates the work and overstates the risk.** Five
+`OPEN` findings, none of them unrepaired. A reader who trusts the state field
+gets the wrong picture in both directions, and this addendum is the only thing
+that corrects it.
 
 **One thing the repair turned up.** Making the controller refuse an unreadable
 run broke three control suites, because their fixtures built review directories
@@ -203,9 +234,9 @@ gap they existed to catch. That is the pattern cycle 04 named, found in the
 fixtures rather than in the assertions, and it is a second place to look if you
 decide the resolved set is worth re-examining.
 
-The suites now stand at 302 controls. That number appears in no prompt, because
-all four cycle prompts are frozen and a finished cycle's prompt states the
-controls that existed when it ran.
+The suites now stand at 307 controls, up from 298 at the close of cycle 04. That
+number appears in no prompt, because all four cycle prompts are frozen and a
+finished cycle's prompt states the controls that existed when it ran.
 
 ---
 

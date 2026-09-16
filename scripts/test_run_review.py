@@ -1347,6 +1347,42 @@ def main() -> int:
     else:
         print("  [ok] no staging files are left behind in the cycle")
 
+    # ---- B02-F04, the half cycle 04 found still open ----
+    # The controls below corrupt working copies while leaving a readable
+    # designation, so what they demonstrate is publication recovery. Codex:
+    # "They demonstrate publication recovery, not survival of this earlier write
+    # boundary." The boundary it means comes before the commit point, where
+    # recording rewrites capture-log.json during preparation. Truncate it there
+    # and the previous generation is still on disk with nothing able to say
+    # which attempt it was.
+    #
+    # A crash cannot be injected from here. These controls drive the runner as a
+    # subprocess, and "die halfway through a write" is not something a command
+    # line argument can ask for. So this reads the source and requires every
+    # write to that file to be the atomic one.
+    #
+    # That is a weaker kind of control than the rest of this suite and it is
+    # named as such. It also happens to be the kind that fits the claim: the
+    # property is that no code path leaves this file partly written, which is a
+    # statement about code paths rather than about one execution.
+    _rr = (SRC / "run_review.py").read_text(encoding="utf-8")
+    _logw = [(i, l.strip()) for i, l in enumerate(_rr.splitlines(), 1)
+             if "capture-log.json" in l and "write_lf" in l]
+    _plain = [(i, l) for i, l in _logw if "write_lf_atomic" not in l]
+    if not _logw:
+        failures.append("no capture-log write was found in the runner at all, "
+                        "so this control is checking nothing")
+    elif _plain:
+        failures.append(
+            "capture-log.json is written non-atomically at:\n      "
+            + "\n      ".join(f"line {i}: {l}" for i, l in _plain) +
+            "\n      An interruption there truncates the pointer naming which "
+            "generation governs,\n      and the atomic commit point below it "
+            "cannot undo that. B02-F04.")
+    else:
+        print(f"  [ok] all {len(_logw)} capture-log writes go through the "
+              f"atomic path")
+
     # ---- B02-F04: interruption at the publication boundary ----
     # Cycle 03: "the required transactional supersession is not implemented. A
     # partial replacement still leaves the authoritative representation

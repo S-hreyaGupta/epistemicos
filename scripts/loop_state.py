@@ -572,19 +572,47 @@ def _run(a) -> int:
             #
             # It cannot extend that budget. This comment used to say the
             # opposite, that clearing MAX_4_REACHED was a human decision to
-            # spend a fifth cycle, and the runner had never agreed to that. The
-            # loop above now breaks on an unclearable exit before reaching here,
-            # so cleared_latest can only ever hold an outcome the runner will
-            # honour. Alex Zamurko's ruling, 15 September.
+            # spend a fifth cycle, and the runner had never agreed to that.
+            #
+            # B01-F02, the half cycle 04 found still open. Making MAX_4_REACHED
+            # unclearable was not enough, because §6 evaluates STALLED BEFORE
+            # the budget. A fourth boundary that genuinely stalls reports
+            # STALLED, not MAX_4_REACHED, so it never met the unclearable list
+            # at all — and clearing it arrived here and became CONTINUE with the
+            # budget never consulted. Codex built exactly that: four valid
+            # cycles, a stalled fourth, a matching STALLED authorization, and
+            # the controller told the operator to open cycle five while the
+            # runner refused it.
+            #
+            # So the ceiling is enforced here, on the way out, rather than
+            # trusted to the shape of the exit that happened to be cleared.
+            # Clearing an exit says the loop may continue; it does not say there
+            # is anywhere left to continue to.
             _st, _auth = cleared_latest
-            status = "CONTINUE"
-            detail = (
-                f"The {_st} at n={n_latest} was cleared by a recorded human "
-                f"authorization from {_auth['authorized_by']}.\n"
-                f"Reason given: {_auth['reason']}\n"
-                "The loop continues on that authority. Repair the plan, produce "
-                "a new version, and\nopen the next cycle with a new frozen "
-                "target.")
+            if n_latest >= MAX_VALID_CYCLES:
+                status = "MAX_4_REACHED"
+                detail = (
+                    f"The {_st} at n={n_latest} was cleared by a recorded human "
+                    f"authorization from {_auth['authorized_by']}, and the loop "
+                    f"still ends here.\n"
+                    f"Reason given: {_auth['reason']}\n\n"
+                    f"{n_latest} valid cycles have been spent and §2 allows "
+                    f"{MAX_VALID_CYCLES}. An authorization clears one named "
+                    "exit at one\nnamed boundary. It does not create a cycle to "
+                    "spend it on, and no authorization\nextends the maximum: "
+                    "Alex Zamurko, 15 September. Escalate to human review.")
+                lines.append(
+                    f"        {_st} at n={n_latest} was cleared, and the "
+                    f"four-valid-cycle ceiling still binds")
+            else:
+                status = "CONTINUE"
+                detail = (
+                    f"The {_st} at n={n_latest} was cleared by a recorded human "
+                    f"authorization from {_auth['authorized_by']}.\n"
+                    f"Reason given: {_auth['reason']}\n"
+                    "The loop continues on that authority. Repair the plan, "
+                    "produce a new version, and\nopen the next cycle with a new "
+                    "frozen target.")
         governing = (n_latest, status, detail, cur, shown)
 
     n, status, detail, cur, shown = governing

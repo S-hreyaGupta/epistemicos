@@ -353,6 +353,27 @@ def cmd_respond(a: argparse.Namespace) -> int:
             raise Refused(f"{a.id} already has a disposition in cycle {a.cycle:02d}: "
                           f"{e['event']}. §5 permits exactly one per finding.")
 
+    # B01-F11, the part cycle 04 found still open. A reopening spends the
+    # acceptance that preceded it, so a fresh one is required. Nothing said the
+    # fresh one had to come AFTER, and the history is a list: Codex appended an
+    # ACCEPT dated cycle 2 to a finding reopened in cycle 3, and the finding was
+    # resolved on it in cycle 4.
+    #
+    # A disposition responds to a transition. One dated before the reopening
+    # responded to the repair the reopening undid, and reusing it is the same
+    # move as reusing the spent acceptance directly, with a later write date on
+    # it. Refused here so it is never recorded; the replay refuses to honour it
+    # too, for histories that already contain one.
+    _re = authorized(f, "REOPENED", proj)
+    if _re is not None and a.cycle < _re["cycle"]:
+        raise Refused(
+            f"{a.id} was reopened in cycle {_re['cycle']:02d} and this "
+            f"disposition is dated cycle {a.cycle:02d}.\n"
+            "  A reopening spends the acceptance before it, and asks whoever "
+            "accepts the new\n  repair to say so. A response dated earlier "
+            "answers the repair that was undone.\n"
+            "  Record it against the reopening cycle or a later one.")
+
     if a.disposition == "ACCEPT":
         # State deliberately unchanged. See the module docstring.
         f["history"].append({"cycle": a.cycle, "event": "ACCEPT", "state": OPEN,

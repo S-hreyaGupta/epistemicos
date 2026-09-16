@@ -416,25 +416,39 @@ def main() -> int:
         return sh(sys.executable, str(root / "scripts" / "ledger.py"), *a,
                   "--review", "runs/T-001/plan-review", cwd=root)
 
-    built = 0
-    for i in range(1, 5):
-        if do_freeze(tfull).returncode != 0:
-            break
-        if not close_cycle(tfull, i):
-            break
-        built = i
-        # The loop has to stay on CONTINUE for four cycles, which means each one
-        # must show progress. A cycle that only adds an open finding is STALLED
-        # by §6 at n=2 — correctly — and the freeze after it is refused before
-        # the budget is ever consulted. So each cycle resolves the previous
-        # finding and raises its own.
-        if i > 1:
-            led(tfull, "resolve", "--cycle", str(i), "--id", f"C{i-1:02d}-F01",
-                "--evidence", "repaired and demonstrated in this cycle")
-        led(tfull, "raise", "--cycle", str(i), "--id", f"C{i:02d}-F01",
-            "--class", "UNTESTED RULE")
-        led(tfull, "respond", "--cycle", str(i), "--id", f"C{i:02d}-F01",
-            "--disposition", "ACCEPT", "--note", "will repair next cycle")
+    def build_four(root: Path, stall_last: bool = False) -> int:
+        """Four valid cycles, optionally with a fourth that reduces nothing.
+
+        The loop has to stay on CONTINUE to reach four cycles, which means each
+        one must show progress. A cycle that only adds an open finding is
+        STALLED by §6 at n=2 — correctly — and the freeze after it is refused
+        before the budget is ever consulted. So each cycle resolves the previous
+        finding and raises its own.
+
+        stall_last skips that for cycle 4, which is legal: cycles 1 to 3 showed
+        progress, so freezing the fourth is permitted, and only the boundary
+        AFTER it stalls. That is the fixture B01-F02 needed and did not have.
+        """
+        n = 0
+        for i in range(1, 5):
+            if do_freeze(root).returncode != 0:
+                break
+            if not close_cycle(root, i):
+                break
+            n = i
+            if stall_last and i == 4:
+                continue
+            if i > 1:
+                led(root, "resolve", "--cycle", str(i), "--id",
+                    f"C{i-1:02d}-F01",
+                    "--evidence", "repaired and demonstrated in this cycle")
+            led(root, "raise", "--cycle", str(i), "--id", f"C{i:02d}-F01",
+                "--class", "UNTESTED RULE")
+            led(root, "respond", "--cycle", str(i), "--id", f"C{i:02d}-F01",
+                "--disposition", "ACCEPT", "--note", "will repair next cycle")
+        return n
+
+    built = build_four(tfull)
 
     if built < 4:
         failures.append(f"fixture: only built {built} valid cycle(s), cannot "
@@ -504,6 +518,61 @@ def main() -> int:
         authorize(tfull, "STALLED")
         boundary("an authorization for a different exit does not reach the "
                  "budget", "")
+
+        # ---- B01-F02, the half cycle 04 found still open ----
+        # Everything above authorises at a boundary that already produces
+        # MAX_4_REACHED, so the unclearable list is what refuses and the budget
+        # is never the thing under test. Codex: "The named control tests a
+        # boundary that already produces MAX_4_REACHED. Its mismatched STALLED
+        # authorization does not exercise a boundary that actually produces
+        # STALLED."
+        #
+        # §6 evaluates STALLED before the budget. So a fourth boundary that
+        # genuinely stalls reports STALLED, never meets the unclearable list,
+        # and a matching authorisation used to clear it straight into CONTINUE
+        # with the ceiling never consulted. The controller told the operator to
+        # open a fifth cycle while the runner refused to.
+        tstall = make_repo(); made.append(tstall)
+        do_init(tstall)
+        if build_four(tstall, stall_last=True) < 4:
+            failures.append("fixture: could not build four valid cycles with a "
+                            "stalled fourth, so the ceiling is untested against "
+                            "a clearable exit")
+        else:
+            _pre = loop_status(tstall)
+            if "LOOP_STATUS: STALLED" not in (_pre.stdout + _pre.stderr):
+                failures.append(
+                    "fixture: boundary 4 does not actually STALL, so "
+                    "authorising STALLED there\n      tests nothing\n"
+                    f"      {(_pre.stdout + _pre.stderr).strip()[-200:]}")
+            else:
+                print("  [ok] a fourth boundary that reduces nothing reports "
+                      "STALLED, not MAX_4_REACHED")
+                authorize(tstall, "STALLED", 4)
+                c = loop_status(tstall)
+                cb = c.stdout + c.stderr
+                f = do_freeze(tstall)
+                fb = f.stdout + f.stderr
+                if "LOOP_STATUS: CONTINUE" in cb:
+                    failures.append(
+                        "a matching authorization cleared STALLED at the "
+                        "budget boundary and the\n      controller granted "
+                        "another cycle. The ceiling was never consulted, and "
+                        "the\n      runner refuses what the controller just "
+                        "permitted")
+                elif "LOOP_STATUS: MAX_4_REACHED" not in cb:
+                    failures.append(
+                        f"the cleared stall did not resolve to MAX_4_REACHED\n"
+                        f"      {cb.strip()[-240:]}")
+                elif f.returncode == 0:
+                    failures.append("a fifth cycle was frozen after a cleared "
+                                    "stall at the budget boundary")
+                elif "budget" not in fb:
+                    failures.append(f"freeze refused, but not for the budget\n"
+                                    f"      {fb.strip()[:240]}")
+                else:
+                    print("  [ok] clearing a real STALLED at the fourth "
+                          "boundary does not buy a fifth cycle")
 
     def prev_open(t: Path):
         do_init(t)

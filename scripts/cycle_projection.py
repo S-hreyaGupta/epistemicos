@@ -353,6 +353,19 @@ def last_authorized(history: list[dict], event: str,
     # Reopening is exactly when a fresh ACCEPT should be required: the finding
     # came back, and whoever accepts the new repair should have to say so.
     live: dict[str, dict] = {}
+    # B01-F11, the part cycle 04 found still open. This walked insertion order
+    # and asked only whether the state was OPEN, so an ACCEPT appended AFTER a
+    # reopening but carrying an EARLIER cycle number re-armed the finding.
+    # Codex's sequence, every command exiting 0: RAISED(1), ACCEPT(1),
+    # DEMONSTRATED(2), REOPENED(3), then ACCEPT(2) appended last, then
+    # DEMONSTRATED(4). Stored state RESOLVED, with no acceptance belonging to
+    # the reopening cycle or later.
+    #
+    # Insertion order says when a thing was written down. The cycle says which
+    # review it belongs to. A disposition has to answer the transition it
+    # follows, and one dated before the reopening answers a different question
+    # -- it was a response to the first repair, which the reopening spent.
+    reopened_at: int | None = None
     for e in history:
         c = e["cycle"]
         if not proj.authorizes(c):
@@ -365,8 +378,9 @@ def last_authorized(history: list[dict], event: str,
             state, accepted, applied = OPEN, False, True
             # A finding starting over carries nothing forward.
             live.clear()
+            reopened_at = None
         elif ev == "ACCEPT":
-            if state == OPEN:
+            if state == OPEN and (reopened_at is None or c >= reopened_at):
                 accepted, applied = True, True
         elif ev == "REJECT_WITH_REASON":
             if state == OPEN:
@@ -377,6 +391,7 @@ def last_authorized(history: list[dict], event: str,
         elif ev == "REOPENED":
             if state == RESOLVED:
                 state, accepted, applied = OPEN, False, True
+                reopened_at = c
                 # The acceptance and the demonstration it produced are both
                 # spent. Their events remain in the history and in `show`; they
                 # are simply no longer the prerequisite for anything.

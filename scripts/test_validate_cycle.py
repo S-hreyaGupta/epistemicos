@@ -82,6 +82,23 @@ def build(root: Path, commit: str, tree: str, kind: str = "plan",
     cycle = review / "cycle-01"
     cycle.mkdir(parents=True)
 
+    # B01-F07, the half cycle 04 found still open. Check 9 used to compare the
+    # target's governing digests with each other, so these fixtures needed no
+    # run at all. It now replays the run's pin history and requires the recorded
+    # set to be the one that history produces, which means the fixture has to
+    # own a run for its claims to be about.
+    #
+    # The pins here are the ones _governed() writes into the target. A fixture
+    # whose run disagreed with its own targets would make every control below
+    # fail for that reason instead of the one it names.
+    write_lf(root / "runs" / "T-001" / "run.json", json.dumps({
+        "run_id": "T-001",
+        "bootstrap_review": "APPROVED",
+        "mc1_enforcement": "CONVENTION_ONLY",
+        "protocol": {"path": "specs/protocol.md", "sha256": "a" * 64},
+        "spec_files": [{"path": "specs/spec.md", "sha256": "b" * 64}],
+    }, indent=2) + "\n")
+
     target = {
         "review_type": kind,
         "run_id": "T-001",
@@ -228,6 +245,60 @@ def main() -> int:
                 9, "plan", mutate=_governed("a" * 64, spec_hash="d" * 64))
     expect_fail("governing pins declared with no hashes to check them against",
                 9, "plan", mutate=_governed("a" * 64, drop_hashes=True))
+
+    # The two cycle 04 asked for. Codex: "The named negative controls change one
+    # assertion while retaining the other, leaving consistent false assertions
+    # untested." Every control above keeps a real pin set and breaks one field.
+    # Neither of these does. They make the whole governing set false and
+    # internally agreed, which is the target Codex built and the gate passed.
+    def _fabricated(target, cycle, root):
+        """Codex's reproduction: an invented set that agrees with itself."""
+        target["governing_pins"] = ["missing-protocol.md"]
+        target["governing_pin_hashes"] = {"missing-protocol.md": "not-a-hash"}
+        target["protocol_sha256"] = "not-a-hash"
+        target["spec_sha256"] = run_pins.spec_digest([])
+        return target
+
+    expect_fail("an invented governing set whose every field agrees with itself",
+                9, "plan", mutate=_fabricated)
+
+    # And the same shape with well formed digests, so the syntax check cannot be
+    # what catches it. Only replaying the run's history can: these are real
+    # looking hashes for a pin set this run never had. Without this control the
+    # repair could be nothing but the hex check and still look complete.
+    def _foreign(target, cycle, root):
+        target["governing_pins"] = ["specs/elsewhere.md"]
+        target["governing_pin_hashes"] = {"specs/elsewhere.md": "e" * 64}
+        target["protocol_sha256"] = "e" * 64
+        target["spec_sha256"] = run_pins.spec_digest([])
+        return target
+
+    expect_fail("a well formed governing set the run's history never produced",
+                9, "plan", mutate=_foreign)
+
+    # The one that isolates the history replay. Both controls above are also
+    # caught by the syntax check or by the protocol-identity check, so neither
+    # shows that replaying run.json does any work. This target declares the run's
+    # real protocol with its real digest, well formed hashes throughout, and a
+    # spec_sha256 correctly derived over its own contents. It is consistent in
+    # every way the old check could see. The only thing wrong with it is that the
+    # run never pinned specs/invented.md, which nothing but the run's own history
+    # can say.
+    def _extra_pin(target, cycle, root):
+        pins = {"specs/protocol.md": "a" * 64,
+                "specs/spec.md": "b" * 64,
+                "specs/invented.md": "c" * 64}
+        target["governing_pins"] = sorted(pins)
+        target["governing_pin_hashes"] = pins
+        target["protocol_sha256"] = "a" * 64
+        target["spec_sha256"] = run_pins.spec_digest(
+            [{"path": "specs/spec.md", "sha256": "b" * 64},
+             {"path": "specs/invented.md", "sha256": "c" * 64}])
+        return target
+
+    expect_fail("a governing set carrying a spec the run never pinned, "
+                "self-consistent in every other way", 9, "plan",
+                mutate=_extra_pin)
 
     # And the historical case, which must NOT fail. Cycles 01 and 02 of
     # BOOTSTRAP-001 were frozen before governing_pin_hashes existed. Failing

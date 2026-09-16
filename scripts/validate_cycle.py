@@ -212,6 +212,116 @@ def _hash_of_declared_file(target: dict, hash_field: str, path_field: str,
     return True, f"{rel} (live; no preserved copy)"
 
 
+_HEX64 = re.compile(r"[0-9a-f]{64}\Z")
+
+
+def _governing_problems(target: dict, gph: dict, run_dir: Path) -> list[str]:
+    """Check 9's governing digests, against the run rather than themselves.
+
+    B01-F07, the half cycle 04 found still open. The previous version compared
+    the target's assertions with each other: protocol_sha256 had to equal the
+    recorded hash of SOME governing pin, and spec_sha256 had to be the digest
+    over the rest. Codex wrote a target whose governing set was one file,
+    `missing-protocol.md`, which does not exist, carrying the literal
+    "not-a-hash", with protocol_sha256 set to the same string and spec_sha256
+    set to the digest over the resulting empty remainder. Every comparison
+    agreed. Check 9 passed and MC-2 returned PASS.
+
+    Two separate things were wrong.
+
+    Nothing validated the syntax, so a value that is not a digest at all was a
+    usable digest. And which pin counted as the protocol was INFERRED from the
+    field under test: the old `_owner` picked whichever entry's hash equalled
+    protocol_sha256, so the check asked its answer to identify itself. An
+    invented set satisfies both conditions as easily as a real one, which is
+    why the existing controls stayed green — each changed one assertion and
+    kept the other, and none made the whole set false together.
+
+    The comment this replaces said that verifying against run.json and the
+    amendment history "would make MC-2 depend on run-level state it does not
+    currently read. That is a larger change than this finding, and it is not
+    claimed here." Cycle 04 is the finding that says do it. The gate now reads
+    the run's own record, replays the pin history for this cycle, and requires
+    the recorded set to be the one the run actually produced. The protocol is
+    the path the RUN declares, not the entry that happens to match.
+
+    The syntax check below is not load-bearing and is not claimed to be. Any
+    value that is not a digest also fails the identity or history comparison,
+    because it cannot equal a real hash. It earns its place by failing early
+    with a message that names the problem, rather than reporting a mismatch and
+    leaving the reader to notice that one side was never a digest at all.
+
+    Still not established, said plainly: this checks the digests against the
+    run's history, not the bytes on disk against the digests. An artifact could
+    be edited after freeze and both records would still agree. Under
+    MC1_ENFORCEMENT: CONVENTION_ONLY that remains detection of record drift and
+    is not a statement about the files.
+    """
+    bad = sorted(f"{p}: {h!r}" for p, h in gph.items()
+                 if not _HEX64.match(str(h)))
+    bad += [f"{f}: {target.get(f)!r}" for f in ("protocol_sha256", "spec_sha256")
+            if not _HEX64.match(str(target.get(f, "")))]
+    if bad:
+        return ["governing digests that are not digests:\n      "
+                + "\n      ".join(bad) +
+                "\n      A digest is 64 lowercase hex characters. Anything else "
+                "names no artifact, and\n      two such values agreeing with "
+                "each other establishes nothing at all."]
+
+    run_json = run_dir / "run.json"
+    if not run_json.is_file():
+        return [f"the governing digests have nothing independent to be checked "
+                f"against:\n      {run_json} does not exist.\n"
+                "      A cycle's governing set is a claim about its run. "
+                "Without the run's own\n      record the claim can only be "
+                "compared with itself, which is the defect this\n      check "
+                "was rewritten to stop."]
+    try:
+        run = json.loads(run_json.read_text(encoding="utf-8"))
+        items = run_pins.load_amendments(run_dir)
+        expect = run_pins.pin_hashes_for_cycle(run, items, int(target["cycle"]))
+        declared = str(run["protocol"]["path"])
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError,
+            run_pins.PinError) as e:
+        return [f"the run's pin history cannot be replayed, so this cycle's "
+                f"governing digests\n      cannot be checked: {e}"]
+
+    if dict(gph) != dict(expect):
+        only_here = sorted(set(gph) - set(expect))
+        only_run = sorted(set(expect) - set(gph))
+        moved = sorted(p for p in set(gph) & set(expect) if gph[p] != expect[p])
+        detail = []
+        if only_here:
+            detail.append("recorded but not in the run's history: "
+                          + ", ".join(only_here))
+        if only_run:
+            detail.append("in the run's history but not recorded: "
+                          + ", ".join(only_run))
+        for p in moved:
+            detail.append(f"{p}\n        recorded {gph[p]}\n        "
+                          f"history  {expect[p]}")
+        return ["the governing set this cycle records is not the one the run's "
+                "history produces\n      for cycle "
+                f"{target.get('cycle')}:\n      " + "\n      ".join(detail)]
+
+    if str(gph.get(declared, "")) != str(target.get("protocol_sha256", "")):
+        return [f"protocol_sha256 is not the digest of the artifact this run "
+                f"declares as its\n      protocol:\n        {declared}\n"
+                f"        run history  {gph.get(declared)!r}\n"
+                f"        target says  {target.get('protocol_sha256')!r}\n"
+                "      Which pin is the protocol comes from the run, not from "
+                "whichever entry\n      happens to match the field being "
+                "checked."]
+
+    rest = [{"path": p, "sha256": h} for p, h in gph.items() if p != declared]
+    want = run_pins.spec_digest(rest)
+    if str(target.get("spec_sha256", "")) != want:
+        return [f"spec_sha256 does not describe this cycle's governing set\n"
+                f"      recorded {target.get('spec_sha256')!r}\n"
+                f"      derived  {want!r} over {len(rest)} non-protocol pin(s)"]
+    return []
+
+
 def validate(cycle_dir: Path, repo_root: Path) -> Result:
     r = Result()
 
@@ -338,22 +448,7 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
             "governing_pin_hashes, so the protocol and spec digests it states "
             "cannot be checked against anything")
     else:
-        _p = str(target.get("protocol_sha256", ""))
-        _owner = [path for path, h in _gph.items() if h == _p]
-        if not _owner:
-            problems.append(
-                f"protocol_sha256 {_p!r} is not the recorded hash of any "
-                f"governing pin in this cycle")
-        else:
-            _rest = [{"path": path, "sha256": h} for path, h in _gph.items()
-                     if path != _owner[0]]
-            _want = run_pins.spec_digest(_rest)
-            if str(target.get("spec_sha256", "")) != _want:
-                problems.append(
-                    f"spec_sha256 does not describe this cycle's governing set\n"
-                    f"      recorded {target.get('spec_sha256')!r}\n"
-                    f"      derived  {_want!r} over {len(_rest)} non-protocol "
-                    f"pin(s)")
+        problems += _governing_problems(target, _gph, cycle_dir.parent.parent)
 
     if rtype == "plan":
         files = target.get("plan_files")

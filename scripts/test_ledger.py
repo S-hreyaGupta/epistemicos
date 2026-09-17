@@ -106,8 +106,32 @@ def make_cycle(root: Path, review: Path, n: int, commit: str, valid: bool = True
         write_lf(c / "codex-output-raw.md", "")
 
 
+# Fixture-validity audit, Alex Zamurko 16 September: "each negative control
+# should first establish that its fixture satisfies all prerequisites except the
+# single condition it intends to violate."
+#
+# The failure this closes, twice observed on 17 September. A scenario builds its
+# fixture by calling the ledger a few times and ignoring what comes back, then
+# asserts a loop state. When those calls started failing — a newly required
+# argument, in that instance — the ledger stayed empty, the loop correctly
+# reported CONVERGED over nothing, and five controls reported a wrong exit code
+# rather than a broken fixture. The controls were pointing at the right defect
+# class and naming the wrong defect.
+#
+# So during fixture construction every ledger call is required to succeed. This
+# does not make the fixtures correct; it makes a fixture that failed to build
+# say so instead of being quietly asserted over.
+_FIXTURE_STRICT = False
+_FIXTURE_ERRORS: list[str] = []
+
+
 def ledger(root: Path, *args: str) -> subprocess.CompletedProcess:
-    return sh(sys.executable, str(root / "scripts" / "ledger.py"), *args, cwd=root)
+    r = sh(sys.executable, str(root / "scripts" / "ledger.py"), *args, cwd=root)
+    if _FIXTURE_STRICT and r.returncode != 0:
+        _FIXTURE_ERRORS.append(
+            f"{' '.join(args[:2])} exited {r.returncode}: "
+            + (r.stderr + r.stdout).strip().splitlines()[0][:160])
+    return r
 
 
 def loop(root: Path, review: Path) -> subprocess.CompletedProcess:
@@ -992,13 +1016,36 @@ def main() -> int:
     print()
     print("loop controller")
 
+    def build(label: str, script, root: Path, rev: Path) -> bool:
+        """Run a scenario's fixture script and require it to have worked.
+
+        Returns False if it did not, having already recorded why. The caller
+        must not then assert anything: an assertion over a fixture that failed
+        to build tests the failure, not the property.
+        """
+        global _FIXTURE_STRICT
+        _FIXTURE_ERRORS.clear()
+        _FIXTURE_STRICT = True
+        try:
+            script(root, rev)
+        finally:
+            _FIXTURE_STRICT = False
+        if _FIXTURE_ERRORS:
+            failures.append(
+                f"{label}: the fixture did not build, so whatever this control "
+                "reports is about the fixture:\n      "
+                + "\n      ".join(_FIXTURE_ERRORS))
+            return False
+        return True
+
     def scenario(label: str, n_cycles: int, script, expect: str,
                  invalid: set[int] | None = None) -> None:
         root, commit, rev = fresh()
         rev.mkdir(parents=True)
         for i in range(1, n_cycles + 1):
             make_cycle(root, rev, i, commit, valid=(i not in (invalid or set())))
-        script(root, rev)
+        if not build(label, script, root, rev):
+            return
         r = loop(root, rev)
         got = status_of(r.stdout)
         if got != expect:
@@ -1018,7 +1065,8 @@ def main() -> int:
         rev.mkdir(parents=True)
         for i in range(1, n_cycles + 1):
             make_cycle(root, rev, i, commit, valid=(i not in (invalid or set())))
-        script(root, rev)
+        if not build(label, script, root, rev):
+            return
         r = loop(root, rev)
         missing = [n for n in needles if n not in r.stdout]
         if missing:
@@ -1040,7 +1088,12 @@ def main() -> int:
         rev.mkdir(parents=True)
         for i in range(1, n_cycles + 1):
             make_cycle(root, rev, i, commit, valid=(i not in (invalid or set())))
-        script(root, rev)
+        # This one most of all. It asserts an absence, and an empty fixture
+        # satisfies an absence perfectly: nothing was built, so nothing is
+        # mentioned, so the control passes. A check that cannot come back false
+        # is the defect class this whole review keeps finding.
+        if not build(label, script, root, rev):
+            return
         r = loop(root, rev)
         present = [n for n in needles if n in r.stdout]
         if present:
@@ -1055,7 +1108,8 @@ def main() -> int:
         rev.mkdir(parents=True)
         for i in range(1, n_cycles + 1):
             make_cycle(root, rev, i, commit, valid=(i not in (invalid or set())))
-        script(root, rev)
+        if not build(label, script, root, rev):
+            return
         r = loop(root, rev)
         if r.returncode != 2 or needle not in (r.stderr + r.stdout):
             failures.append(f"{label}: expected exit 2 mentioning {needle!r}, "
@@ -1072,6 +1126,44 @@ def main() -> int:
     def one_open(root, rev):
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
                "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
+
+    # ---- the fixture guard itself ----
+    # Two-sided, because a guard that never fires and a guard that always fires
+    # are equally useless and only one of them is obvious. `nothing` is a
+    # legitimate fixture that issues no ledger calls at all, so the quiet side
+    # is checked against a scenario that is genuinely supposed to be empty.
+    global _FIXTURE_STRICT
+    _probe_root, _probe_commit, _probe_rev = fresh()
+    _probe_rev.mkdir(parents=True)
+
+    _FIXTURE_ERRORS.clear()
+    _FIXTURE_STRICT = True
+    try:
+        ledger(_probe_root, "raise", "--review", str(_probe_rev), "--cycle", "1",
+               "--id", "C01-F01", "--class", "UNTESTED RULE",
+               "--source", "CODEX_REVIEW")
+        _quiet = list(_FIXTURE_ERRORS)
+        ledger(_probe_root, "raise", "--review", str(_probe_rev), "--cycle", "1",
+               "--id", "C01-F02", "--class", "NOT ONE OF THE SIX",
+               "--source", "CODEX_REVIEW")
+        _noisy = list(_FIXTURE_ERRORS)
+    finally:
+        _FIXTURE_STRICT = False
+        _FIXTURE_ERRORS.clear()
+
+    if _quiet:
+        failures.append(
+            f"the fixture guard fired on a ledger call that succeeded: {_quiet}. "
+            "A guard that reports every fixture as broken stops anyone reading "
+            "it.")
+    elif not _noisy:
+        failures.append(
+            "the fixture guard did not fire on a ledger call that failed. Every "
+            "scenario below trusts it to notice, and a fixture that fails to "
+            "build would once again be asserted over rather than reported.")
+    else:
+        print("  [ok] the fixture guard is quiet on success and fires on "
+              "failure")
 
     scenario("no findings at all", 1, nothing, "CONVERGED")
 

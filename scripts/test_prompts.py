@@ -522,9 +522,17 @@ def main() -> int:
             # Applied to the current prompt only. An earlier cycle's prompt is a
             # record of what was reviewed then, and grading it against files that
             # did not exist yet would demand it name the future.
+            #
+            # "Current" is the latest cycle of the latest RUN, not the highest
+            # cycle number. Those were the same sentence until 17 September and
+            # stopped being one the moment a second run existed: BOOTSTRAP-002's
+            # cycle 01 is newer than BOOTSTRAP-001's cycle 04 and sorts below it
+            # on cycle number alone. The first BOOTSTRAP-002 prompt was written,
+            # this check ran green, and what it had graded was a prompt frozen
+            # the day before. Third instance of one rule that was correct while
+            # there was one run, after frozen_input and the finding-ID letter.
             numbered = sorted(
-                (int(mm.group(1)), b) for b in boots
-                for mm in [re.search(r"cycle-(\d+)\.md$", b.name)] if mm)
+                (refresh_counts.run_and_cycle_for_prompt(b), b) for b in boots)
             current = numbered[-1][1] if numbered else boot
             try:
                 covered_now = sorted(m_.covered(REPO))

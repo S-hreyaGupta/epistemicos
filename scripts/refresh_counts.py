@@ -58,14 +58,83 @@ SUITES = ("test_validate_cycle", "test_run_review", "test_ledger",
           "test_bootstrap_gate", "test_interfaces")
 
 
-def cycle_for_prompt(p: Path) -> int:
-    """Which review cycle a bootstrap prompt was written for.
+# Three shapes, because the first run predates there being a second:
+#
+#   bootstrap-review.md                    BOOTSTRAP-001, cycle 01
+#   bootstrap-review-cycle-NN.md           BOOTSTRAP-001, cycle NN
+#   bootstrap-review-RRR-cycle-NN.md       BOOTSTRAP-RRR,  cycle NN
+#
+# The run segment is required to be three digits so that it cannot be confused
+# with the cycle segment of the second form, which is two.
+PROMPT_NAME = re.compile(
+    r"^bootstrap-review(?:-(?P<run>\d{3}))?(?:-cycle-(?P<cycle>\d{2}))?\.md$")
 
-    The unnumbered `bootstrap-review.md` is cycle 01's; the rest say so in the
-    filename.
+
+def run_and_cycle_for_prompt(p: Path) -> tuple[str, int]:
+    """Which run and which cycle a bootstrap prompt was written for.
+
+    The run half of this did not exist until 16 September, and its absence was
+    not visible while there was only one run to be wrong about. `frozen_input`
+    globbed `runs/*/`, so it answered "which run has a cycle with this number",
+    not "which run is this prompt's". With one run those are the same sentence.
+
+    With two they are not. A prompt written for BOOTSTRAP-002 cycle 01 would
+    have matched BOOTSTRAP-001's cycle-01 input, been declared frozen, and never
+    received today's control counts — so it would have gone to a reviewer
+    stating the counts of a different run's first cycle, and `test_prompts.py`
+    would have confirmed it against that same wrong input, because it asks this
+    module rather than deciding for itself.
+
+    Two checks agreeing while both read the wrong run. That is the shape this
+    file's own docstring is about, one axis over.
     """
-    m = re.search(r"bootstrap-review-cycle-(\d+)\.md$", p.name)
-    return int(m.group(1)) if m else 1
+    m = PROMPT_NAME.match(p.name)
+    if not m:
+        # Not a name this function can read. Returning a guess here is how the
+        # above happened, so it refuses instead.
+        raise ValueError(
+            f"{p.name} is not a bootstrap prompt name this tool can attribute "
+            f"to a run and cycle. Expected one of:\n"
+            f"    bootstrap-review.md\n"
+            f"    bootstrap-review-cycle-NN.md\n"
+            f"    bootstrap-review-RRR-cycle-NN.md")
+    run = f"BOOTSTRAP-{m.group('run') or '001'}"
+    cycle = int(m.group("cycle") or 1)
+    return run, cycle
+
+
+def cycle_for_prompt(p: Path) -> int:
+    """Which review cycle a bootstrap prompt was written for."""
+    return run_and_cycle_for_prompt(p)[1]
+
+
+# The Finding ID prefix letter each bootstrap run raises under.
+#
+# This is a convention, not a derivation, and it is written down here rather
+# than inferred so that it is one decision in one place. `B` was never defined
+# as "run one"; it meant "bootstrap", and the two digits after it are the cycle.
+# With a second run that reading stops being enough: BOOTSTRAP-002 cycle 01
+# would also raise B01-Fnn, and while the two ledgers are separate files and
+# would each accept it, the identifiers do not stay in the ledgers. They are
+# quoted in the handover, the cycle summaries and Slack, where nothing carries
+# the run alongside them and B01-F02 would name two different defects.
+#
+# The ledger itself is indifferent: check_id takes the grammar from the schema,
+# which permits up to two letters, and validates only that the digits match the
+# cycle. So this constrains the prompts, not the recording.
+RUN_LETTER = {
+    "BOOTSTRAP-001": "B",
+    "BOOTSTRAP-002": "C",
+}
+
+
+def letter_for_run(run: str) -> str | None:
+    """The prefix letter for a run, or None if the run has not been given one.
+
+    None rather than a computed default: a letter invented at read time is a
+    second convention, and the point of the table above is that there is one.
+    """
+    return RUN_LETTER.get(run)
 
 
 def frozen_input(p: Path) -> Path | None:
@@ -86,10 +155,9 @@ def frozen_input(p: Path) -> Path | None:
     present is the same act as backdating an amendment: it makes the record
     describe now rather than then.
     """
-    n = cycle_for_prompt(p)
-    for ci in sorted(REPO.glob(f"runs/*/plan-review/cycle-{n:02d}/codex-input.md")):
-        return ci
-    return None
+    run, n = run_and_cycle_for_prompt(p)
+    ci = REPO / "runs" / run / "plan-review" / f"cycle-{n:02d}" / "codex-input.md"
+    return ci if ci.is_file() else None
 
 
 def main() -> int:
@@ -128,7 +196,16 @@ def main() -> int:
     changed = []
     kept: list[str] = []
     for p in sorted((REPO / "specs" / "prompts").glob("bootstrap-review*.md")):
-        ci = frozen_input(p)
+        # A name this tool cannot attribute to a run is not a name it may
+        # rewrite. Treating it as unfrozen would edit a prompt on a guess, and
+        # the guess it used to make silently was "cycle 01 of whichever run
+        # sorts first".
+        try:
+            ci = frozen_input(p)
+        except ValueError as e:
+            print()
+            print(f"NOT WRITING. {e}")
+            return 1
         if ci is not None:
             kept.append(f"{p.name} (cycle {cycle_for_prompt(p):02d} is frozen)")
             continue

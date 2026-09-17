@@ -315,7 +315,14 @@ def main() -> int:
         live = 0
         for name, claimed in sorted(claims.items()):
             wrong = []
-            ci = refresh_counts.frozen_input(PROMPTS / name)
+            # An unattributable name is a finding, not a crash. A crash here
+            # reports no FAIL line, and a grep for failures would read clean.
+            try:
+                ci = refresh_counts.frozen_input(PROMPTS / name)
+            except ValueError as e:
+                any_wrong = True
+                failures.append(str(e))
+                continue
             if ci is not None:
                 was = {f"scripts/{m}": int(n) for m, n in re.findall(
                     r"scripts/(\w+\.py)\s+(\d+)\s+controls",
@@ -388,11 +395,35 @@ def main() -> int:
             m_cycle = re.search(r"cycle-(\d+)\.md$", b.name)
             if not m_cycle:
                 continue
-            n_cycle = int(m_cycle.group(1))
-            grammars = set(re.findall(r"Finding ID: ([A-Z]\d{2})-F\d{2}",
+            # The run as well as the cycle. This read the cycle out of the
+            # filename and hardcoded the letter as `B`, which was right for as
+            # long as `B` and "the only bootstrap run" were the same thing. A
+            # BOOTSTRAP-002 prompt would have failed this check for using the
+            # letter its own run raises under.
+            b_run, n_cycle = refresh_counts.run_and_cycle_for_prompt(b)
+            letter = refresh_counts.letter_for_run(b_run)
+            if letter is None:
+                failures.append(
+                    f"{b.name} belongs to {b_run}, which has no Finding ID "
+                    "prefix letter in refresh_counts.RUN_LETTER. Give it one "
+                    "there rather than letting this check guess, or two runs "
+                    "will raise findings under the same identifiers.")
+                continue
+            grammars = set(re.findall(r"Finding ID: ([A-Z]{1,2}\d{2})-F\d{2,3}",
                                       b.read_text(encoding="utf-8")))
-            expected = f"B{n_cycle:02d}"
+            expected = f"{letter}{n_cycle:02d}"
             stray = sorted(g for g in grammars if g != expected)
+            # Only identifiers from this run's own letter can be "a later
+            # cycle". An identifier under a different letter belongs to a
+            # different run, and BOOTSTRAP-002's first prompt necessarily names
+            # several of BOOTSTRAP-001's: its whole purpose is the five findings
+            # that run could not close. Comparing their cycle digits against
+            # this run's cycle number would read B02-F04 as cycle 2 of this run
+            # and fail a correct prompt.
+            def _cycle_of(g: str) -> int:
+                return int(re.sub(r"^[A-Z]{1,2}", "", g))
+
+            same_run = [g for g in stray if re.sub(r"\d+$", "", g) == letter]
             # A prompt may legitimately show an earlier identifier when telling
             # the reviewer how to report an unrepaired finding against its
             # persistent id, so this only fails on a LATER or absent one.
@@ -401,10 +432,10 @@ def main() -> int:
                     f"{b.name} never shows the {expected}-Fnn identifier its "
                     "cycle requires, so findings raised from it would be refused "
                     "by the ledger")
-            elif any(int(g[1:]) > n_cycle for g in stray):
+            elif any(_cycle_of(g) > n_cycle for g in same_run):
                 failures.append(
-                    f"{b.name} shows identifiers from a later cycle: "
-                    f"{', '.join(stray)}")
+                    f"{b.name} shows identifiers from a later cycle of its own "
+                    f"run: {', '.join(g for g in same_run if _cycle_of(g) > n_cycle)}")
             else:
                 ok(f"{b.name} uses the finding-ID grammar its cycle requires")
 

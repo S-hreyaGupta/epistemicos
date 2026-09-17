@@ -82,11 +82,30 @@ B03-F02, about that run's cycle-02 prompt, and was right to.
 
 ## What you are reviewing
 
-Ten artifacts, hashed and listed in `target.json`. The same ten as
-BOOTSTRAP-001's cycles 02 to 04.
+**Nine artifacts**, hashed and listed in `target.json`. BOOTSTRAP-001's cycles
+02 to 04 reviewed ten. The tenth is `specs/evidence-schema-v1.0.md`, and it is
+absent here deliberately.
+
+`run_pins.py` opens with the rule: *which artifacts govern a run, and which are
+under review. Never both.* That is Alex Zamurko's Run-Pin and Review-Target
+Separation Specification of 10 September, whose governing invariant is that no
+review process may require an artifact to remain byte-invariant for the duration
+of a run while simultaneously requiring that same version to change in order to
+resolve findings. It was written because BOOTSTRAP-001 required exactly that of
+the schema.
+
+This run pins the schema as its governing spec, so this cycle cannot review it.
+**Cycle 02 will, under a pin amendment that moves it between roles**, which is
+what `pin-amendments.json` and `pins_for_cycle` exist for.
+
+Two consequences worth stating rather than discovering. The gate's covered set
+is ten, so no approval resting on this run alone can claim the schema was
+reviewed — that needs cycle 02. And the schema's current bytes have been
+reviewed by nobody: BOOTSTRAP-001 pinned `98a5920d…` and this run pins
+`4203ba64…`, so it was amended after the first run froze and no cycle has seen
+the version in the tree today.
 
 ```text
-specs/evidence-schema-v1.0.md   the frozen evidence structure
 scripts/validate_cycle.py       the MC-2 conformance gate, fifteen checks
 scripts/run_review.py           the review runner
 scripts/ledger.py               the finding and state ledger
@@ -102,8 +121,9 @@ scripts/run_pins.py             which artifacts govern a run, and which are
                                 under review
 ```
 
-The covered set is read from `bootstrap_gate.covered()` rather than asserted
-from memory. It is ten.
+The gate's covered set is read from `bootstrap_gate.covered()` rather than
+asserted from memory. It is ten, and all ten are named in this document. Nine of
+them are in this cycle's target; the tenth is the governing spec, as above.
 
 ### The control suites are auxiliary evidence, not members of the target
 

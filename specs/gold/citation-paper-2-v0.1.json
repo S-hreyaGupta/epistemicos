@@ -57,7 +57,7 @@
       "as_annotated": "Gualandris et al., 2024"
     },
     {
-      "author_phrase": "muñoz and branzei",
+      "author_phrase": "munoz and branzei",
       "year": "2021",
       "as_annotated": "Muñoz and Branzei, 2021"
     },
@@ -82,7 +82,7 @@
       "as_annotated": "Pagell and Wu, 2009"
     },
     {
-      "author_phrase": "seuring and müller",
+      "author_phrase": "seuring and muller",
       "year": "2008",
       "as_annotated": "Seuring and Müller, 2008"
     },
@@ -147,7 +147,7 @@
       "as_annotated": "FAO, 2018"
     },
     {
-      "author_phrase": "muñoz and branzei",
+      "author_phrase": "munoz and branzei",
       "year": "2011",
       "as_annotated": "Muñoz and Branzei, 2011"
     },
@@ -177,7 +177,7 @@
       "as_annotated": "Sauer and Seuring, 2023"
     },
     {
-      "author_phrase": "ateş and luzzini",
+      "author_phrase": "ates and luzzini",
       "year": "2024",
       "as_annotated": "Ateş and Luzzini, 2024"
     },
@@ -197,7 +197,7 @@
       "as_annotated": "Kliem and Sievers-Glotzbach, 2022"
     },
     {
-      "author_phrase": "boissière et al.",
+      "author_phrase": "boissiere et al.",
       "year": "2020",
       "as_annotated": "Boissière et al., 2020"
     },
@@ -332,7 +332,7 @@
       "as_annotated": "Makino et al., 2020"
     },
     {
-      "author_phrase": "sanz-cañada et al.",
+      "author_phrase": "sanz-canada et al.",
       "year": "2023",
       "as_annotated": "Sanz-Cañada et al., 2023"
     },
@@ -372,7 +372,7 @@
       "as_annotated": "Valencia et al., 2019"
     },
     {
-      "author_phrase": "hervé et al.",
+      "author_phrase": "herve et al.",
       "year": "2020",
       "as_annotated": "Hervé et al., 2020"
     },
@@ -492,7 +492,7 @@
       "as_annotated": "Brix-Asala et al., 2021"
     },
     {
-      "author_phrase": "sancha, longoni and giménez",
+      "author_phrase": "sancha, longoni and gimenez",
       "year": "2015",
       "as_annotated": "Sancha, Longoni and Giménez, 2015"
     },
@@ -527,6 +527,12 @@
       "as_annotated": "Stathatou et al., 2023"
     }
   ],
+  "verified_against_manuscript": {
+    "text_sha256": "dcc60ce90fb80e00e63fa57a527f074db10730fbca1bab5dbaca503dd3ba5b3b",
+    "checked": 102,
+    "not_found": [],
+    "means": "each annotated first author appears within 140 characters of its year somewhere in the manuscript. It establishes that the annotation was not invented. It does not establish that the annotation is complete — a citation nobody wrote down is invisible to this check and is exactly what recall is for."
+  },
   "excluded_no_year": [
     "Speich (no year given)"
   ]

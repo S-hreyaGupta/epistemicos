@@ -72,7 +72,7 @@
       "as_annotated": "Roberts, 2003"
     },
     {
-      "author_phrase": "fontana and egels-zandén",
+      "author_phrase": "fontana and egels-zanden",
       "year": "2019",
       "as_annotated": "Fontana and Egels-Zandén, 2019"
     },
@@ -87,7 +87,7 @@
       "as_annotated": "Lu and Shang, 2017"
     },
     {
-      "author_phrase": "kolaczyk and csárdi",
+      "author_phrase": "kolaczyk and csardi",
       "year": "2014",
       "as_annotated": "Kolaczyk and Csárdi, 2014"
     },
@@ -417,7 +417,7 @@
       "as_annotated": "Darnall et al., 2009"
     },
     {
-      "author_phrase": "kölbel et al.",
+      "author_phrase": "kolbel et al.",
       "year": "2017",
       "as_annotated": "Kölbel et al., 2017"
     },
@@ -471,5 +471,11 @@
       "year": "2019b",
       "as_annotated": "Sharma et al., 2019b"
     }
-  ]
+  ],
+  "verified_against_manuscript": {
+    "text_sha256": "71e90ba5d9ed099adb642e2ba6aec47fe9ae86521635e73fdcf239508c2fd805",
+    "checked": 91,
+    "not_found": [],
+    "means": "each annotated first author appears within 140 characters of its year somewhere in the manuscript. It establishes that the annotation was not invented. It does not establish that the annotation is complete — a citation nobody wrote down is invisible to this check and is exactly what recall is for."
+  }
 }

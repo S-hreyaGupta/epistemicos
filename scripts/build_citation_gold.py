@@ -72,13 +72,37 @@ CORPUS_ID = {"paper-1": "ad1e3ff9", "paper-2": "c1d56945"}
 
 YEAR = re.compile(r"\b((?:1[89]|20)\d{2}[a-z]?(?:,[a-z])*)\b")
 
+# Written as a literal rather than with \b after the optional period. The
+# obvious `\bet\s*al\.?\b` cannot match "et al." at all: after the "." the next
+# character is a space, and two non-word characters give no boundary, so it
+# strips "et al" and leaves a stray period behind. The first version of the
+# verification below did that and reported 79 of 193 annotated citations
+# missing from manuscripts that contained every one of them.
+ET_AL = re.compile(r"\bet\s*al\b\.?")
+
+
+def flatten(s: str) -> str:
+    """Case, accents and whitespace removed; nothing else.
+
+    Manuscript text extracted from a PDF breaks names across lines and pages,
+    so a search for an author has to be done against text whose line structure
+    has been collapsed. `grep` on the raw extraction finds nothing for exactly
+    this reason and would suggest the annotation was wrong.
+    """
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def first_author(phrase: str) -> str:
+    a = ET_AL.sub("", flatten(phrase))
+    a = re.split(r"\band\b|&", a)[0]
+    return a.strip().strip(".,;").strip()
+
 
 class Refused(Exception):
     pass
-
-
-def norm(s: str) -> str:
-    return re.sub(r"\s+", " ", s).strip().lower()
 
 
 def split_citation(raw: str) -> tuple[str, str] | None:
@@ -104,7 +128,23 @@ def main() -> int:
     ap.add_argument("--out", default="specs/gold")
     ap.add_argument("--annotator", default="Alex Zamurko and Mohit")
     ap.add_argument("--annotated", default="2026-09-17")
+    ap.add_argument("--verify-against", action="append", default=[],
+                    metavar="PAPER=TEXTFILE",
+                    help="e.g. paper-1=/tmp/paper-1.txt — check every "
+                         "annotated citation appears in the manuscript")
     a = ap.parse_args()
+
+    verify: dict[str, Path] = {}
+    for spec in a.verify_against:
+        if "=" not in spec:
+            raise Refused(f"--verify-against wants PAPER=TEXTFILE, got {spec!r}")
+        k, v = spec.split("=", 1)
+        if k not in LAYOUT:
+            raise Refused(f"unknown paper {k!r}; expected one of {list(LAYOUT)}")
+        p = Path(v).resolve()
+        if not p.is_file():
+            raise Refused(f"manuscript text not found: {p}")
+        verify[k] = p
 
     try:
         import openpyxl
@@ -141,7 +181,7 @@ def main() -> int:
                 no_year.append(s)
                 continue
             author, year = parsed
-            k = (norm(author), year)
+            k = (flatten(author), year)
             if k in seen:
                 # The annotation is a list of distinct works; a repeat is the
                 # annotator's, and collapsing it silently would understate the
@@ -150,7 +190,7 @@ def main() -> int:
                 continue
             seen[k] = 1
             items.append({
-                "author_phrase": norm(author),
+                "author_phrase": flatten(author),
                 "year": year,
                 "as_annotated": s,
             })
@@ -174,6 +214,29 @@ def main() -> int:
             "reference_list_entries": len(raw_ref),
             "items": items,
         }
+        if paper in verify:
+            text = flatten(verify[paper].read_text(encoding="utf-8",
+                                                   errors="replace"))
+            absent = [it["as_annotated"] for it in items
+                      if not re.search(re.escape(first_author(it["author_phrase"]))
+                                       + r".{0,140}?" + it["year"][:4],
+                                       text, re.S)]
+            doc["verified_against_manuscript"] = {
+                "text_sha256": hashlib.sha256(
+                    verify[paper].read_bytes()).hexdigest(),
+                "checked": len(items),
+                "not_found": absent,
+                "means": "each annotated first author appears within 140 "
+                         "characters of its year somewhere in the manuscript. "
+                         "It establishes that the annotation was not invented. "
+                         "It does not establish that the annotation is "
+                         "complete — a citation nobody wrote down is invisible "
+                         "to this check and is exactly what recall is for.",
+            }
+            summary.append(f"      verified against manuscript: "
+                           f"{len(items) - len(absent)}/{len(items)} found"
+                           + (f", MISSING {absent}" if absent else ""))
+
         if no_year:
             doc["excluded_no_year"] = no_year
         dupes = {f"{k[0]}|{k[1]}": n for k, n in seen.items() if n > 1}

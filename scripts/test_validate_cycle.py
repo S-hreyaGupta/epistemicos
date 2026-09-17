@@ -178,7 +178,26 @@ def main() -> int:
         made.append(root)
         return root, commit, tree
 
-    def expect_fail(label: str, check: int, kind: str, mutate=None, **kw) -> None:
+    def expect_fail(label: str, check: int, kind: str, mutate=None,
+                    also: tuple[int, ...] = (), **kw) -> None:
+        """One mutation, one red check.
+
+        Fixture-validity audit, Alex Zamurko 16 September: "each negative
+        control should first establish that its fixture satisfies all
+        prerequisites except the single condition it intends to violate."
+
+        The builder and the two clean-cycle controls above already give half of
+        that: every fixture here comes from the same builder, which is shown to
+        pass unmutated. The half that was missing is the other direction. This
+        asserted the intended check went red and never asked what else did, so a
+        mutation that broke four checks satisfied a control about one of them,
+        and the control would have stayed green if its own check had stopped
+        being reachable.
+
+        `also` names checks a mutation legitimately takes with it — a malformed
+        target.json cannot be read by anything downstream of it — so that the
+        cascade is declared per control rather than tolerated everywhere.
+        """
         root, commit, tree = fresh()
         cycle = build(root, commit, tree, kind, mutate=mutate, **kw)
         rc, out = run(root, cycle)
@@ -189,6 +208,16 @@ def main() -> int:
         if got.get(check) != "FAIL":
             failures.append(f"{label}: expected check {check} to FAIL, "
                             f"it was {got.get(check)!r}")
+            return
+        collateral = sorted(n for n, v in got.items()
+                            if v == "FAIL" and n != check and n not in also)
+        if collateral:
+            failures.append(
+                f"{label}: check {check} failed as intended, and so did "
+                f"{collateral}. The fixture violates more than the one "
+                f"condition this control is about, so it does not show that "
+                f"check {check} is what caught it. Declare the cascade with "
+                f"also=(...) if it is genuine.")
             return
         print(f"  [ok] check {check:>2} fails on: {label}")
 
@@ -403,7 +432,12 @@ def main() -> int:
         print("  [ok] check  7 fails on: target.json is not valid JSON")
 
     # ---- checks 11-15, §10.2 ----
+    # An unresolvable candidate commit takes checks 8 and 12 with it: 8 resolves
+    # the referenced commit and 12 hashes that commit's tree, so neither has
+    # anything left to work on. Declared rather than tolerated, so that a
+    # cascade growing a seventh member is a failure and not a shrug.
     expect_fail("candidate commit does not resolve", 11, "implementation",
+                also=(8, 12),
                 mutate=lambda t, c, r: {**t, "candidate_commit": "deadbeef" * 5})
     expect_fail("candidate tree hash is wrong", 12, "implementation",
                 mutate=lambda t, c, r: {**t, "candidate_tree_hash": "a" * 40})
@@ -418,9 +452,23 @@ def main() -> int:
                 mutate=lambda t, c, r: {**t, "diff_path": "nope.diff"})
     expect_fail("test-result hash does not match", 15, "implementation",
                 mutate=lambda t, c, r: {**t, "test_result_hash": "e" * 64})
-    for field in ("candidate_commit", "candidate_tree_hash", "approved_plan_hash",
-                  "diff_hash", "test_result_hash"):
+    # Each §10.1 field is consumed by exactly one later check, so removing it
+    # fails check 9 for its absence and that check for having nothing to read.
+    # The pairing is the point: it says which check owns which field, and if one
+    # of these ever cascades somewhere else the control says so.
+    #
+    # candidate_commit takes 11 and 12 both, because 12 hashes the tree of the
+    # commit 11 resolves.
+    _consumes = {
+        "candidate_commit":   (11, 12),
+        "candidate_tree_hash": (12,),
+        "approved_plan_hash":  (13,),
+        "diff_hash":           (14,),
+        "test_result_hash":    (15,),
+    }
+    for field, downstream in _consumes.items():
         expect_fail(f"§10.1 field absent: {field}", 9, "implementation",
+                    also=downstream,
                     mutate=lambda t, c, r, f=field: {k: v for k, v in t.items() if k != f})
 
     for p in made:

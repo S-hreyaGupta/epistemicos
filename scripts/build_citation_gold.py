@@ -70,6 +70,23 @@ LAYOUT = {
 # paper 2 carries Carrieri de Souza, Ellen MacArthur and Wezel.
 CORPUS_ID = {"paper-1": "ad1e3ff9", "paper-2": "c1d56945"}
 
+# The manuscripts the annotation was made from, by hash rather than by filename.
+# Alex Zamurko sent them as `4_5861686162019590604.pdf` and
+# `paper_2_review_input_manuscript_v1.pdf`; the first is byte-identical to the
+# `paper_1_review_input_manuscript_v1` that has been through this pipeline four
+# times, so the names travelled and the bytes did not.
+#
+# Recorded here so the gold set names the document it describes. It is NOT the
+# `source` the runner checks: the extractor reads Mathpix markdown, not the PDF,
+# and the two have different hashes by definition. Binding to the markdown needs
+# papers.markdown for these rows, which is a database query, and until that is
+# done the runner will say the score rests on an unverified assumption that gold
+# and candidate describe the same text.
+MANUSCRIPT_PDF = {
+    "paper-1": "209af10a1a02c047b089d572a74dd99b48873a31c3d85701b8e98c77334b37f2",
+    "paper-2": "c4d19c6fb53965655e60209dff785b05d5bfa1757f08f2c5aadf52ef0780e3b8",
+}
+
 YEAR = re.compile(r"\b((?:1[89]|20)\d{2}[a-z]?(?:,[a-z])*)\b")
 
 # Written as a literal rather than with \b after the optional period. The
@@ -210,6 +227,16 @@ def main() -> int:
                                                    "not verifiable from the "
                                                    "spreadsheet",
                 "spreadsheet_sha256": sheet_sha,
+                "manuscript_pdf_sha256": MANUSCRIPT_PDF[paper],
+            },
+            "source": {
+                "note": "unbound. The extractor reads papers.markdown, and "
+                        "this gold set is not yet tied to that row's hash. "
+                        "Until it is, gold_runner.py will say the score rests "
+                        "on an unverified assumption that both describe the "
+                        "same text.",
+                "corpus_paper": CORPUS_ID[paper],
+                "manuscript_pdf_sha256": MANUSCRIPT_PDF[paper],
             },
             "reference_list_entries": len(raw_ref),
             "items": items,

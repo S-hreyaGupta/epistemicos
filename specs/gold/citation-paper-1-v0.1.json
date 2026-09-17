@@ -12,7 +12,13 @@
     "annotated": "2026-09-17",
     "method": "in-text citations and reference list read from the manuscript and written out by hand",
     "independent_of_extractor_output": "asserted by the annotator; not verifiable from the spreadsheet",
-    "spreadsheet_sha256": "102571276ef70d197374c2a51d4446dde308e6238aefec3e2a819934355df5c4"
+    "spreadsheet_sha256": "102571276ef70d197374c2a51d4446dde308e6238aefec3e2a819934355df5c4",
+    "manuscript_pdf_sha256": "209af10a1a02c047b089d572a74dd99b48873a31c3d85701b8e98c77334b37f2"
+  },
+  "source": {
+    "note": "unbound. The extractor reads papers.markdown, and this gold set is not yet tied to that row's hash. Until it is, gold_runner.py will say the score rests on an unverified assumption that both describe the same text.",
+    "corpus_paper": "ad1e3ff9",
+    "manuscript_pdf_sha256": "209af10a1a02c047b089d572a74dd99b48873a31c3d85701b8e98c77334b37f2"
   },
   "reference_list_entries": 97,
   "items": [

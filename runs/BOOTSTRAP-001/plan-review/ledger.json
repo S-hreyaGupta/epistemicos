@@ -49,6 +49,7 @@
           "state": "OPEN"
         }
       ],
+      "repair_status": "IMPLEMENTED_AWAITING_DEMONSTRATION",
       "requirement_id": "S6",
       "state": "OPEN",
       "transcription_note": "recorded as C01-F02 on 9 September; corrected to B01-F02, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
@@ -192,6 +193,7 @@
           "state": "OPEN"
         }
       ],
+      "repair_status": "IMPLEMENTED_AWAITING_DEMONSTRATION",
       "requirement_id": "MC-2",
       "state": "OPEN",
       "transcription_note": "recorded as C01-F07 on 9 September; corrected to B01-F07, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
@@ -305,6 +307,7 @@
           "state": "OPEN"
         }
       ],
+      "repair_status": "IMPLEMENTED_AWAITING_DEMONSTRATION",
       "requirement_id": "S6",
       "state": "OPEN",
       "transcription_note": "recorded as C01-F11 on 9 September; corrected to B01-F11, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
@@ -388,6 +391,7 @@
           "state": "OPEN"
         }
       ],
+      "repair_status": "IMPLEMENTED_AWAITING_DEMONSTRATION",
       "requirement_id": "MC-1",
       "state": "OPEN",
       "transcription_note": "recorded as C01-F14 on 9 September; corrected to B01-F14, the identifier the reviewer assigned. Renaming a finding in transcription is B01-F13."
@@ -618,6 +622,7 @@
           "state": "OPEN"
         }
       ],
+      "repair_status": "IMPLEMENTED_AWAITING_DEMONSTRATION",
       "requirement_id": "",
       "state": "OPEN"
     },

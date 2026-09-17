@@ -40,3 +40,13 @@ coverage.out
 # Python bytecode, created by running the scripts in scripts/
 __pycache__/
 *.py[cod]
+
+# Working copies of reviewer replies, staged in the root on the way to `record`.
+# The authoritative copy is cycle-NN/codex-output-raw.md: preserved at record
+# time, hashed into target evidence, and checked by MC-2. A second copy in the
+# root is checked by nothing, so an edit to it would be invisible and a later
+# reader could take it for the record. Four were tracked until 17 September;
+# all four were byte-identical to their cycle copies, which is luck rather than
+# a property anything enforced.
+/reply*.md
+/codex-reply*.md

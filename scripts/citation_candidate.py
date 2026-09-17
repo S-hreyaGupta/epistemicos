@@ -1,40 +1,37 @@
 #!/usr/bin/env python3
-"""Turn a citation extractor run into a candidate the gold runner can score.
+"""Turn citation extractor output into a candidate the §15 gold runner can score.
 
-    python scripts/citation_candidate.py --jsonl <run>/<paper>.jsonl \
-        --out /tmp/candidate.json
+    python scripts/citation_candidate.py --output <extractor.jsonl> \
+        --paper paper-1 --out /tmp/candidate-1.json
 
-Exit 0 = written. Exit 1 = refused.
+Exit 0 = candidate written.
+Exit 1 = refused; nothing written.
 
-Why this is a separate script
-----------------------------
-The extractor emits occurrences with a derived key (`sodhi|2019`). The gold set
-is a list of distinct works identified by the author phrase a human read
-(`sodhi and tang` + `2019`). Scoring one against the other needs a stated
-conversion, and putting that conversion inside either side would let it quietly
-decide the result.
+Why this is a separate step
+--------------------------
+The gold set keys on `author_phrase` plus year. rc3 §A already requires the
+extractor to emit exactly that: *`author_phrase` always records the complete
+source candidate phrase before STOP reduction, and STOP reduction MUST never
+alter it.* So the two meet without either bending toward the other, which is
+the property that makes the comparison worth anything.
 
-Two things it does, both declared
----------------------------------
-**Reads the phrase, not the key.** `citation_segment` holds the text as it
-appeared; `citation_key` holds what the grammar made of it. Using the key would
-compare the extractor's surname rule against a gold set that deliberately avoids
-having one, so every multi-token surname would score as a miss for a reason that
-has nothing to do with whether the citation was found. The phrase is split by
-the same rule the gold set used: everything before the year is the author.
+What it deliberately does not use is `citation_key`. That is the extractor's
+resolved identity — `person|smith|2020`, `non_person|world bank|2016` — and
+deriving a surname from a phrase is the grammar under test. Scoring against a
+gold set built from the same derivation would agree by construction on exactly
+the cases rc3 exists to fix.
 
-**Collapses occurrences to works.** The gold set lists each work once and the
-extractor emits one record per mention. ad1e3ff9 has 180 citation records for
-91 annotated works. Comparing those directly would report a precision of about
-0.5 that measures nothing but repetition. The occurrence count is preserved on
-each item so nothing is lost, and an occurrence-level score needs an
-occurrence-level annotation, which does not exist.
+Occurrences to works
+--------------------
+The extractor emits one record per occurrence. The gold set lists each cited
+work once. This collapses occurrences to distinct works and reports how many
+were collapsed, because the alternative — scoring occurrence output against a
+work-level gold set — produces a precision figure that is mostly an artefact of
+how often a paper repeats itself.
 
-What it does not do
--------------------
-It does not repair. A record whose segment carries no year is reported as
-unparseable rather than guessed at, and the count appears in the output so the
-denominator is visible.
+The collapse is stated in the output. Anyone reading the score can see how many
+occurrences stood behind it, and a later occurrence-level gold set will not
+have to guess what this run measured.
 """
 
 from __future__ import annotations
@@ -47,75 +44,149 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO / "scripts"))
 
-# The same rule both sides are split by. Imported rather than restated: a second
-# copy is free to disagree, and the whole point is that gold and candidate are
-# reduced to comparable form by one rule.
-from build_citation_gold import YEAR, flatten  # noqa: E402
+# The terminal states rc3 §A gives a detected candidate. Only `parsed` is a
+# claim that a citation was read; the other two are the extractor declining, and
+# counting a declined candidate as an extraction would score a refusal as a
+# success.
+PARSED = "parsed"
+STATES = (PARSED, "unresolved_citation", "excluded_candidate")
 
 
 class Refused(Exception):
     pass
 
 
+def flatten(s: str) -> str:
+    import unicodedata
+    s = unicodedata.normalize("NFKD", str(s))
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def records(path: Path):
+    """One JSON object per line, or a single JSON array. Both are seen."""
+    text = path.read_text(encoding="utf-8")
+    stripped = text.lstrip()
+    if stripped.startswith("["):
+        try:
+            for r in json.loads(text):
+                yield r
+            return
+        except json.JSONDecodeError as e:
+            raise Refused(f"{path.name} starts as a JSON array and does not "
+                          f"parse: {e}")
+    for n, line in enumerate(text.splitlines(), 1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            yield json.loads(line)
+        except json.JSONDecodeError as e:
+            raise Refused(f"{path.name} line {n} is not valid JSON: {e}\n"
+                          f"  {line[:120]}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         prog="citation_candidate.py", description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--jsonl", required=True)
+    ap.add_argument("--output", required=True,
+                    help="the extractor's records, JSONL or a JSON array")
+    ap.add_argument("--paper", required=True,
+                    help="which gold set this is for, e.g. paper-1")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--label", default="")
+    ap.add_argument("--source-sha256", default="",
+                    help="papers.markdown hash the extractor ran against; "
+                         "without it the runner cannot establish that "
+                         "candidate and gold describe the same text")
     a = ap.parse_args()
 
-    src = Path(a.jsonl).resolve()
+    src = Path(a.output).resolve()
     if not src.is_file():
         raise Refused(f"extractor output not found: {src}")
 
-    works: dict[tuple, dict] = {}
-    occurrences = 0
-    unparseable: list[str] = []
+    gold_p = REPO / "specs" / "gold" / f"citation-{a.paper}-v0.1.json"
+    if not gold_p.is_file():
+        raise Refused(f"no gold set for {a.paper!r}: {gold_p}")
+    gold = json.loads(gold_p.read_text(encoding="utf-8"))
 
-    for line in src.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        rec = json.loads(line)
-        if rec.get("type") != "citation":
-            continue
-        occurrences += 1
-        seg = rec.get("citation_segment") or rec.get("citation_group") or ""
-        m = YEAR.search(seg)
-        if not m:
-            unparseable.append(seg[:60])
-            continue
-        author = flatten(seg[:m.start()].rstrip(" ,;:").strip("("))
-        year = m.group(1)
-        k = (author, year)
-        if k in works:
-            works[k]["occurrences"] += 1
-            continue
-        works[k] = {
-            "author_phrase": author,
-            "year": year,
-            "occurrences": 1,
-            "citation_key_emitted": rec.get("citation_key"),
-            "first_seen_in": rec.get("section_name"),
-        }
+    seen: dict[tuple, int] = {}
+    items: list[dict] = []
+    counts = {s: 0 for s in STATES}
+    unknown_state, no_phrase = 0, []
 
+    for r in records(src):
+        if r.get("type") not in (None, "citation"):
+            continue
+        state = r.get("candidate_state")
+        if state is None:
+            # Pre-rc3 output has no candidate_state. Treat a record carrying a
+            # citation_key as parsed and say so, rather than silently assuming.
+            state = PARSED if r.get("citation_key") or r.get("author_phrase") \
+                else "unresolved_citation"
+        if state in counts:
+            counts[state] += 1
+        else:
+            unknown_state += 1
+            continue
+        if state != PARSED:
+            continue
+
+        phrase = r.get("author_phrase")
+        if not phrase:
+            # rc3 §A requires it on every citation record. A parsed citation
+            # without one cannot be scored against this gold set, and guessing
+            # from citation_key would reintroduce the derivation under test.
+            no_phrase.append(r.get("citation_index", "?"))
+            continue
+        year = str(r.get("year") or "").strip()
+        if not year:
+            no_phrase.append(r.get("citation_index", "?"))
+            continue
+
+        k = (flatten(phrase), year)
+        if k in seen:
+            seen[k] += 1
+            continue
+        seen[k] = 1
+        items.append({"author_phrase": flatten(phrase), "year": year,
+                      "as_extracted": str(phrase)})
+
+    if not items:
+        raise Refused(
+            "no parsed citation carried both an author_phrase and a year, so "
+            "there is nothing to score.\n"
+            f"  records by state: {counts}\n"
+            "  rc3 §A requires author_phrase on every citation record. If this "
+            "output predates that,\n  the extractor has to be re-run rather "
+            "than the phrase reconstructed here.")
+
+    occurrences = sum(seen.values())
     doc = {
-        "candidate": a.label or src.stem,
+        "candidate": f"citation-{a.paper}",
         "unit": "distinct cited work",
-        "from": {
-            "path": str(src),
+        "key_fields": gold["key_fields"],
+        "produced_from": {
+            "extractor_output": src.name,
             "sha256": hashlib.sha256(src.read_bytes()).hexdigest(),
         },
-        "citation_records_read": occurrences,
-        "distinct_works": len(works),
-        "unparseable_segments": unparseable,
-        "items": sorted(works.values(),
-                        key=lambda x: (x["author_phrase"], x["year"])),
+        "collapsed": {
+            "parsed_occurrences": occurrences,
+            "distinct_works": len(items),
+            "note": "the extractor emits one record per occurrence; the gold "
+                    "set lists each work once. Scoring is at the work level "
+                    "and this is the ratio behind it.",
+        },
+        "candidate_states": counts,
+        "items": items,
     }
+    if a.source_sha256:
+        doc["source"] = {"sha256": a.source_sha256}
+    if no_phrase:
+        doc["parsed_without_author_phrase"] = no_phrase
+    if unknown_state:
+        doc["records_with_unrecognised_state"] = unknown_state
 
     dest = Path(a.out).resolve()
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -123,13 +194,16 @@ def main() -> int:
         json.dump(doc, fh, indent=2, ensure_ascii=False)
         fh.write("\n")
 
-    print(f"{dest}")
-    print(f"  {occurrences} citation records -> {len(works)} distinct works"
-          + (f"  ({occurrences / len(works):.1f} per work)" if works else ""))
-    if unparseable:
-        print(f"  {len(unparseable)} segment(s) with no year, not guessed at:")
-        for s in unparseable[:5]:
-            print(f"      {s!r}")
+    print(f"wrote {dest}")
+    print(f"  {occurrences} parsed occurrence(s) -> {len(items)} distinct work(s)")
+    print(f"  states: {counts}")
+    if no_phrase:
+        print(f"  parsed with no author_phrase or year: {len(no_phrase)} "
+              f"(not scored, rc3 §A requires them)")
+    if not a.source_sha256:
+        print("  no --source-sha256: the runner will say the score rests on an")
+        print("  unverified assumption that candidate and gold describe the "
+              "same text")
     return 0
 
 

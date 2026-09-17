@@ -96,6 +96,9 @@ jobs:
       - name: section 15 gold runner
         run: python scripts/test_gold_runner.py
 
+      - name: citation candidate adapter
+        run: python scripts/test_citation_candidate.py
+
       # The suites ask whether each component refuses what it should. This asks
       # whether they still compose. It is the only check here that would catch
       # two components drifting apart while both remain individually correct.

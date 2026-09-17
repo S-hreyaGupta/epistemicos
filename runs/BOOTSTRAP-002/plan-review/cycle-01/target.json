@@ -1,0 +1,56 @@
+{
+  "review_type": "plan",
+  "run_id": "BOOTSTRAP-002",
+  "cycle": 1,
+  "governing_pins": [
+    "specs/evidence-schema-v1.0.md",
+    "specs/implementation-review-protocol-v1.1.md"
+  ],
+  "governing_pin_hashes": {
+    "specs/implementation-review-protocol-v1.1.md": "296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483",
+    "specs/evidence-schema-v1.0.md": "4203ba64bd5ba1db9cd56357c8bf9dd8e6efb419fab7f7635a415c272d3a739c"
+  },
+  "protocol_commit": "52013960b62aa4fa9f058142111dbfbe55560862",
+  "protocol_sha256": "296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483",
+  "spec_sha256": "325cfe3634b2427d8ce351fea34d14143008657bd9a183853b959dd119403ab0",
+  "frozen_at": "2026-09-17T14:51:49Z",
+  "plan_files": [
+    {
+      "path": "scripts/validate_cycle.py",
+      "sha256": "d7183baf425cd3fcd204f85c9301569b6e8c587b33cdb259c1af2c13d013b611"
+    },
+    {
+      "path": "scripts/run_review.py",
+      "sha256": "b0110725ae145d05a8b3b6d6315cfc722201c7551be82320f76588239e020aa2"
+    },
+    {
+      "path": "scripts/ledger.py",
+      "sha256": "f15a27f2d604daa9c1502c22b82d26549df24e142cafa1e9b5193efb01ae1820"
+    },
+    {
+      "path": "scripts/loop_state.py",
+      "sha256": "4839fff415bb2d6bd099709bf99e1cf6a7ccd137c6ffbcad9cefd5275bd71d70"
+    },
+    {
+      "path": "scripts/bootstrap_gate.py",
+      "sha256": "44e292a85ae299663e3713c403a04f34bc17d673fce6b31f5167b51a4190eb1c"
+    },
+    {
+      "path": "scripts/findings_format.py",
+      "sha256": "27dcf377b0014b3ac2563da61597675fc0bca9c95bce18d1b776bcb22ee53a90"
+    },
+    {
+      "path": "scripts/cycle_projection.py",
+      "sha256": "78403ecadf990d2426b5f7e7681909e9456d3a195aa79965b9ec3e7f32026b93"
+    },
+    {
+      "path": "scripts/authority.py",
+      "sha256": "c0a394d68ba5f13168dfc78b029ed6799f7bd16b25a21ba5f4ff4401e2efa6d6"
+    },
+    {
+      "path": "scripts/run_pins.py",
+      "sha256": "20a22852b3a2c3642ea8a2c0a01ae23e58aedf8e421e1135dc592fcfdb149753"
+    }
+  ],
+  "auxiliary_evidence_sha256": "6652161a2358d0cc1ffe86c7f433082c0f0e34b0bfee2293b55d2afb8a656834"
+}

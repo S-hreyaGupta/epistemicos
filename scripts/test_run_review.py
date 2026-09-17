@@ -774,11 +774,36 @@ def main() -> int:
     sp = t4b / "specs" / "spec.md"
     sp.write_text(sp.read_text(encoding="utf-8") + "\nrule G9\n", encoding="utf-8")
     r = do_freeze(t4b)
+    # Fixture-validity audit, 17 September. This asserted only that freeze
+    # refused. Freeze refuses for a dozen reasons, and the fixture edits a spec
+    # on disk, so "it refused" did not establish that the drift is what stopped
+    # it. Same correction applied to the four other bare refusal assertions in
+    # this suite; the remaining twenty-nine already named their reason.
+    #
+    # Naming the reason changed what this control is about. It was called "a
+    # drifted spec is not embedded under its old hash" and read as a control on
+    # the snapshot comparison in cmd_freeze. It is not: the pin check refuses
+    # first, and the snapshot comparison is never reached.
+    #
+    # That comparison appears to be unreachable by any fixture. It hashes the
+    # copy it has just written and compares it against a hash computed from the
+    # same file a few lines earlier in the same call, so the two can differ only
+    # if the file changes on disk between those two reads. It is a defensive
+    # branch, and this suite was reporting a control over it that does not
+    # exist.
+    #
+    # Left as it stands rather than repaired. run_review.py is in the frozen
+    # BOOTSTRAP-002 cycle-01 target and editing it now would put an unreviewed
+    # change into the file under review. It belongs in the reviewer's findings.
     if r.returncode == 0:
         failures.append("a cycle was frozen embedding a spec that no longer "
                         "matches the hash in its own header")
+    elif "run pins no longer hold" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the drifted governing pin\n"
+                        f"{r.stdout}{r.stderr}")
     else:
-        print("  [ok] refused: a drifted spec is not embedded under its old hash")
+        print("  [ok] refused: a drifted governing spec stops the freeze at the "
+              "pin check")
 
     # Implementation review: the §10.1 fields have to reach the reviewer.
     t4c = make_repo(); made.append(t4c)
@@ -1059,6 +1084,9 @@ def main() -> int:
     r, cyc = recorded(t11, "Finding ID: C01-F01\nEvidence: no class line here\n")
     if r.returncode == 0:
         failures.append("a finding block with no Class: line was recorded")
+    elif "neither a Class: line nor a Status: line" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the missing class line\n"
+                        f"{r.stdout}{r.stderr}")
     else:
         print("  [ok] refused: finding block with no class")
 
@@ -1107,9 +1135,15 @@ def main() -> int:
                    .replace("FINDING_ID_GRAMMAR", "REMOVED_GRAMMAR"),
                    encoding="utf-8")
     r, _ = recorded(t15, "Finding ID: C01-F01\nClass: UNTESTED RULE\n")
+    # This one needed it most. The fixture mutilates the evidence schema, which
+    # several earlier checks also read, so a refusal proves the schema is broken
+    # and not that the missing grammar is what noticed.
     if r.returncode == 0:
         failures.append("the runner parsed findings with no canonical grammar "
                         "declared; it is carrying its own copy")
+    elif "no FINDING_ID_GRAMMAR declared" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the absent grammar declaration\n"
+                        f"{r.stdout}{r.stderr}")
     else:
         print("  [ok] refused: no canonical grammar declared in the schema")
 
@@ -1161,6 +1195,9 @@ def main() -> int:
     if r.returncode == 0:
         failures.append("a later capture displaced the authoritative one with "
                         "no explicit invalidation")
+    elif "already the authoritative" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the existing authoritative "
+                        f"capture\n{r.stdout}{r.stderr}")
     else:
         print("  [ok] refused: a later capture cannot displace silently")
 
@@ -1168,6 +1205,9 @@ def main() -> int:
                "--invocation", "manual", "--supersede-capture")
     if r.returncode == 0:
         failures.append("--supersede-capture was accepted with no reason")
+    elif "requires --reason" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the missing reason\n"
+                        f"{r.stdout}{r.stderr}")
     else:
         print("  [ok] refused: superseding without a stated reason")
 

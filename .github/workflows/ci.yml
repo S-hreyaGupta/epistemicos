@@ -39,6 +39,83 @@ jobs:
       - name: go test
         run: go test ./... -count=1
 
+  # Until 17 September this workflow ran Go checks and nothing else, so the
+  # execution layer — the review machinery itself, and every control over it —
+  # was verified only when somebody remembered to type the command. 319 controls
+  # that nothing ran on push.
+  #
+  # That is the shape this layer keeps finding in itself: a check that exists
+  # and is not reached. It was invisible because the suites were run by hand
+  # constantly during development, so they were always green and never
+  # scheduled.
+  execution-layer:
+    name: review machinery — 319 controls + rehearsal
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The suites resolve git commits and check that a referenced commit
+          # exists. A shallow clone fails those for a reason that has nothing
+          # to do with the code.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Each suite separately, so a failure names which one rather than
+      # stopping at the first and leaving the rest unknown.
+      - name: MC-2 conformance gate
+        run: python scripts/test_validate_cycle.py
+
+      - name: review runner
+        run: python scripts/test_run_review.py
+
+      - name: finding ledger and loop controller
+        run: python scripts/test_ledger.py
+
+      - name: bootstrap gate
+        run: python scripts/test_bootstrap_gate.py
+
+      - name: component seams
+        run: python scripts/test_interfaces.py
+
+      - name: prompts agree with the protocol
+        run: python scripts/test_prompts.py
+
+      - name: protocol conversion and pinning
+        run: |
+          python scripts/test_convert_protocol.py
+          python scripts/test_protocol_pin.py
+
+      # Outside the reviewed target, so outside the 319, and run here for the
+      # same reason: a control nobody runs is not a control.
+      - name: section 7 approval package
+        run: python scripts/test_approval_package.py
+
+      - name: section 15 gold runner
+        run: python scripts/test_gold_runner.py
+
+      # The suites ask whether each component refuses what it should. This asks
+      # whether they still compose. It is the only check here that would catch
+      # two components drifting apart while both remain individually correct.
+      - name: full protocol rehearsal
+        run: python scripts/dry_run.py
+
+      # The count the bootstrap prompts state is checked against the suites by
+      # test_prompts above. This asserts the tool that produces it still exits
+      # cleanly, without letting it write: a refresh that rewrote a prompt in
+      # CI would be an unreviewed edit to a frozen document.
+      - name: control counts are computable
+        run: |
+          python scripts/refresh_counts.py
+          git diff --exit-code -- specs/prompts/ || {
+            echo "refresh_counts.py modified a prompt during CI."
+            echo "A finished cycle's prompt states the controls that existed"
+            echo "when it ran, and CI must not be what changes that."
+            exit 1
+          }
+
   docker:
     name: docker build smoke
     runs-on: ubuntu-latest

@@ -5,7 +5,7 @@ Tracks every Codex finding through OPEN / RESOLVED / DISPUTED across the cycles
 of one review loop, with a full audit trail and no illegal transitions.
 
     python scripts/ledger.py raise   --review <dir> --cycle 1 --id C01-F01 \
-        --class "UNTESTED RULE" --requirement R-B7
+        --class "UNTESTED RULE" --requirement R-B7 --source CODEX_REVIEW
     python scripts/ledger.py respond --review <dir> --cycle 1 --id C01-F01 \
         --disposition ACCEPT --note "..."
     python scripts/ledger.py resolve --review <dir> --cycle 2 --id C01-F01 \
@@ -94,6 +94,90 @@ CLASSES = (
     "UNTESTED RULE",
     "CONTRADICTORY IMPLEMENTATION MAPPING",
 )
+
+# Who found the defect. Alex Zamurko, 16 September 2026, closing B02-F11:
+#
+#   "Record them, but not as reviewer findings. Self-found defects receive
+#    persistent IDs and lifecycle state, but are explicitly distinguished from
+#    Codex findings. They should require independent verification before closure
+#    just like other substantive defects."
+#
+# B02-F11 was open from 10 September and had two instances by the time it was
+# ruled on: the defect found on 10 September, and the count refresh rewriting
+# finished cycles' prompts on 15 September. Both sat in prose nobody was
+# required to read, so the ledger was not a complete register of known defects.
+#
+# The alternative was letting the implementing agent raise findings against
+# itself under reviewer identifiers, which would have made the ledger complete
+# by making its provenance false. That is the worse trade: the review exists so
+# as not to depend on the implementer's own account of its work, and an
+# identifier that cannot be told apart from a reviewer's erases the distinction
+# the whole arrangement rests on.
+SOURCES = (
+    "CODEX_REVIEW",
+    "IMPLEMENTER_SELF_FOUND",
+    "HUMAN_REVIEW",
+)
+
+# No default, deliberately. A default of CODEX_REVIEW would mean an
+# implementer-found defect recorded without the flag silently claims reviewer
+# provenance, which is the exact falsification the ruling refuses. Omitting it
+# is refused instead.
+#
+# Findings raised before 16 September carry no source and are reported as
+# UNRECORDED rather than assumed. All thirty appear as Codex findings in the
+# frozen cycle outputs, which under CONVENTION_ONLY is detection that holds
+# while the checks run faithfully and nobody has edited those files, not proof
+# of provenance. And "the outputs show it" and "the record states it" are
+# different claims in any case; this file is the second one.
+SOURCE_UNRECORDED = "UNRECORDED"
+
+# Descriptive implementation status, sitting beside the authoritative state
+# rather than inside it. Alex Zamurko, 16 September 2026:
+#
+#   "Do not change the three-state protocol vocabulary merely to solve this.
+#    Add a separate non-authoritative repair-status field. The ledger state
+#    remains correct while the handover stops overstating current
+#    implementation risk."
+#
+# And, the following day, the constraint that governs this whole field:
+#
+#   "External demonstration may update descriptive repair/closure metadata, but
+#    must never masquerade as a §5 RESOLVED transition in the original ledger."
+#
+# The condition it exists for: BOOTSTRAP-001 closed at MAX_4_REACHED with five
+# findings OPEN, all five since repaired. §5 gives RESOLVED only on
+# demonstration in a NEXT review target, and there is no next target in that
+# loop, so those five stay OPEN for as long as the file exists however
+# thoroughly they are fixed. OPEN therefore means two different things in the
+# same ledger — not repaired, and repaired but undemonstrable here — and a
+# reader who trusts the state field is misled in both directions.
+#
+# This does not fix that. It records it.
+REPAIR_STATUSES = (
+    "NOT_REPAIRED",
+    "IMPLEMENTED_AWAITING_DEMONSTRATION",
+    "EXTERNALLY_DEMONSTRATED",
+)
+
+# EXTERNALLY_DEMONSTRATED is the only one that asserts someone else checked, so
+# it is the only one that must name who and where. Without that it would be an
+# unfalsifiable claim in a file whose entire purpose is that claims carry their
+# evidence.
+REPAIR_STATUS_NEEDS_VERIFICATION = ("EXTERNALLY_DEMONSTRATED",)
+
+# Read by nothing in the state machine. This is load-bearing and the ledger's
+# own control suite exercises it: `effective_state`, replay, `snapshot` and the
+# loop controller must all produce byte-identical output whether or not these
+# fields are present. A comment promising non-interference is worth nothing, so
+# the control captures both outputs and compares them.
+#
+# The suite is not named here on purpose. The bootstrap gate discovers
+# dependencies by matching any module filename appearing as a string in covered
+# code, so writing one into this file adds it to the covered set and changes
+# what the approval covers. Found that way on 17 September, by doing it.
+NON_AUTHORITATIVE_FIELDS = ("source", "repair_status", "external_verification_run",
+                            "human_closure_record")
 
 # Kept out of CLASSES deliberately, and refused by name rather than falling
 # through the generic "not one of the six" message, because the reason it is
@@ -317,14 +401,24 @@ def cmd_raise(a: argparse.Namespace) -> int:
     if a.klass not in CLASSES:
         raise Refused(f"class must be one of the six in §4, got {a.klass!r}\n  "
                       + "\n  ".join(CLASSES))
+    if a.source not in SOURCES:
+        raise Refused(
+            f"source must be one of the three, got {a.source!r}\n  "
+            + "\n  ".join(SOURCES) + "\n"
+            "  Who found the defect is part of the record. A finding the\n"
+            "  implementing agent found in its own work is admissible and gets a\n"
+            "  persistent identifier, but it is not a reviewer finding, and the\n"
+            "  ledger says which it is rather than leaving them the same shape.")
 
     data["findings"][a.id] = {
         "cycle_raised": a.cycle,
         "class": a.klass,
         "requirement_id": a.requirement or "",
+        "source": a.source,
         "state": OPEN,
         "history": [{"cycle": a.cycle, "event": "RAISED", "state": OPEN,
-                     "at": now(), "note": a.note or ""}],
+                     "at": now(), "note": a.note or "",
+                     "source": a.source}],
     }
     save(review, data)
     print(f"{a.id}  RAISED  cycle {a.cycle:02d}  {a.klass}  -> {OPEN}")
@@ -530,6 +624,56 @@ def snapshot(data: dict, cycle: int,
     return out
 
 
+def cmd_repair_status(a: argparse.Namespace) -> int:
+    """Record descriptive repair status. Never a state transition.
+
+    Deliberately not folded into `resolve`. `resolve` is the §5 transition and
+    writes a DEMONSTRATED event into the history that replay reads; this writes
+    a field replay does not look at. Two commands because they are two acts, and
+    the one thing this must never become is a second route to RESOLVED.
+    """
+    review = Path(a.review).resolve()
+    data = load(review)
+    f = get(data, a.id)
+
+    if a.status not in REPAIR_STATUSES:
+        raise Refused(
+            f"repair status must be one of the three, got {a.status!r}\n  "
+            + "\n  ".join(REPAIR_STATUSES))
+
+    if a.status in REPAIR_STATUS_NEEDS_VERIFICATION:
+        if not a.verification_run:
+            raise Refused(
+                f"{a.status} requires --verification-run naming the run that "
+                "demonstrated it.\n"
+                "  It is a claim that an independent review saw the repair. A "
+                "claim like that\n  carries where it was seen, or it is not "
+                "evidence.")
+        if not a.closure_record:
+            raise Refused(
+                f"{a.status} requires --closure-record.\n"
+                "  §5 cannot close this finding, so the closure lives outside "
+                "the ledger. The\n  pointer to it is the only thing connecting "
+                "the two, and without it the state\n  field says OPEN with "
+                "nothing to read next.")
+
+    f["repair_status"] = a.status
+    if a.verification_run:
+        f["external_verification_run"] = a.verification_run
+    if a.closure_record:
+        f["human_closure_record"] = a.closure_record
+
+    save(review, data)
+    proj = projection(review)
+    print(f"{a.id}  repair status -> {a.status}")
+    print(f"       finding state is unchanged at {effective_state(f, proj)}, "
+          "and stays that way.")
+    print("       §5 gives RESOLVED only on demonstration in a next review "
+          "target. This")
+    print("       field describes the repair; it does not resolve the finding.")
+    return 0
+
+
 def cmd_show(a: argparse.Namespace) -> int:
     review = Path(a.review).resolve()
     data = load(review)
@@ -552,8 +696,24 @@ def cmd_show(a: argparse.Namespace) -> int:
               + ", ".join(f"{c:02d}" for c in sorted(proj.invalid)))
     for fid in sorted(data["findings"]):
         f = data["findings"][fid]
+        # Shown on every finding, including the ones that predate the field.
+        # Printing it only when present would make an unrecorded provenance
+        # look like a reviewer finding, which is the distinction the field
+        # exists to keep.
+        src = f.get("source", SOURCE_UNRECORDED)
         print(f"\n  {fid}  [{effective_state(f, proj)}]  {f['class']}"
-              + (f"  ({f['requirement_id']})" if f["requirement_id"] else ""))
+              + (f"  ({f['requirement_id']})" if f["requirement_id"] else "")
+              + (f"\n      found by: {src}"
+                 if src != "CODEX_REVIEW" else ""))
+        # Printed directly under the state, because the whole reason it exists
+        # is that the state above it is about to be misread.
+        if f.get("repair_status"):
+            extra = ", ".join(
+                x for x in (f.get("external_verification_run"),
+                            f.get("human_closure_record")) if x)
+            print(f"      repair:   {f['repair_status']}"
+                  + (f"  ({extra})" if extra else "")
+                  + "  [descriptive, not a state]")
         for e in f["history"]:
             note = f"  {e['note'][:60]}" if e.get("note") else ""
             mark = "" if proj.authorizes(e["cycle"]) else "  [no authority]"
@@ -565,6 +725,20 @@ def cmd_show(a: argparse.Namespace) -> int:
         counts[effective_state(f, proj)] += 1
     for s in STATES:
         print(f"  {s:<9} {counts[s]}")
+
+    # Provenance tally, printed only when the ledger holds more than one kind.
+    # A register whose entries came from different places and does not say so
+    # reads as though they all came from the same place, which is the condition
+    # B02-F11 named.
+    by_source: dict[str, int] = {}
+    for f in data["findings"].values():
+        by_source[f.get("source", SOURCE_UNRECORDED)] = \
+            by_source.get(f.get("source", SOURCE_UNRECORDED), 0) + 1
+    if len(by_source) > 1:
+        print()
+        print("  found by")
+        for s in sorted(by_source):
+            print(f"    {s:<24} {by_source[s]}")
     return 0
 
 
@@ -579,7 +753,20 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--review", required=True,
                         help="the review directory, e.g. runs/A1E-001/plan-review")
 
-    r = sub.add_parser("raise", help="record a Codex finding")
+    rs = sub.add_parser("repair-status",
+                        help="record descriptive repair status; never a state "
+                             "transition")
+    common(rs)
+    rs.add_argument("--id", required=True)
+    rs.add_argument("--status", required=True, metavar="STATUS",
+                    help=" | ".join(REPAIR_STATUSES))
+    rs.add_argument("--verification-run", default="",
+                    help="the run that independently demonstrated the repair")
+    rs.add_argument("--closure-record", default="",
+                    help="reference or hash of the human closure record")
+    rs.set_defaults(fn=cmd_repair_status)
+
+    r = sub.add_parser("raise", help="record a finding, naming who found it")
     common(r)
     r.add_argument("--cycle", type=int, required=True)
     r.add_argument("--id", required=True)
@@ -590,6 +777,11 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--class", dest="klass", required=True,
                    metavar="CLASS")
     r.add_argument("--requirement")
+    # Required, and validated in cmd_raise rather than by argparse `choices` for
+    # the same reason as --class: a bare usage error exits 2 without saying why
+    # the distinction matters.
+    r.add_argument("--source", required=True, metavar="SOURCE",
+                   help=" | ".join(SOURCES))
     r.add_argument("--note", default="")
     r.set_defaults(fn=cmd_raise)
 

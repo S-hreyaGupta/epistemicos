@@ -443,7 +443,7 @@ def main() -> int:
                     f"C{i-1:02d}-F01",
                     "--evidence", "repaired and demonstrated in this cycle")
             led(root, "raise", "--cycle", str(i), "--id", f"C{i:02d}-F01",
-                "--class", "UNTESTED RULE")
+                "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
             led(root, "respond", "--cycle", str(i), "--id", f"C{i:02d}-F01",
                 "--disposition", "ACCEPT", "--note", "will repair next cycle")
         return n
@@ -661,7 +661,8 @@ def main() -> int:
         failures.append(f"fixture: could not record cycle 01\n{_r7.stderr}{_r7.stdout}")
     _l7 = sh(sys.executable, str(t7 / "scripts" / "ledger.py"), "raise",
              "--review", "runs/T-001/plan-review", "--cycle", "1",
-             "--id", "C01-F01", "--class", "UNTESTED RULE", cwd=t7)
+             "--id", "C01-F01", "--class", "UNTESTED RULE",
+             "--source", "CODEX_REVIEW", cwd=t7)
     if _l7.returncode != 0:
         failures.append(f"fixture: could not raise the finding\n{_l7.stderr}{_l7.stdout}")
 
@@ -1365,6 +1366,22 @@ def main() -> int:
     # named as such. It also happens to be the kind that fits the claim: the
     # property is that no code path leaves this file partly written, which is a
     # statement about code paths rather than about one execution.
+    #
+    # Alex Zamurko, 16 September 2026, ruling on exactly this control:
+    #
+    #   "Acceptable temporarily, but mark it as structural evidence, not
+    #    behavioral fault-injection evidence. It does not need to block the
+    #    verification run if the atomic-write primitive itself already has
+    #    behavioral tests."
+    #
+    # It is marked STRUCTURAL in its own output line, so the distinction reaches
+    # a reader scanning results rather than only one reading this comment.
+    #
+    # The second half of that ruling was a condition, and on 17 September it was
+    # not met: write_lf_atomic had no test of any kind. The structural control
+    # says every write goes through the primitive; nothing said the primitive
+    # works. Two statements, and the pair is only worth something with both. The
+    # behavioural controls for it are immediately below.
     _rr = (SRC / "run_review.py").read_text(encoding="utf-8")
     _logw = [(i, l.strip()) for i, l in enumerate(_rr.splitlines(), 1)
              if "capture-log.json" in l and "write_lf" in l]
@@ -1380,8 +1397,82 @@ def main() -> int:
             "generation governs,\n      and the atomic commit point below it "
             "cannot undo that. B02-F04.")
     else:
-        print(f"  [ok] all {len(_logw)} capture-log writes go through the "
+        print(f"  [ok] STRUCTURAL: all {len(_logw)} capture-log writes go through the "
               f"atomic path")
+
+    # ---- BEHAVIOURAL: the atomic primitive itself ----
+    # The condition attached to accepting the structural control above. These
+    # exercise write_lf_atomic directly rather than through the runner, which is
+    # what makes fault injection possible here and impossible there: the
+    # primitive is a function this suite can call, so a failure can be put
+    # inside it at the exact instant that matters.
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location("_rr_probe", SRC / "run_review.py")
+    _mod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+
+    _atomic_dir = Path(tempfile.mkdtemp())
+    _target = _atomic_dir / "capture-log.json"
+
+    # 1. It writes, and with LF endings, which is the other half of the name.
+    _mod.write_lf_atomic(_target, '{"authoritative": 1}\n')
+    if _target.read_bytes() != b'{"authoritative": 1}\n':
+        failures.append("write_lf_atomic did not write the content it was given, "
+                        f"got {_target.read_bytes()!r}")
+    else:
+        print("  [ok] BEHAVIOURAL: the atomic write writes, with LF endings")
+
+    # 2. A failure partway through leaves the PREVIOUS generation readable and
+    #    complete. This is the actual B02-F04 property, and until now nothing
+    #    tested it: the old control proved the call site, not the guarantee.
+    _orig_write = _mod.write_lf
+
+    def _die_mid_write(p, text):
+        # Stage a truncated file exactly as a half-completed write would, then
+        # fail before the rename can commit it.
+        _orig_write(p, text[:len(text) // 2])
+        raise OSError("disk full, halfway through")
+
+    _mod.write_lf = _die_mid_write
+    try:
+        _mod.write_lf_atomic(_target, '{"authoritative": 2}\n')
+    except OSError:
+        pass
+    finally:
+        _mod.write_lf = _orig_write
+
+    _survived = _target.read_bytes()
+    _staged_left = sorted(_atomic_dir.glob(".*.staged"))
+    if _survived != b'{"authoritative": 1}\n':
+        failures.append(
+            "a write that failed partway through changed the file it was "
+            f"replacing. It now reads {_survived!r}. The previous generation "
+            "must survive whole: that is the entire property B02-F04 asked for, "
+            "and a rename that does not provide it is not a commit point.")
+    elif _staged_left:
+        failures.append(
+            f"a failed write left staging files behind: "
+            f"{[p.name for p in _staged_left]}. They are not the authoritative "
+            "name so nothing reads them as governing, but they accumulate and "
+            "the next reader has to know which names to ignore.")
+    else:
+        print("  [ok] BEHAVIOURAL: a write that dies partway leaves the "
+              "previous generation whole")
+
+    # 3. The replacement is all-or-nothing on success too: no window where the
+    #    target exists but is short. Checked by staging under a name the reader
+    #    of the real file would never pick up.
+    _mod.write_lf_atomic(_target, '{"authoritative": 3}\n')
+    if _target.read_bytes() != b'{"authoritative": 3}\n':
+        failures.append("the atomic write did not replace the previous "
+                        "generation on success")
+    elif sorted(_atomic_dir.glob(".*.staged")):
+        failures.append("a successful atomic write left its staging file in "
+                        "place, so the directory grows one file per write")
+    else:
+        print("  [ok] BEHAVIOURAL: a successful atomic write replaces "
+              "completely and cleans up")
+    shutil.rmtree(_atomic_dir, ignore_errors=True)
 
     # ---- B02-F04: interruption at the publication boundary ----
     # Cycle 03: "the required transactional supersession is not implemented. A
@@ -1522,7 +1613,7 @@ def main() -> int:
     do_init(tf); do_freeze(tf)
     sh(sys.executable, str(tf / "scripts" / "ledger.py"), "raise",
        "--review", "runs/T-001/plan-review", "--cycle", "1", "--id", "C01-F01",
-       "--class", "WRONG OWNERSHIP", cwd=tf)
+       "--class", "WRONG OWNERSHIP", "--source", "CODEX_REVIEW", cwd=tf)
     write_lf(tf / "rec.md", with_target(tf, "Finding ID: C01-F01\n"
                                             "Status: REPAIR NOT DEMONSTRATED\n"
                                             "Evidence: x\nFinding: y\n"
@@ -1678,7 +1769,8 @@ def main() -> int:
                         f"control\n{_rp0.stderr}{_rp0.stdout}")
     _lp0 = sh(sys.executable, str(tP / "scripts" / "ledger.py"), "raise",
               "--review", "runs/T-001/plan-review", "--cycle", "1",
-              "--id", "C01-F01", "--class", "UNTESTED RULE", cwd=tP)
+              "--id", "C01-F01", "--class", "UNTESTED RULE",
+              "--source", "CODEX_REVIEW", cwd=tP)
     if _lp0.returncode != 0:
         failures.append(f"fixture: could not raise the finding\n{_lp0.stderr}{_lp0.stdout}")
 
@@ -1737,7 +1829,8 @@ def main() -> int:
                  "--output", "replyS.md", "--invocation", "manual")
     _ls = sh(sys.executable, str(tS / "scripts" / "ledger.py"), "raise",
              "--review", "runs/T-001/plan-review", "--cycle", "1",
-             "--id", "C01-F01", "--class", "UNTESTED RULE", cwd=tS)
+             "--id", "C01-F01", "--class", "UNTESTED RULE",
+             "--source", "CODEX_REVIEW", cwd=tS)
     if _rs.returncode != 0 or _ls.returncode != 0:
         failures.append(f"fixture: could not close cycle 01 for B01-F04\n"
                         f"{_rs.stderr}{_ls.stderr}")
@@ -1837,7 +1930,8 @@ def main() -> int:
         failures.append(f"fixture: could not record cycle 01\n{rec.stdout}{rec.stderr}")
     rl = sh(sys.executable, str(tr / "scripts" / "ledger.py"), "raise",
             "--review", "runs/T-001/plan-review", "--cycle", "1",
-            "--id", "C01-F01", "--class", "UNTESTED RULE", cwd=tr)
+            "--id", "C01-F01", "--class", "UNTESTED RULE",
+            "--source", "CODEX_REVIEW", cwd=tr)
     if rl.returncode != 0:
         failures.append(f"fixture: could not raise the finding\n{rl.stdout}{rl.stderr}")
     spec_p = tr / "specs" / "spec.md"
@@ -2140,7 +2234,8 @@ def main() -> int:
         failures.append(f"fixture: could not record cycle 01\n{_rb.stderr}{_rb.stdout}")
     _lb = sh(sys.executable, str(tB / "scripts" / "ledger.py"), "raise",
              "--review", "runs/T-001/plan-review", "--cycle", "1",
-             "--id", "C01-F01", "--class", "UNTESTED RULE", cwd=tB)
+             "--id", "C01-F01", "--class", "UNTESTED RULE",
+             "--source", "CODEX_REVIEW", cwd=tB)
     if _lb.returncode != 0:
         failures.append(f"fixture: could not raise the finding\n{_lb.stderr}{_lb.stdout}")
 

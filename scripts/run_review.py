@@ -1218,9 +1218,34 @@ def write_lf_atomic(p: Path, text: str) -> None:
     is what lets a single file be the moment a change takes effect.
     """
     staged = p.with_name(f".{p.name}.staged")
-    write_lf(staged, text)
     import os as _os
-    _os.replace(staged, p)
+    try:
+        write_lf(staged, text)
+        _os.replace(staged, p)
+    except BaseException:
+        # Found 17 September by the behavioural controls Alex Zamurko's ruling
+        # of the day before required, and invisible to the structural control
+        # beside them: that one reads the source and confirms every write goes
+        # through this function, which was true and said nothing about what the
+        # function leaves behind when it fails.
+        #
+        # The authoritative file is untouched, so this is not a correctness
+        # defect. It is an accumulation one. Every interrupted write drops
+        # another `.capture-log.json.staged` next to the real file, and a
+        # directory whose contents include names a reader must know to ignore
+        # is a directory that will eventually be read wrong.
+        #
+        # BaseException rather than Exception: KeyboardInterrupt and SystemExit
+        # are exactly the interruptions this is about, and neither is an
+        # Exception.
+        try:
+            staged.unlink(missing_ok=True)
+        except OSError:
+            # Nothing further to try, and the original failure is the one worth
+            # raising. Swallowing it to report a cleanup problem would hide the
+            # reason the write failed.
+            pass
+        raise
 
 
 def publish_from_designation(cycle: Path) -> list[str]:

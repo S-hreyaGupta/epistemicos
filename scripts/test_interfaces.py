@@ -408,7 +408,8 @@ def main() -> int:
 
     rev = root2 / "runs" / "A1E-001" / "plan-review"
     run(root2, "ledger.py", "raise", "--review", str(rev), "--cycle", "1",
-        "--id", "C01-F01", "--class", "UNTESTED RULE", "--requirement", "R-B7")
+        "--id", "C01-F01", "--class", "UNTESTED RULE", "--requirement", "R-B7",
+        "--source", "CODEX_REVIEW")
     # --development throughout these seams: root2 was initialised with
     # --bootstrap-exempt, so its cycles are development evidence and B01-F08
     # makes the controller refuse to read them as anything else. The flag is
@@ -615,7 +616,8 @@ def main() -> int:
         for op, fid in ops:
             if op == "raise":
                 run(root3, "ledger.py", "raise", "--review", str(rv), "--cycle", "1",
-                    "--id", fid, "--class", "UNTESTED RULE")
+                    "--id", fid, "--class", "UNTESTED RULE",
+                    "--source", "CODEX_REVIEW")
             elif op == "accept":
                 run(root3, "ledger.py", "respond", "--review", str(rv), "--cycle", "1",
                     "--id", fid, "--disposition", "ACCEPT", "--note", "fix")
@@ -643,7 +645,7 @@ def main() -> int:
                   "plan_files": [{"path": "plan/01-PLAN.md",
                                   "sha256": sha256_file(root3 / "plan" / "01-PLAN.md")}]})
     run(root3, "ledger.py", "raise", "--review", str(rv), "--cycle", "1",
-        "--id", "C01-F01", "--class", "WRONG OWNERSHIP")
+        "--id", "C01-F01", "--class", "WRONG OWNERSHIP", "--source", "CODEX_REVIEW")
     run(root3, "ledger.py", "respond", "--review", str(rv), "--cycle", "1",
         "--id", "C01-F01", "--disposition", "REJECT_WITH_REASON", "--note", "disagree",
         "--spec-evidence", "§4: the class does not apply to this requirement")
@@ -783,7 +785,7 @@ def main() -> int:
 
     ok10 = cycle10(1, "Finding ID: C01-F01\nClass: UNTESTED RULE\nEvidence: x\n")
     run(root10, "ledger.py", "raise", "--review", str(rev10), "--cycle", "1",
-        "--id", "C01-F01", "--class", "UNTESTED RULE")
+        "--id", "C01-F01", "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     run(root10, "ledger.py", "respond", "--review", str(rev10), "--cycle", "1",
         "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "will repair")
     ok10 = ok10 and cycle10(2, "Finding ID: C01-F01\nClass: UNTESTED RULE\n"

@@ -122,6 +122,11 @@ def main() -> int:
     for fid, klass, req, _ in FINDINGS:
         bad += run("raise", "--review", str(REVIEW), "--cycle", "1",
                    "--id", fid, "--class", klass, "--requirement", req,
+                   # These are transcriptions of what the reviewer wrote, which
+                   # is the one case where CODEX_REVIEW is a statement of fact
+                   # rather than an assertion: codex-output-raw.md is on disk
+                   # and frozen, and every identifier here appears in it.
+                   "--source", "CODEX_REVIEW",
                    "--note", "transcribed verbatim from codex-output-raw.md, "
                              "B01 numbering")
 

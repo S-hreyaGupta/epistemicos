@@ -168,7 +168,7 @@ def main() -> int:
         write_lf(c / "codex-input.md", f"target {digest}\n")
         for fid, kl in (("C01-F01", "UNTESTED RULE"), ("C01-F02", "WRONG OWNERSHIP")):
             ledger(root, "raise", "--review", str(rev), "--cycle", "1",
-                   "--id", fid, "--class", kl)
+                   "--id", fid, "--class", kl, "--source", "CODEX_REVIEW")
         return root, rev, c
 
     root, rev, c = integrity_fixture()
@@ -213,7 +213,7 @@ def main() -> int:
         root, commit, rev = fresh()
         rev.mkdir(parents=True)
         ledger(root, "raise", "--review", str(rev), "--cycle", "1",
-               "--id", "C01-F01", "--class", "UNTESTED RULE")
+               "--id", "C01-F01", "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
         ledger(root, "respond", "--review", str(rev), "--cycle", "1",
                "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "will fix")
         ledger(root, "resolve", "--review", str(rev), "--cycle", "2",
@@ -247,7 +247,7 @@ def main() -> int:
     root2, commit2, rev2 = fresh()
     rev2.mkdir(parents=True)
     ledger(root2, "raise", "--review", str(rev2), "--cycle", "1",
-           "--id", "C01-F01", "--class", "UNTESTED RULE")
+           "--id", "C01-F01", "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     expect_refused("reopen a finding that is still OPEN", "not RESOLVED",
                    lambda: ledger(root2, "reopen", "--review", str(rev2),
                                   "--cycle", "2", "--id", "C01-F01",
@@ -288,7 +288,7 @@ def main() -> int:
             failures.append(f"the parser rejected {fid} ({label}): {probs}")
             continue
         r = ledger(rootG, "raise", "--review", str(revG), "--cycle", "2",
-                   "--id", fid, "--class", "UNTESTED RULE")
+                   "--id", fid, "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
         if r.returncode != 0:
             failures.append(
                 f"the parser accepted {fid} ({label}) and the ledger refused "
@@ -301,7 +301,7 @@ def main() -> int:
                    "canonical grammar",
                    lambda: ledger(rootG, "raise", "--review", str(revG),
                                   "--cycle", "2", "--id", "ABC02-F01",
-                                  "--class", "UNTESTED RULE"))
+                                  "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW"))
 
     # The cycle rule still holds, and holds independently of prefix length —
     # which is the part that made the ledger keep its own pattern.
@@ -309,7 +309,7 @@ def main() -> int:
                    "declares cycle",
                    lambda: ledger(rootG, "raise", "--review", str(revG),
                                   "--cycle", "3", "--id", "AB02-F09",
-                                  "--class", "UNTESTED RULE"))
+                                  "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW"))
 
     # And the ledger reads the grammar rather than carrying a copy: with the
     # declaration gone it refuses outright instead of falling back.
@@ -322,7 +322,7 @@ def main() -> int:
                    "cannot be read",
                    lambda: ledger(rootH, "raise", "--review", str(revH),
                                   "--cycle", "1", "--id", "C01-F01",
-                                  "--class", "UNTESTED RULE"))
+                                  "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW"))
 
     # ---- B01-F12: no event may predate the finding it acts on ----
     # "Require every ACCEPT, RESOLVE, or DISPUTE event to occur in the raising
@@ -336,7 +336,7 @@ def main() -> int:
     rootF, commitF, revF = fresh()
     revF.mkdir(parents=True)
     ledger(rootF, "raise", "--review", str(revF), "--cycle", "3",
-           "--id", "C03-F01", "--class", "UNTESTED RULE")
+           "--id", "C03-F01", "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
 
     expect_refused("ACCEPT dated before the raising cycle", "could not have happened",
                    lambda: ledger(rootF, "respond", "--review", str(revF),
@@ -369,7 +369,7 @@ def main() -> int:
     # rename, which is what B01-F13 was about.
     root4, rev4 = resolved_fixture()
     r = ledger(root4, "raise", "--review", str(rev4), "--cycle", "1",
-               "--id", "C01-F01", "--class", "UNTESTED RULE")
+               "--id", "C01-F01", "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     if r.returncode == 0:
         failures.append("a duplicate identifier was accepted")
     elif "reopen" not in (r.stdout + r.stderr):
@@ -385,7 +385,8 @@ def main() -> int:
     root, commit, rev = fresh()
     rev.mkdir(parents=True)
     r = ledger(root, "raise", "--review", str(rev), "--cycle", "1",
-               "--id", "C01-F01", "--class", "UNTESTED RULE", "--requirement", "R-B7")
+               "--id", "C01-F01", "--class", "UNTESTED RULE", "--requirement", "R-B7",
+               "--source", "CODEX_REVIEW")
     if r.returncode != 0:
         failures.append(f"raise failed:\n{r.stderr}{r.stdout}")
     else:
@@ -411,15 +412,134 @@ def main() -> int:
     # ---- refusals ----
     expect_refused("duplicate finding id", "already exists", lambda: ledger(
         root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-        "--class", "UNTESTED RULE"))
+        "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW"))
 
     expect_refused("id declares a different cycle", "persistent", lambda: ledger(
         root, "raise", "--review", str(rev), "--cycle", "2", "--id", "C09-F01",
-        "--class", "UNTESTED RULE"))
+        "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW"))
 
     expect_refused("respond to a finding never raised", "no such finding", lambda: ledger(
         root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F99",
         "--disposition", "ACCEPT"))
+
+    # ---- provenance, B02-F11 ----
+    # Alex Zamurko's ruling of 16 September. The register is complete only if
+    # implementer-found defects can enter it, and honest only if they cannot
+    # enter it wearing a reviewer's identifier.
+    expect_refused("a source outside the three", "must be one of the three",
+                   lambda: ledger(
+                       root, "raise", "--review", str(rev), "--cycle", "1",
+                       "--id", "C01-F07", "--class", "UNTESTED RULE",
+                       "--source", "CODEX"))
+
+    # Omission is refused by argparse rather than by cmd_raise, so it exits 2
+    # and not 1. Checked separately for that reason: a control asserting exit 1
+    # here would pass on the day someone gives --source a default, which is the
+    # change this control exists to prevent.
+    r_nosrc = ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+                     "--id", "C01-F08", "--class", "UNTESTED RULE")
+    if r_nosrc.returncode == 0:
+        failures.append(
+            "raise succeeded with no --source. A finding whose provenance was "
+            "never stated is indistinguishable from a reviewer finding, which "
+            "is what the ruling refuses.")
+    else:
+        print("  [ok] refused: a finding raised without saying who found it")
+
+    r_self = ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+                    "--id", "C01-F09", "--class", "UNTESTED RULE",
+                    "--source", "IMPLEMENTER_SELF_FOUND")
+    d_self = json.loads((rev / "ledger.json").read_text(encoding="utf-8"))
+    rec = d_self["findings"].get("C01-F09", {})
+    if r_self.returncode != 0:
+        failures.append(f"a self-found defect was refused entry:\n{r_self.stderr}")
+    elif rec.get("source") != "IMPLEMENTER_SELF_FOUND":
+        failures.append("a self-found defect was recorded without its source, "
+                        f"got {rec.get('source')!r}")
+    elif rec.get("state") != "OPEN":
+        failures.append("a self-found defect did not get ordinary lifecycle "
+                        f"state, got {rec.get('state')!r}")
+    else:
+        print("  [ok] a self-found defect enters the ledger, labelled, with "
+              "ordinary state")
+
+    r_show = ledger(root, "show", "--review", str(rev))
+    if "IMPLEMENTER_SELF_FOUND" not in (r_show.stdout + r_show.stderr):
+        failures.append(
+            "show does not surface IMPLEMENTER_SELF_FOUND. A provenance "
+            "recorded in the file and absent from the report leaves the "
+            "distinction where nobody reads it, which is the condition "
+            "B02-F11 named.")
+    else:
+        print("  [ok] show names the provenance of a self-found defect")
+
+    # ---- repair status is descriptive, and the loop cannot see it ----
+    # Alex Zamurko, 17 September: "External demonstration may update descriptive
+    # repair/closure metadata, but must never masquerade as a §5 RESOLVED
+    # transition in the original ledger." And: neither field "may affect OPEN_n,
+    # convergence, stall, or cycle counting."
+    #
+    # A comment asserting non-interference is the kind of control this review
+    # keeps rejecting. This one measures it: the authoritative outputs are
+    # captured, every non-authoritative field is then written onto every
+    # finding, and the outputs are required to be identical afterwards.
+    rootN, commitN, revN = fresh()
+    revN.mkdir(parents=True)
+    for n in (1, 2):
+        make_cycle(rootN, revN, n, commitN)
+    ledger(rootN, "raise", "--review", str(revN), "--cycle", "1",
+           "--id", "C01-F01", "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
+    ledger(rootN, "raise", "--review", str(revN), "--cycle", "1",
+           "--id", "C01-F02", "--class", "WRONG OWNERSHIP", "--source", "CODEX_REVIEW")
+    ledger(rootN, "respond", "--review", str(revN), "--cycle", "1",
+           "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "will fix")
+    ledger(rootN, "resolve", "--review", str(revN), "--cycle", "2",
+           "--id", "C01-F01", "--evidence", "demonstrated")
+
+    before_loop = loop(rootN, revN)
+    before_snap = ledger(rootN, "show", "--review", str(revN), "--cycle", "2")
+
+    r_rs = ledger(rootN, "repair-status", "--review", str(revN), "--id", "C01-F02",
+                  "--status", "EXTERNALLY_DEMONSTRATED",
+                  "--verification-run", "BOOTSTRAP-002",
+                  "--closure-record", "bootstrap-review/decision.json")
+    dN = json.loads((revN / "ledger.json").read_text(encoding="utf-8"))
+    if r_rs.returncode != 0:
+        failures.append(f"repair-status was refused:\n{r_rs.stderr}{r_rs.stdout}")
+    elif dN["findings"]["C01-F02"]["state"] != "OPEN":
+        failures.append(
+            "repair-status moved the finding out of OPEN. It is descriptive "
+            "metadata and must never be a second route to RESOLVED.")
+    else:
+        print("  [ok] repair-status records EXTERNALLY_DEMONSTRATED and leaves "
+              "the state OPEN")
+
+    after_loop = loop(rootN, revN)
+    after_snap = ledger(rootN, "show", "--review", str(revN), "--cycle", "2")
+    if (before_loop.stdout, before_loop.returncode) != \
+            (after_loop.stdout, after_loop.returncode):
+        failures.append(
+            "the loop controller's output changed once repair status was "
+            "recorded. OPEN_n, convergence, stall and cycle counting must not "
+            "see this field.\n      before: "
+            f"{before_loop.stdout.strip()[:200]}\n      after:  "
+            f"{after_loop.stdout.strip()[:200]}")
+    elif before_snap.stdout != after_snap.stdout:
+        failures.append(
+            "the per-cycle state snapshot changed once repair status was "
+            "recorded; the field is reaching the state machine.")
+    else:
+        print("  [ok] recording repair status changes no authoritative output")
+
+    expect_refused("EXTERNALLY_DEMONSTRATED with no verification run",
+                   "requires --verification-run", lambda: ledger(
+                       rootN, "repair-status", "--review", str(revN),
+                       "--id", "C01-F02", "--status", "EXTERNALLY_DEMONSTRATED"))
+
+    expect_refused("a repair status outside the three", "one of the three",
+                   lambda: ledger(
+                       rootN, "repair-status", "--review", str(revN),
+                       "--id", "C01-F02", "--status", "RESOLVED"))
 
     expect_refused("respond to a RESOLVED finding", "resolved", lambda: ledger(
         root, "respond", "--review", str(rev), "--cycle", "3", "--id", "C01-F01",
@@ -428,7 +548,7 @@ def main() -> int:
     root2, commit2, rev2 = fresh()
     rev2.mkdir(parents=True)
     ledger(root2, "raise", "--review", str(rev2), "--cycle", "1", "--id", "C01-F01",
-           "--class", "UNTESTED RULE")
+           "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
 
     expect_refused("REJECT_WITH_REASON with no reason", "requires --note", lambda: ledger(
         root2, "respond", "--review", str(rev2), "--cycle", "1", "--id", "C01-F01",
@@ -471,7 +591,7 @@ def main() -> int:
     root3, commit3, rev3 = fresh()
     rev3.mkdir(parents=True)
     ledger(root3, "raise", "--review", str(rev3), "--cycle", "1", "--id", "C01-F01",
-           "--class", "WRONG OWNERSHIP")
+           "--class", "WRONG OWNERSHIP", "--source", "CODEX_REVIEW")
     ledger(root3, "respond", "--review", str(rev3), "--cycle", "1", "--id", "C01-F01",
            "--disposition", "REJECT_WITH_REASON", "--note", "spec says otherwise",
            "--spec-evidence", "§5: ACCEPT does not resolve")
@@ -496,19 +616,22 @@ def main() -> int:
     expect_refused("raise OUT OF VOCABULARY as a finding", "not a finding",
                    lambda: ledger(root4, "raise", "--review", str(rev4),
                                   "--cycle", "1", "--id", "C01-F01",
-                                  "--class", "OUT OF VOCABULARY"))
+                                  "--class", "OUT OF VOCABULARY",
+                                  "--source", "CODEX_REVIEW"))
 
     # Case and spacing must not be a way around it. A refusal that a different
     # capitalisation defeats is a refusal in appearance only.
     expect_refused("raise it in lower case", "not a finding",
                    lambda: ledger(root4, "raise", "--review", str(rev4),
                                   "--cycle", "1", "--id", "C01-F02",
-                                  "--class", "out of vocabulary"))
+                                  "--class", "out of vocabulary",
+                                  "--source", "CODEX_REVIEW"))
 
     expect_refused("raise it with surrounding whitespace", "not a finding",
                    lambda: ledger(root4, "raise", "--review", str(rev4),
                                   "--cycle", "1", "--id", "C01-F03",
-                                  "--class", "  OUT OF VOCABULARY  "))
+                                  "--class", "  OUT OF VOCABULARY  ",
+                                  "--source", "CODEX_REVIEW"))
 
     # And nothing was written on the way to being refused.
     if (rev4 / "findings.json").is_file():
@@ -527,7 +650,8 @@ def main() -> int:
                                "SEMANTIC STEP TOO BROAD", "UNTESTED RULE",
                                "CONTRADICTORY IMPLEMENTATION MAPPING"), start=10):
         r = ledger(root4, "raise", "--review", str(rev4), "--cycle", "1",
-                   "--id", f"C01-F{i}", "--class", klass)
+                   "--id", f"C01-F{i}", "--class", klass,
+                   "--source", "CODEX_REVIEW")
         if r.returncode != 0:
             failures.append(f"the ledger refused a legitimate class {klass!r}:\n"
                             f"{r.stderr}{r.stdout}")
@@ -541,7 +665,8 @@ def main() -> int:
     expect_refused("an invented seventh class", "one of the six",
                    lambda: ledger(root4, "raise", "--review", str(rev4),
                                   "--cycle", "1", "--id", "C01-F20",
-                                  "--class", "STYLE NIT"))
+                                  "--class", "STYLE NIT",
+                                  "--source", "CODEX_REVIEW"))
 
     expect_refused("resolve a DISPUTED finding", "human adjudication", lambda: ledger(
         root3, "resolve", "--review", str(rev3), "--cycle", "2", "--id", "C01-F01",
@@ -571,7 +696,7 @@ def main() -> int:
     # then counted as real.
     root, rev = review_with({1: True, 2: False, 3: True})
     ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-           "--class", "UNTESTED RULE")
+           "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     ledger(root, "respond", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
            "--disposition", "ACCEPT", "--note", "accepted in a cycle that failed")
     expect_refused(
@@ -607,7 +732,7 @@ def main() -> int:
     # CONVERGED. A resolution survived on an acceptance that had been withdrawn.
     root, rev = review_with({1: True, 2: True, 3: True})
     ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-           "--class", "UNTESTED RULE")
+           "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     ledger(root, "respond", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
            "--disposition", "ACCEPT", "--note", "accepted while cycle 2 passed")
     ledger(root, "resolve", "--review", str(rev), "--cycle", "3", "--id", "C01-F01",
@@ -662,7 +787,7 @@ def main() -> int:
     # happened. Nothing but the membership rule can refuse this.
     root, rev = review_with({1: True, 3: True})
     ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-           "--class", "UNTESTED RULE")
+           "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     _acc = ledger(root, "respond", "--review", str(rev), "--cycle", "2",
                   "--id", "C01-F01", "--disposition", "ACCEPT",
                   "--note", "recorded against a cycle that never existed")
@@ -714,7 +839,7 @@ def main() -> int:
     # agreement nobody made about the second repair.
     root, rev = review_with({1: True, 2: True, 3: True, 4: True})
     ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-           "--class", "UNTESTED RULE")
+           "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
            "--disposition", "ACCEPT", "--note", "will fix")
     ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
@@ -763,7 +888,7 @@ def main() -> int:
     # ACCEPT is causally eligible." A fresh row is not a fresh agreement.
     root, rev = review_with({1: True, 2: True, 3: True, 4: True})
     ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-           "--class", "UNTESTED RULE")
+           "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
            "--disposition", "ACCEPT", "--note", "will fix")
     ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
@@ -794,7 +919,7 @@ def main() -> int:
     # writes the row directly and then asks whether it can still close anything.
     root, rev = review_with({1: True, 2: True, 3: True, 4: True})
     ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-           "--class", "UNTESTED RULE")
+           "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
            "--disposition", "ACCEPT", "--note", "will fix")
     ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
@@ -835,7 +960,7 @@ def main() -> int:
     # survives the repair being removed. It did, on the first attempt.
     root, rev = review_with({1: True, 2: True, 3: True})
     ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-           "--class", "UNTESTED RULE")
+           "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
            "--disposition", "ACCEPT", "--note", "fix")
     ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
@@ -946,7 +1071,7 @@ def main() -> int:
 
     def one_open(root, rev):
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-               "--class", "UNTESTED RULE")
+               "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
 
     scenario("no findings at all", 1, nothing, "CONVERGED")
 
@@ -954,7 +1079,7 @@ def main() -> int:
 
     def resolved_by_2(root, rev):
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-               "--class", "UNTESTED RULE")
+               "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
         ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
                "--disposition", "ACCEPT", "--note", "fix")
         ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
@@ -964,16 +1089,16 @@ def main() -> int:
     def stalled(root, rev):
         # Raised in 1, accepted in 1, nothing demonstrated in 2, nothing new.
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-               "--class", "UNTESTED RULE")
+               "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
         ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
                "--disposition", "ACCEPT", "--note", "fix")
     scenario("no reduction, nothing resolved, nothing disputed", 2, stalled, "STALLED")
 
     def new_dispute(root, rev):
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-               "--class", "UNTESTED RULE")
+               "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F02",
-               "--class", "WRONG OWNERSHIP")
+               "--class", "WRONG OWNERSHIP", "--source", "CODEX_REVIEW")
         # A NEW dispute in cycle 2 is progress under §6, so this must NOT stall.
         ledger(root, "respond", "--review", str(rev), "--cycle", "2", "--id", "C01-F02",
                "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees",
@@ -989,7 +1114,7 @@ def main() -> int:
         c1 = cycles[0]
         for i in range(1, 5):
             ledger(root, "raise", "--review", str(rev), "--cycle", str(c1),
-                   "--id", f"C{c1:02d}-F{i:02d}", "--class", "UNTESTED RULE")
+                   "--id", f"C{c1:02d}-F{i:02d}", "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
         # Accept one per cycle and demonstrate it in the next valid cycle.
         for k, cyc in enumerate(cycles[:-1], start=1):
             ledger(root, "respond", "--review", str(rev), "--cycle", str(cyc),
@@ -1006,7 +1131,7 @@ def main() -> int:
     def four_no_progress(root, rev):
         for c in range(1, 5):
             ledger(root, "raise", "--review", str(rev), "--cycle", str(c),
-                   "--id", f"C{c:02d}-F01", "--class", "UNTESTED RULE")
+                   "--id", f"C{c:02d}-F01", "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     scenario("STALLED is tested before MAX_4", 4, four_no_progress, "STALLED")
 
     # B01-F02. This scenario used to assert CONVERGED, and Codex named the
@@ -1020,7 +1145,7 @@ def main() -> int:
     # latest boundary let the cycle-4 resolution erase the cycle-2 exit.
     def four_then_resolved(root, rev):
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-               "--class", "UNTESTED RULE")
+               "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
         ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
                "--disposition", "ACCEPT", "--note", "fix")
         ledger(root, "resolve", "--review", str(rev), "--cycle", "4", "--id", "C01-F01",
@@ -1072,7 +1197,7 @@ def main() -> int:
     # and nothing beyond it.
     def cleared_at_the_latest(root, rev):
         ledger(root, "raise", "--review", str(rev), "--cycle", "1",
-               "--id", "C01-F01", "--class", "UNTESTED RULE")
+               "--id", "C01-F01", "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
         ledger(root, "respond", "--review", str(rev), "--cycle", "1",
                "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "fix")
         auth_record(rev, 2)
@@ -1087,7 +1212,7 @@ def main() -> int:
     # pass equally well if the exit had simply stopped being detected.
     def not_cleared_at_the_latest(root, rev):
         ledger(root, "raise", "--review", str(rev), "--cycle", "1",
-               "--id", "C01-F01", "--class", "UNTESTED RULE")
+               "--id", "C01-F01", "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
         ledger(root, "respond", "--review", str(rev), "--cycle", "1",
                "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "fix")
     scenario("the same loop stops when nothing authorizes the latest exit", 2,
@@ -1133,7 +1258,7 @@ def main() -> int:
     # STALLED, which mislabels a loop that finished everything automation could.
     def only_a_dispute(root, rev):
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-               "--class", "WRONG OWNERSHIP")
+               "--class", "WRONG OWNERSHIP", "--source", "CODEX_REVIEW")
         ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
                "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees",
                "--spec-evidence", "§4 closed vocabulary")
@@ -1148,7 +1273,7 @@ def main() -> int:
     def resolved_and_disputed(root, rev):
         for fid, cls in (("C01-F01", "UNTESTED RULE"), ("C01-F02", "WRONG OWNERSHIP")):
             ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", fid,
-                   "--class", cls)
+                   "--class", cls, "--source", "CODEX_REVIEW")
         ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
                "--disposition", "ACCEPT", "--note", "fix")
         ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
@@ -1164,7 +1289,7 @@ def main() -> int:
     def dispute_plus_open(root, rev):
         for fid, cls in (("C01-F01", "UNTESTED RULE"), ("C01-F02", "WRONG OWNERSHIP")):
             ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", fid,
-                   "--class", cls)
+                   "--class", cls, "--source", "CODEX_REVIEW")
         ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F02",
                "--disposition", "REJECT_WITH_REASON", "--note", "spec disagrees",
                "--spec-evidence", "§4 closed vocabulary")
@@ -1173,7 +1298,7 @@ def main() -> int:
 
     def resolved_in_invalid_cycle(root, rev):
         ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
-               "--class", "UNTESTED RULE")
+               "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
         ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
                "--disposition", "ACCEPT", "--note", "fix")
         # Demonstrated in cycle 2, which fails the gate. It must not count.

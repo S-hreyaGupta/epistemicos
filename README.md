@@ -300,3 +300,91 @@ The `EPISTEMIC_OS_` prefix is legacy naming retained so existing deployments and
 running.
 
 `.env` is gitignored and must stay that way — it holds live credentials.
+
+---
+
+## The review layer
+
+Everything above is the ingest pipeline. `scripts/` is something else: the
+machinery that reviews implementation work against a governing protocol, in
+`specs/implementation-review-protocol-v1.1.md`.
+
+It had no entry in this file until 17 September, which mattered more than it
+sounds. The person who has to approve it was going to arrive at a repository
+whose documentation did not mention the thing being approved.
+
+### What it is for
+
+A plan or an implementation is reviewed by a second party, up to four times.
+Each cycle freezes exactly what was reviewed, captures the reviewer's reply
+verbatim, and records every finding and its disposition. A loop controller
+decides from that record alone whether to continue, and a human decides at the
+end. The point of the machinery is that none of those steps can be skipped
+quietly.
+
+### The order
+
+```text
+run_review.py init      pin the protocol and specs for a run
+run_review.py freeze    open a cycle, snapshot what is reviewed, compose the
+                        reviewer's input — the implementing agent does not
+                        author it
+                        → give cycle-NN/codex-input.md to the reviewer
+run_review.py record    store the reply verbatim, extract findings, run MC-2
+validate_cycle.py       the MC-2 gate, fifteen checks; a cycle that fails is
+                        INVALID and does not consume the four-cycle budget
+ledger.py               raise / respond / resolve, with persistent identifiers
+loop_state.py           CONTINUE, CONVERGED, HUMAN_ADJUDICATION_REQUIRED,
+                        STALLED or MAX_4_REACHED, computed from the ledger
+approval_package.py     assemble the §7 package a human decides from
+bootstrap_gate.py       record that decision; APPROVE, RETURN_FOR_REWORK, REJECT
+gold_runner.py          §15 scoring against a frozen gold set
+```
+
+`dry_run.py` runs that whole sequence against a throwaway repository and prints
+what an operator would see. It is the fastest way to understand the layer, and
+it takes under a minute:
+
+```sh
+python scripts/dry_run.py
+```
+
+### Three things that are easy to get wrong
+
+**`ACCEPT` does not resolve a finding.** §5 gives `RESOLVED` only once the repair
+is demonstrated in the *next* review target. Accepting a finding and fixing it
+leaves it `OPEN`, by design, because the claim that a repair works is the
+implementing agent's until someone else sees it.
+
+**A demonstrated repair is reported by absence.** There is no "repair
+demonstrated" status. A reviewer says `REPAIR NOT DEMONSTRATED` when a fix did
+not hold, and otherwise simply does not raise the finding again. A clean cycle
+is recorded with `--zero-findings`, which has to be asserted rather than
+inferred from a parser that found nothing.
+
+**An artifact governs a run or is reviewed by it, never both.** A spec cannot be
+required to stay byte-identical for a run's duration while also being the thing
+findings ask to change. Roles move between cycles through
+`pin-amendments.json`, not by editing the pin.
+
+### Nothing here is technically enforced
+
+`MC1_ENFORCEMENT` is `CONVENTION_ONLY`. Every check is detection that holds
+while the checks run faithfully and nobody edits the records they read, and the
+same writable code performs the checks on itself. That is recorded in each run
+rather than assumed, and the machinery refuses to claim more.
+
+### State
+
+The layer has not been approved. `python scripts/bootstrap_gate.py check`
+reports what is outstanding, and until it passes no real protocol cycle can
+run. `runs/BOOTSTRAP-001/plan-review/HANDOVER.md` is the account of how it got
+here.
+
+The suites — 319 controls over these components, plus three more over the tools
+outside them — run in CI on every push, and can be run by hand:
+
+```sh
+python scripts/refresh_counts.py     # what the counts are
+python scripts/test_ledger.py        # or any single suite
+```

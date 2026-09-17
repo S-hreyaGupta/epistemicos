@@ -254,4 +254,12 @@ the raw reviewer output, the extracted findings, and the capture log recording
 every attempt. Cycle 04 also holds the auxiliary manifest binding the versions of
 the five control suites, which are evidence but not members of the target.
 
-The control suites stand at 298 controls across five files.
+The control suites stand at **307 controls across five files**. They stood at
+**298 at the close of cycle 04**, which is the figure cycle 04's frozen prompt
+states and the one that belongs to that review; the nine added since are the
+controls for the five repairs in the addendum above.
+
+*This section said 298 as the current figure while the addendum said 307. Alex
+Zamurko caught it, 16 September. The two numbers were written by different
+passes and only one of them was updated, which is the same shape as the count
+refresh on 14 September.*

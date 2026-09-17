@@ -227,6 +227,19 @@ loop.
 gets the wrong picture in both directions, and this addendum is the only thing
 that corrects it.
 
+*Corrected 17 September.* It is no longer the only thing. On your item B, the
+ledger now carries a descriptive `repair_status` beside the authoritative state,
+and all five read `IMPLEMENTED_AWAITING_DEMONSTRATION`. The state field is
+unchanged and stays `OPEN`; the counts are unchanged at five open and
+twenty-five resolved; the loop still reports `MAX_4_REACHED`. A control captures
+the controller's output and the per-cycle snapshot, writes the field, recomputes
+both, and fails if either moved by a byte.
+
+They become `EXTERNALLY_DEMONSTRATED` only once BOOTSTRAP-002 has actually
+demonstrated them, and the command refuses that value without both a verification
+run and a closure record. So the ledger cannot claim the demonstration before it
+happens, which is the one thing this field could otherwise have been used for.
+
 **One thing the repair turned up.** Making the controller refuse an unreadable
 run broke three control suites, because their fixtures built review directories
 with no `run.json` at all. They had been exercising those seams through the very

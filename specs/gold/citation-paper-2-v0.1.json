@@ -1,0 +1,533 @@
+{
+  "gold_set": "citation-paper-2-v0.1",
+  "unit": "distinct cited work",
+  "not_unit": "citation occurrence — see the module docstring",
+  "corpus_paper": "c1d56945",
+  "key_fields": [
+    "author_phrase",
+    "year"
+  ],
+  "provenance": {
+    "annotator": "Alex Zamurko and Mohit",
+    "annotated": "2026-09-17",
+    "method": "in-text citations and reference list read from the manuscript and written out by hand",
+    "independent_of_extractor_output": "asserted by the annotator; not verifiable from the spreadsheet",
+    "spreadsheet_sha256": "102571276ef70d197374c2a51d4446dde308e6238aefec3e2a819934355df5c4"
+  },
+  "reference_list_entries": 94,
+  "items": [
+    {
+      "author_phrase": "dyllick and muff",
+      "year": "2016",
+      "as_annotated": "Dyllick and Muff, 2016"
+    },
+    {
+      "author_phrase": "rodriguez and amaya",
+      "year": "2024",
+      "as_annotated": "Rodriguez and Amaya, 2024"
+    },
+    {
+      "author_phrase": "hahn and tampe",
+      "year": "2021",
+      "as_annotated": "Hahn and Tampe, 2021"
+    },
+    {
+      "author_phrase": "salmi et al.",
+      "year": "2023",
+      "as_annotated": "Salmi et al., 2023"
+    },
+    {
+      "author_phrase": "wieland",
+      "year": "2021",
+      "as_annotated": "Wieland, 2021"
+    },
+    {
+      "author_phrase": "pagell and shevchenko",
+      "year": "2014",
+      "as_annotated": "Pagell and Shevchenko, 2014"
+    },
+    {
+      "author_phrase": "montabon et al.",
+      "year": "2016",
+      "as_annotated": "Montabon et al., 2016"
+    },
+    {
+      "author_phrase": "gualandris et al.",
+      "year": "2024",
+      "as_annotated": "Gualandris et al., 2024"
+    },
+    {
+      "author_phrase": "muñoz and branzei",
+      "year": "2021",
+      "as_annotated": "Muñoz and Branzei, 2021"
+    },
+    {
+      "author_phrase": "barbier",
+      "year": "2022",
+      "as_annotated": "Barbier, 2022"
+    },
+    {
+      "author_phrase": "luzzini et al.",
+      "year": "2024",
+      "as_annotated": "Luzzini et al., 2024"
+    },
+    {
+      "author_phrase": "wieland and creutzig",
+      "year": "2025",
+      "as_annotated": "Wieland and Creutzig, 2025"
+    },
+    {
+      "author_phrase": "pagell and wu",
+      "year": "2009",
+      "as_annotated": "Pagell and Wu, 2009"
+    },
+    {
+      "author_phrase": "seuring and müller",
+      "year": "2008",
+      "as_annotated": "Seuring and Müller, 2008"
+    },
+    {
+      "author_phrase": "du plessis and cole",
+      "year": "2011",
+      "as_annotated": "du Plessis and Cole, 2011"
+    },
+    {
+      "author_phrase": "hawken",
+      "year": "2021",
+      "as_annotated": "Hawken, 2021"
+    },
+    {
+      "author_phrase": "rahman et al.",
+      "year": "2024",
+      "as_annotated": "Rahman et al., 2024"
+    },
+    {
+      "author_phrase": "slawinski et al.",
+      "year": "2021",
+      "as_annotated": "Slawinski et al., 2021"
+    },
+    {
+      "author_phrase": "guthey et al.",
+      "year": "2014",
+      "as_annotated": "Guthey et al., 2014"
+    },
+    {
+      "author_phrase": "whiteman et al",
+      "year": "2013",
+      "as_annotated": "Whiteman et al, 2013"
+    },
+    {
+      "author_phrase": "ellen macarthur",
+      "year": "2024",
+      "as_annotated": "Ellen MacArthur, 2024"
+    },
+    {
+      "author_phrase": "morseletto",
+      "year": "2020",
+      "as_annotated": "Morseletto, 2020"
+    },
+    {
+      "author_phrase": "de la cruz and dessein",
+      "year": "2021",
+      "as_annotated": "De La Cruz and Dessein, 2021"
+    },
+    {
+      "author_phrase": "nelson and coe",
+      "year": "2014",
+      "as_annotated": "Nelson and Coe, 2014"
+    },
+    {
+      "author_phrase": "enthoven and van den broeck",
+      "year": "2023",
+      "as_annotated": "Enthoven and Van den Broeck, 2023"
+    },
+    {
+      "author_phrase": "fao",
+      "year": "2018",
+      "as_annotated": "FAO, 2018"
+    },
+    {
+      "author_phrase": "muñoz and branzei",
+      "year": "2011",
+      "as_annotated": "Muñoz and Branzei, 2011"
+    },
+    {
+      "author_phrase": "giller et al.",
+      "year": "2021",
+      "as_annotated": "Giller et al., 2021"
+    },
+    {
+      "author_phrase": "albareda and branzei",
+      "year": "2024",
+      "as_annotated": "Albareda and Branzei, 2024"
+    },
+    {
+      "author_phrase": "porter et al.",
+      "year": "2020",
+      "as_annotated": "Porter et al., 2020"
+    },
+    {
+      "author_phrase": "durach et al.",
+      "year": "2017",
+      "as_annotated": "Durach et al., 2017"
+    },
+    {
+      "author_phrase": "sauer and seuring",
+      "year": "2023",
+      "as_annotated": "Sauer and Seuring, 2023"
+    },
+    {
+      "author_phrase": "ateş and luzzini",
+      "year": "2024",
+      "as_annotated": "Ateş and Luzzini, 2024"
+    },
+    {
+      "author_phrase": "marculetiu et al.",
+      "year": "2023",
+      "as_annotated": "Marculetiu et al., 2023"
+    },
+    {
+      "author_phrase": "guerrero",
+      "year": "2019",
+      "as_annotated": "Guerrero, 2019"
+    },
+    {
+      "author_phrase": "kliem and sievers-glotzbach",
+      "year": "2022",
+      "as_annotated": "Kliem and Sievers-Glotzbach, 2022"
+    },
+    {
+      "author_phrase": "boissière et al.",
+      "year": "2020",
+      "as_annotated": "Boissière et al., 2020"
+    },
+    {
+      "author_phrase": "tripathi et al.",
+      "year": "2024",
+      "as_annotated": "Tripathi et al., 2024"
+    },
+    {
+      "author_phrase": "rover et al.",
+      "year": "2020",
+      "as_annotated": "Rover et al., 2020"
+    },
+    {
+      "author_phrase": "fao",
+      "year": "2005",
+      "as_annotated": "FAO, 2005"
+    },
+    {
+      "author_phrase": "garrett et al",
+      "year": "2017",
+      "as_annotated": "Garrett et al, 2017"
+    },
+    {
+      "author_phrase": "macfadyen et al.",
+      "year": "2015",
+      "as_annotated": "Macfadyen et al., 2015"
+    },
+    {
+      "author_phrase": "kouassi et al.",
+      "year": "2021",
+      "as_annotated": "Kouassi et al., 2021"
+    },
+    {
+      "author_phrase": "lanka et al.",
+      "year": "2017",
+      "as_annotated": "Lanka et al., 2017"
+    },
+    {
+      "author_phrase": "sears et al.",
+      "year": "2018",
+      "as_annotated": "Sears et al., 2018"
+    },
+    {
+      "author_phrase": "albrecht and wiek",
+      "year": "2021",
+      "as_annotated": "Albrecht and Wiek, 2021"
+    },
+    {
+      "author_phrase": "duru, therond, and fares",
+      "year": "2015",
+      "as_annotated": "Duru, Therond, and Fares, 2015"
+    },
+    {
+      "author_phrase": "wezel et al.",
+      "year": "2016",
+      "as_annotated": "Wezel et al., 2016"
+    },
+    {
+      "author_phrase": "raintree",
+      "year": "1986",
+      "as_annotated": "Raintree, 1986"
+    },
+    {
+      "author_phrase": "andres et al.",
+      "year": "2024",
+      "as_annotated": "Andres et al., 2024"
+    },
+    {
+      "author_phrase": "fremout et al.",
+      "year": "2022",
+      "as_annotated": "Fremout et al., 2022"
+    },
+    {
+      "author_phrase": "urzedo et al.",
+      "year": "2022",
+      "as_annotated": "Urzedo et al., 2022"
+    },
+    {
+      "author_phrase": "rauw et al.",
+      "year": "2023",
+      "as_annotated": "Rauw et al., 2023"
+    },
+    {
+      "author_phrase": "carrieri de souza et al.",
+      "year": "2023",
+      "as_annotated": "Carrieri de Souza et al., 2023"
+    },
+    {
+      "author_phrase": "levidow et al.",
+      "year": "2023",
+      "as_annotated": "Levidow et al., 2023"
+    },
+    {
+      "author_phrase": "resque et al.",
+      "year": "2019",
+      "as_annotated": "Resque et al., 2019"
+    },
+    {
+      "author_phrase": "wardell et al.",
+      "year": "2021",
+      "as_annotated": "Wardell et al., 2021"
+    },
+    {
+      "author_phrase": "miller et al.",
+      "year": "2022",
+      "as_annotated": "Miller et al., 2022"
+    },
+    {
+      "author_phrase": "urzedo et al.",
+      "year": "2020",
+      "as_annotated": "Urzedo et al., 2020"
+    },
+    {
+      "author_phrase": "jordan et al.",
+      "year": "2016",
+      "as_annotated": "Jordan et al., 2016"
+    },
+    {
+      "author_phrase": "da silva et al.",
+      "year": "2024",
+      "as_annotated": "da Silva et al., 2024"
+    },
+    {
+      "author_phrase": "debrot et al.",
+      "year": "2020",
+      "as_annotated": "Debrot et al., 2020"
+    },
+    {
+      "author_phrase": "makino et al.",
+      "year": "2020",
+      "as_annotated": "Makino et al., 2020"
+    },
+    {
+      "author_phrase": "sanz-cañada et al.",
+      "year": "2023",
+      "as_annotated": "Sanz-Cañada et al., 2023"
+    },
+    {
+      "author_phrase": "bisht et al.",
+      "year": "2020",
+      "as_annotated": "Bisht et al., 2020"
+    },
+    {
+      "author_phrase": "moraine et al.",
+      "year": "2016",
+      "as_annotated": "Moraine et al., 2016"
+    },
+    {
+      "author_phrase": "sam",
+      "year": "2018",
+      "as_annotated": "Sam, 2018"
+    },
+    {
+      "author_phrase": "esquivel et al.",
+      "year": "2021",
+      "as_annotated": "Esquivel et al., 2021"
+    },
+    {
+      "author_phrase": "zimmerer",
+      "year": "2003",
+      "as_annotated": "Zimmerer, 2003"
+    },
+    {
+      "author_phrase": "vanlauwe et al.",
+      "year": "2019",
+      "as_annotated": "Vanlauwe et al., 2019"
+    },
+    {
+      "author_phrase": "valencia et al.",
+      "year": "2019",
+      "as_annotated": "Valencia et al., 2019"
+    },
+    {
+      "author_phrase": "hervé et al.",
+      "year": "2020",
+      "as_annotated": "Hervé et al., 2020"
+    },
+    {
+      "author_phrase": "oliviera da silva et al.",
+      "year": "2023",
+      "as_annotated": "Oliviera da Silva et al., 2023"
+    },
+    {
+      "author_phrase": "salliou",
+      "year": "2019",
+      "as_annotated": "Salliou, 2019"
+    },
+    {
+      "author_phrase": "souissi et al.",
+      "year": "2024",
+      "as_annotated": "Souissi et al., 2024"
+    },
+    {
+      "author_phrase": "barrios et al.",
+      "year": "2020",
+      "as_annotated": "Barrios et al., 2020"
+    },
+    {
+      "author_phrase": "de freitas",
+      "year": "2017",
+      "as_annotated": "de Freitas, 2017"
+    },
+    {
+      "author_phrase": "da silva et al.",
+      "year": "2017",
+      "as_annotated": "Da silva et al., 2017"
+    },
+    {
+      "author_phrase": "dudley and alexander",
+      "year": "2017",
+      "as_annotated": "Dudley and Alexander, 2017"
+    },
+    {
+      "author_phrase": "vieira",
+      "year": "2021",
+      "as_annotated": "Vieira, 2021"
+    },
+    {
+      "author_phrase": "hett et al.",
+      "year": "2023",
+      "as_annotated": "Hett et al., 2023"
+    },
+    {
+      "author_phrase": "kettle",
+      "year": "2010",
+      "as_annotated": "Kettle, 2010"
+    },
+    {
+      "author_phrase": "andersen",
+      "year": "2014",
+      "as_annotated": "Andersen, 2014"
+    },
+    {
+      "author_phrase": "liu",
+      "year": "2023",
+      "as_annotated": "Liu, 2023"
+    },
+    {
+      "author_phrase": "de santana et al.",
+      "year": "2023",
+      "as_annotated": "de Santana et al., 2023"
+    },
+    {
+      "author_phrase": "buor et al.",
+      "year": "2022",
+      "as_annotated": "Buor et al., 2022"
+    },
+    {
+      "author_phrase": "bisht",
+      "year": "2019",
+      "as_annotated": "Bisht, 2019"
+    },
+    {
+      "author_phrase": "barbieri et al.",
+      "year": "2023",
+      "as_annotated": "Barbieri et al., 2023"
+    },
+    {
+      "author_phrase": "flora",
+      "year": "2010",
+      "as_annotated": "Flora, 2010"
+    },
+    {
+      "author_phrase": "oliveira da silva et al.",
+      "year": "2024",
+      "as_annotated": "Oliveira da Silva et al., 2024"
+    },
+    {
+      "author_phrase": "whiteman and cooper",
+      "year": "2000",
+      "as_annotated": "Whiteman and Cooper, 2000"
+    },
+    {
+      "author_phrase": "roth and zheng",
+      "year": "2021",
+      "as_annotated": "Roth and Zheng, 2021"
+    },
+    {
+      "author_phrase": "mamine et al.",
+      "year": "2020",
+      "as_annotated": "Mamine et al., 2020"
+    },
+    {
+      "author_phrase": "sjoerdsma and van weele",
+      "year": "2015",
+      "as_annotated": "Sjoerdsma and van Weele, 2015"
+    },
+    {
+      "author_phrase": "brix-asala et al.",
+      "year": "2021",
+      "as_annotated": "Brix-Asala et al., 2021"
+    },
+    {
+      "author_phrase": "sancha, longoni and giménez",
+      "year": "2015",
+      "as_annotated": "Sancha, Longoni and Giménez, 2015"
+    },
+    {
+      "author_phrase": "pagell et al.",
+      "year": "2010",
+      "as_annotated": "Pagell et al., 2010"
+    },
+    {
+      "author_phrase": "touboulic and walker",
+      "year": "2015",
+      "as_annotated": "Touboulic and Walker, 2015"
+    },
+    {
+      "author_phrase": "glaser et al.",
+      "year": "2024",
+      "as_annotated": "Glaser et al., 2024"
+    },
+    {
+      "author_phrase": "ali",
+      "year": "2024",
+      "as_annotated": "Ali, 2024"
+    },
+    {
+      "author_phrase": "le et al.",
+      "year": "2023",
+      "as_annotated": "Le et al., 2023"
+    },
+    {
+      "author_phrase": "stathatou et al.",
+      "year": "2023",
+      "as_annotated": "Stathatou et al., 2023"
+    }
+  ],
+  "excluded_no_year": [
+    "Speich (no year given)"
+  ]
+}

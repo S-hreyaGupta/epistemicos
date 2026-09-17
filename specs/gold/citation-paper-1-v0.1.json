@@ -1,0 +1,475 @@
+{
+  "gold_set": "citation-paper-1-v0.1",
+  "unit": "distinct cited work",
+  "not_unit": "citation occurrence — see the module docstring",
+  "corpus_paper": "ad1e3ff9",
+  "key_fields": [
+    "author_phrase",
+    "year"
+  ],
+  "provenance": {
+    "annotator": "Alex Zamurko and Mohit",
+    "annotated": "2026-09-17",
+    "method": "in-text citations and reference list read from the manuscript and written out by hand",
+    "independent_of_extractor_output": "asserted by the annotator; not verifiable from the spreadsheet",
+    "spreadsheet_sha256": "102571276ef70d197374c2a51d4446dde308e6238aefec3e2a819934355df5c4"
+  },
+  "reference_list_entries": 97,
+  "items": [
+    {
+      "author_phrase": "sodhi and tang",
+      "year": "2019",
+      "as_annotated": "(Sodhi and Tang, 2019)"
+    },
+    {
+      "author_phrase": "jira and toffel",
+      "year": "2013",
+      "as_annotated": "Jira and Toffel, 2013"
+    },
+    {
+      "author_phrase": "gualandris et al.",
+      "year": "2015",
+      "as_annotated": "Gualandris et al., 2015"
+    },
+    {
+      "author_phrase": "kim and davis",
+      "year": "2016",
+      "as_annotated": "Kim and Davis, 2016"
+    },
+    {
+      "author_phrase": "swift et al.",
+      "year": "2019",
+      "as_annotated": "Swift et al., 2019"
+    },
+    {
+      "author_phrase": "marquis et al.",
+      "year": "2016",
+      "as_annotated": "Marquis et al., 2016"
+    },
+    {
+      "author_phrase": "ostrom",
+      "year": "2000",
+      "as_annotated": "Ostrom, 2000"
+    },
+    {
+      "author_phrase": "mena et al.",
+      "year": "2013",
+      "as_annotated": "Mena et al., 2013"
+    },
+    {
+      "author_phrase": "tachizawa and wong",
+      "year": "2014",
+      "as_annotated": "Tachizawa and Wong, 2014"
+    },
+    {
+      "author_phrase": "wilhelm et al.",
+      "year": "2016",
+      "as_annotated": "Wilhelm et al., 2016"
+    },
+    {
+      "author_phrase": "roberts",
+      "year": "2003",
+      "as_annotated": "Roberts, 2003"
+    },
+    {
+      "author_phrase": "fontana and egels-zandén",
+      "year": "2019",
+      "as_annotated": "Fontana and Egels-Zandén, 2019"
+    },
+    {
+      "author_phrase": "sharma et al.",
+      "year": "2019a",
+      "as_annotated": "Sharma et al., 2019a"
+    },
+    {
+      "author_phrase": "lu and shang",
+      "year": "2017",
+      "as_annotated": "Lu and Shang, 2017"
+    },
+    {
+      "author_phrase": "kolaczyk and csárdi",
+      "year": "2014",
+      "as_annotated": "Kolaczyk and Csárdi, 2014"
+    },
+    {
+      "author_phrase": "chen et al.",
+      "year": "2018",
+      "as_annotated": "Chen et al., 2018"
+    },
+    {
+      "author_phrase": "busse et al.",
+      "year": "2017",
+      "as_annotated": "Busse et al., 2017"
+    },
+    {
+      "author_phrase": "marshall et al.",
+      "year": "2016",
+      "as_annotated": "Marshall et al., 2016"
+    },
+    {
+      "author_phrase": "kolk",
+      "year": "2004",
+      "as_annotated": "Kolk, 2004"
+    },
+    {
+      "author_phrase": "flammer and kacperczyk",
+      "year": "2016",
+      "as_annotated": "Flammer and Kacperczyk, 2016"
+    },
+    {
+      "author_phrase": "marquis et al.",
+      "year": "2018",
+      "as_annotated": "Marquis et al., 2018"
+    },
+    {
+      "author_phrase": "villena and gioia",
+      "year": "2018",
+      "as_annotated": "Villena and Gioia, 2018"
+    },
+    {
+      "author_phrase": "carlos and lewis",
+      "year": "2018",
+      "as_annotated": "Carlos and Lewis, 2018"
+    },
+    {
+      "author_phrase": "fabrizio and kim",
+      "year": "2019",
+      "as_annotated": "Fabrizio and Kim, 2019"
+    },
+    {
+      "author_phrase": "carter and washispack",
+      "year": "2018",
+      "as_annotated": "Carter and Washispack, 2018"
+    },
+    {
+      "author_phrase": "choi et al.",
+      "year": "2001",
+      "as_annotated": "Choi et al., 2001"
+    },
+    {
+      "author_phrase": "carter et al.",
+      "year": "2015",
+      "as_annotated": "Carter et al., 2015"
+    },
+    {
+      "author_phrase": "choi and krause",
+      "year": "2006",
+      "as_annotated": "Choi and Krause, 2006"
+    },
+    {
+      "author_phrase": "pathak et al.",
+      "year": "2014",
+      "as_annotated": "Pathak et al., 2014"
+    },
+    {
+      "author_phrase": "brandon-jones et al.",
+      "year": "2015",
+      "as_annotated": "Brandon-Jones et al., 2015"
+    },
+    {
+      "author_phrase": "gao et al.",
+      "year": "2015",
+      "as_annotated": "Gao et al., 2015"
+    },
+    {
+      "author_phrase": "fagiolo",
+      "year": "2007",
+      "as_annotated": "Fagiolo, 2007"
+    },
+    {
+      "author_phrase": "carnovale and yeniyurt",
+      "year": "2015",
+      "as_annotated": "Carnovale and Yeniyurt, 2015"
+    },
+    {
+      "author_phrase": "olson",
+      "year": "1965",
+      "as_annotated": "Olson, 1965"
+    },
+    {
+      "author_phrase": "ostrom",
+      "year": "1990",
+      "as_annotated": "Ostrom, 1990"
+    },
+    {
+      "author_phrase": "samuelson",
+      "year": "1954",
+      "as_annotated": "Samuelson, 1954"
+    },
+    {
+      "author_phrase": "connolly and thorn",
+      "year": "1990",
+      "as_annotated": "Connolly and Thorn, 1990"
+    },
+    {
+      "author_phrase": "frischmann",
+      "year": "2013",
+      "as_annotated": "Frischmann, 2013"
+    },
+    {
+      "author_phrase": "fulk et al.",
+      "year": "1996",
+      "as_annotated": "Fulk et al., 1996"
+    },
+    {
+      "author_phrase": "bimber et al.",
+      "year": "2005",
+      "as_annotated": "Bimber et al., 2005"
+    },
+    {
+      "author_phrase": "wilhoit and kisselburgh",
+      "year": "2015",
+      "as_annotated": "Wilhoit and Kisselburgh, 2015"
+    },
+    {
+      "author_phrase": "reed et al.",
+      "year": "2014",
+      "as_annotated": "Reed et al., 2014"
+    },
+    {
+      "author_phrase": "madison et al.",
+      "year": "2010",
+      "as_annotated": "Madison et al., 2010"
+    },
+    {
+      "author_phrase": "von krogh et al.",
+      "year": "2003",
+      "as_annotated": "von Krogh et al., 2003"
+    },
+    {
+      "author_phrase": "yan et al.",
+      "year": "2015",
+      "as_annotated": "Yan et al., 2015"
+    },
+    {
+      "author_phrase": "kim et al.",
+      "year": "2011",
+      "as_annotated": "Kim et al., 2011"
+    },
+    {
+      "author_phrase": "gould",
+      "year": "1993",
+      "as_annotated": "Gould, 1993"
+    },
+    {
+      "author_phrase": "ostrom and walker",
+      "year": "2003",
+      "as_annotated": "Ostrom and Walker, 2003"
+    },
+    {
+      "author_phrase": "rivera et al.",
+      "year": "2010",
+      "as_annotated": "Rivera et al., 2010"
+    },
+    {
+      "author_phrase": "wenger",
+      "year": "1998",
+      "as_annotated": "Wenger, 1998"
+    },
+    {
+      "author_phrase": "marwell and oliver",
+      "year": "1988",
+      "as_annotated": "Marwell and Oliver, 1988"
+    },
+    {
+      "author_phrase": "fu and shumate",
+      "year": "2016",
+      "as_annotated": "Fu and Shumate, 2016"
+    },
+    {
+      "author_phrase": "choi and wu",
+      "year": "2009",
+      "as_annotated": "Choi and Wu, 2009"
+    },
+    {
+      "author_phrase": "kim and choi",
+      "year": "2015",
+      "as_annotated": "Kim and Choi, 2015"
+    },
+    {
+      "author_phrase": "schilling and phelps",
+      "year": "2007",
+      "as_annotated": "Schilling and Phelps, 2007"
+    },
+    {
+      "author_phrase": "centola",
+      "year": "2013",
+      "as_annotated": "Centola, 2013"
+    },
+    {
+      "author_phrase": "poteete and ostrom",
+      "year": "2004",
+      "as_annotated": "Poteete and Ostrom, 2004"
+    },
+    {
+      "author_phrase": "bode and wagner",
+      "year": "2015",
+      "as_annotated": "Bode and Wagner, 2015"
+    },
+    {
+      "author_phrase": "jacobs and subramanian",
+      "year": "2012",
+      "as_annotated": "Jacobs and Subramanian, 2012"
+    },
+    {
+      "author_phrase": "hall and matos",
+      "year": "2010",
+      "as_annotated": "Hall and Matos, 2010"
+    },
+    {
+      "author_phrase": "parmigiani and rivera-santos",
+      "year": "2015",
+      "as_annotated": "Parmigiani and Rivera-Santos, 2015"
+    },
+    {
+      "author_phrase": "marques et al.",
+      "year": "2019",
+      "as_annotated": "Marques et al., 2019"
+    },
+    {
+      "author_phrase": "van den brink and van der woerd",
+      "year": "2004",
+      "as_annotated": "Van den Brink and Van der Woerd, 2004"
+    },
+    {
+      "author_phrase": "leven et al.",
+      "year": "2014",
+      "as_annotated": "Leven et al., 2014"
+    },
+    {
+      "author_phrase": "enkel and gassmann",
+      "year": "2010",
+      "as_annotated": "Enkel and Gassmann, 2010"
+    },
+    {
+      "author_phrase": "osadchiy et al.",
+      "year": "2015",
+      "as_annotated": "Osadchiy et al., 2015"
+    },
+    {
+      "author_phrase": "park and ravenel",
+      "year": "2013",
+      "as_annotated": "Park and Ravenel, 2013"
+    },
+    {
+      "author_phrase": "lai et al.",
+      "year": "2016",
+      "as_annotated": "Lai et al., 2016"
+    },
+    {
+      "author_phrase": "qiu et al.",
+      "year": "2016",
+      "as_annotated": "Qiu et al., 2016"
+    },
+    {
+      "author_phrase": "wang et al.",
+      "year": "2018",
+      "as_annotated": "Wang et al., 2018"
+    },
+    {
+      "author_phrase": "rice",
+      "year": "2006",
+      "as_annotated": "Rice, 2006"
+    },
+    {
+      "author_phrase": "ahnert and fink",
+      "year": "2008",
+      "as_annotated": "Ahnert and Fink, 2008"
+    },
+    {
+      "author_phrase": "borgatti and li",
+      "year": "2009",
+      "as_annotated": "Borgatti and Li, 2009"
+    },
+    {
+      "author_phrase": "ostrom",
+      "year": "2003",
+      "as_annotated": "Ostrom, 2003"
+    },
+    {
+      "author_phrase": "darnall et al.",
+      "year": "2010",
+      "as_annotated": "Darnall et al., 2010"
+    },
+    {
+      "author_phrase": "reverte",
+      "year": "2009",
+      "as_annotated": "Reverte, 2009"
+    },
+    {
+      "author_phrase": "fine",
+      "year": "1998",
+      "as_annotated": "Fine, 1998"
+    },
+    {
+      "author_phrase": "oyserman",
+      "year": "2011",
+      "as_annotated": "Oyserman, 2011"
+    },
+    {
+      "author_phrase": "schmidt et al.",
+      "year": "2017",
+      "as_annotated": "Schmidt et al., 2017"
+    },
+    {
+      "author_phrase": "darnall et al.",
+      "year": "2009",
+      "as_annotated": "Darnall et al., 2009"
+    },
+    {
+      "author_phrase": "kölbel et al.",
+      "year": "2017",
+      "as_annotated": "Kölbel et al., 2017"
+    },
+    {
+      "author_phrase": "reprisk",
+      "year": "2016",
+      "as_annotated": "RepRisk, 2016"
+    },
+    {
+      "author_phrase": "world bank",
+      "year": "2016",
+      "as_annotated": "World Bank, 2016"
+    },
+    {
+      "author_phrase": "abadie et al.",
+      "year": "2017",
+      "as_annotated": "Abadie et al., 2017"
+    },
+    {
+      "author_phrase": "wooldridge",
+      "year": "2015",
+      "as_annotated": "Wooldridge, 2015"
+    },
+    {
+      "author_phrase": "bliese",
+      "year": "2000",
+      "as_annotated": "Bliese, 2000"
+    },
+    {
+      "author_phrase": "bartko",
+      "year": "1976",
+      "as_annotated": "Bartko, 1976"
+    },
+    {
+      "author_phrase": "mcgraw and wong",
+      "year": "1996",
+      "as_annotated": "McGraw and Wong, 1996"
+    },
+    {
+      "author_phrase": "dooley et al.",
+      "year": "2019",
+      "as_annotated": "Dooley et al., 2019"
+    },
+    {
+      "author_phrase": "gardner and cooper",
+      "year": "2003",
+      "as_annotated": "Gardner and Cooper, 2003"
+    },
+    {
+      "author_phrase": "sharma et al.",
+      "year": "2019b",
+      "as_annotated": "Sharma et al., 2019b"
+    }
+  ]
+}

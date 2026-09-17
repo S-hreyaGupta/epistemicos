@@ -1,0 +1,212 @@
+#!/usr/bin/env python3
+"""Turn the hand-annotated citation spreadsheet into frozen gold sets.
+
+    python scripts/build_citation_gold.py --xlsx <sheet.xlsx> --out specs/gold/
+
+Exit 0 = gold sets written, with a stated count.
+Exit 1 = refused; nothing written.
+
+Provenance
+----------
+The annotation is Alex Zamurko's and Mohit's, 17 September 2026: the in-text
+citations and reference list of two manuscripts, read and written out by hand.
+That is what makes it a gold set. It was produced without reference to any
+extractor output, which is the property the whole exercise depends on and the
+one thing this script cannot verify — it sees a spreadsheet, not how it was made.
+
+What these gold sets measure, and what they do not
+--------------------------------------------------
+**Distinct works, not occurrences.** The annotation lists each cited work once.
+The extractor emits an occurrence every time a work is cited, and the corpus run
+of 29 August put that at roughly 2.1 occurrences per source. So:
+
+    recall here    = of the works the paper cites, how many did the extractor
+                     find at least once
+    NOT            = of the citation occurrences in the text, how many were
+                     extracted
+
+Both are worth knowing and they are not the same number. The second needs an
+occurrence-level annotation, which this is not. Scoring occurrence output
+against a work-level gold set without saying so would report a precision figure
+that is mostly an artefact of repeated citations.
+
+Identity
+--------
+`key_fields` is `author_phrase_normalised + year`, where the normalisation is
+lowercase and collapsed whitespace and nothing else.
+
+Deliberately not first-surname. Reducing "Carrieri de Souza et al., 2023" to a
+surname requires deciding where the surname ends, and that decision is the
+grammar under test — rc3 §B1a exists because the current one gets it wrong.
+A gold set that applied the same rule would agree with the extractor by
+construction on exactly the cases in dispute.
+
+The cost is that the candidate must supply the author phrase it read, not the
+key it derived. A candidate emitting only `person|souza|2023` cannot be scored
+against this without a mapping, and building that mapping here would reintroduce
+the problem.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+
+# Which spreadsheet column holds what. Zero-based, from the sheet as received:
+# an index column, then the values, twice per paper.
+LAYOUT = {
+    "paper-1": {"in_text": 1, "references": 4},
+    "paper-2": {"in_text": 7, "references": 10},
+}
+
+# Identified by matching distinctive names against the 29 August corpus run.
+# Paper 1 carries Kim and Davis 2016, Sharma et al. 2019a and Bloomberg;
+# paper 2 carries Carrieri de Souza, Ellen MacArthur and Wezel.
+CORPUS_ID = {"paper-1": "ad1e3ff9", "paper-2": "c1d56945"}
+
+YEAR = re.compile(r"\b((?:1[89]|20)\d{2}[a-z]?(?:,[a-z])*)\b")
+
+
+class Refused(Exception):
+    pass
+
+
+def norm(s: str) -> str:
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def split_citation(raw: str) -> tuple[str, str] | None:
+    """Author phrase and year, as written. None when there is no year.
+
+    Nothing is repaired here. An entry the annotator wrote without a year is
+    reported, not guessed at: "Speich (no year given)" is a fact about the
+    manuscript and inventing a year would delete it.
+    """
+    s = raw.strip().strip("()").strip()
+    m = YEAR.search(s)
+    if not m:
+        return None
+    author = s[:m.start()].rstrip(" ,;:")
+    return author, m.group(1)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(
+        prog="build_citation_gold.py", description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--xlsx", required=True)
+    ap.add_argument("--out", default="specs/gold")
+    ap.add_argument("--annotator", default="Alex Zamurko and Mohit")
+    ap.add_argument("--annotated", default="2026-09-17")
+    a = ap.parse_args()
+
+    try:
+        import openpyxl
+    except ImportError:
+        raise Refused("openpyxl is not installed: pip install openpyxl")
+
+    xlsx = Path(a.xlsx).resolve()
+    if not xlsx.is_file():
+        raise Refused(f"spreadsheet not found: {xlsx}")
+    sheet_sha = hashlib.sha256(xlsx.read_bytes()).hexdigest()
+
+    ws = openpyxl.load_workbook(xlsx, data_only=True).active
+    rows = list(ws.iter_rows(values_only=True))
+
+    out_dir = Path(a.out)
+    if not out_dir.is_absolute():
+        out_dir = REPO / out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    summary: list[str] = []
+    for paper, cols in LAYOUT.items():
+        raw_in, raw_ref, no_year = [], [], []
+        for r in rows[2:]:
+            for kind, c in cols.items():
+                v = r[c] if c < len(r) else None
+                if not v or not str(v).strip():
+                    continue
+                (raw_in if kind == "in_text" else raw_ref).append(str(v).strip())
+
+        items, seen = [], {}
+        for s in raw_in:
+            parsed = split_citation(s)
+            if parsed is None:
+                no_year.append(s)
+                continue
+            author, year = parsed
+            k = (norm(author), year)
+            if k in seen:
+                # The annotation is a list of distinct works; a repeat is the
+                # annotator's, and collapsing it silently would understate the
+                # denominator by an amount nobody could recover.
+                seen[k] += 1
+                continue
+            seen[k] = 1
+            items.append({
+                "author_phrase": norm(author),
+                "year": year,
+                "as_annotated": s,
+            })
+
+        doc = {
+            "gold_set": f"citation-{paper}-v0.1",
+            "unit": "distinct cited work",
+            "not_unit": "citation occurrence — see the module docstring",
+            "corpus_paper": CORPUS_ID[paper],
+            "key_fields": ["author_phrase", "year"],
+            "provenance": {
+                "annotator": a.annotator,
+                "annotated": a.annotated,
+                "method": "in-text citations and reference list read from the "
+                          "manuscript and written out by hand",
+                "independent_of_extractor_output": "asserted by the annotator; "
+                                                   "not verifiable from the "
+                                                   "spreadsheet",
+                "spreadsheet_sha256": sheet_sha,
+            },
+            "reference_list_entries": len(raw_ref),
+            "items": items,
+        }
+        if no_year:
+            doc["excluded_no_year"] = no_year
+        dupes = {f"{k[0]}|{k[1]}": n for k, n in seen.items() if n > 1}
+        if dupes:
+            doc["annotated_more_than_once"] = dupes
+
+        dest = out_dir / f"citation-{paper}-v0.1.json"
+        with dest.open("w", encoding="utf-8", newline="\n") as fh:
+            json.dump(doc, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+        summary.append(
+            f"  {dest.relative_to(REPO).as_posix()}\n"
+            f"      {len(items)} distinct works  ·  {len(raw_ref)} reference "
+            f"entries  ·  corpus {CORPUS_ID[paper]}\n"
+            f"      sha256 {hashlib.sha256(dest.read_bytes()).hexdigest()}"
+            + (f"\n      excluded, no year: {no_year}" if no_year else "")
+            + (f"\n      annotated twice: {dupes}" if dupes else ""))
+
+    print("built from " + xlsx.name)
+    print(f"  spreadsheet sha256 {sheet_sha}")
+    print()
+    print("\n".join(summary))
+    print()
+    print("  Unit is the distinct cited work. Recall against these answers")
+    print("  'of the works this paper cites, how many did the extractor find at")
+    print("  least once'. It does not answer the occurrence question, which")
+    print("  needs a different annotation.")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Refused as e:
+        print(f"REFUSED: {e}", file=sys.stderr)
+        sys.exit(1)

@@ -47,6 +47,31 @@ func main() {
 	}
 	defer pool.Close()
 
+	// The database has to be the one configuration names. POSTGRES_DB and
+	// POSTGRES_USER apply only at first initialisation, so the prefix rename of
+	// 24 August changed the configuration and could not change the volume: for
+	// three weeks the config said epistemicos and the server was paperly.
+	// Nothing noticed because nothing compared them, and this is the comparison.
+	//
+	// Fatal rather than a warning, unlike the Mathpix probe. A deployment
+	// missing Mathpix credentials can still serve reads honestly; a deployment
+	// writing to a database other than the one it reports is producing evidence
+	// attributed to the wrong place, and every count and hash downstream
+	// inherits that.
+	{
+		var gotDB, gotUser string
+		if err := pool.QueryRow(context.Background(), preflight.IdentityQuery).
+			Scan(&gotDB, &gotUser); err != nil {
+			fatalf("database identity preflight: could not ask the server what it is: %v", err)
+		}
+		if res := preflight.CheckDatabaseIdentity(cfg.DBURL, gotDB, gotUser); !res.OK {
+			fatalf("database identity preflight: %s\n"+
+				"  The connection string and the server disagree. Either repoint the\n"+
+				"  configuration or rename the database; do not proceed with the two\n"+
+				"  out of step.", res.Reason)
+		}
+	}
+
 	metricsReg := metrics.New()
 
 	paperStore := store.NewPostgresPaperStore(pool)

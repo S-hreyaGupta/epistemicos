@@ -518,8 +518,15 @@ def _emit_segment(body, gs, ge, ss, se, seg_text, style, sent, heads, cits,
     m = re.match(rf"\A(?:(?:{'|'.join(re.escape(c) for c in PREFIX_CUES_CP)})[, ][ \t\n]?)?",
                  seg_text)
     rest = seg_text[m.end():] if m else seg_text
-    comma = rest.find(",")
-    authors = rest[:comma] if comma > 0 else rest
+    # The whole AUTHORS_PAREN production, not the text up to the first comma.
+    # A comma separates authors as well as authors from year, so cutting at the
+    # first one turns "Duru, Therond, and Fares, 2015" into "Duru" — which
+    # keys correctly and reports an author_phrase no annotator would write.
+    # Scored against a hand-annotated gold set those read as misses, and they
+    # were not: the citation was extracted and the phrase was truncated.
+    am = re.match(rf"\A{AUTHORS_PAREN}", rest, re.U)
+    authors = am.group(0) if am else (rest.split(",")[0] if "," in rest else rest)
+    comma = len(authors)
     core = first_core(authors)
     if is_all_caps(core):
         _unres(body, ss, se, "all_caps_surname", sent, heads, unres)

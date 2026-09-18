@@ -61,6 +61,11 @@ MUTATIONS = [
      "    am = re.match(rf\"\\A{AUTHORS_PAREN}\", rest, re.U)",
      "    am = None",
      "multi-author parenthetical"),
+
+    ("particles are matched case-sensitively again",
+     'PARTICLE = "(?i:" + "|".join(PARTICLES) + ")"',
+     'PARTICLE = "|".join(PARTICLES)',
+     "sentence-initial particle surnames"),
 ]
 
 # The STOP mutation needs to empty the set rather than edit its opening line.

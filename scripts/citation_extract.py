@@ -65,7 +65,19 @@ NAMECHAR = r"[^\W\d_]|['’\-]"
 CORE = r"[A-ZÀ-Þ][\w'’\-]+"
 PARTICLES = ("de", "del", "della", "der", "den", "di", "da", "dos", "du",
              "la", "le", "van", "von", "ter", "ten", "zu", "zur")
-PARTICLE = "|".join(PARTICLES)
+# §4 lists the particles in lower case and says "single words, compared via
+# lower()". Joining them into a case-sensitive alternation did not do that, so
+# `van der Maas` parsed and `Van der Maas` did not — the same name, the second
+# form being what you get at the start of a sentence. §12 names `van der Maas
+# (2022)` as a conformance case and the suite tested exactly that spelling, so
+# nothing caught it.
+#
+# Scoped flag rather than re.I on the whole pattern: CORE is `\p{Lu}NAMECHAR+`
+# and must stay case-sensitive, or every lower-case word becomes a surname.
+#
+# Worth 15 citations across the nine in-profile papers, 10 fewer unresolved
+# spans, and nothing lost on any paper.
+PARTICLE = "(?i:" + "|".join(PARTICLES) + ")"
 WS = r"[ \t\n]+"
 SURNAME = rf"(?:(?:{PARTICLE}){WS})*{CORE}"
 YEAR = r"(?:1[5-9]|20)\d{2}[a-z]?|n\.d\."

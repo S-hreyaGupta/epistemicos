@@ -123,6 +123,29 @@ def main() -> int:
     # §12 names this one explicitly, particles included in the key.
     case("particle surname", "van der Maas (2022) argues this.",
          ["van der maas|2022"])
+    # And the same name where a sentence puts it, which §12 does not name and
+    # the implementation did not handle: §4 says particles are "compared via
+    # lower()", and the alternation was case-sensitive. Testing only the
+    # spelling the spec happened to write is how that survived.
+    case("the same particle surname, sentence-initial",
+         "Van der Maas (2022) argues this.", ["van der maas|2022"])
+    case("capitalised particle, parenthetical",
+         "As shown (Da Silva et al., 2020).", ["da silva|2020"])
+    case("two capitalised particles",
+         "As shown (De La Cruz and Dessein, 2021).", ["de la cruz|2021"])
+    case("capitalised particle after a conjunction",
+         "As shown (Enthoven and Van den Broeck, 2023).", ["enthoven|2023"])
+    # The limit of the rule, so the fix is not read as wider than it is.
+    # SURNAME is (PARTICLE WS)* CORE — particles lead. A particle *inside* a
+    # surname is outside the grammar as specified, and stays unresolved.
+    case("a particle inside the surname is still out of grammar",
+         "As shown (Oliveira da Silva et al., 2024).", [],
+         want_unres=["no_grammar_match"])
+    # CORE requires an upper-case initial, so this stays out too. It is a
+    # source typo rather than a name form.
+    case("a lower-case core is not a surname",
+         "As shown (Da silva et al., 2017).", [],
+         want_unres=["no_grammar_match"])
 
     # ---- adversarial narrative, §12 row 6 ----
     # The discard constraint: a STOP word before the author is dropped and the

@@ -93,7 +93,7 @@ Two works, one paper. Whether to widen the grammar for a typo this common is a
 judgement, and the pairing above is the argument on both sides: the neighbouring
 segment parses, so a reader has no trouble, and neither would a looser rule.
 
-## What this comes to
+## What the misses come to
 
 ```text
 3    specification working as written, against institutional authors
@@ -112,6 +112,109 @@ What it does not mean is that recall of 0.873 is acceptable. Six of the thirteen
 — the institutional three and EC-4's three — are works a reader would expect a
 citation extractor to find, and the fact that they are refused by rule rather
 than missed by accident does not put them in the output.
+
+## The eleven extras: one cause, and it is in the measuring apparatus
+
+Adjudicated after the misses, and the result is not like paper 1's.
+
+**Every one of paper 2's eleven extras is the same work as a gold item, under a
+different author phrase.** Not one is a citation the extractor invented.
+
+```text
+candidate                 gold                              why they differ
+de freitas et al. 2017    de freitas 2017                   et al. present in one
+de santana 2023           de santana et al. 2023            et al. present in one
+duru et al. 2015          duru, therond, and fares 2015     et al. vs the full list
+garrett 2017              garrett et al 2017                et al. present in one
+lanka 2017                lanka et al. 2017                 et al. present in one
+levidow 2023              levidow et al. 2023               et al. present in one
+macfadyen 2015            macfadyen et al. 2015             et al., and MacFadyen vs Macfadyen
+resque 2019               resque et al. 2019                et al. present in one
+roth and zeng 2021        roth and zheng 2021               Zeng/Zheng, a source typo
+sancha et al. 2015        sancha, longoni and giménez 2015  et al. vs the full list
+sanz-cañada 2023          sanz-cañada et al. 2023           et al. present in one
+```
+
+Ten works in this paper are cited under more than one phrase, and `macfadyen`
+under three. Ten works, eleven surplus entries.
+
+### Why that produces extras
+
+`citation_candidate.py` collapses the extractor's per-occurrence output to
+works before scoring, and the key it collapses on is `(author_phrase, year)`.
+The document it writes declares `"unit": "distinct cited work"` and a field
+called `"distinct_works"`.
+
+It is not counting distinct works. It is counting distinct phrasings, and a
+manuscript that writes `(Duru et al., 2015)` in one paragraph and
+`Duru, Therond, and Fares (2015)` in another contributes two. One matches the
+annotation and the other is a false positive, so the extractor is penalised for
+the manuscript varying its own wording.
+
+The label and the number disagree, which is the defect this layer keeps finding
+in itself, here in the instrument rather than in what it measures.
+
+### What collapsing by work is worth, measured
+
+Grouping occurrences by the work and accepting a match on any phrase observed
+for it:
+
+```text
+                       items   matched   precision
+paper 2  by phrase      100       89       0.890
+paper 2  by work         90       89       0.989
+
+paper 1  by phrase       97       90       0.928
+paper 1  by work         96       89       0.927
+```
+
+Paper 2's precision is almost entirely this. Recall does not move on either
+paper, which is the expected shape: nothing new is found, duplicate entries
+stop being counted against it.
+
+### Paper 1's single lost match is a gold-set duplicate
+
+Collapsing costs paper 1 one match, and that one is worth following.
+`ostrom|2003` is cited two ways, and **gold holds both as separate works**:
+
+```text
+(Gould, 1993; Ostrom and Walker, 2003)   the work as the bibliography gives it
+(Ostrom, 1990, 2003)                     a multi-year group, where the
+                                         manuscript attributes the 2003 work
+                                         to Ostrom alone
+```
+
+Both quoted as whole groups, because a segment is not a string you can find in
+the source. Writing `(Ostrom and Walker, 2003)` here would have been the third
+time today that a segment got quoted as though it stood alone — the gold
+builder refused its own input over the same mistake an hour earlier, which is
+why these were checked rather than transcribed.
+
+The bibliography has one 2003 Ostrom entry —
+`Ostrom, E., & Walker, J. (Eds.). (2003)` — so there is one work, recorded
+twice. The annotation was faithful to what the manuscript says, and
+`author_phrase + year` cannot express that two spellings are one work.
+
+Across both gold sets this happens once: paper 1 has 96 items and 95 distinct
+first-surname-and-year pairs, paper 2 has 102 and 102. So the annotation is
+nearly free of it, and the splitting is on the candidate's side, because the
+candidate sees every occurrence and the annotator wrote one line per work.
+
+### Why this is recorded and not repaired
+
+Collapsing by work means collapsing on `citation_key`, and
+`citation_candidate.py` avoids that deliberately and says so: *deriving a
+surname from a phrase is the grammar under test, and scoring against a gold set
+built from the same derivation would agree by construction on exactly the cases
+rc3 exists to fix.*
+
+That objection is about scoring rather than grouping, and matching would stay on
+`author_phrase`. But it is not empty: EC-3 shows the key can be wrong, and a
+wrong key groups wrongly. Reversing a considered decision in the instrument that
+produces the numbers everyone is arguing about is a decision for whoever owns
+the criteria.
+
+**Needs a decision, not a repair.** Nothing has been changed.
 
 ## What this does not establish
 

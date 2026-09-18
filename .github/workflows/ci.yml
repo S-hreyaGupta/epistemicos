@@ -63,44 +63,63 @@ jobs:
         with:
           python-version: "3.11"
 
+      # Recorded on the run page, because it is the thing local runs cannot
+      # tell you. Twelve consecutive failures were undiagnosable from outside
+      # partly because nobody could see what the runner's environment was.
+      - name: environment, on the run page
+        run: |
+          {
+            echo "### environment"
+            echo '```text'
+            echo "python     $(python -V 2>&1)   at $(command -v python)"
+            echo "commit     $(git rev-parse HEAD)"
+            echo "cwd        $(pwd)"
+            echo "scripts    $(ls scripts/*.py 2>/dev/null | wc -l) python files present"
+            echo "data/      $(ls data 2>/dev/null | wc -l) entries"
+            echo '```'
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # Each suite separately, so a failure names which one rather than
-      # stopping at the first and leaving the rest unknown.
+      # stopping at the first and leaving the rest unknown. Through
+      # ci-step.sh, so a failure is legible on the run page without a
+      # GitHub account — see the header of that file.
       - name: MC-2 conformance gate
-        run: python scripts/test_validate_cycle.py
+        run: bash .github/ci-step.sh "test_validate_cycle" python scripts/test_validate_cycle.py
 
       - name: review runner
-        run: python scripts/test_run_review.py
+        run: bash .github/ci-step.sh "test_run_review" python scripts/test_run_review.py
 
       - name: finding ledger and loop controller
-        run: python scripts/test_ledger.py
+        run: bash .github/ci-step.sh "test_ledger" python scripts/test_ledger.py
 
       - name: bootstrap gate
-        run: python scripts/test_bootstrap_gate.py
+        run: bash .github/ci-step.sh "test_bootstrap_gate" python scripts/test_bootstrap_gate.py
 
       - name: component seams
-        run: python scripts/test_interfaces.py
+        run: bash .github/ci-step.sh "test_interfaces" python scripts/test_interfaces.py
 
       - name: prompts agree with the protocol
-        run: python scripts/test_prompts.py
+        run: bash .github/ci-step.sh "test_prompts" python scripts/test_prompts.py
 
       - name: protocol conversion and pinning
         run: |
-          python scripts/test_convert_protocol.py
-          python scripts/test_protocol_pin.py
+          bash .github/ci-step.sh "test_convert_protocol" python scripts/test_convert_protocol.py
+          bash .github/ci-step.sh "test_protocol_pin" python scripts/test_protocol_pin.py
 
       # Outside the reviewed target, so outside the 319, and run here for the
       # same reason: a control nobody runs is not a control.
       - name: section 7 approval package
-        run: python scripts/test_approval_package.py
+        run: bash .github/ci-step.sh "test_approval_package" python scripts/test_approval_package.py
 
       - name: section 15 gold runner
-        run: python scripts/test_gold_runner.py
+        run: bash .github/ci-step.sh "test_gold_runner" python scripts/test_gold_runner.py
 
       - name: citation candidate adapter
-        run: python scripts/test_citation_candidate.py
+        run: bash .github/ci-step.sh "test_citation_candidate" python scripts/test_citation_candidate.py
 
       - name: citation extractor conformance
-        run: python scripts/test_citation_extract.py
+        run: bash .github/ci-step.sh "test_citation_extract" python scripts/test_citation_extract.py
 
       # The suite above is the only evidence that the rebuilt extractor follows
       # v3.3, and on the day it was written it passed with two of the spec's
@@ -112,13 +131,13 @@ jobs:
       # a control that cannot fail is not a control, and this suite has already
       # contained two of those. Half a second.
       - name: citation controls can actually fail
-        run: python scripts/mutate_citation_suite.py
+        run: bash .github/ci-step.sh "mutate_citation_suite" python scripts/mutate_citation_suite.py
 
       # The suites ask whether each component refuses what it should. This asks
       # whether they still compose. It is the only check here that would catch
       # two components drifting apart while both remain individually correct.
       - name: full protocol rehearsal
-        run: python scripts/dry_run.py
+        run: bash .github/ci-step.sh "dry_run" python scripts/dry_run.py
 
       # The count the bootstrap prompts state is checked against the suites by
       # test_prompts above. This asserts the tool that produces it still exits
@@ -126,7 +145,7 @@ jobs:
       # CI would be an unreviewed edit to a frozen document.
       - name: control counts are computable
         run: |
-          python scripts/refresh_counts.py
+          bash .github/ci-step.sh "refresh_counts" python scripts/refresh_counts.py
           git diff --exit-code -- specs/prompts/ || {
             echo "refresh_counts.py modified a prompt during CI."
             echo "A finished cycle's prompt states the controls that existed"

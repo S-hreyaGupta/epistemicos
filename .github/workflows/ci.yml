@@ -99,6 +99,21 @@ jobs:
       - name: citation candidate adapter
         run: python scripts/test_citation_candidate.py
 
+      - name: citation extractor conformance
+        run: python scripts/test_citation_extract.py
+
+      # The suite above is the only evidence that the rebuilt extractor follows
+      # v3.3, and on the day it was written it passed with two of the spec's
+      # rules broken: the six-token C2 cap removed, and author_phrase cut at the
+      # first comma. Both were found by mutating the implementation, neither by
+      # a control going red.
+      #
+      # So this runs the mutation probe as well. It is the check on the check —
+      # a control that cannot fail is not a control, and this suite has already
+      # contained two of those. Half a second.
+      - name: citation controls can actually fail
+        run: python scripts/mutate_citation_suite.py
+
       # The suites ask whether each component refuses what it should. This asks
       # whether they still compose. It is the only check here that would catch
       # two components drifting apart while both remain individually correct.

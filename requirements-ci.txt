@@ -1,0 +1,18 @@
+# What the checks need, stated where CI can install it.
+#
+# Added 18 September 2026. The execution-layer job was introduced on
+# 17 September without this file and without a pip install, so on the runner
+# `from docx import Document` failed, test_convert_protocol.py raised
+# SystemExit(2) at import, and the job stopped there. It had never once been
+# green. Every step after that point had never run at all.
+#
+# Only what CI actually executes belongs here.
+
+# convert_protocol.py reads the protocol from .docx; its suite imports the
+# same module and aborts at import time without it.
+python-docx==1.1.2
+
+# Deliberately absent: openpyxl. build_citation_gold.py needs it to read the
+# annotation spreadsheet, and CI does not run that script — it reads a source
+# that is not in the repository. Adding it here would install a dependency for
+# a check that does not exist, and quietly suggest that one does.

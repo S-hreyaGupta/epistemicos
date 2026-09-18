@@ -63,6 +63,13 @@ jobs:
         with:
           python-version: "3.11"
 
+      # The job had no install step from the day it was written, so python-docx
+      # was missing, test_convert_protocol.py raised SystemExit(2) at import,
+      # and the job stopped at step 7 of 16. It was never green, and the nine
+      # steps after it had never run on any commit.
+      - name: dependencies
+        run: pip install -r requirements-ci.txt
+
       # Recorded on the run page, because it is the thing local runs cannot
       # tell you. Twelve consecutive failures were undiagnosable from outside
       # partly because nobody could see what the runner's environment was.
@@ -84,25 +91,39 @@ jobs:
       # stopping at the first and leaving the rest unknown. Through
       # ci-step.sh, so a failure is legible on the run page without a
       # GitHub account — see the header of that file.
+      #
+      # `if: !cancelled()` because separate steps alone did not deliver what
+      # the sentence above claims. GitHub stops a job at its first failed
+      # step, so one missing dependency in step 7 meant the nine steps after
+      # it had never run on any commit — the rest were left unknown exactly as
+      # described, by a workflow whose comment said otherwise. Now every suite
+      # reports, and the job still fails if any of them do.
       - name: MC-2 conformance gate
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "test_validate_cycle" python scripts/test_validate_cycle.py
 
       - name: review runner
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "test_run_review" python scripts/test_run_review.py
 
       - name: finding ledger and loop controller
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "test_ledger" python scripts/test_ledger.py
 
       - name: bootstrap gate
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "test_bootstrap_gate" python scripts/test_bootstrap_gate.py
 
       - name: component seams
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "test_interfaces" python scripts/test_interfaces.py
 
       - name: prompts agree with the protocol
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "test_prompts" python scripts/test_prompts.py
 
       - name: protocol conversion and pinning
+        if: ${{ !cancelled() }}
         run: |
           bash .github/ci-step.sh "test_convert_protocol" python scripts/test_convert_protocol.py
           bash .github/ci-step.sh "test_protocol_pin" python scripts/test_protocol_pin.py
@@ -110,15 +131,19 @@ jobs:
       # Outside the reviewed target, so outside the 319, and run here for the
       # same reason: a control nobody runs is not a control.
       - name: section 7 approval package
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "test_approval_package" python scripts/test_approval_package.py
 
       - name: section 15 gold runner
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "test_gold_runner" python scripts/test_gold_runner.py
 
       - name: citation candidate adapter
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "test_citation_candidate" python scripts/test_citation_candidate.py
 
       - name: citation extractor conformance
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "test_citation_extract" python scripts/test_citation_extract.py
 
       # The suite above is the only evidence that the rebuilt extractor follows
@@ -131,12 +156,14 @@ jobs:
       # a control that cannot fail is not a control, and this suite has already
       # contained two of those. Half a second.
       - name: citation controls can actually fail
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "mutate_citation_suite" python scripts/mutate_citation_suite.py
 
       # The suites ask whether each component refuses what it should. This asks
       # whether they still compose. It is the only check here that would catch
       # two components drifting apart while both remain individually correct.
       - name: full protocol rehearsal
+        if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "dry_run" python scripts/dry_run.py
 
       # The count the bootstrap prompts state is checked against the suites by
@@ -144,6 +171,7 @@ jobs:
       # cleanly, without letting it write: a refresh that rewrote a prompt in
       # CI would be an unreviewed edit to a frozen document.
       - name: control counts are computable
+        if: ${{ !cancelled() }}
         run: |
           bash .github/ci-step.sh "refresh_counts" python scripts/refresh_counts.py
           git diff --exit-code -- specs/prompts/ || {
@@ -163,6 +191,7 @@ jobs:
       # This is last deliberately. It asks whether anything above wrote into the
       # record, so it has to run after all of them.
       - name: no suite wrote into a recorded run
+        if: ${{ !cancelled() }}
         run: |
           git diff --exit-code -- runs/ || {
             echo ""

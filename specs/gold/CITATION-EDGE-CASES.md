@@ -13,6 +13,29 @@ Measured against `scripts/citation_extract.py` with all four corrections on
 (`ampersand,segments,colon,cp`), over `data/md_full`, the corpus established
 unchanged since 29 August in `PROVENANCE-GAP.md`.
 
+Baseline for every count below, and it is not what the first version of this
+file used:
+
+```text
+1548   citations parsed
+ 213   unresolved spans
+  10   papers reach extraction; four of fourteen abort at exit 3
+```
+
+**Corrected 18 September.** The counts here first read 1103 parsed and 574
+unresolved. The ampersand correction is applied by `citation_extract.run()` to
+the body and the reference section before extraction, because `\&` is a
+property of the markdown rather than of the grammar. Every ad-hoc measurement
+made that day called `extract_citations` directly and passed `"ampersand"` in
+the fix set, which looks like applying the correction and does not: the flag is
+read inside for other purposes, so nothing errors and the numbers simply come
+out low.
+
+The gold-set scores are unaffected — those go through the CLI. Every corpus
+count in this file was wrong and is restated below. `scripts/edge_case_census.py`
+now mirrors the CLI and carries the explanation, so the next person measuring
+does not have to rediscover it.
+
 ---
 
 ## EC-1 — the coordinated "and" joining two narrative citations
@@ -56,28 +79,33 @@ one construction and wrong in the other, and the grammar sees only the token.
 ### What it costs
 
 ```text
-12          occurrences across the nine in-profile papers
-2.1%        of all 584 unresolved spans
-1 of 15     works missed in gold paper 2 (c1d56945) attributable to it
+11          occurrences across the corpus
+5.2%        of all 213 unresolved spans
+1 of 13     works missed in gold paper 2 (c1d56945) attributable to it
 ```
 
-The gap between twelve occurrences and one missed work is the useful part, and
+(Read 12 and 2.1% of 584 before the measurement correction above. The
+occurrence count barely moved; the proportion trebled, because the denominator
+was nearly three times too large.)
+
+The gap between eleven occurrences and one missed work is the useful part, and
 it is not luck. A work is lost only when **every** occurrence of it sits in
 coordinated position:
 
 ```text
-Sauer and Seuring (2023)    2 occurrences, both coordinated      lost
-Pagell and Wu (2009)        5 occurrences, 1 coordinated         recovered
-Seuring and Müller (2008)   5 occurrences, 1 coordinated         recovered
+                            body mentions   parsed   lost to EC-1
+Sauer and Seuring (2023)          1            0          1        lost
+Pagell and Wu (2009)              8            7          1        recovered
+Seuring and Müller (2008)         6            5          0        recovered
 ```
 
-So the occurrence count overstates the recall cost by roughly an order of
-magnitude, because repetition rescues most of it. Anyone quoting the twelve as a
-recall figure would be wrong, which is why both numbers are here.
+So repetition rescues a work, and the occurrence count overstates the recall
+cost by roughly an order of magnitude. Anyone quoting the eleven as a recall
+figure would be wrong, which is why both numbers are here.
 
-Worth noting that the surviving Sauer occurrence is `Durach et al. (2017) and
-Sauer \& Seuring (2023)` — the ampersand correction applies and the leading
-`and` still takes it. Fixes do not compose their way out of this one.
+The manuscript also writes this work as `Durach et al. (2017) and Sauer \&
+Seuring (2023)` elsewhere, where the ampersand correction applies and the
+leading `and` still takes it. Fixes do not compose their way out of this one.
 
 ### What would close it
 
@@ -128,7 +156,7 @@ output says so.
 ### Reach
 
 ```text
-13 occurrences   across 6 of the 9 in-profile papers
+13 occurrences   across 6 of the 10 papers that reach extraction
 4 papers         where the bare form also appears, so one work is counted twice
 2 papers         where only the possessive appears, so the work is keyed wrong
                  with nothing to compare it against
@@ -237,10 +265,9 @@ saying plainly even though it raised recall on both gold papers.
 
 ```text
 cap    parsed    unresolved    effect
- 6      1103        574        as specified
- 7      1103        574
- 8      1102        575        three of the four corrected
- 9+     1102        575        nothing further changes at any size up to 16
+ 6      1548        213        as specified
+ 8      1547        214        three of the four corrected, one becomes a
+                               refusal — see the per-work table below
 ```
 
 Per work, at 8:
@@ -317,17 +344,23 @@ appears in neither output list. A reader of the results cannot tell it exists.
 ### Reach
 
 ```text
-31 footnote blocks   across 5 of the 9 in-profile papers
-11 citations         would parse if the same text sat in the body
- 2 papers            ad1e3ff9 and e1b418a4 carry all eleven
+31 footnote blocks   across 5 papers
+15 citations         would parse if the same text sat in the body
+ 2 papers            ad1e3ff9 and e1b418a4 carry all fifteen
 ```
 
 ```text
 ad1e3ff9   Cohen (1988), Fagiolo (2007), Dooley et al. (2019)
-e1b418a4   Earley et al. (1989), Cook and Campbell (1979) x2,
-           Buhrmester et al. (2011), Colquitt et al. (2015) x2,
-           Kline (2011), Kline's (2011)
+e1b418a4   DeShon & Alexander (1996), Drach-Zahavy & Erez (2002),
+           Earley et al. (1989), Cook & Campbell (1979),
+           Cook and Campbell (1979) x2, Buhrmester et al. (2011),
+           Colquitt et al. (2015) x2, Ou, Tsui, Kinicki, Waldman,
+           Xiao, & Song (2014), Kline (2011), Kline's (2011)
 ```
+
+Read 11 before the measurement correction at the top of this file; four of the
+fifteen carry `\&` and were invisible to the flawed count, which is a small
+demonstration of what that error did. `Kline's` is EC-2 arriving here too.
 
 ### Why it costs recall rather than being a scope choice
 
@@ -375,10 +408,23 @@ expectation, rather than by anything designed to look for them. The one
 designed check in this area — the conformance suite — passed throughout, because
 §12 pins the string `van der Maas (2022)` and the suite tested that string.
 
-Two corrections were made to this file after first writing, both because a set
-difference disagreed with a direct look. EC-2's cost was recorded as one
-penalty per work and is two. EC-3's cap-8 effect was recorded as two works
-corrected and two orphaned, and is three corrected and one turned into a
-refusal; the missing key was already present from another occurrence and the
-set difference hid it. Both are noted rather than silently amended, since the
-failure mode is the subject of the file.
+Three rounds of corrections were made to this file after first writing, and
+they are left visible rather than smoothed over, since the failure mode is the
+subject of the file.
+
+Two came from a set difference disagreeing with a direct look. EC-2's cost was
+recorded as one penalty per work and is two. EC-3's cap-8 effect was recorded
+as two works corrected and two orphaned, and is three corrected and one turned
+into a refusal; the missing key was already present from another occurrence and
+the set difference hid it.
+
+The third was larger and is described at the top: every corpus count in the
+first version was measured through a pipeline missing the ampersand correction,
+so the parse count was a third too low and the unresolved count nearly three
+times too high. Nothing in the file looked wrong. The rows were internally
+consistent, the proportions were plausible, and the error surfaced only because
+a pattern match returned seventeen hits for a paper that should have had one or
+two, and reading them showed they were all `\&`.
+
+That is the same shape as everything else here: the number was not implausible
+enough to question, and it took a detail that did not fit to expose it.

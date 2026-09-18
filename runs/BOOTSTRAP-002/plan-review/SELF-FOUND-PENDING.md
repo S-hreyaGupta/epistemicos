@@ -105,10 +105,23 @@ it.
 
 ## 4. What this says about the resolved set
 
-All three items are the shape cycle 04 named: a control that passes for a reason
-other than the one it is named for. Item 1 was green for four review cycles.
-Neither was found by a control failing; both came from asking a question no
-control asks.
+Items 1 and 2 are the shape cycle 04 named: something green for a reason other
+than the one it is named for. Item 1 was green for four review cycles.
+
+Item 3 is a different shape and worth separating rather than lumping in. Nothing
+there is broken or mislabelled; the machinery does what it says. What is wrong is
+the scope of a claim — the gate covers ten components and one of them cannot be
+covered the way the other nine are.
+
+What the three share is how they were found. None came from a control failing.
+All three came from asking a question no control asks: what does this control
+actually demonstrate, which refusals has nobody named, and can this component be
+reviewed at all.
+
+That is the argument for the twenty-five. Twenty-five findings in BOOTSTRAP-001
+are marked `RESOLVED` on controls written the same way, and six of those were
+never re-verified. A green suite is evidence that the questions someone thought
+to ask are answered, and nothing more.
 
 Twenty-five findings in BOOTSTRAP-001 are marked `RESOLVED` on controls written
 the same way, and six of those were never re-verified.

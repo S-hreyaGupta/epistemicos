@@ -72,7 +72,31 @@ corpus, six counts      papers 14, with markdown 14, segmentation_runs 17,
                         block was headed "corpus, unchanged" until 18
                         September, which claimed more than six integers can
                         carry: equal row counts are consistent with altered
-                        content and would not distinguish it.
+                        content and would not distinguish it. The content
+                        claim is below, and is a different measurement.
+
+corpus, content         All fourteen papers' markdown, md5 as the server
+                        computes it, against the bytes in data/md_full/ —
+                        exported 29 August 18:55, before the rename:
+
+                        17bef7c6  699d9f105a098b23e7dff4517194c601
+                        2af68a7f  5690b03127e5bf99531599e09b9f68db
+                        43338825  52b01e6b72d93eda928e47d58a07b6bb
+                        4918fd7d  852e2e407b37912e7bba7d3963faeaaf
+                        50408397  e8c3776f40e15cfd89ff6e8ae80212f1
+                        5da73cf4  26601fae605c5b55673b8ce02e96aa0a
+                        849f8fc6  f55bc30bf6752750285cbc89f2aac875
+                        ad1e3ff9  818511aaf25ecf56194712bb3da3f46e
+                        bf2fdc4a  5608402e9225d9cd8ec1e398a9c662f9
+                        c1d56945  e771b52372fa2cb3fb059755c8e23c00
+                        c22df19f  bfe20256c82a1412ff686732831ebe2a
+                        e1b418a4  df72154144d46138d0b849a4f67d07cc
+                        ea07e5f5  b454757c677224f9ebeed261503094c6
+                        ed6a890a  120c415a8aa12248ea9b34e6f75bfd8d
+
+                        14 of 14 identical. The hashes are written out here
+                        because data/ is gitignored, so the evidence has to
+                        live in the record rather than beside it.
 ```
 
 ## What was done
@@ -137,35 +161,56 @@ configuration and server named the same database and user at that run,
 
 six recorded counts are equal to the Phase 0B counts taken before the rename
 
+all fourteen papers' markdown is byte-identical to data/md_full/, which was
+  written on 29 August, before the rename — so the corpus content did not
+  change across it, and not merely the number of rows
+
 the identity check runs on the startup path, because the API started and
   reported listening, which it does only after the check returns
 ```
 
+The corpus line was added on 18 September and is the reason the earlier
+"corpus, unchanged" wording is not simply deleted but replaced. Six counts
+could not support it; fourteen hashes can, and the two are different
+measurements that were briefly conflated.
+
+Two qualifications on it. The comparison is md5, which is sound against
+accidental change and not against deliberate substitution — `PROVENANCE-GAP.md`
+additionally carries sha256 for two of the fourteen. And it establishes that
+the database agrees with `data/md_full/`, so it inherits whatever that export
+was; it is a statement about drift since 29 August, not about the corpus being
+correct.
+
 It does not establish:
 
-**That the corpus is unchanged.** Six equal counts do not carry that. Rows can
-be rewritten without the count moving, and nothing here would see it. The
-stronger claim is available and is not made here: `PROVENANCE-GAP.md` records
-two of the fourteen papers as byte-identical between `data/md_full/` and
-`papers.markdown`, by sha256, which is real evidence for two papers and not for
-the corpus. Extending it to fourteen is a command nobody has run.
+**That `main()` calls `os.Exit` on a disagreement.** Narrower than it was, and
+the remaining gap is now one `if` statement.
 
-**That a future disagreement will stop the API.** This was asserted, and the
-evidence for it is one layer below the claim. `TestCheckDatabaseIdentity`
-covers six cases including the mismatch as it occurred, and what it shows is
-that `preflight.CheckDatabaseIdentity` *returns* not-OK. The decision to treat
-that as fatal lives in `main.go`, in package `main`, which has no test file at
-all — `go test ./...` reports `cmd/epistemicos-api [no test files]`, and has
-on every run.
+As first written this record asserted that a future disagreement would stop the
+API, and the evidence was a layer below the claim: `TestCheckDatabaseIdentity`
+showed `preflight.CheckDatabaseIdentity` *returning* not-OK, while the decision
+to treat that as fatal sat inline in `main()`, in a package with no test file at
+all. `go test ./...` reported `cmd/epistemicos-api [no test files]` on every run
+since the repository was created. A refactor that made the preflight a warning,
+or dropped the call, would have passed everything here.
 
-So the function is covered and the wiring is not. A refactor that made the
-preflight a warning, or dropped the call, would pass every control in this
-repository. That is the same shape as the defect this document is about: the
-check existed and the path carrying it had never been exercised.
+Closed on 18 September by extracting `ensureDatabaseIdentity` and giving
+package `main` its first controls — `cmd/epistemicos-api/main_test.go`, seven
+of them, including the `paperly` mismatch as it actually occurred, a server
+answering blank, and a failing query. What they hold down is the decision:
+given what the server said, startup stops.
+
+What they still do not reach is the three lines that call `fatalf` on that
+error, which would mean running a process and asserting an exit code. A
+mismatch that still connects is awkward to construct, because the connection
+string determines which database you reach, so in ordinary operation the two
+agree by construction; the fault this guards against arrives through a DSN form
+where the name is not what it appears, or through a proxy.
 
 Alex Zamurko's wording on 18 September kept the conditional deliberately, that
 a disagreement causes a fatal refusal *if the negative control demonstrates
-this*, and no control in this repository currently demonstrates it.
+this*. The refusal is now demonstrated. The exit is not, and that residue is
+named here rather than left for someone to find the way this gap was found.
 
 It also says nothing about whether `epistemicos` is the right name, which was
 decided on 24 August and is not revisited here.

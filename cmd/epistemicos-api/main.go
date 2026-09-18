@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
@@ -47,29 +48,11 @@ func main() {
 	}
 	defer pool.Close()
 
-	// The database has to be the one configuration names. POSTGRES_DB and
-	// POSTGRES_USER apply only at first initialisation, so the prefix rename of
-	// 24 August changed the configuration and could not change the volume: for
-	// three weeks the config said epistemicos and the server was paperly.
-	// Nothing noticed because nothing compared them, and this is the comparison.
-	//
-	// Fatal rather than a warning, unlike the Mathpix probe. A deployment
-	// missing Mathpix credentials can still serve reads honestly; a deployment
-	// writing to a database other than the one it reports is producing evidence
-	// attributed to the wrong place, and every count and hash downstream
-	// inherits that.
-	{
-		var gotDB, gotUser string
-		if err := pool.QueryRow(context.Background(), preflight.IdentityQuery).
-			Scan(&gotDB, &gotUser); err != nil {
-			fatalf("database identity preflight: could not ask the server what it is: %v", err)
-		}
-		if res := preflight.CheckDatabaseIdentity(cfg.DBURL, gotDB, gotUser); !res.OK {
-			fatalf("database identity preflight: %s\n"+
-				"  The connection string and the server disagree. Either repoint the\n"+
-				"  configuration or rename the database; do not proceed with the two\n"+
-				"  out of step.", res.Reason)
-		}
+	if err := ensureDatabaseIdentity(context.Background(), pool, cfg.DBURL); err != nil {
+		fatalf("database identity preflight: %v\n"+
+			"  The connection string and the server disagree. Either repoint the\n"+
+			"  configuration or rename the database; do not proceed with the two\n"+
+			"  out of step.", err)
 	}
 
 	metricsReg := metrics.New()
@@ -140,6 +123,45 @@ func main() {
 		fatalf("listen: %v", err)
 	}
 	<-idle
+}
+
+// identityQuerier is the one thing the preflight needs from the pool: a row
+// carrying two strings. An interface, so the refusal can be exercised without
+// a Postgres server — *pgxpool.Pool satisfies it.
+type identityQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// ensureDatabaseIdentity asks the server what it is and returns an error if
+// startup must not continue.
+//
+// The database has to be the one configuration names. POSTGRES_DB and
+// POSTGRES_USER apply only at first initialisation, so the prefix rename of
+// 24 August changed the configuration and could not change the volume: for
+// three weeks the config said epistemicos and the server was paperly. Nothing
+// noticed because nothing compared them, and this is the comparison.
+//
+// Fatal rather than a warning, unlike the Mathpix probe. A deployment missing
+// Mathpix credentials can still serve reads honestly; a deployment writing to
+// a database other than the one it reports is producing evidence attributed to
+// the wrong place, and every count and hash downstream inherits that.
+//
+// This was four statements inside main() until 18 September, which meant the
+// decision to abort could not be reached by any control: thirteen controls
+// covered CheckDatabaseIdentity returning not-OK, and nothing covered what the
+// API then did about it. Package main has no test file and `go test ./...`
+// reported "[no test files]" for it on every run, so changing the preflight to
+// a warning, or deleting the call, would have passed everything. Extracted so
+// that the refusal itself is testable; see main_test.go.
+func ensureDatabaseIdentity(ctx context.Context, q identityQuerier, dsn string) error {
+	var gotDB, gotUser string
+	if err := q.QueryRow(ctx, preflight.IdentityQuery).Scan(&gotDB, &gotUser); err != nil {
+		return fmt.Errorf("could not ask the server what it is: %w", err)
+	}
+	if res := preflight.CheckDatabaseIdentity(dsn, gotDB, gotUser); !res.OK {
+		return fmt.Errorf("%s", res.Reason)
+	}
+	return nil
 }
 
 func fatalf(format string, args ...any) {

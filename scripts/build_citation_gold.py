@@ -87,6 +87,47 @@ MANUSCRIPT_PDF = {
     "paper-2": "c4d19c6fb53965655e60209dff785b05d5bfa1757f08f2c5aadf52ef0780e3b8",
 }
 
+# `papers.markdown` for those two rows: the bytes the extractor actually reads,
+# and therefore what the gold set has to be bound to. The PDF hashes above are
+# provenance for the annotation; these are the source of the comparison.
+#
+# They are not the same documents. The corpus rows were built from a different
+# copy of each paper, established 17 September by comparing hashes, and the
+# difference was then measured rather than assumed: 192 of the 193 annotated
+# citations appear in these bytes. The one that does not is recorded in
+# ABSENT_FROM_SOURCE below.
+CORPUS_MARKDOWN = {
+    "paper-1": "cff9bb85d74fbac8ffd69fd0c258812cb1d051b2963cbc8b8df8ebe447264615",
+    "paper-2": "48b2b2f459e5cad88b7105048a0d7e0f852084764662a9e67155de52b52921d8",
+}
+
+# Annotated citations that are genuinely not in the bound source, with the
+# reason. Scoring an extractor for missing a citation that is not in the text
+# it was given would charge it for the corpus holding a different copy.
+#
+# `Wang et al., 2018` appears exactly once in the annotated PDF, inside a
+# methods table listing sampling steps. That table is absent from the corpus
+# copy entirely — `Step 4`, `Step 5`, `Isolate 245`, `NACE`, `CIE_DES` and
+# `27,973` are all in the annotated PDF and none of them is in the corpus
+# markdown. So the annotated copy is the fuller of the two, and the versions
+# differ by one appendix table holding one citation.
+#
+# Kept in `items` rather than deleted. The annotation is what the annotator
+# read, and deleting an entry would make the gold set describe a document
+# nobody annotated. It is flagged, and the runner excludes flagged items from
+# scoring and says how many it excluded.
+ABSENT_FROM_SOURCE = {
+    "paper-1": {
+        "wang et al.|2018":
+            "the paper's only occurrence is inside a methods table that the "
+            "corpus copy of this paper does not contain. Verified by the "
+            "absence of Step 4, Step 5, Isolate 245, NACE, CIE_DES and 27,973 "
+            "from the corpus markdown, all of which are present in the "
+            "annotated PDF.",
+    },
+    "paper-2": {},
+}
+
 YEAR = re.compile(r"\b((?:1[89]|20)\d{2}[a-z]?(?:,[a-z])*)\b")
 
 # Written as a literal rather than with \b after the optional period. The
@@ -206,11 +247,16 @@ def main() -> int:
                 seen[k] += 1
                 continue
             seen[k] = 1
-            items.append({
+            item = {
                 "author_phrase": flatten(author),
                 "year": year,
                 "as_annotated": s,
-            })
+            }
+            why = ABSENT_FROM_SOURCE.get(paper, {}).get(
+                f"{flatten(author)}|{year}")
+            if why:
+                item["absent_from_source"] = why
+            items.append(item)
 
         doc = {
             "gold_set": f"citation-{paper}-v0.1",
@@ -230,13 +276,16 @@ def main() -> int:
                 "manuscript_pdf_sha256": MANUSCRIPT_PDF[paper],
             },
             "source": {
-                "note": "unbound. The extractor reads papers.markdown, and "
-                        "this gold set is not yet tied to that row's hash. "
-                        "Until it is, gold_runner.py will say the score rests "
-                        "on an unverified assumption that both describe the "
-                        "same text.",
+                "sha256": CORPUS_MARKDOWN[paper],
+                "what": "papers.markdown for this row — the bytes the "
+                        "extractor reads",
                 "corpus_paper": CORPUS_ID[paper],
-                "manuscript_pdf_sha256": MANUSCRIPT_PDF[paper],
+                "annotated_from_pdf_sha256": MANUSCRIPT_PDF[paper],
+                "note": "the annotation was made from a different copy of this "
+                        "paper than the corpus holds. 192 of the 193 annotated "
+                        "citations across both papers are present in these "
+                        "bytes; any that are not carry absent_from_source and "
+                        "are excluded from scoring.",
             },
             "reference_list_entries": len(raw_ref),
             "items": items,

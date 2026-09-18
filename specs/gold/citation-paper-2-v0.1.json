@@ -16,9 +16,11 @@
     "manuscript_pdf_sha256": "c4d19c6fb53965655e60209dff785b05d5bfa1757f08f2c5aadf52ef0780e3b8"
   },
   "source": {
-    "note": "unbound. The extractor reads papers.markdown, and this gold set is not yet tied to that row's hash. Until it is, gold_runner.py will say the score rests on an unverified assumption that both describe the same text.",
+    "sha256": "48b2b2f459e5cad88b7105048a0d7e0f852084764662a9e67155de52b52921d8",
+    "what": "papers.markdown for this row — the bytes the extractor reads",
     "corpus_paper": "c1d56945",
-    "manuscript_pdf_sha256": "c4d19c6fb53965655e60209dff785b05d5bfa1757f08f2c5aadf52ef0780e3b8"
+    "annotated_from_pdf_sha256": "c4d19c6fb53965655e60209dff785b05d5bfa1757f08f2c5aadf52ef0780e3b8",
+    "note": "the annotation was made from a different copy of this paper than the corpus holds. 192 of the 193 annotated citations across both papers are present in these bytes; any that are not carry absent_from_source and are excluded from scoring."
   },
   "reference_list_entries": 94,
   "items": [
@@ -534,7 +536,7 @@
     }
   ],
   "verified_against_manuscript": {
-    "text_sha256": "dcc60ce90fb80e00e63fa57a527f074db10730fbca1bab5dbaca503dd3ba5b3b",
+    "text_sha256": "48b2b2f459e5cad88b7105048a0d7e0f852084764662a9e67155de52b52921d8",
     "checked": 102,
     "not_found": [],
     "means": "each annotated first author appears within 140 characters of its year somewhere in the manuscript. It establishes that the annotation was not invented. It does not establish that the annotation is complete — a citation nobody wrote down is invisible to this check and is exactly what recall is for."

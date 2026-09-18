@@ -16,9 +16,11 @@
     "manuscript_pdf_sha256": "209af10a1a02c047b089d572a74dd99b48873a31c3d85701b8e98c77334b37f2"
   },
   "source": {
-    "note": "unbound. The extractor reads papers.markdown, and this gold set is not yet tied to that row's hash. Until it is, gold_runner.py will say the score rests on an unverified assumption that both describe the same text.",
+    "sha256": "cff9bb85d74fbac8ffd69fd0c258812cb1d051b2963cbc8b8df8ebe447264615",
+    "what": "papers.markdown for this row — the bytes the extractor reads",
     "corpus_paper": "ad1e3ff9",
-    "manuscript_pdf_sha256": "209af10a1a02c047b089d572a74dd99b48873a31c3d85701b8e98c77334b37f2"
+    "annotated_from_pdf_sha256": "209af10a1a02c047b089d572a74dd99b48873a31c3d85701b8e98c77334b37f2",
+    "note": "the annotation was made from a different copy of this paper than the corpus holds. 192 of the 193 annotated citations across both papers are present in these bytes; any that are not carry absent_from_source and are excluded from scoring."
   },
   "reference_list_entries": 97,
   "items": [
@@ -370,7 +372,8 @@
     {
       "author_phrase": "wang et al.",
       "year": "2018",
-      "as_annotated": "Wang et al., 2018"
+      "as_annotated": "Wang et al., 2018",
+      "absent_from_source": "the paper's only occurrence is inside a methods table that the corpus copy of this paper does not contain. Verified by the absence of Step 4, Step 5, Isolate 245, NACE, CIE_DES and 27,973 from the corpus markdown, all of which are present in the annotated PDF."
     },
     {
       "author_phrase": "rice",
@@ -479,9 +482,11 @@
     }
   ],
   "verified_against_manuscript": {
-    "text_sha256": "71e90ba5d9ed099adb642e2ba6aec47fe9ae86521635e73fdcf239508c2fd805",
+    "text_sha256": "cff9bb85d74fbac8ffd69fd0c258812cb1d051b2963cbc8b8df8ebe447264615",
     "checked": 91,
-    "not_found": [],
+    "not_found": [
+      "Wang et al., 2018"
+    ],
     "means": "each annotated first author appears within 140 characters of its year somewhere in the manuscript. It establishes that the annotation was not invented. It does not establish that the annotation is complete — a citation nobody wrote down is invisible to this check and is exactly what recall is for."
   }
 }

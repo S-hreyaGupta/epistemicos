@@ -148,6 +148,16 @@ def main() -> int:
     G = items_of(gold, fields, "gold set")
     C = items_of(cand, fields, "candidate")
 
+    # Items the gold set says are not in the bound source at all. Scoring an
+    # extractor for missing a citation absent from the text it was given would
+    # charge it for a difference between two copies of a paper. Excluded from
+    # every count, and the exclusion is reported rather than quietly applied:
+    # a denominator that shrank without saying so is how a rate stops meaning
+    # anything.
+    excluded = {k: v for k, v in G.items() if v.get("absent_from_source")}
+    for k in excluded:
+        del G[k]
+
     tp = sorted(set(G) & set(C))
     fn = sorted(set(G) - set(C))          # gold says it is there, candidate missed it
     fp = sorted(set(C) - set(G))          # candidate produced it, gold does not have it
@@ -167,6 +177,17 @@ def main() -> int:
           "source it was made from, so this run cannot establish that they "
           "describe the same text. The score below is only as good as that "
           "assumption.")
+        W("")
+
+    if excluded:
+        W("## Excluded from scoring")
+        W("")
+        W(f"{len(excluded)} gold item(s) are not in the source the candidate "
+          f"was produced from, so the candidate is not scored on them. The "
+          f"denominator below is {len(G)}, not {len(G) + len(excluded)}.")
+        W("")
+        for k, v in sorted(excluded.items()):
+            W(f"- `{' · '.join(str(x) for x in k)}` — {v['absent_from_source']}")
         W("")
 
     W("## Candidate against gold")

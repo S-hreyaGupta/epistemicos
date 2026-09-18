@@ -122,6 +122,3 @@ That is the argument for the twenty-five. Twenty-five findings in BOOTSTRAP-001
 are marked `RESOLVED` on controls written the same way, and six of those were
 never re-verified. A green suite is evidence that the questions someone thought
 to ask are answered, and nothing more.
-
-Twenty-five findings in BOOTSTRAP-001 are marked `RESOLVED` on controls written
-the same way, and six of those were never re-verified.

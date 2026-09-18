@@ -95,26 +95,56 @@ def main() -> int:
         ok("refused: a review with no frozen cycle")
 
     # ---- the real run ----
-    out = REPO / "runs" / "BOOTSTRAP-001" / "plan-review" / "APPROVAL-PACKAGE.md"
-    ledger = REPO / "runs" / "BOOTSTRAP-001" / "plan-review" / "ledger.json"
-    before = ledger.read_bytes()
-    r = run("--run", "BOOTSTRAP-001", "--type", "plan", cwd=REPO)
+    #
+    # --out, to a temp path. Without it the generator writes to its default,
+    # which is the committed APPROVAL-PACKAGE.md of a finished review, so
+    # running this suite silently rewrote a real artifact — in CI invisibly,
+    # because the checkout is thrown away, and locally as a dirty working tree
+    # someone could commit without noticing. Found 18 September, by `git status`
+    # after a routine local CI run, not by anything here.
+    review_dir = REPO / "runs" / "BOOTSTRAP-001" / "plan-review"
+    canonical = review_dir / "APPROVAL-PACKAGE.md"
+    ledger = review_dir / "ledger.json"
+
+    # Everything the run owns, watched as a whole rather than one file of it.
+    def snapshot() -> dict[Path, bytes]:
+        return {p: p.read_bytes() for p in sorted(review_dir.rglob("*"))
+                if p.is_file()}
+
+    before = snapshot()
+    tmp_out = Path(tempfile.mkdtemp()) / "APPROVAL-PACKAGE.md"
+    r = run("--run", "BOOTSTRAP-001", "--type", "plan",
+            "--out", str(tmp_out), cwd=REPO)
     if r.returncode != 0:
         failures.append(f"could not build a package for BOOTSTRAP-001:\n"
                         f"{r.stdout}{r.stderr}")
         text = ""
     else:
-        text = out.read_text(encoding="utf-8")
+        text = tmp_out.read_text(encoding="utf-8")
         ok("a package is produced for a run with frozen cycles")
 
     # The one thing it must never do.
-    if ledger.read_bytes() != before:
+    #
+    # This control used to compare ledger.json alone and pass, while the same
+    # call overwrote APPROVAL-PACKAGE.md in the directory next to it. The
+    # package is part of the record it describes, so the control was named for
+    # the right rule and watching one file of it. Comparing the whole review
+    # directory is what the sentence below actually claims.
+    after = snapshot()
+    changed = sorted({p for p in set(before) | set(after)
+                      if before.get(p) != after.get(p)})
+    if changed:
         failures.append(
-            "building a package altered the ledger. It assembles a record for "
-            "a human to decide from and must write nothing into the record it "
-            "describes.")
+            "building a package altered the review it describes: "
+            + ", ".join(p.relative_to(REPO).as_posix() for p in changed) +
+            "\n      It assembles a record for a human to decide from and must "
+            "write nothing\n      into that record. Pass --out.")
     else:
-        ok("building a package writes nothing into the ledger")
+        ok("building a package writes nothing into the review it describes")
+
+    if canonical.read_bytes() != before.get(canonical):
+        failures.append("the committed APPROVAL-PACKAGE.md was modified by "
+                        "this suite")
 
     if text and "decides nothing" not in text:
         failures.append("the package does not say that it decides nothing, so "
@@ -185,8 +215,16 @@ def main() -> int:
     # Every run passes through this state, and it is where the first version of
     # this tool crashed: `ledger show` exits 0 on a review with no ledger, and
     # exit 0 was read as "the file is there".
-    r = run("--run", "BOOTSTRAP-002", "--type", "plan", cwd=REPO)
-    p2 = REPO / "runs" / "BOOTSTRAP-002" / "plan-review" / "APPROVAL-PACKAGE.md"
+    # --out again, for the same reason: BOOTSTRAP-002's package is tracked too.
+    b2_dir = REPO / "runs" / "BOOTSTRAP-002" / "plan-review"
+    b2_before = {p: p.read_bytes() for p in sorted(b2_dir.rglob("*"))
+                 if p.is_file()}
+    p2 = Path(tempfile.mkdtemp()) / "APPROVAL-PACKAGE.md"
+    r = run("--run", "BOOTSTRAP-002", "--type", "plan",
+            "--out", str(p2), cwd=REPO)
+    if any(p.read_bytes() != b for p, b in b2_before.items()):
+        failures.append("building BOOTSTRAP-002's package altered its review "
+                        "directory")
     if r.returncode != 0:
         failures.append(f"a frozen run with no recorded review should still "
                         f"produce a package:\n{r.stdout}{r.stderr}")

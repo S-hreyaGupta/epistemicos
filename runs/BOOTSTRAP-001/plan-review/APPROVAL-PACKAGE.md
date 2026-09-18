@@ -94,19 +94,19 @@ Budget exhausted with findings still open. Proceed to human plan review with the
 
 - **B01-F02** · CONTRADICTORY IMPLEMENTATION MAPPING · S6
   - repair status: `IMPLEMENTED_AWAITING_DEMONSTRATION` — descriptive, not a lifecycle state
-  - found by: `UNRECORDED`
+  - found by: `CODEX_REVIEW`
 - **B01-F07** · MISSING REQUIREMENT · MC-2
   - repair status: `IMPLEMENTED_AWAITING_DEMONSTRATION` — descriptive, not a lifecycle state
-  - found by: `UNRECORDED`
+  - found by: `CODEX_REVIEW`
 - **B01-F11** · CONTRADICTORY IMPLEMENTATION MAPPING · S6
   - repair status: `IMPLEMENTED_AWAITING_DEMONSTRATION` — descriptive, not a lifecycle state
-  - found by: `UNRECORDED`
+  - found by: `CODEX_REVIEW`
 - **B01-F14** · MISSING REQUIREMENT · MC-1
   - repair status: `IMPLEMENTED_AWAITING_DEMONSTRATION` — descriptive, not a lifecycle state
-  - found by: `UNRECORDED`
+  - found by: `CODEX_REVIEW`
 - **B02-F04** · CONTRADICTORY IMPLEMENTATION MAPPING
   - repair status: `IMPLEMENTED_AWAITING_DEMONSTRATION` — descriptive, not a lifecycle state
-  - found by: `UNRECORDED`
+  - found by: `CODEX_REVIEW`
 
 ### Disputes — the human adjudicates
 
@@ -126,181 +126,151 @@ None.
 findings ledger — /sessions/elegant-wizardly-bardeen/mnt/epistemicos/runs/BOOTSTRAP-001/plan-review
 
   B01-F01  [RESOLVED]  CONTRADICTORY IMPLEMENTATION MAPPING  (MC-2)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  next_cycle counts directories, not valid cycles, so four inv
       cycle 03  DEMONSTRATED       -> RESOLVED  cycle 03: repair verdict demonstrated
 
   B01-F02  [OPEN]  CONTRADICTORY IMPLEMENTATION MAPPING  (S6)
-      found by: UNRECORDED
       repair:   IMPLEMENTED_AWAITING_DEMONSTRATION  [descriptive, not a state]
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  The controller tests exits only at the latest boundary and t
 
   B01-F03  [RESOLVED]  WRONG OWNERSHIP  (MC-1)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  The schema assigns per-cycle findings.json to the runner; th
       cycle 02  DEMONSTRATED       -> RESOLVED  cycle 02 review, 'Claimed repairs checked and found to hold'
 
   B01-F04  [RESOLVED]  MISSING REQUIREMENT  (S2.2)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  compose_input carries the protocol but not the pinned spec, 
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 04: amended specifications enter the c
 
   B01-F05  [RESOLVED]  NONDETERMINISTIC WHERE D POSSIBLE  (S10.1)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  candidate_commit is stored verbatim, so HEAD is accepted and
       cycle 03  DEMONSTRATED       -> RESOLVED  cycle 03: repair verdict demonstrated
 
   B01-F06  [RESOLVED]  MISSING REQUIREMENT  (S10.2)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  Check 13 compares two recorded strings and never hashes the 
       cycle 02  DEMONSTRATED       -> RESOLVED  cycle 02 review, 'Claimed repairs checked and found to hold'
 
   B01-F07  [OPEN]  MISSING REQUIREMENT  (MC-2)
-      found by: UNRECORDED
       repair:   IMPLEMENTED_AWAITING_DEMONSTRATION  [descriptive, not a state]
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  protocol_sha256 and spec_sha256 are checked for presence onl
 
   B01-F08  [RESOLVED]  MISSING REQUIREMENT  (MC-2)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  The bootstrap gate runs at init and never again, so componen
       cycle 03  DEMONSTRATED       -> RESOLVED  cycle 03: repair verdict demonstrated
 
   B01-F09  [RESOLVED]  MISSING REQUIREMENT  (MC-1)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  cmd_record hashes whatever is on disk at decision time and n
       cycle 03  DEMONSTRATED       -> RESOLVED  cycle 03: repair verdict demonstrated
 
   B01-F10  [RESOLVED]  MISSING REQUIREMENT  (MC-1)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  The review target carries six artifacts; the gate covers fiv
       cycle 02  DEMONSTRATED       -> RESOLVED  cycle 02 review, 'Claimed repairs checked and found to hold'
 
   B01-F11  [OPEN]  CONTRADICTORY IMPLEMENTATION MAPPING  (S6)
-      found by: UNRECORDED
       repair:   IMPLEMENTED_AWAITING_DEMONSTRATION  [descriptive, not a state]
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  The ledger authorises transitions from unfiltered history wh
 
   B01-F12  [RESOLVED]  MISSING REQUIREMENT  (S5)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  No event is checked against the finding's raising cycle, so 
       cycle 03  DEMONSTRATED       -> RESOLVED  cycle 03: repair verdict demonstrated
 
   B01-F13  [RESOLVED]  CONTRADICTORY IMPLEMENTATION MAPPING  (V40)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  The duplicate-id refusal instructs that a re-raised issue be
       cycle 02  DEMONSTRATED       -> RESOLVED  cycle 02 review, 'Claimed repairs checked and found to hold'
 
   B01-F14  [OPEN]  MISSING REQUIREMENT  (MC-1)
-      found by: UNRECORDED
       repair:   IMPLEMENTED_AWAITING_DEMONSTRATION  [descriptive, not a state]
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  MC-1 requires each run to record MC1_ENFORCEMENT. run.json d
 
   B01-F15  [RESOLVED]  CONTRADICTORY IMPLEMENTATION MAPPING  (MC-1)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  The schema says freezing proves the artifact did not change,
       cycle 02  DEMONSTRATED       -> RESOLVED  cycle 02 review, 'Claimed repairs checked and found to hold'
 
   B01-F16  [RESOLVED]  UNTESTED RULE  (MC-1)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  PY_REF matches filename strings, so a real import is invisib
       cycle 02  DEMONSTRATED       -> RESOLVED  cycle 02 review, 'Claimed repairs checked and found to hold'
 
   B01-F17  [RESOLVED]  UNTESTED RULE  (S10.1)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  Two of five implementation refusals are exercised while the 
       cycle 02  DEMONSTRATED       -> RESOLVED  cycle 02 review, 'Claimed repairs checked and found to hold'
 
   B01-F18  [RESOLVED]  UNTESTED RULE  (MC-2)
-      found by: UNRECORDED
       cycle 01  RAISED             -> OPEN  transcribed verbatim from codex-output-raw.md, B01 numbering
       cycle 01  ACCEPT             -> OPEN  Seam-1 probes sit outside a cycle layout, so check 13 fails 
       cycle 02  DEMONSTRATED       -> RESOLVED  cycle 02 review, 'Claimed repairs checked and found to hold'
 
   B02-F01  [RESOLVED]  MISSING REQUIREMENT
-      found by: UNRECORDED
       cycle 02  RAISED             -> OPEN  transcribed from cycle-02 findings.json by identifier and cl
       cycle 03  ACCEPT             -> OPEN  accepted by Alex Zamurko 14 September; recorded at cycle 3 r
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 03: the reconciliation runs regardless
 
   B02-F02  [RESOLVED]  CONTRADICTORY IMPLEMENTATION MAPPING
-      found by: UNRECORDED
       cycle 02  RAISED             -> OPEN  transcribed from cycle-02 findings.json by identifier and cl
       cycle 03  ACCEPT             -> OPEN  accepted by Alex Zamurko 14 September; recorded at cycle 3 r
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 03: the parser accepts the recurrence 
 
   B02-F03  [RESOLVED]  CONTRADICTORY IMPLEMENTATION MAPPING
-      found by: UNRECORDED
       cycle 02  RAISED             -> OPEN  transcribed from cycle-02 findings.json by identifier and cl
       cycle 03  ACCEPT             -> OPEN  accepted by Alex Zamurko 14 September; recorded at cycle 3 r
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 03: ledger identifier validity comes f
 
   B02-F04  [OPEN]  CONTRADICTORY IMPLEMENTATION MAPPING
-      found by: UNRECORDED
       repair:   IMPLEMENTED_AWAITING_DEMONSTRATION  [descriptive, not a state]
       cycle 02  RAISED             -> OPEN  transcribed from cycle-02 findings.json by identifier and cl
       cycle 03  ACCEPT             -> OPEN  accepted by Alex Zamurko 14 September; recorded at cycle 3 r
 
   B02-F05  [RESOLVED]  MISSING REQUIREMENT
-      found by: UNRECORDED
       cycle 02  RAISED             -> OPEN  transcribed from cycle-02 findings.json by identifier and cl
       cycle 03  ACCEPT             -> OPEN  accepted by Alex Zamurko 14 September; recorded at cycle 3 r
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 04: retained-pin hash overrides are re
 
   B02-F06  [RESOLVED]  MISSING REQUIREMENT
-      found by: UNRECORDED
       cycle 02  RAISED             -> OPEN  transcribed from cycle-02 findings.json by identifier and cl
       cycle 03  ACCEPT             -> OPEN  accepted by Alex Zamurko 14 September; recorded at cycle 3 r
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 04: demonstrated for recorded assignme
 
   B02-F07  [RESOLVED]  CONTRADICTORY IMPLEMENTATION MAPPING
-      found by: UNRECORDED
       cycle 02  RAISED             -> OPEN  transcribed from cycle-02 findings.json by identifier and cl
       cycle 03  ACCEPT             -> OPEN  accepted by Alex Zamurko 14 September; recorded at cycle 3 r
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 03: freeze preserves the diff, results
 
   B02-F08  [RESOLVED]  CONTRADICTORY IMPLEMENTATION MAPPING
-      found by: UNRECORDED
       cycle 02  RAISED             -> OPEN  transcribed from cycle-02 findings.json by identifier and cl
       cycle 03  ACCEPT             -> OPEN  accepted by Alex Zamurko 14 September; recorded at cycle 3 r
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 04: failed history queries withhold th
 
   B02-F09  [RESOLVED]  CONTRADICTORY IMPLEMENTATION MAPPING
-      found by: UNRECORDED
       cycle 02  RAISED             -> OPEN  transcribed from cycle-02 findings.json by identifier and cl
       cycle 03  ACCEPT             -> OPEN  accepted by Alex Zamurko 14 September; recorded at cycle 3 r
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 03: the module disclaims forced sequen
 
   B02-F10  [RESOLVED]  UNTESTED RULE
-      found by: UNRECORDED
       cycle 02  RAISED             -> OPEN  transcribed from cycle-02 findings.json by identifier and cl
       cycle 03  ACCEPT             -> OPEN  accepted by Alex Zamurko 14 September; recorded at cycle 3 r
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 03: the prose scan takes its file list
 
   B03-F01  [RESOLVED]  MISSING REQUIREMENT
-      found by: UNRECORDED
       cycle 03  RAISED             -> OPEN  failure to calculate loop state is read as permission to ope
       cycle 03  ACCEPT             -> OPEN  accepted on 15 September by repairing it while cycle 3 was t
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 04: demonstrated for the reported cont
 
   B03-F02  [RESOLVED]  CONTRADICTORY IMPLEMENTATION MAPPING
-      found by: UNRECORDED
       cycle 03  RAISED             -> OPEN  the cycle-03 prompt states the suites are in the target; tar
       cycle 03  ACCEPT             -> OPEN  accepted on 15 September by repairing it while cycle 3 was t
       cycle 04  DEMONSTRATED       -> RESOLVED  demonstrated by cycle 04: demonstrated as an auxiliary evide

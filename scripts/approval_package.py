@@ -385,7 +385,17 @@ def main() -> int:
     with dest.open("w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(out) + "\n")
 
-    print(f"wrote {dest.relative_to(REPO).as_posix()}")
+    # --out may name a path outside the repository, which is its main use: a
+    # caller that wants the package without writing into the review it
+    # describes. This line used to call relative_to(REPO) unconditionally and
+    # raise for exactly that case, so the flag was in --help and had never
+    # worked. Nothing caught it because the one caller passing --out did not
+    # exist: the suite used the default and rewrote the committed package.
+    try:
+        shown = dest.relative_to(REPO).as_posix()
+    except ValueError:
+        shown = str(dest)
+    print(f"wrote {shown}")
     print(f"  §7 items present  {sum(present.values())}/{len(SECTION_7_ITEMS)}")
     for k in missing:
         print(f"  not present       {k}")

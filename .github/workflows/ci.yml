@@ -134,6 +134,26 @@ jobs:
             exit 1
           }
 
+      # The same hazard, one directory over, and it was live until 18 September.
+      # The guard above existed for specs/prompts and there was none for runs/,
+      # so test_approval_package.py regenerated a finished review's committed
+      # APPROVAL-PACKAGE.md on every run — invisibly here, because the checkout
+      # is discarded, and locally as a dirty tree someone could commit without
+      # reading.
+      #
+      # This is last deliberately. It asks whether anything above wrote into the
+      # record, so it has to run after all of them.
+      - name: no suite wrote into a recorded run
+        run: |
+          git diff --exit-code -- runs/ || {
+            echo ""
+            echo "A step above modified a file under runs/."
+            echo "Cycles, ledgers and packages are the record a human decides"
+            echo "from. A suite may read them and must not rewrite them; if a"
+            echo "tool needs to produce one, give it --out."
+            exit 1
+          }
+
   docker:
     name: docker build smoke
     runs-on: ubuntu-latest

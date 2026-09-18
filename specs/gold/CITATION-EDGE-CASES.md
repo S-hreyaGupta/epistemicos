@@ -149,6 +149,13 @@ recall            0.933            0.967
 precision         0.884            0.916
 ```
 
+**It costs twice per work, which this entry first missed.** Established in
+`ADJUDICATION-paper-1.md`: the gold set holds `bartko 1976` and the candidate
+produces `bartko's 1976`, so the gold item goes unmatched — a miss — and the
+possessive form is absent from gold — a false positive. Three works, six
+penalties. That is why both figures move together above, which the first
+version of this entry recorded without explaining.
+
 **Recall crosses C1.** Alex Zamurko's threshold is ≥ 0.95 on both, set 28 August;
 this moves one of the two over it on paper 1. Precision does not cross and is
 not close, so the criteria are still unmet and the gap is elsewhere.

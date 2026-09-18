@@ -184,6 +184,114 @@ regression.
 
 ---
 
+## EC-3 — the six-token envelope attributes long author lists to the wrong author
+
+Unlike EC-1 and EC-2, this one is **spec-conformant**. §6.1 says the C2 run
+collects eligible tokens "at most 6", and the implementation collects at most
+six. Nothing here is a coding error, and it cannot be repaired without amending
+the specification.
+
+### The shape
+
+A narrative citation with five or six authors runs past six tokens, so the run
+starts partway through the author list. §6.2's longest-admissible-suffix rule
+then parses what it can see, which is a shorter but perfectly well-formed
+author list, and reports it with confidence.
+
+```text
+source     El Akremi, Gond, Swaen, De Roeck, and Igalens (2015)
+run        [Gond,] [Swaen,] [De] [Roeck,] [and] [Igalens]     six, cap reached
+parsed     author_phrase "Gond, Swaen, De Roeck, and Igalens"
+key        gond|2015
+```
+
+The work is by El Akremi and colleagues. It is recorded as Gond.
+
+This is not a refusal. It is a `parsed` record with a well-formed key,
+indistinguishable in the output from a correct one, which puts it in the same
+family as EC-2 and makes it the most expensive of the three.
+
+### Every instance in the corpus
+
+Four, all the same shape — first author dropped, second author becomes the key:
+
+```text
+50408397   El Akremi, Gond, Swaen, De Roeck, and Igalens (2015)   -> gond|2015
+e1b418a4   Mackinnon, Jorm, Christensen, Korten, Jacomb, and
+           Rodgers (1999)                                          -> jorm|1999
+e1b418a4   Mayer, Thau, Workman, Van Dijke, and De Cremer (2012)   -> workman|2012
+ad1e3ff9   Van den Brink and Van der Woerd (2004)                  -> den brink|2004
+```
+
+The last one also produces a duplicate: the same work is cited
+parenthetically elsewhere in that paper, where no C2 run is needed, and keys
+correctly as `van den brink|2004`. So one work, two keys, one of them wrong —
+the EC-2 pattern arriving by a different route.
+
+Three of the four predate the particle fix of 18 September and are live today.
+The fourth, `den brink`, was invisible before it: the citation did not parse at
+all. So that fix turned one silent miss into one wrong record, which is worth
+saying plainly even though it raised recall on both gold papers.
+
+### What a larger envelope is worth, measured
+
+```text
+cap    parsed    unresolved    effect
+ 6      1103        574        as specified
+ 7      1103        574
+ 8      1102        575        three of the four corrected
+ 9+     1102        575        nothing further changes at any size up to 16
+```
+
+Per work, at 8:
+
+```text
+Mackinnon et al. 1999     jorm|1999      ->  mackinnon|1999      corrected
+Mayer et al. 2012         workman|2012   ->  mayer|2012          corrected
+Van den Brink … 2004      two keys       ->  van den brink|2004  corrected, duplicate gone
+El Akremi et al. 2015     gond|2015      ->  unresolved          see EC-4
+```
+
+Nothing is lost, and no new key appears anywhere else in the corpus, so on this
+corpus the envelope is not acting as a false-positive brake at these sizes.
+That is evidence from ten papers and not an argument about the rule.
+
+The El Akremi case turns a wrong attribution into an honest refusal, which is
+an improvement of a different kind: a refusal is counted and arguable, a wrong
+attribution is neither.
+
+### What would close it
+
+An amendment to §6.1 raising the cap. The measurement above says 8 captures
+everything this corpus contains and that 9 through 16 add nothing, but a cap
+chosen from ten papers is a cap fitted to ten papers, and the number belongs to
+whoever owns the specification rather than to this file.
+
+**This needs a decision, not a repair.** Nothing here has been changed.
+
+---
+
+## EC-4 — a compound surname whose first word is not a particle
+
+Found inside EC-3, and it is why raising the envelope leaves one of the four
+unresolved rather than correct.
+
+```text
+El Akremi       "El" is not in PARTICLE, so SURNAME cannot span both words
+                SURNAME = (PARTICLE WS)* CORE — one CORE, particles ahead of it
+```
+
+`El Akremi et al. (2015)` and `(El Akremi et al., 2015: 2)` both fail, so with
+a larger envelope the work has no key at all in `50408397` rather than a wrong
+one. One work on this corpus.
+
+The same limit covers `Carrieri de Souza` and `Oliveira da Silva` from paper 2,
+where the particle sits *inside* the surname rather than ahead of it. Three
+works, all unresolved, all refused for the same structural reason.
+
+Widening PARTICLE to include `el` would fix one case and not the other two,
+which are CORE PARTICLE CORE and outside the production's shape entirely.
+
 ## How an entry gets here
 
 A case is filed once it has been reproduced from a minimal input, its cause
@@ -194,10 +302,26 @@ and measure.
 Nothing in this file is scheduled. It is a record of what is known to be wrong,
 kept so the knowledge outlives the conversation it came from.
 
-One note on how both entries were found. EC-1 came from Alex and was filed on
-request. EC-2 was found while measuring EC-1 and was nearly filed wrong: the
-first draft recorded it as *one occurrence, lost behind EC-1, unclear whether it
-would parse alone*. Testing the bare form instead of assuming showed it parses,
-keys differently, appears thirteen times, and costs more than EC-1 does. The
-difference between the two drafts was one command. That is the argument for the
-reproduce-and-measure rule above, and it is not hypothetical.
+One note on how these were found, because each came out of the one before it.
+
+EC-1 came from Alex Zamurko and was filed on request. EC-2 was found while
+measuring EC-1, and was nearly filed wrong: the first draft recorded it as *one
+occurrence, lost behind EC-1, unclear whether it would parse alone*. Testing the
+bare form instead of assuming showed it parses, keys differently, appears
+thirteen times, and costs more than EC-1. EC-3 and EC-4 came out of a
+spec-conformance fix to particle matching, which raised recall on both gold
+papers and simultaneously turned one silent miss into one wrong record; chasing
+that single regression is what surfaced the envelope.
+
+Three of the four were found by following a measurement that did not match
+expectation, rather than by anything designed to look for them. The one
+designed check in this area — the conformance suite — passed throughout, because
+§12 pins the string `van der Maas (2022)` and the suite tested that string.
+
+Two corrections were made to this file after first writing, both because a set
+difference disagreed with a direct look. EC-2's cost was recorded as one
+penalty per work and is two. EC-3's cap-8 effect was recorded as two works
+corrected and two orphaned, and is three corrected and one turned into a
+refusal; the missing key was already present from another occurrence and the
+set difference hid it. Both are noted rather than silently amended, since the
+failure mode is the subject of the file.

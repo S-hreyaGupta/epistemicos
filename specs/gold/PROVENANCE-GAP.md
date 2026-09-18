@@ -60,6 +60,40 @@ behaves the same.
 It also means rc3's §I is frozen on evidence that cannot be re-derived. That is
 not a defect in rc3. It is a fact about what freezing it captured.
 
+## The inputs survived, and they are unchanged
+
+Established 18 September, after the searches above came back empty.
+
+`data/md_full/` holds all fourteen corpus papers, written 29 August 18:55, two
+minutes after `data/all_md.b64` — the pipe-delimited base64 export the markdown
+was moved out of the database with. That is the corpus the runs read.
+
+Both papers now carrying gold sets are byte-identical in that directory to what
+`papers.markdown` holds today:
+
+```text
+ad1e3ff9   md_full cff9bb85d74fbac8…   database cff9bb85d74fbac8…   same
+c1d56945   md_full 48b2b2f459e5cad8…   database 48b2b2f459e5cad8…   same
+```
+
+So the corpus has not drifted since 29 August. Whatever was measured then was
+measured against these bytes, and anything measured now is measured against the
+same ones.
+
+That matters more than it first appears. A replacement implementation cannot
+reproduce the old figures, because the old implementation is gone. But it can be
+run against the identical text, so a new figure and an old figure would differ
+only by the extractor — which is the comparison anyone would actually want.
+
+What survived and what did not is worth stating plainly:
+
+```text
+inputs       intact, verified byte-identical to the database
+outputs      gone — corpus_run_2/ and the raw per-paper results
+the code     gone
+the reports  in Slack only, not in this repository
+```
+
 ## What would close it
 
 Either the implementation turns up — another machine, a notebook, a container,

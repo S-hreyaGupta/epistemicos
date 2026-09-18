@@ -292,6 +292,63 @@ works, all unresolved, all refused for the same structural reason.
 Widening PARTICLE to include `el` would fix one case and not the other two,
 which are CORE PARTICLE CORE and outside the production's shape entirely.
 
+## EC-5 — citations inside footnotes are invisible
+
+Found 18 September while accounting for the last unexplained miss in gold
+paper 1. Structural rather than grammatical, and the only entry here that
+produces **no record of any kind** — not a citation, not an unresolved span.
+
+### The shape
+
+Mathpix renders footnote *definitions* as `[^n]:` blocks and places them at the
+end of the document, after the reference list. §3 splits body from references at
+the References heading and extracts only from the body, so every footnote body
+falls on the wrong side of that line and is never read.
+
+```text
+...a specific category (country of origin or industry group) (Dooley et al., 2019).
+
+[^7]:    ${ }^{8}$ This variable meas...
+```
+
+`(Dooley et al., 2019)` is a well-formed parenthetical with a valid year. It
+appears in neither output list. A reader of the results cannot tell it exists.
+
+### Reach
+
+```text
+31 footnote blocks   across 5 of the 9 in-profile papers
+11 citations         would parse if the same text sat in the body
+ 2 papers            ad1e3ff9 and e1b418a4 carry all eleven
+```
+
+```text
+ad1e3ff9   Cohen (1988), Fagiolo (2007), Dooley et al. (2019)
+e1b418a4   Earley et al. (1989), Cook and Campbell (1979) x2,
+           Buhrmester et al. (2011), Colquitt et al. (2015) x2,
+           Kline (2011), Kline's (2011)
+```
+
+### Why it costs recall rather than being a scope choice
+
+The annotation reads footnotes. Gold paper 1 contains `fagiolo 2007` and
+`dooley et al. 2019`, both of which are cited in footnotes, so the gold set and
+the extractor disagree about what part of the document counts.
+
+`dooley et al. 2019` is one of the five works gold paper 1 still misses at
+v0.2, and it is the only one of the five without a cause in this register —
+which is how the entry was found.
+
+### What would close it
+
+A §3 change: footnote definition blocks are body text wherever the converter
+puts them, and the body/references split should exclude them from the reference
+side rather than swallow them. The ambiguity is real — a `[^n]:` block after the
+References heading looks structurally like part of the reference list — so this
+is a specification question about what the body is, not a bug in the splitter.
+
+**This needs a decision, not a repair.** Nothing has been changed.
+
 ## How an entry gets here
 
 A case is filed once it has been reproduced from a minimal input, its cause

@@ -1,0 +1,508 @@
+{
+  "gold_set": "citation-paper-1-references-v0.1",
+  "unit": "bibliography entry",
+  "corpus_paper": "ad1e3ff9",
+  "key_fields": [
+    "author_field",
+    "year"
+  ],
+  "identity_note": "author_field is positional: the text before the year, cut at the first comma within it, with a trailing run of initials removed. No grammar. Whether an author field is a person or an organisation is what rc3's C-series decides and is therefore not decided here.",
+  "provenance": {
+    "annotator": "Alex Zamurko and Mohit",
+    "annotated": "2026-09-17",
+    "method": "reference list read from the manuscript and written out by hand",
+    "spreadsheet_sha256": "102571276ef70d197374c2a51d4446dde308e6238aefec3e2a819934355df5c4",
+    "annotated_from_pdf_sha256": "209af10a1a02c047b089d572a74dd99b48873a31c3d85701b8e98c77334b37f2"
+  },
+  "source": {
+    "sha256": "cff9bb85d74fbac8ffd69fd0c258812cb1d051b2963cbc8b8df8ebe447264615",
+    "what": "papers.markdown for this row"
+  },
+  "items": [
+    {
+      "author_field": "abadie",
+      "year": "2017",
+      "as_annotated": "Abadie, A., Athey, S., Imbens, G., Wooldridge, J., 2017. When Should You Adjust Standard\n Errors for Clustering?"
+    },
+    {
+      "author_field": "ahnert",
+      "year": "2008",
+      "as_annotated": "Ahnert, S. E., & Fink, T. M. (2008). Clustering signatures classify directed networks. Physical Review E, 78(3), 1-5."
+    },
+    {
+      "author_field": "bartko",
+      "year": "1976",
+      "as_annotated": "Bartko, J. (1976). On various intraclass correlation reliability coefficients. Psycological Bulletin, 83, 762-765"
+    },
+    {
+      "author_field": "basole",
+      "year": "2017",
+      "as_annotated": "Basole, R. C., Ghosh, S., & Hora, M. S. (2017). Supply network structure and firm performance: Evidence from the electronics industry. IEEE Transactions on Engineering Management, 65(1), 141-154."
+    },
+    {
+      "author_field": "bellamy",
+      "year": "2014",
+      "as_annotated": "Bellamy, M. A., Ghosh, S., & Hora, M. (2014). The influence of supply network structure on firm innovation. Journal of Operations Management, 32(6), 357–373."
+    },
+    {
+      "author_field": "bimber",
+      "year": "2005",
+      "as_annotated": "Bimber, B., Flanagin, A. and Stohl, C. (2005). Reconceptualizing collective action in the contemporary media environment. Communication Theory, 15 (4), 365-388."
+    },
+    {
+      "author_field": "bliese",
+      "year": "2000",
+      "as_annotated": "Bliese, P. D. (2000). Within-group agreement, non-independence, and reliability: Implications for data aggregation and analysis. In K. J. Klein & S. W. J. Kozlowski (Eds.), Multilevel theory, research, and methods in organizations: Foundations, extensions, and new directions (p. 349–381). Jossey-Bass."
+    },
+    {
+      "author_field": "bloomberg",
+      "year": "2011",
+      "as_annotated": "Bloomberg. (2011). Supply Chain on Bloomberg. Retrieved December 7, 2018, from https://business.library.emory.edu/documents/faq-handouts/bloomberg-splc.pdf."
+    },
+    {
+      "author_field": "bloomberg",
+      "year": "2013",
+      "as_annotated": "Bloomberg. (2013). Bloomberg Supply Chain Algorithm: Providing insight into a company relationships. Retrieved December 7, 2018, from https://kenanflagler.instructure.com/files/54372815."
+    },
+    {
+      "author_field": "bode",
+      "year": "2015",
+      "as_annotated": "Bode, C., & Wagner, S. M. (2015). Structural drivers of upstream supply chain complexity and the frequency of supply chain disruptions. Journal of Operations Management, 36, 215–228."
+    },
+    {
+      "author_field": "borgatti",
+      "year": "2009",
+      "as_annotated": "Borgatti, S. P., & Li, X. (2009). On social network analysis in a supply chain context. Journal of Supply Chain Management, 45(2), 5–22."
+    },
+    {
+      "author_field": "brandon-jones",
+      "year": "2015",
+      "as_annotated": "Brandon-Jones, E., Squire, B., & Van Rossenberg, Y. G. (2015). The impact of supply base complexity on disruptions and performance: the moderating effects of slack and visibility. International Journal of Production Research, 53(22), 6903-6918."
+    },
+    {
+      "author_field": "busse",
+      "year": "2017",
+      "as_annotated": "Busse, C., Meinlschmidt, J. and Foerstl, K. (2017). Managing information processing needs in global supply chains: A prerequisite to sustainable supply chain management. Journal of Supply Chain Management, Vol. 53 No. 1, pp. 87-113."
+    },
+    {
+      "author_field": "carlos",
+      "year": "2018",
+      "as_annotated": "Carlos, W. and Lewis, B. (2018). Strategic silence: withholding certification status as a hypocrisy avoidance tactic. Administrative Science Quarterly, 63(1), 130-169."
+    },
+    {
+      "author_field": "carnovale",
+      "year": "2015",
+      "as_annotated": "Carnovale, S., & Yeniyurt, S. (2015). The role of ego network structure in facilitating ego network innovations. Journal of Supply Chain Management, 51(2), 22–46."
+    },
+    {
+      "author_field": "carter",
+      "year": "2015",
+      "as_annotated": "Carter, C. R., Rogers, D. S., & Choi, T. Y. (2015). Toward the theory of the supply chain. Journal of Supply Chain Management, 51(2), 89–97."
+    },
+    {
+      "author_field": "carter",
+      "year": "2018",
+      "as_annotated": "Carter, C.R. and Washispack, S. (2018). Mapping the Path Forward for Sustainable Supply Chain Management: A Review of Reviews. Journal of Business Logistics, 39(4), 242-247."
+    },
+    {
+      "author_field": "centola",
+      "year": "2013",
+      "as_annotated": "Centola, 2013. Homophily, networks, and critical mass: Solving the start-up problem in large group collective action. 25(1), 3-40."
+    },
+    {
+      "author_field": "chen",
+      "year": "2018",
+      "as_annotated": "Chen, S., Zhang, Q and Zhou, Y. (2018). Impact of supply chain transparency on sustainability under NGO scrutiny. Production and Operations Management, 28(12), 1-21."
+    },
+    {
+      "author_field": "choi",
+      "year": "2001",
+      "as_annotated": "Choi, T. Y., Dooley, K. J., & Rungtusanatham, M. (2001). Supply networks and complex adaptive systems: control versus emergence. Journal of Operations management, 19(3), 351-366."
+    },
+    {
+      "author_field": "choi",
+      "year": "2006",
+      "as_annotated": "Choi, T. Y., & Krause, D. R. (2006). The supply base and its complexity: Implications for transaction costs, risks, responsiveness, and innovation. Journal of Operations Management, 24(5), 637–652."
+    },
+    {
+      "author_field": "choi",
+      "year": "2009",
+      "as_annotated": "Choi, T. Y., & Wu, Z. (2009). Triads in supply networks: Theorizing buyer–supplier–supplier relationships. Journal of Supply Chain Management, 45(1), 8–25."
+    },
+    {
+      "author_field": "cohen",
+      "year": "1988",
+      "as_annotated": "Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences. Lawrence Erlbaum."
+    },
+    {
+      "author_field": "connolly",
+      "year": "1990",
+      "as_annotated": "Connolly, T., & Thorn, B. K. (1990). Discretionary databases: Theory, data, and implications. In J. Fulk & C. Steinfield (Eds.), Organizations and communication technology, 219–233, Newbury Park, CA: Sage."
+    },
+    {
+      "author_field": "dai",
+      "year": "2020",
+      "as_annotated": "Dai, R., Liang, H., & Ng, L. (2020). Socially responsible corporate customers. Journal of Financial Economics, https://doi.org/10.1016/j.jfineco.2020.01.003."
+    },
+    {
+      "author_field": "darnall",
+      "year": "2010",
+      "as_annotated": "Darnall, N., Henriques, I., & Sadorsky, P. (2010). Adopting proactive environmental strategy: The influence of stakeholders and firm size. Journal of Management Studies, 47(6), 1072–1094."
+    },
+    {
+      "author_field": "de villiers",
+      "year": "2016",
+      "as_annotated": "De Villiers, C., & Marques, A. (2016). Corporate social responsibility, country-level predispositions, and the consequences of choosing a level of disclosure. Accounting and Business Research, 46(2), 167–195."
+    },
+    {
+      "author_field": "dong",
+      "year": "2015",
+      "as_annotated": "Dong, M. C., Liu, Z., Yu, Y., & Zheng, J.-H. (2015). Opportunism in Distribution Networks: The Role of Network Embeddedness and Dependence. Production and Operations Management, 24(10), 1657–1670."
+    },
+    {
+      "author_field": "ellram",
+      "year": "2004",
+      "as_annotated": "Ellram, L. M., Tate, W. L., & Billington, C. (2004). Understanding and managing the services supply chain. Journal of Supply Chain Management, 40(3), 17-32."
+    },
+    {
+      "author_field": "enkel",
+      "year": "2010",
+      "as_annotated": "Enkel, E. and Gassmann, O. (2010). Creative imitation: exploring the case of cross‐industry innovation. R&D Management, 40(3), 256-270."
+    },
+    {
+      "author_field": "fabrizio",
+      "year": "2019",
+      "as_annotated": "Fabrizio, K. and Kim, E. (2019). Reluctant disclosure and transparency: evidence from environmental disclosures. Organization Science, 30(6), 1207-1231."
+    },
+    {
+      "author_field": "fagiolo",
+      "year": "2007",
+      "as_annotated": "Fagiolo, G. (2007). Clustering in complex directed networks. Physical Review E, 76(2), 1-16."
+    },
+    {
+      "author_field": "fine",
+      "year": "1998",
+      "as_annotated": "Fine, C. (1998). Clockspeed: Winning Industry Control in the Age of Temporary Advantage. New York: Perseus Books."
+    },
+    {
+      "author_field": "flammer",
+      "year": "2016",
+      "as_annotated": "Flammer, C., & Kacperczyk, A. (2016). The risk of knowledge spillovers and corporate social responsibility: Evidence from the inevitable disclosure doctrine. Working Paper, Massachusetts Institute of Technology."
+    },
+    {
+      "author_field": "fontana",
+      "year": "2019",
+      "as_annotated": "Fontana, E. and Egels-Zandén, N. (2019). influence of supplier collective behaviour on corporate social responsibility in the Bangladeshi apparel supply chain. Journal of Business Ethics, 159(4),1047-1064."
+    },
+    {
+      "author_field": "frischmann",
+      "year": "2013",
+      "as_annotated": "Frischmann, B. (2013). Two enduring lessons from Elinor Ostrom. Journal of Institutional Economics, 9(4), 387-406."
+    },
+    {
+      "author_field": "fulk",
+      "year": "1996",
+      "as_annotated": "Fulk, J., Flanagin, A., Kalman, M., Monge, P. and Ryan, T. (1996). Connective and communal public goods in interactive communication systems. Communiocation Theory, 6(1), 60-87."
+    },
+    {
+      "author_field": "gao",
+      "year": "2015",
+      "as_annotated": "Gao, G., Xie, E., Zhou, K. (2015). How does technological diversity in supplier network drive buyer innovation? Relational process and contingencies. Journal of Operations Management, 36, 165-177."
+    },
+    {
+      "author_field": "gardner",
+      "year": "2003",
+      "as_annotated": "Gardner, J. T., & Cooper, M. C. (2003). Strategic supply chain mapping approaches. Journal of Business Logistics, 24(2), 37-64."
+    },
+    {
+      "author_field": "gould",
+      "year": "1993",
+      "as_annotated": "Gould, R. V. (1993). Collective action and network structure. American Sociological Review, 182–196."
+    },
+    {
+      "author_field": "gualandris",
+      "year": "2015",
+      "as_annotated": "Gualandris, J., Klassen, R. D., Vachon, S., & Kalchschmidt, M. (2015). Sustainable evaluation and verification in supply chains: Aligning and leveraging accountability to stakeholders. Journal of Operations Management, 38, 1–13."
+    },
+    {
+      "author_field": "hall",
+      "year": "2010",
+      "as_annotated": "Hall, J. and Matos, S. (2010). Incorporating impoverished communities in sustainable supply chains. International Journal of Physical Distribution & Logistics Management, 40(1/2), 124-147."
+    },
+    {
+      "author_field": "jacobs",
+      "year": "2012",
+      "as_annotated": "Jacobs, B. and Subramanian, R. (2012). Sharing responsibility for product recovery across the supply chain. Production & Operations Management, 21(1), 85-100."
+    },
+    {
+      "author_field": "jira",
+      "year": "2013",
+      "as_annotated": "Jira, C. (Fern), & Toffel, M. W. (2013). Engaging Supply Chains in Climate Change. Manufacturing & Service Operations Management, 15(4), 559–577."
+    },
+    {
+      "author_field": "kim",
+      "year": "2015",
+      "as_annotated": "Kim, Y. and Choi T. (2015). Deep, sticky, transient, and gracious: an expanded buyer–supplier relationship typology. Journal of Supply Chain Management, 51(3), 61-86."
+    },
+    {
+      "author_field": "kim",
+      "year": "2016",
+      "as_annotated": "Kim, Y. and Davis, G. F. (2016). Challenges for global supply chain sustainability: Evidence from conflict minerals reports. Academy of Management Journal, 59(6), 1896–1916."
+    },
+    {
+      "author_field": "kim",
+      "year": "2011",
+      "as_annotated": "Kim, Y., Choi, T. Y., Yan, T., & Dooley, K. (2011). Structural investigation of supply networks: A social network analysis approach. Journal of Operations Management, 29(3), 194–211."
+    },
+    {
+      "author_field": "kolaczyk",
+      "year": "2014",
+      "as_annotated": "Kolaczyk, E. D., & Csárdi, G. (2014). Statistical analysis of network data with R, New York: Springer."
+    },
+    {
+      "author_field": "kolbel",
+      "year": "2017",
+      "as_annotated": "Kölbel, J.F., Busch, T. and Jancso, L.M., (2017). How media coverage of corporate social irresponsibility increases financial risk. Strategic Management Journal, 38(11), 2266-2284."
+    },
+    {
+      "author_field": "kolk",
+      "year": "2004",
+      "as_annotated": "Kolk, A. (2004). A decade of sustainability reporting: developments and significance. International Journal of Environment and Sustainable Development, 3(1), 51–64."
+    },
+    {
+      "author_field": "lai",
+      "year": "2016",
+      "as_annotated": "Lai, A., Melloni, G., & Stacchezzini, R. (2016). Corporate sustainable development: is 'integrated reporting' a legitimation strategy? Business Strategy and the Environment, 25(3), 165–177."
+    },
+    {
+      "author_field": "leven",
+      "year": "2014",
+      "as_annotated": "Leven, P., Holmström, J. and Mathiassen, L. (2014). Managing research and innovation networks: Evidence from a government sponsored cross-industry program. Research Policy, 43(1), 156-168."
+    },
+    {
+      "author_field": "lu",
+      "year": "2017",
+      "as_annotated": "Lu, G., & Shang, G. (2017). Impact of supply base structural complexity on financial performance: Roles of visible and not-so-visible characteristics. Journal of Operations Management, 53, 23–44."
+    },
+    {
+      "author_field": "madison",
+      "year": "2009",
+      "as_annotated": "Madison, M. J., Frischmann, B. M., & Strandburg, K. J. (2009). Constructing commons in the cultural environment. Cornell Law Review, 95, 657-710."
+    },
+    {
+      "author_field": "marques",
+      "year": "2019",
+      "as_annotated": "Marques, L., Tingting, Y., and Matthews, L. (2019). Knowledge diffusion in a global supply network: a network of practice view. Journal of Supply Chain Management, 56(1), 33-53."
+    },
+    {
+      "author_field": "marquis",
+      "year": "2016",
+      "as_annotated": "Marquis, C., Toffel, M. W., & Zhou, Y. (2016). Scrutiny, Norms, and Selective Disclosure: A Global Study of Greenwashing. Organization Science, 27(2), 483–504."
+    },
+    {
+      "author_field": "marshall",
+      "year": "2016",
+      "as_annotated": "Marshall, D., McCarthy, L., McGrath, P., & Harrigan, F. (2016). What's Your Strategy for Supply Chain Disclosure? MIT Sloan Management Review, 12, 1-14."
+    },
+    {
+      "author_field": "marwell",
+      "year": "1988",
+      "as_annotated": "Marwell, P. and Oliver, G. (1988). The paradox of group size in collective action: a theory of the critical mass. American Sociological Review, 53(1), 1-8"
+    },
+    {
+      "author_field": "mena",
+      "year": "2013",
+      "as_annotated": "Mena, C., Humphries, A. and Choi, T.(2013). Toward a theory of multi-tier supply chain management. Journal of Supply Chain Management, 49(2), 58-77."
+    },
+    {
+      "author_field": "olson",
+      "year": "1965",
+      "as_annotated": "Olson, M. (1965). The logic of collective action: public goods and the theory of groups. Cambridge, MA: Harvard University Press."
+    },
+    {
+      "author_field": "osadchiy",
+      "year": "2015",
+      "as_annotated": "Osadchiy, N., Gaur, V., & Seshadri, S. (2015). Systematic risk in supply chain networks. Management Science, 62(6), 1755–1777."
+    },
+    {
+      "author_field": "ostrom",
+      "year": "1990",
+      "as_annotated": "Ostrom, E. (1990). Governing the commons. New York: Cambridge University Press."
+    },
+    {
+      "author_field": "ostrom",
+      "year": "2000",
+      "as_annotated": "Ostrom, E. (2000). Collective action and the evolution of social norms. Journal of Economic Perspectives, 14(3), 137–158."
+    },
+    {
+      "author_field": "ostrom",
+      "year": "2003",
+      "as_annotated": "Ostrom, E., & Walker, J. (Eds.). (2003). Trust and reciprocity: Interdisciplinary lessons for experimental research. Russell Sage Foundation."
+    },
+    {
+      "author_field": "oyserman",
+      "year": "2011",
+      "as_annotated": "Oyserman, D. (2011). Culture as situated cognition: Cultural mindsets, cultural fluency, and meaning making. European review of social psychology, 22(1), 164-214"
+    },
+    {
+      "author_field": "park",
+      "year": "2018",
+      "as_annotated": "Park, H., Bellamy, M. and Basole, R. (2018). Structural anatomy and evolution of supply chain alliance networks: A multi-method approach. Journal of Operations Management, 63, 79-96."
+    },
+    {
+      "author_field": "park",
+      "year": "2013",
+      "as_annotated": "Park, A., & Ravenel, C. (2013). Integrating sustainability into capital markets: Bloomberg LP And ESG's quantitative legitimacy. Journal of Applied Corporate Finance, 25(3), 62–67."
+    },
+    {
+      "author_field": "parmigiani",
+      "year": "2015",
+      "as_annotated": "Parmigiani, A. and Rivera-Santos, M. (2015). Sourcing for the base of the pyramid: Constructing supply chains to address voids in subsistence markets. Journal of Operations Management, 33–34(0), 60-70."
+    },
+    {
+      "author_field": "pathak",
+      "year": "2014",
+      "as_annotated": "Pathak, S. D., Wu, Z., & Johnston, D. (2014). Toward a structural view of co-opetition in supply networks. Journal of Operations Management, 32(5), 254–267."
+    },
+    {
+      "author_field": "poteete",
+      "year": "2004",
+      "as_annotated": "Poteete, A. and Ostrom, E. (2004). Heterogeneity, group size and collective action: the role of institutions in forest management, Development & Change, 35(3), 435-461."
+    },
+    {
+      "author_field": "qiu",
+      "year": "2016",
+      "as_annotated": "Qiu, Y., Shaukat, A., & Tharyan, R. (2016). Environmental and social disclosures: Link with corporate financial performance. The British Accounting Review, 48(1), 102-116."
+    },
+    {
+      "author_field": "reed",
+      "year": "2014",
+      "as_annotated": "Reed, J., Smith, A., Parish, M., Rickhoff, A. (2014). Using contemporary collective action to understand the use of computer-mediated communication in virtual citizen science. In: Agarwal N., Lim M., Wigand R. (eds) Online Collective Action. Lecture Notes in Social Networks. Springer, Vienna."
+    },
+    {
+      "author_field": "reprisk",
+      "year": "2016",
+      "as_annotated": "RepRisk (2016). RepRisk Scope, Process and Metrics. Available at https://www.reprisk.com/our-approach#risk-metrics. Accessed 11 Dec 2018."
+    },
+    {
+      "author_field": "reverte",
+      "year": "2009",
+      "as_annotated": "Reverte, C. (2009). Determinants of corporate social responsibility disclosure ratings by Spanish listed firms. Journal of Business Ethics, 88(2), 351–366."
+    },
+    {
+      "author_field": "rice",
+      "year": "2006",
+      "as_annotated": "Rice, J. A. (2006). Mathematical statistics and data analysis. Cengage Learning"
+    },
+    {
+      "author_field": "rivera",
+      "year": "2010",
+      "as_annotated": "Rivera, M. T., Soderstrom, S. B., & Uzzi, B. (2010). Dynamics of dyads in social networks: Assortative, relational, and proximity mechanisms. Annual Review of Sociology, 36(1), 91-115."
+    },
+    {
+      "author_field": "roberts",
+      "year": "2003",
+      "as_annotated": "Roberts, S. (2003). Supply chain specific? Understanding the patchy success of ethical sourcing initiatives. Journal of business ethics, 44(2-3), 159-170."
+    },
+    {
+      "author_field": "sampson",
+      "year": "2006",
+      "as_annotated": "Sampson, S. E., & Froehle, C. M. (2006). Foundations and implications of a proposed unified services theory. Production and Operations Management, 15(2), 329-343."
+    },
+    {
+      "author_field": "samuelson",
+      "year": "1954",
+      "as_annotated": "Samuelson, P. (1954). The Pure Theory of Public Expenditure. Review of Economics and Statistics, 36, 387-389."
+    },
+    {
+      "author_field": "schilling",
+      "year": "2007",
+      "as_annotated": "Schilling, M. and Phelps, C. (2007). Interfirm collaboration networks: The impact of large-scale network structure on firm innovation. Management Science, 53(7), 1113-1126."
+    },
+    {
+      "author_field": "schmidt",
+      "year": "2017",
+      "as_annotated": "Schmidt, C. G., Foerstl, K., & Schaltenbrand, B. (2017). The supply chain position paradox: green practices and firm performance. Journal of Supply Chain Management, 53(1), 3-25."
+    },
+    {
+      "author_field": "shao",
+      "year": "2018",
+      "as_annotated": "Shao, B. B., Shi, Z. M., Choi, T. Y., & Chae, S. 2018. A data analytics approach to identifying hidden critical suppliers in supply networks: Development of nexus supplier index. Decision Support Systems, 114, 37–48"
+    },
+    {
+      "author_field": "sharma",
+      "year": "2019a",
+      "as_annotated": "Sharma, A., Pathak, S., Borah, S. B., & Adhikary, A. (2019a). Is it too complex? The curious case of supply network complexity and focal firm innovation. Journal of Operations Management."
+    },
+    {
+      "author_field": "sharma",
+      "year": "2019b",
+      "as_annotated": "Sharma, A., Kumar, V.; Yan, J., Borah, S. and Adhikary, A. (2019b). Understanding the structural characteristics of a firm's whole buyer–supplier network and its impact on international business performance. Journal of International Business Studies, 50(3), 365-392."
+    },
+    {
+      "author_field": "sodhi",
+      "year": "2019",
+      "as_annotated": "Sodhi, M. and Tang, C. (2019). Research Opportunities in Supply Chain Transparency. Production & Operations Management, 28(12), 2946-2959."
+    },
+    {
+      "author_field": "swift",
+      "year": "2019",
+      "as_annotated": "Swift, C., Guide Jr, V.D.R. and Muthulingam, S. (2019). Does supply chain visibility affect operating performance? Evidence from conflict minerals disclosures. Journal of Operations Management. 65(2), 406-429."
+    },
+    {
+      "author_field": "tachizawa",
+      "year": "2014",
+      "as_annotated": "Tachizawa, M. and Wong, Y. (2014). Towards a theory of multi-tier sustainable supply chains: a systematic literature review. Supply Chain Management: An International Journal, 19 (5/6), 643-663."
+    },
+    {
+      "author_field": "unruh",
+      "year": "2016",
+      "as_annotated": "Unruh, G., Kiron, D., Kruschwitz, N., Reeves, M., Rubel, H. & Meyer zum Felde, A. (2016). Investing for a sustainable future: Investors care more about sustainability than many executives believe. MIT Sloan Management Review, 57(4), 3-29."
+    },
+    {
+      "author_field": "van den brink",
+      "year": "2004",
+      "as_annotated": "Van Den Brink, T. W., & van Der Woerd, F. (2004). Industry specific sustainability benchmarks: An ECSF pilot bridging corporate sustainability with social responsible investments. Journal of Business Ethics, 55(2), 187–203."
+    },
+    {
+      "author_field": "villena",
+      "year": "2018",
+      "as_annotated": "Villena, V. H., & Gioia, D. A. (2018). On the riskiness of lower-tier suppliers: Managing sustainability in supply networks. Journal of Operations Management, 64, 65-87"
+    },
+    {
+      "author_field": "von krogh",
+      "year": "2003",
+      "as_annotated": "Von Krogh, G., Spaeth, S. and Lakhani, K. R. (2003). Community, joining, and specialization in open source software innovation: A case study. Research Policy, 32(7), 1217–1241."
+    },
+    {
+      "author_field": "wenger",
+      "year": "2000",
+      "as_annotated": "Wenger, E., and Snyder, W. (2000). Communities of practice: the organizational frontier. Harvard Business Review, 78(1), 139-145."
+    },
+    {
+      "author_field": "wilhelm",
+      "year": "2016",
+      "as_annotated": "Wilhelm, M. M., Blome, C., Bhakoo, V., & Paulraj, A. (2016). Sustainability in extended supply chains: Understanding the double agency role of the first-tier supplier. Journal of Operations Management, 41, 42-60."
+    },
+    {
+      "author_field": "wilhoit",
+      "year": "2015",
+      "as_annotated": "Wilhoit, E. and Kisselburgh, L. (2015). Collective action without organization: the material constitution of bike commuters as collective. Organization Studies, 36(5), 573–592."
+    },
+    {
+      "author_field": "wooldridge",
+      "year": "2015",
+      "as_annotated": "Wooldridge, J. M. (2015). Introductory econometrics: A modern approach. Nelson Education."
+    },
+    {
+      "author_field": "world",
+      "year": "2016",
+      "as_annotated": "World Bank. (2016). Available at: https://datacatalog.worldbank.org/dataset/worldwide-governance-indicators. Accessed 12 December 2018."
+    },
+    {
+      "author_field": "yan",
+      "year": "2015",
+      "as_annotated": "Yan, T., Choi, T. Y., Kim, Y., & Yang, Y. (2015). A theory of the nexus supplier: A critical supplier from a network perspective. Journal of Supply Chain Management, 51(1), 52–66."
+    }
+  ]
+}

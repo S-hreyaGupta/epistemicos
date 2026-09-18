@@ -140,16 +140,25 @@ ET_AL = re.compile(r"\bet\s*al\b\.?")
 
 
 def flatten(s: str) -> str:
-    """Case, accents and whitespace removed; nothing else.
+    """Case, accents, dash variants and whitespace removed; nothing else.
 
     Manuscript text extracted from a PDF breaks names across lines and pages,
     so a search for an author has to be done against text whose line structure
     has been collapsed. `grep` on the raw extraction finds nothing for exactly
     this reason and would suggest the annotation was wrong.
+
+    Dashes are folded because they differ between annotation and corpus without
+    the name differing. `Brix‐Asala` carries U+2010 in the annotation and U+002D
+    in the corpus markdown, and NFKD folds neither to the other, so the entry
+    read as absent from a document containing it twice. That was the only one of
+    191 bibliography entries to fail the check, and the fault was here.
     """
     import unicodedata
     s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c))
+    # Every Unicode dash, and the minus sign, to an ASCII hyphen.
+    s = "".join("-" if unicodedata.category(c) == "Pd" or c == "−" else c
+                for c in s)
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
@@ -157,6 +166,48 @@ def first_author(phrase: str) -> str:
     a = ET_AL.sub("", flatten(phrase))
     a = re.split(r"\band\b|&", a)[0]
     return a.strip().strip(".,;").strip()
+
+
+# A trailing run of initials, for reference entries written "Surname A.B.,"
+# with no comma after the surname. Five of the 191 are in that form.
+TRAILING_INITIALS = re.compile(r"\s+(?:[A-Za-z]\.?){1,4}$")
+
+
+def reference_key(entry: str) -> tuple[str, str] | None:
+    """(author field, year) for one bibliography entry, positionally.
+
+    No grammar. The year is located, the text before it is the author field,
+    and the surname is what precedes the first comma inside that field — which
+    works because a reference list puts the surname first.
+
+    That last rule is why it is the first comma *before the year* and not the
+    first comma in the entry. An institutional author has no forename, so no
+    comma follows the name: `Bloomberg. (2011). Supply Chain on Bloomberg.
+    Retrieved December 7, 2018` has its first comma deep in the retrieval date,
+    and splitting there returned most of the entry as the author. Taking the
+    pre-year text first bounds it, which is also what rc3's NON_PERSON_AUTHOR
+    does: bounded by the start of the entry and the year.
+
+    Deliberately positional. Deciding whether `Carrieri de Souza` is a
+    multi-token surname or a surname plus a forename is the grammar under test,
+    and a gold set that decided it would agree with the extractor by
+    construction on the cases in dispute.
+    """
+    m = REF_YEAR.search(entry)
+    if not m:
+        return None
+    year = m.group(1) or m.group(2)
+    pre = entry[:m.start()]
+    author = pre.split(",")[0] if "," in pre else pre
+    author = author.strip().strip(".,;:").strip()
+    author = TRAILING_INITIALS.sub("", author).strip()
+    return (author, year) if author else None
+
+
+# Parenthesised year first, because an entry may carry a date in its title or
+# its retrieval note and the publication year is the parenthesised one when
+# there is one.
+REF_YEAR = re.compile(r"\((\d{4}[a-z]?)\)|\b((?:1[89]|20)\d{2}[a-z]?)\b")
 
 
 class Refused(Exception):
@@ -318,6 +369,62 @@ def main() -> int:
         dupes = {f"{k[0]}|{k[1]}": n for k, n in seen.items() if n > 1}
         if dupes:
             doc["annotated_more_than_once"] = dupes
+
+        # ---- the reference list, as its own gold set ----
+        # The bibliography side was never measured against anything but the
+        # extractor's own detections: #citation reported references at 92.5%,
+        # counted from what it found. These 191 entries are what a human read.
+        ref_items, ref_seen, ref_unkeyed = [], set(), []
+        for s in raw_ref:
+            k = reference_key(s)
+            if k is None:
+                ref_unkeyed.append(s[:80])
+                continue
+            author, year = k
+            kk = (flatten(author), year)
+            if kk in ref_seen:
+                continue
+            ref_seen.add(kk)
+            ref_items.append({"author_field": flatten(author), "year": year,
+                              "as_annotated": s})
+
+        ref_doc = {
+            "gold_set": f"citation-{paper}-references-v0.1",
+            "unit": "bibliography entry",
+            "corpus_paper": CORPUS_ID[paper],
+            "key_fields": ["author_field", "year"],
+            "identity_note":
+                "author_field is positional: the text before the year, cut at "
+                "the first comma within it, with a trailing run of initials "
+                "removed. No grammar. Whether an author field is a person or "
+                "an organisation is what rc3's C-series decides and is "
+                "therefore not decided here.",
+            "provenance": {
+                "annotator": a.annotator,
+                "annotated": a.annotated,
+                "method": "reference list read from the manuscript and written "
+                          "out by hand",
+                "spreadsheet_sha256": sheet_sha,
+                "annotated_from_pdf_sha256": MANUSCRIPT_PDF[paper],
+            },
+            "source": {
+                "sha256": CORPUS_MARKDOWN[paper],
+                "what": "papers.markdown for this row",
+            },
+            "items": ref_items,
+        }
+        if ref_unkeyed:
+            ref_doc["unkeyable"] = ref_unkeyed
+        ref_dest = out_dir / f"citation-{paper}-references-v0.1.json"
+        with ref_dest.open("w", encoding="utf-8", newline="\n") as fh:
+            json.dump(ref_doc, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+        summary.append(
+            f"  {ref_dest.relative_to(REPO).as_posix()}\n"
+            f"      {len(ref_items)} bibliography entries"
+            + (f"  ·  {len(raw_ref) - len(ref_items)} duplicate key(s) collapsed"
+               if len(ref_items) != len(raw_ref) else "")
+            + (f"\n      UNKEYABLE: {ref_unkeyed}" if ref_unkeyed else ""))
 
         dest = out_dir / f"citation-{paper}-v0.1.json"
         with dest.open("w", encoding="utf-8", newline="\n") as fh:

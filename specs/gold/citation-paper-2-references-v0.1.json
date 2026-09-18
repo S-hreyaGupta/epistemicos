@@ -1,0 +1,493 @@
+{
+  "gold_set": "citation-paper-2-references-v0.1",
+  "unit": "bibliography entry",
+  "corpus_paper": "c1d56945",
+  "key_fields": [
+    "author_field",
+    "year"
+  ],
+  "identity_note": "author_field is positional: the text before the year, cut at the first comma within it, with a trailing run of initials removed. No grammar. Whether an author field is a person or an organisation is what rc3's C-series decides and is therefore not decided here.",
+  "provenance": {
+    "annotator": "Alex Zamurko and Mohit",
+    "annotated": "2026-09-17",
+    "method": "reference list read from the manuscript and written out by hand",
+    "spreadsheet_sha256": "102571276ef70d197374c2a51d4446dde308e6238aefec3e2a819934355df5c4",
+    "annotated_from_pdf_sha256": "c4d19c6fb53965655e60209dff785b05d5bfa1757f08f2c5aadf52ef0780e3b8"
+  },
+  "source": {
+    "sha256": "48b2b2f459e5cad88b7105048a0d7e0f852084764662a9e67155de52b52921d8",
+    "what": "papers.markdown for this row"
+  },
+  "items": [
+    {
+      "author_field": "andersen",
+      "year": "2014",
+      "as_annotated": "Andersen, P., 2014. Challenges for under-utilized crops illustrated by ricebean (Vigna umbellata) in India and Nepal. In Technological and Social Dimensions of the Green Revolution (pp. 56-66). Routledge."
+    },
+    {
+      "author_field": "andres",
+      "year": "2024",
+      "as_annotated": "Andres, S., Atkinson, J., Coleman, D., Brazill-Boast, J., Wright, I., Allen, S., Gallagher, R., 2024. Constraints of commercially available seed diversity in restoration: Implications for plant functional diversity. Plants People Planet."
+    },
+    {
+      "author_field": "ates",
+      "year": "2024",
+      "as_annotated": "Ateş, M.A., Luzzini, D., 2024. Untying the Gordian knot systematic review and integrative framework of supply network complexity. Journal of Business Logistics, 45 (1), e12365."
+    },
+    {
+      "author_field": "albareda",
+      "year": "2024",
+      "as_annotated": "Albareda, L., Branzei, O., 2024. Biocentric work in the anthropocene: how actors regenerate degenerated natural commons. Journal of Management Studies."
+    },
+    {
+      "author_field": "albrecht",
+      "year": "2021",
+      "as_annotated": "Albrecht, S., Wiek, A., 2021. Food forests: Their services and sustainability. Journal of Agriculture, Food Systems, and Community Development, 10.0, 91."
+    },
+    {
+      "author_field": "ali",
+      "year": "2024",
+      "as_annotated": "Ali, J. (2024). Environmental Resilience: Transition to regenerative supply chain management. AIMS Environmental Science, 11(2)."
+    },
+    {
+      "author_field": "barbier",
+      "year": "2022",
+      "as_annotated": "Barbier, E.B., 2022. The policy implications of the Dasgupta review: land use change and biodiversity: invited paper for the special issue on “the economics of biodiversity: Building on the Dasgupta Review” in environmental and resource economics. Environmental and Resource Economics, 83 (4), 911–935."
+    },
+    {
+      "author_field": "bisht",
+      "year": "2020",
+      "as_annotated": "Bisht, I. S., Rana, J. C., Pal Ahlawat, S., 2020. The future of smallholder farming in India: Some sustainability considerations. Sustainability, 12(9), 3751."
+    },
+    {
+      "author_field": "boissiere",
+      "year": "2020",
+      "as_annotated": "Boissière, M., Atmadja, S., Benmakhlouf, S., Beyessa, M., Kassa, H., Hunde, T., Assefa, F., 2020. Developing small-scale bamboo enterprises for livelihoods and environmental restoration in Benishangul-Gumuz Regional State, Ethiopia. International Forestry Review, 22 (3), 306–322."
+    },
+    {
+      "author_field": "brix-asala",
+      "year": "2021",
+      "as_annotated": "Brix‐Asala, C., Seuring, S., Sauer, P.C., Zehendner, A., Schilling, L., 2021. Resolving the base of the pyramid inclusion paradox through supplier development. Business Strategy and the Environment, 30 (7), 3208–3227."
+    },
+    {
+      "author_field": "buor",
+      "year": "2022",
+      "as_annotated": "Buor, J., 2022. Understanding the socio-economic and environmental impacts of Ghana’s change in economic status on the upstream cocoa supply chain. Management of Environmental Quality: An International Journal 33.0, 1379."
+    },
+    {
+      "author_field": "carrieri de souza",
+      "year": "2023",
+      "as_annotated": "Carrieri de Souza, M., Rover, O. J., Forno, F., 2023. Food Networks and Agroecology in the Province of Trento–Italy. Frontiers in Sustainable Food Systems, 7, 1130082."
+    },
+    {
+      "author_field": "debrot",
+      "year": "2020",
+      "as_annotated": "Debrot, A. O., Veldhuizen, A., Van Den Burg, S. W., Klapwijk, C. J., Islam, M. N., Alam, M. I., Poelman, M., 2020. Non-timber forest product livelihood-focused interventions in support of mangrove restoration: A call to action. Forests, 11(11), 1224."
+    },
+    {
+      "author_field": "de la cruz",
+      "year": "2021",
+      "as_annotated": "De la Cruz M., Dessein, J., 2021. Beyond institutional bricolage: an ‘intertwining approach’ to understanding the transition towards agroecology in Peru. Ecological economics, 187, 107091."
+    },
+    {
+      "author_field": "de freitas",
+      "year": "2017",
+      "as_annotated": "de Freitas, F. L. M., Sparovek, G., Mörtberg, U., Silveira, S., Klug, I., Berndes, G., 2017. Offsetting legal deficits of native vegetation among Brazilian landholders: Effects on nature protection and socioeconomic development. Land use policy, 68, 189-199."
+    },
+    {
+      "author_field": "de santana",
+      "year": "2023",
+      "as_annotated": "de Santana A.C., de Santana Á.L., de Santana Á.L., da Silva de Oliveira G.M.T., Dos Santos M.A.S., 2023. Bioeconomic evaluation of an agroforestry system and the potential to recover degraded areas and capitalize producers in the state of Pará, Brazilian Amazon; [Avaliação bioeconômica de um sistema agroflorestal e o potencial de recuperação de áreas degradadas e capitalização de produtores no estado do Pará, Amazônia brasileira]. Desenvolvimento e Meio Ambiente."
+    },
+    {
+      "author_field": "du plessis",
+      "year": "2011",
+      "as_annotated": "du Plessis C., Cole R.J., 2011. Motivating change: shifting the paradigm. Building Research & Information, 39 (5), 436–449."
+    },
+    {
+      "author_field": "dudley",
+      "year": "2017",
+      "as_annotated": "Dudley, N., Alexander, S., 2017. Agriculture and biodiversity: a review. Biodiversity, 18(2-3), 45-49."
+    },
+    {
+      "author_field": "durach",
+      "year": "2017",
+      "as_annotated": "Durach, C.F., Kembro, J., Wieland, A., 2017. A New Paradigm for Systematic Literature Reviews in Supply Chain Management. Journal of Supply Chain Management, 53, 67–85."
+    },
+    {
+      "author_field": "duru",
+      "year": "2015",
+      "as_annotated": "Duru, M., Therond, O., Fares, M.H., 2015. Designing agroecological transitions: a review. Agronomy for Sustainable Development, 35, 1237-1257."
+    },
+    {
+      "author_field": "dyllick",
+      "year": "2016",
+      "as_annotated": "Dyllick, T., Muff, K., 2016. Clarifying the meaning of sustainable business: introducing a typology from business-as-usual to true business sustainability. Organization & Environment, 29 (2), 156–174."
+    },
+    {
+      "author_field": "ellen macarthur foundation (emf)",
+      "year": "2024",
+      "as_annotated": "Ellen MacArthur Foundation (EMF)., 2024. The circular economy in detail. https://www.ellenmacarthurfoundation.org/the-circular-economy-in-detail-deep-dive retrieved September 20th 2024"
+    },
+    {
+      "author_field": "enthoven",
+      "year": "2023",
+      "as_annotated": "Enthoven, L., Van den Broeck, G., 2023. How to boost the local trade of participatory guarantee system (PGS)-certified produce? A value chain perspective in Huánuco, Peru. Ecological Economics, 212, 107929."
+    },
+    {
+      "author_field": "esquivel",
+      "year": "2021",
+      "as_annotated": "Esquivel, K. E., Carlisle, L., Ke, A., Olimpi, E. M., Baur, P., Ory, J., Bowles, T. M., 2021. The “sweet spot” in the middle: why do mid-scale farms adopt diversification practices at higher rates? Frontiers in Sustainable Food Systems, 5, 734088."
+    },
+    {
+      "author_field": "fao",
+      "year": "2005",
+      "as_annotated": "FAO, 2005. Building on Gender, Agrobiodiversity and Local Knowledge. https://www.fao.org/4/y5609e/y5609e01.htmhttps://www.fao.org/4/y5609e/y5609e01.htm"
+    },
+    {
+      "author_field": "fao",
+      "year": "2018",
+      "as_annotated": "FAO, 2018. The 10 Elements of Agroecology. https://www.fao.org/agroecology/overview/overview10elements/en/"
+    },
+    {
+      "author_field": "flora",
+      "year": "2010",
+      "as_annotated": "Flora, C., 2010. Food security in the context of energy and resource depletion: Sustainable agriculture in developing countries. Renewable Agriculture and Food Systems 25.0, 118."
+    },
+    {
+      "author_field": "fremout",
+      "year": "2022",
+      "as_annotated": "Fremout, T., Thomas, E., Taedoumg, H., Briers, S., Gutiérrez-Miranda, C., Alcázar-Caicedo, C., Lindau, A., Mounmemi, K.H., Vinceti, B., Kettle, C., Ekué, M., Atkinson, R., Jalonen, R., Gaisberger, H., Elliott, S., Brechbühler, E., Ceccarelli, V., Krishnan, S., Vacik, H., Wiederkehr-Guerra, G., Salgado-Negret, B., González, M., Ramírez, W., Moscoso-Higuita, L., Vásquez, Á., Cerrón, J., Maycock, C., Muys, B., 2022. Diversity for Restoration (D4R): Guiding the selection of tree species and seed sources for climate-resilient restoration of tropical forest landscapes. Journal of Applied Ecology, 59.0, 664."
+    },
+    {
+      "author_field": "garrett",
+      "year": "2017",
+      "as_annotated": "Garrett, R., Niles, M., Gil, J., Gaudin, A., Chaplin-Kramer, R., Assmann, A., Assmann, T., Brewer, K., de, F.C.P., Cortner, O., Dynes, R., Garbach, K., Kebreab, E., Mueller, N., Peterson, C., Reis, J., Snow, V., Valentim, J., 2017. Social and ecological analysis of commercial integrated crop livestock systems: Current knowledge and remaining uncertainty. Agricultural Systems, 155.0, 136."
+    },
+    {
+      "author_field": "giller",
+      "year": "2021",
+      "as_annotated": "Giller, K.E., Hijbeek, R., Andersson, J.A., Sumberg, J., 2021. Regenerative agriculture: an agronomic perspective. Outlook on Agriculture, 50 (1), 13–25."
+    },
+    {
+      "author_field": "gualandris",
+      "year": "2024",
+      "as_annotated": "Gualandris, J., Branzei, O., Wilhelm, M., Lazzarini, S., Linnenluecke, M., Hamann, R., Chen, C. M., 2024. Unchaining supply chains: transformative leaps toward regenerating social–ecological systems. Journal of Supply Chain Management, 60 (1), 53–67."
+    },
+    {
+      "author_field": "guerrero",
+      "year": "2019",
+      "as_annotated": "Guerrero, L., Pereira, L.M., Ravera, F., Jiménez-Aceituno, A., 2019. Flipping the tortilla: social-ecological innovations and traditional ecological knowledge for more sustainable agri-food systems in Spain. Sustainability, 11 (5), 1222."
+    },
+    {
+      "author_field": "guthey",
+      "year": "2014",
+      "as_annotated": "Guthey G.T., Whiteman G., Elmes M., 2014. Place and sense of place: implications for organizational studies of sustainability. Journal of Management Inquiry, 23 (3), 254–265."
+    },
+    {
+      "author_field": "hahn",
+      "year": "2021",
+      "as_annotated": "Hahn, T., Tampe, M., 2021. Strategies for regenerative business. Strategic Organization, 19 (3), 456–477."
+    },
+    {
+      "author_field": "hawken",
+      "year": "2021",
+      "as_annotated": "Hawken, P., 2021. Regeneration: ending the climate crisis in one generation. Penguin."
+    },
+    {
+      "author_field": "herve",
+      "year": "2020",
+      "as_annotated": "Hervé, M. E. T., Boudes, P., Cieslik, C., Montembault, D., Jung, V., Burel, F., Cluzeau, D., Winter, S., Nicolai, A, 2020. Landscape complexity perception and representation in a wine-growing region with the designation of origin in the Loire Valley (France): A cultural ecosystem service? Renewable Agriculture and Food Systems, 35(1), 77–89."
+    },
+    {
+      "author_field": "hett",
+      "year": "2023",
+      "as_annotated": "Hett, C., Aye, Z. C., Gironde, C., Beban, A., Castella, J. C., Bernhard, R., Ehrensperger, A., 2023. Agroecological initiatives in the Mekong Region: a systematic literature review and mapping reveals their implications for transitioning to sustainable food systems. Journal of land use science, 18(1), 334-355."
+    },
+    {
+      "author_field": "jordan",
+      "year": "2016",
+      "as_annotated": "Jordan, N. R., Dorn, K., Runck, B., Ewing, P., Williams, A., Anderson, K. A., Johnson, G., 2016. Sustainable commercialization of new crops for the agricultural bioeconomy. Elementa, 4, 000081."
+    },
+    {
+      "author_field": "kettle",
+      "year": "2010",
+      "as_annotated": "Kettle, C. J., 2010. Ecological considerations for using dipterocarps for restoration of lowland rainforest in Southeast Asia. Biodiversity and Conservation, 19, 1137-1151."
+    },
+    {
+      "author_field": "kliem",
+      "year": "2022",
+      "as_annotated": "Kliem, L., Sievers-Glotzbach, S., 2022. Seeds of resilience: the contribution of commons-based plant breeding and seed production to the social-ecological resilience of the agricultural sector. International Journal of Agricultural Sustainability 20.0, 595–614."
+    },
+    {
+      "author_field": "kouassi",
+      "year": "2021",
+      "as_annotated": "Kouassi, J. L., Kouassi, A., Bene, Y., Konan, D., Tondoh, E. J., Kouame, C., 2021. Exploring barriers to agroforestry adoption by cocoa farmers in South-Western Côte d’Ivoire. Sustainability, 13(23), 13075."
+    },
+    {
+      "author_field": "lanka",
+      "year": "2017",
+      "as_annotated": "Lanka, S., Khadaroo, I., Böhm, S., 2017. Agroecology accounting: biodiversity and sustainable livelihoods from the margins. Accounting, Auditing and Accountability Journal 30.0, 1592."
+    },
+    {
+      "author_field": "le",
+      "year": "2023",
+      "as_annotated": "Le, T., Behl, A., Graham, G., 2023. The Role of Entrepreneurship in Successfully Achieving Circular Supply Chain Management. Global Journal of Flexible Systems Management 24.0, 537."
+    },
+    {
+      "author_field": "levidow",
+      "year": "2023",
+      "as_annotated": "Levidow, L., Sansolo, D., Schiavinatto, M., 2023. Territorialising local food systems for an agroecological transition in Latin America. Land, 12 (8), 1577."
+    },
+    {
+      "author_field": "liu",
+      "year": "2023",
+      "as_annotated": "Liu, J. (2023). Leveraging the metacoupling framework for sustainability science and global sustainable development. National Science Review, 10(7), nwad090."
+    },
+    {
+      "author_field": "luzzini",
+      "year": "2024",
+      "as_annotated": "Luzzini, D., Pagell, M., Devenin, V., Miemczyk, J., Longoni, A., Banerjee, B., 2024. Rethinking Supply Chain Management in a Post‐Growth Era. Journal of Supply Chain Management, 60(4), 92-106."
+    },
+    {
+      "author_field": "macfadyen",
+      "year": "2015",
+      "as_annotated": "Macfadyen, S., Tylianakis, J. M., Letourneau, D. K., Benton, T. G., Tittonell, P., Perring, M. P., Smith, H. G., 2015. The role of food retailers in improving resilience in global food supply. Global Food Security, 7, 1-8."
+    },
+    {
+      "author_field": "makino",
+      "year": "2020",
+      "as_annotated": "Makino, Y., Geringer, M., Manuelli, S., 2020. Promoting mountain biodiversity through sustainable value chains. Mountain Research and Development, 40(4), P1."
+    },
+    {
+      "author_field": "mamine",
+      "year": "2020",
+      "as_annotated": "Mamine, F., Farès, M., 2020. Barriers and levers to developing wheat-pea intercropping in Europe: A review. Sustainability, 12.0."
+    },
+    {
+      "author_field": "marculetiu",
+      "year": "2023",
+      "as_annotated": "Marculetiu, A., Ataseven, C., Mackelprang, A.W., 2023. A review of how pressures and their sources drive sustainable supply chain management practices. Journal of Business Logistics, 44 (2), 257–288."
+    },
+    {
+      "author_field": "maurice-hammond",
+      "year": "2023",
+      "as_annotated": "Maurice-Hammond, I., McAlvay, A., Mathews, D., Bosman, A., Morris, J., 2023. A lək̓ʷəŋən estuarine root garden: the case of Tl’chés. Economic Botany, 77 (4), 410–432."
+    },
+    {
+      "author_field": "miller",
+      "year": "2022",
+      "as_annotated": "Miller, D., Legras, S., Barnes, A., Cazacu, M., Gava, O., Helin, J., Vlahos, G., 2022. Creating conditions for harnessing the potential of transitions to agroecology in Europe and requirements for policy. EuroChoices, 21(3), 72-79."
+    },
+    {
+      "author_field": "montabon",
+      "year": "2016",
+      "as_annotated": "Montabon, F., Pagell, M., Wu, Z., 2016. Making sustainability sustainable. Journal of Supply Chain Management, 52 (2), 11–27."
+    },
+    {
+      "author_field": "morseletto",
+      "year": "2020",
+      "as_annotated": "Morseletto, P., 2020. Restorative and regenerative: exploring the concepts in the circular economy. Journal of Industrial Ecology, 24 (4), 763–773."
+    },
+    {
+      "author_field": "moraine",
+      "year": "2016",
+      "as_annotated": "Moraine, M., Grimaldi, J., Murgue, C., Duru, M., Therond, O., 2016. Co-design and assessment of cropping systems for developing crop-livestock integration at the territory level. Agricultural Systems, 147, 87-97."
+    },
+    {
+      "author_field": "munoz",
+      "year": "2021",
+      "as_annotated": "Muñoz, P., Branzei, O., 2021. Regenerative organizations: introduction to the special issue. Organization & Environment, 34 (4), 507–516."
+    },
+    {
+      "author_field": "nelson",
+      "year": "2014",
+      "as_annotated": "Nelson, R., Coe, R., 2014. Transforming research and development practice to support agroecological intensification of smallholder farming. Journal of International Affairs, 107–127."
+    },
+    {
+      "author_field": "oliveira da silva",
+      "year": "2024",
+      "as_annotated": "Oliveira da Silva, F., Arellano, E. C., Felipe Viana, B., Silva-Ferreira, V., Oliveira-Rebouças, P., Rojas-Arévalo, N., Muñoz-Sáez, A., Jimenez, V. P., Zielonka, N. B., Crowther, L. P., Dicks, L. V., 2024. Co-production of agroecological innovations to improve sustainability in South American fruit farms. People and Nature, 6(2), 833–848"
+    },
+    {
+      "author_field": "pagell",
+      "year": "2009",
+      "as_annotated": "Pagell, M., Wu, Z., 2009. Building a more complete theory of sustainable supply chain management using case studies of 10 exemplars. Journal of Supply Chain Management, 45 (2), 37–56."
+    },
+    {
+      "author_field": "pagell",
+      "year": "2010",
+      "as_annotated": "Pagell, M., Wu, Z., Wasserman, M.E., 2010. Thinking differently about purchasing portfolios: an assessment of sustainable sourcing. Journal of Supply Chain Management, 46 (1), 57–73."
+    },
+    {
+      "author_field": "pagell",
+      "year": "2014",
+      "as_annotated": "Pagell, M., Shevchenko, A., 2014. Why research in sustainable supply chain management should have no future. Journal of Supply Chain Management, 50(1), 44–55."
+    },
+    {
+      "author_field": "porter",
+      "year": "2020",
+      "as_annotated": "Porter, A.J., Tuertscher, P., Huysman, M., 2020. Saving our oceans: scaling the impact of robust action through crowdsourcing. Journal of Management Studies, 57 (2), 246–286."
+    },
+    {
+      "author_field": "rahman",
+      "year": "2024",
+      "as_annotated": "Rahman, S., Nguyen, N.T., Slawinski, N., 2024. Regenerating place: highlighting the Role of Ecological Knowledge. Organization & Environment, 10860266231220081."
+    },
+    {
+      "author_field": "raintree",
+      "year": "1986",
+      "as_annotated": "Raintree, J.B., 1986. Agroforestry pathways: land tenure, shifting cultivation and sustainable agriculture. Food and Agriculture Organization of the United Nations, 38 (5)."
+    },
+    {
+      "author_field": "rauw",
+      "year": "2023",
+      "as_annotated": "Rauw, W. M., Gomez-Raya, L., Star, L., Øverland, M., Delezie, E., Grivins, M., Formato, G., 2023. Sustainable development in circular agriculture: An illustrative bee↺ legume↺ poultry example. Sustainable Development, 31(2), 639-648."
+    },
+    {
+      "author_field": "resque",
+      "year": "2019",
+      "as_annotated": "Resque, A. G., Coudel, E., Piketty, M. G., Cialdella, N., Sá, T., Piraux, M., Le Page, C., 2019. Agrobiodiversity and public food procurement programs in Brazil: influence of local stakeholders in configuring green mediated markets. Sustainability, 11(5), 1425."
+    },
+    {
+      "author_field": "rodriguez",
+      "year": "2024",
+      "as_annotated": "Rodríguez, J.A., Amaya‐Rivas, A., 2024. Framing sustainability strategies for the enactment of corporate actions with positive macro‐level impact: evidence from a developing country. Business Strategy and the Environment, 33 (6), 6066–6083."
+    },
+    {
+      "author_field": "roth",
+      "year": "2021",
+      "as_annotated": "Roth, A., Zheng, Y., 2021. A tale of two food chains: The duality of practices on well‐being. Production and Operations Management, 30(3), 783-801."
+    },
+    {
+      "author_field": "rover",
+      "year": "2020",
+      "as_annotated": "Rover, O.J., da Silva Pugas, A., De Gennaro, B.C., Vittori, F., Roselli, L., 2020. Conventionalization of organic agriculture: a multiple case study analysis in Brazil and Italy. Sustainability, 12 (16), 6580."
+    },
+    {
+      "author_field": "salmi",
+      "year": "2023",
+      "as_annotated": "Salmi, A., Quarshie, A.M., Scott-Kennel, J., Kähkönen, A.K., 2023. Biodiversity management: a supply chain practice view. Journal of Purchasing and Supply Management, 29 (4), 100865."
+    },
+    {
+      "author_field": "sam",
+      "year": "2018",
+      "as_annotated": "Sam, K., & Zabbey, N. (2018). Contaminated land and wetland remediation in Nigeria: opportunities for sustainable livelihood creation. Science of the Total Environment, 639, 1560-1573."
+    },
+    {
+      "author_field": "sancha",
+      "year": "2015",
+      "as_annotated": "Sancha, C., Longoni, A., Giménez, C., 2015. Sustainable supplier development practices: drivers and enablers in a global context. Journal of Purchasing and Supply Management, 21 (2), 95–102."
+    },
+    {
+      "author_field": "sanz-canada",
+      "year": "2023",
+      "as_annotated": "Sanz-Cañada, J., Sánchez-Hernández, J. L., López-García, D., 2023. Reflecting on the concept of local agroecological food systems. Land, 12(6), 1147."
+    },
+    {
+      "author_field": "sauer",
+      "year": "2023",
+      "as_annotated": "Sauer, P.C., Seuring, S., 2023. How to conduct systematic literature reviews in management research: a guide in 6 steps and 14 decisions. Review of Managerial Science, 17 (5), 1899–1933."
+    },
+    {
+      "author_field": "sears",
+      "year": "2018",
+      "as_annotated": "Sears, R.R., Cronkleton, P., Polo, F., Miranda, M., Pérez-Ojeda del Arco, M., 2018. Farm-forestry in the Peruvian Amazon and the feasibility of its regulation through forest policy reform. Forest Policy and Economics, 87.0, 49."
+    },
+    {
+      "author_field": "seuring",
+      "year": "2008",
+      "as_annotated": "Seuring, S., Müller, M., 2008. From a literature review to a conceptual framework for sustainable supply chain management. Journal of Cleaner Production, 16 (15), 1699–1710."
+    },
+    {
+      "author_field": "slawinski",
+      "year": "2021",
+      "as_annotated": "Slawinski, N., Winsor, B., Mazutis, D., Schouten, J.W., Smith, W.K., 2021. Managing the paradoxes of place to foster regeneration. Organization & Environment, 34 (4), 595–618."
+    },
+    {
+      "author_field": "sjoerdsma",
+      "year": "2015",
+      "as_annotated": "Sjoerdsma, M., van Weele, A. J., 2015. Managing supplier relationships in a new product development context. Journal of Purchasing and Supply Management, 21 (3), 192–203."
+    },
+    {
+      "author_field": "souissi",
+      "year": "2024",
+      "as_annotated": "Souissi, A., Dhehibi, B., Oumer, A. M., Mejri, R., Frija, A., Zlaoui, M., Dhraief, M. Z., 2024. Linking farmers’ perceptions and management decision toward sustainable agroecological transition: evidence from rural Tunisia. Frontiers in Nutrition, 11, 1389007."
+    },
+    {
+      "author_field": "stathatou",
+      "year": "2023",
+      "as_annotated": "Stathatou, P.M., Corbin, L., Meredith, J.C., Garmulewicz, A., 2023. Biomaterials and regenerative agriculture: a methodological framework to enable circular transitions. Sustainability, 15 (19), 14306."
+    },
+    {
+      "author_field": "tripathi",
+      "year": "2024",
+      "as_annotated": "Tripathi, S.K., Singh, J., Rakshit, A., 2024. sustainability assessment of high-value vegetable crops using biopriming approach towards improved performance. Nutritional Security, and Smallholder Farmers. Journal of Soil Science and Plant Nutrition, 1–14."
+    },
+    {
+      "author_field": "touboulic",
+      "year": "2015",
+      "as_annotated": "Touboulic, A., Walker, H., 2015. Love me, love me not: A nuanced view on collaboration in sustainable supply chains. Journal of Purchasing and Supply Management, 21 (3), 178–191."
+    },
+    {
+      "author_field": "urzedo",
+      "year": "2020",
+      "as_annotated": "Urzedo, D. I., Neilson, J., Fisher, R., Junqueira, R. G., 2020. A global production network for ecosystem services: The emergent governance of landscape restoration in the Brazilian Amazon. Global Environmental Change, 61, 102059."
+    },
+    {
+      "author_field": "urzedo",
+      "year": "2022",
+      "as_annotated": "Urzedo, D., Pedrini, S., Hearps, C., Dixon, K., van Leeuwen, S., 2022. Indigenous environmental justice through coproduction of mining restoration supply chains in Australia. Restoration Ecology, 30 (S1)."
+    },
+    {
+      "author_field": "valencia",
+      "year": "2019",
+      "as_annotated": "Valencia, V., Wittman, H., Blesh, J., 2019. Structuring markets for resilient farming systems. Agronomy for Sustainable Development, 39, 1–14."
+    },
+    {
+      "author_field": "vanlauwe",
+      "year": "2019",
+      "as_annotated": "Vanlauwe, B., Hungria, M., Kanampiu, F., Giller, K. E., 2019. The role of legumes in the sustainable intensification of African smallholder agriculture: Lessons learnt and challenges for the future. Agriculture, ecosystems & environment, 284, 106583."
+    },
+    {
+      "author_field": "vieira",
+      "year": "2022",
+      "as_annotated": "Vieira, D. L., Sano, E. E., Silva, T. R., 2022. A classification of cultivated pastures in the Brazilian Cerrado for sustainable intensification and savanna restoration. Ambio, 51(5), 1219-1226."
+    },
+    {
+      "author_field": "wardell",
+      "year": "2021",
+      "as_annotated": "Wardell, D. A., Tapsoba, A., Lovett, P. N., Zida, M., Rousseau, K., Gautier, D., Bama, T., 2021. Shea (Vitellaria paradoxa CF Gaertn.)–the emergence of global production networks in Burkina Faso, 1960–2021 1. International Forestry Review, 23(4), 534-561."
+    },
+    {
+      "author_field": "wezel",
+      "year": "2016",
+      "as_annotated": "Wezel, A., Brives, H., Casagrande, M., Clément, C., Dufour, A., Vandenbroucke, P., 2016. Agroecology territories: places for sustainable agricultural and food systems and biodiversity conservation. Agroecology and Sustainable Food Systems,40.0, 132."
+    },
+    {
+      "author_field": "whitman",
+      "year": "2000",
+      "as_annotated": "Whitman, G., Cooper, W.H., 2000. Ecological embeddedness. Academy of Management Journal, 43, 1265–1282."
+    },
+    {
+      "author_field": "whiteman",
+      "year": "2013",
+      "as_annotated": "Whiteman G., Walker B., Perego, P., 2013. Planetary boundaries: ecological foundations for corporate sustainability. Journal of Management Studies, 50 (2), 307–336."
+    },
+    {
+      "author_field": "wieland",
+      "year": "2021",
+      "as_annotated": "Wieland, A., 2021. Dancing the supply chain: Toward transformative supply chain management. Journal of Supply Chain Management, 57(1), 58-73."
+    },
+    {
+      "author_field": "wieland",
+      "year": "2025",
+      "as_annotated": "Wieland, A., Creutzig, F., 2025. Taking Academic Ownership of the Supply Chain Emissions Discourse. Journal of Supply Chain Management."
+    },
+    {
+      "author_field": "zimmerer",
+      "year": "2003",
+      "as_annotated": "Zimmerer, K. S., 2003. Geographies of seed networks for food plants (potato, ulluco) and approaches to agrobiodiversity conservation in the Andean countries. Society & Natural Resources, 16(7), 583-601."
+    }
+  ]
+}

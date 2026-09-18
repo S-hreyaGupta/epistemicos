@@ -94,6 +94,43 @@ the code     gone
 the reports  in Slack only, not in this repository
 ```
 
+## Independently replicated, 18 September
+
+`scripts/citation_extract.py` is a fresh implementation of the same
+specification, written without reference to the lost one, which was never seen.
+Run against `data/md_full`, the corpus established above as unchanged since
+29 August:
+
+```text
+                        this implementation      reported in August
+nine in-profile papers  1467 / 1608 = 91.2%      1469 / 1611 = 91.2%
+```
+
+Two citations apart on the numerator, three on the denominator.
+
+Three further findings from the August runs reproduced without being aimed at:
+
+```text
+four papers exit 3      references section not found — the same four
+c22df19f  30.5%         ACL style, bracketed keys, out of apa7_like_v1;
+                        reported then as correctly refused
+5da73cf4  100.0%        reported then as 21% → 100% once \& was corrected
+```
+
+**This materially changes what the gap means.** The figures are no longer
+unverifiable. Two independent implementations of v3.3, given identical bytes,
+agree to within 0.2 per cent, which is far stronger evidence than a recorded
+hash of a missing file would have been.
+
+What remains true is narrower and still worth keeping: the original run cannot
+be interrogated. A question about which specific citations were in its 142 has
+no answer, because that run's outputs are gone and this one's are merely
+similar in aggregate. Agreement on a total is not identity of contents.
+
+What is no longer true is that six weeks of figures rest on nothing checkable.
+They rest on a specification that was kept, which turns out to have been the
+part that mattered.
+
 ## What would close it
 
 Either the implementation turns up — another machine, a notebook, a container,

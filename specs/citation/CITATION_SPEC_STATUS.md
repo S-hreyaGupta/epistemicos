@@ -18,7 +18,7 @@ citation-spec-v3.3.md
   §4 grammar, §5 sentences, §6 envelope, §7 assembly, §8 reconciliation,
   §9 output contract, §10 exit codes, §12 conformance suite
 
-citation-architecture-v3.4-rc1.md
+citation-v3.4-rc1-architecture.md
   sha256   6a615c8136543ef492598196a918b2c1e4b62bb54fdbcca4bd12af28bac66cb0
   435 lines
   front matter says:  content_state: review_candidate

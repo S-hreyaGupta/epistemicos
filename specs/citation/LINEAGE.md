@@ -22,9 +22,23 @@ v3.4 rc1 — a FOUR-file package, all present
   Nothing implements any of them.
 
 v3.4 rc2 — MISSING
-  rc3 calls it "the four-file rc2 package" and cites rc2-A3 and rc2-B4, so
-  rc2 carries its own A- and B-series: it is an amendment layer over rc1,
-  not a fresh package.
+  rc3 calls it "the four-file rc2 package" and cites `rc2-A3` and `rc2-B4`.
+
+  What that establishes: rc2 exists, is four files, and carries its own
+  A- and B-series identifiers.
+
+  What it does NOT establish, and an earlier version of this file asserted
+  anyway: whether rc2 is an amendment set over rc1 or a full revision of
+  rc1's four documents. **rc3 does not mention rc1 at all — zero
+  occurrences.** So the relationship between rc1 and rc2 is unknown, and the
+  A/B-series naming is suggestive rather than decisive: rc3 uses the same
+  scheme for its own amendments, but a four-file package could carry section
+  identifiers in that form too.
+
+  This matters for reconstruction. If rc2 revises rc1's documents, then
+  rc2 + rc3 is complete and rc1 is superseded. If rc2 amends rc1, then
+  rc1 + rc2 + rc3 is required and rc1's four files are load-bearing. Nobody
+  can tell which until rc2 is in hand.
 
 v3.4 rc3 — one document, present
   citation-v3.4-rc3-amendments.md              c392982e…  735 lines
@@ -39,7 +53,7 @@ So the shape is:
 
    v3.4 rc1  (4 files)     base package
         ↓
-   v3.4 rc2  (amendments)  MISSING
+   v3.4 rc2  (4 files)     MISSING — amends or revises rc1, unknown which
         ↓
    v3.4 rc3  (amendments)  present
 ```

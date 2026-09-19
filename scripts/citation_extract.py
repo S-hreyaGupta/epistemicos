@@ -189,6 +189,28 @@ def split_body_and_references(text: str):
 
     ref = next((h for h in heads
                 if 2 <= h[1] <= 4 and h[2].strip().lower() in REF_NAMES), None)
+
+    if ref is None:
+        # §3, unmarked-up label. Four of the fourteen corpus papers aborted
+        # here from August to 19 September, recorded as "references section
+        # not found". They all have one: 58 to 99 entries each, alphabetically
+        # ordered, sitting where a bibliography sits, and the line immediately
+        # above the first entry reads exactly
+        #
+        #     References
+        #
+        # as plain text. Mathpix wrote the word and did not mark it up, so
+        # headings() never saw it and the whole document was refused. 582
+        # citations, 27% of the corpus, behind two characters and a space.
+        #
+        # Alex Zamurko, 18 September: treat that standalone line as the
+        # boundary when no marked-up heading exists, and use alphabetical
+        # ordering only as confirmation. Narrower than the structural fallback
+        # first proposed, which was over-engineered because the evidence
+        # gathered asked what the last *heading* before the block was and
+        # never what the last *line* was.
+        ref = _unmarked_reference_label(text)
+
     if ref is None:
         raise Abort(3, "references section not found")
 
@@ -196,6 +218,52 @@ def split_body_and_references(text: str):
     ref_end = after[0][3] if after else len(text)
     body = text[:ref[3]]
     return body, text[ref[4] + 1:ref_end], ref[4] + 1, heads
+
+
+# How much of the run after the label has to look like a bibliography, and how
+# much of it has to be in order. Both are deliberately loose: the corpus runs
+# 95-100% ascending and so do the papers that already work, so the check
+# confirms rather than discriminates.
+MIN_ENTRIES = 5
+MIN_ASCENDING = 0.80
+
+
+def _unmarked_reference_label(text: str):
+    """A standalone `References` line acting as a section boundary.
+
+    Returns a heading-shaped tuple so the caller cannot tell the difference,
+    or None. The label alone is not enough — what follows it has to look like
+    a reference list, or any paragraph ending in the word would split a paper.
+    """
+    lines = text.split("\n")
+    offs, pos = [], 0
+    for line in lines:
+        offs.append(pos)
+        pos += len(line) + 1
+
+    for i, line in enumerate(lines):
+        if line.strip().lower() not in REF_NAMES:
+            continue
+
+        # Confirmation, per the ruling: the run below is entry-shaped and in
+        # near-alphabetical order by first surname.
+        surnames = []
+        for later in lines[i + 1:]:
+            s = later.strip()
+            if not s:
+                continue
+            m = ENTRY_START.match(s)
+            if m:
+                surnames.append(re.split(r",", m.group(0))[0].strip().lower())
+        if len(surnames) < MIN_ENTRIES:
+            continue
+        ascending = sum(1 for a, b in zip(surnames, surnames[1:]) if a <= b)
+        if ascending / max(1, len(surnames) - 1) < MIN_ASCENDING:
+            continue
+
+        start = offs[i]
+        return (i, 2, clean_name(line.strip()), start, start + len(line))
+    return None
 
 
 def roles_of(name: str) -> list[str]:

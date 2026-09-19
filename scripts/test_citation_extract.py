@@ -289,6 +289,96 @@ def main() -> int:
                         f"tolerates a stray extra h1 and only refuses when "
                         f"sectioning apparently lives in h1")
 
+    # ---- §3, the unmarked-up label ----
+    #
+    # Four corpus papers aborted at exit 3 from August to 19 September with a
+    # complete reference list present, because Mathpix wrote `References` as
+    # plain text rather than a heading. Ruled by Alex Zamurko on 18 September:
+    # the standalone line is the boundary when no marked-up heading exists,
+    # with alphabetical ordering as confirmation only.
+    print("\nan unmarked-up References label")
+
+    ENTRIES = ("Adams, J. (2001). A paper. Journal, 1(1), 1-10.\n"
+               "Baker, R. (2002). Another. Journal, 2(1), 1-10.\n"
+               "Clark, S. (2003). A third. Journal, 3(1), 1-10.\n"
+               "Dunn, M. (2004). A fourth. Journal, 4(1), 1-10.\n"
+               "Evans, T. (2005). A fifth. Journal, 5(1), 1-10.\n")
+
+    def splits(doc: str):
+        return ce.split_body_and_references(ce.normalise(doc.encode()))
+
+    try:
+        body, refs, _, _ = splits(
+            "# P\n\n## Intro\n\nAs shown (Adams, 2001).\n\nReferences\n\n" + ENTRIES)
+        if "Adams, J." not in refs:
+            failures.append("the plain-text label was found but the section "
+                            "below it did not come back as references")
+        elif "References" in body:
+            failures.append("the label was left in the body, so it would be "
+                            "scanned for citations")
+        else:
+            ok("a standalone `References` line is a section boundary")
+    except ce.Abort as a:
+        failures.append(f"a plain-text References label with five ordered "
+                        f"entries below it still aborted {a.code}")
+
+    # The label alone cannot be enough, or any paragraph ending in the word
+    # splits the paper.
+    for label, doc in (
+        ("nothing below it", "# P\n\n## Intro\n\nText.\n\nReferences\n"),
+        # Three entries, in perfect alphabetical order, so the ordering check
+        # passes and only the entry count can refuse this. The first version
+        # used a single entry, which the ordering check rejects on its own —
+        # so the control named for the count was being decided by the other
+        # rule, and the mutation probe caught it immediately.
+        ("too few entries below it",
+         "# P\n\n## Intro\n\nText.\n\nReferences\n\n"
+         "Adams, J. (2001). A paper. Journal, 1(1), 1-10.\n"
+         "Baker, R. (2002). Another. Journal, 2(1), 1-10.\n"
+         "Clark, S. (2003). A third. Journal, 3(1), 1-10.\n"),
+        ("prose below it, not entries",
+         "# P\n\n## Intro\n\nText.\n\nReferences\n\n"
+         "were consulted throughout the study and are listed elsewhere.\n"),
+    ):
+        try:
+            splits(doc)
+            failures.append(f"a `References` line with {label} was accepted "
+                            f"as a boundary; the confirmation check did not "
+                            f"hold")
+        except ce.Abort as a:
+            if a.code != 3:
+                failures.append(f"{label}: aborted {a.code}, expected 3")
+            else:
+                ok(f"refused: a `References` line with {label}")
+
+    # Out of order is the confirmation the ruling names.
+    try:
+        splits("# P\n\n## Intro\n\nText.\n\nReferences\n\n"
+               "Evans, T. (2005). A paper. Journal, 1(1), 1-10.\n"
+               "Dunn, M. (2004). Another. Journal, 2(1), 1-10.\n"
+               "Clark, S. (2003). A third. Journal, 3(1), 1-10.\n"
+               "Baker, R. (2002). A fourth. Journal, 4(1), 1-10.\n"
+               "Adams, J. (2001). A fifth. Journal, 5(1), 1-10.\n")
+        failures.append("a reverse-alphabetical run was accepted; the "
+                        "ordering confirmation did not hold")
+    except ce.Abort as a:
+        ok("refused: entries below the label are not in order") \
+            if a.code == 3 else failures.append(
+                f"reverse-alphabetical aborted {a.code}, expected 3")
+
+    # A real heading still wins, so the fallback cannot change any paper that
+    # already worked.
+    try:
+        body, refs, _, _ = splits(
+            "# P\n\n## Intro\n\nReferences were consulted.\n\n"
+            "## References\n\n" + ENTRIES)
+        if "Adams, J." in refs and "were consulted" in body:
+            ok("a marked-up heading still takes priority over a stray line")
+        else:
+            failures.append("the fallback displaced a real heading")
+    except ce.Abort as a:
+        failures.append(f"a document with a real heading aborted {a.code}")
+
     try:
         ce.normalise(b"\xff\xfe invalid")
         failures.append("invalid UTF-8 did not abort")

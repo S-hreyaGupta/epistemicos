@@ -111,7 +111,7 @@ def main() -> int:
         raise Refused(f"no gold set for {a.paper!r}: {gold_p}")
     gold = json.loads(gold_p.read_text(encoding="utf-8"))
 
-    seen: dict[tuple, int] = {}
+    works: dict[str, dict] = {}
     items: list[dict] = []
     counts = {s: 0 for s in STATES}
     unknown_state, no_phrase = 0, []
@@ -145,13 +145,50 @@ def main() -> int:
             no_phrase.append(r.get("citation_index", "?"))
             continue
 
-        k = (flatten(phrase), year)
-        if k in seen:
-            seen[k] += 1
+        # Collapse to the WORK, not to the phrasing.
+        #
+        # This keyed on (author_phrase, year) until 19 September, while the
+        # document it writes declared `"unit": "distinct cited work"` and a
+        # field called `"distinct_works"`. It was counting distinct phrasings.
+        # A manuscript writing `(Duru et al., 2015)` in one paragraph and
+        # `Duru, Therond, and Fares (2015)` in another contributed two, one of
+        # which matched the annotation and one of which scored as a false
+        # positive — so the extractor was penalised for the manuscript varying
+        # its own wording. Ten works in gold paper 2 are cited under more than
+        # one phrase, `macfadyen` under three: eleven surplus entries, and
+        # every one of that paper's extras.
+        #
+        # Alex Zamurko, 18 September: *If citation_candidate.py collapses by
+        # author_phrase, it is not measuring distinct works correctly.*
+        #
+        # The identity used for grouping is the extractor's `citation_key`.
+        # That is a considered reversal, and the reason for the original
+        # decision still stands for *matching* — deriving a surname from a
+        # phrase is the grammar under test — so matching stays on
+        # author_phrase and every phrase observed for a work is carried in
+        # `author_phrase_variants`. A gold item matches if it matches any of
+        # them. Grouping a run's own occurrences by the extractor's own notion
+        # of identity compares nothing; scoring still does not use it.
+        key = r.get("citation_key") or f"?phrase:{flatten(phrase)}|{year}"
+        if key in works:
+            works[key]["variants"].add(flatten(phrase))
+            works[key]["n"] += 1
             continue
-        seen[k] = 1
-        items.append({"author_phrase": flatten(phrase), "year": year,
-                      "as_extracted": str(phrase)})
+        works[key] = {"variants": {flatten(phrase)}, "n": 1,
+                      "year": year, "as_extracted": str(phrase)}
+
+    # One item per work. `author_phrase` carries the longest variant seen,
+    # which is the most complete form the manuscript used; the rest travel
+    # alongside so a gold set keyed on any of them still matches.
+    for key, w in works.items():
+        variants = sorted(w["variants"], key=lambda s: (-len(s), s))
+        items.append({
+            "author_phrase": variants[0],
+            "year": w["year"],
+            "as_extracted": w["as_extracted"],
+            "author_phrase_variants": variants,
+            "occurrences": w["n"],
+        })
 
     if not items:
         raise Refused(
@@ -162,7 +199,8 @@ def main() -> int:
             "output predates that,\n  the extractor has to be re-run rather "
             "than the phrase reconstructed here.")
 
-    occurrences = sum(seen.values())
+    occurrences = sum(w["n"] for w in works.values())
+    multi = sum(1 for w in works.values() if len(w["variants"]) > 1)
     doc = {
         "candidate": f"citation-{a.paper}",
         "unit": "distinct cited work",
@@ -174,6 +212,9 @@ def main() -> int:
         "collapsed": {
             "parsed_occurrences": occurrences,
             "distinct_works": len(items),
+            "works_cited_under_more_than_one_phrase": multi,
+            "grouped_by": "citation_key",
+            "matched_on": "author_phrase, any variant",
             "note": "the extractor emits one record per occurrence; the gold "
                     "set lists each work once. Scoring is at the work level "
                     "and this is the ratio behind it.",

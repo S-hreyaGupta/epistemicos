@@ -66,6 +66,21 @@ MUTATIONS = [
      'PARTICLE = "(?i:" + "|".join(PARTICLES) + ")"',
      'PARTICLE = "|".join(PARTICLES)',
      "sentence-initial particle surnames"),
+
+    ("the unmarked-up References label is not recognised",
+     "        ref = _unmarked_reference_label(text)",
+     "        ref = None",
+     "a standalone `References` line is a section boundary"),
+
+    ("the entry-count confirmation is removed",
+     "        if len(surnames) < MIN_ENTRIES:",
+     "        if False:",
+     "a `References` line with too few entries below it is refused"),
+
+    ("the ordering confirmation is removed",
+     "        if ascending / max(1, len(surnames) - 1) < MIN_ASCENDING:",
+     "        if False:",
+     "entries below the label are not in order"),
 ]
 
 # The STOP mutation needs to empty the set rather than edit its opening line.

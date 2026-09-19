@@ -158,6 +158,28 @@ def main() -> int:
     for k in excluded:
         del G[k]
 
+    # A candidate item may carry `author_phrase_variants`: every phrasing the
+    # manuscript used for one work. A manuscript writing both
+    # `(Duru et al., 2015)` and `Duru, Therond, and Fares (2015)` cites one
+    # work, and the annotation recorded whichever phrasing the annotator saw.
+    # So a gold item matches a candidate work if it matches *any* variant of
+    # it, and the candidate still contributes one item to the denominator.
+    #
+    # Without this the same work scored as one miss and one false positive.
+    # Ten works in gold paper 2 are cited under more than one phrase, and that
+    # accounted for every one of that paper's eleven extras.
+    _remap = {}
+    for ck, cv in C.items():
+        for variant in cv.get("author_phrase_variants") or []:
+            alt = key_of({**cv, "author_phrase": variant}, fields)
+            if alt != ck and alt in G and ck not in _remap and alt not in C:
+                _remap[ck] = alt
+    for old, new in _remap.items():
+        C[new] = C.pop(old)
+    if _remap:
+        print(f"  {len(_remap)} candidate work(s) matched on an alternative "
+              f"phrasing the manuscript also used")
+
     tp = sorted(set(G) & set(C))
     fn = sorted(set(G) - set(C))          # gold says it is there, candidate missed it
     fp = sorted(set(C) - set(G))          # candidate produced it, gold does not have it

@@ -211,6 +211,31 @@ def main() -> int:
     # So the suite was faithful to the spec and still blind to the bug that
     # actually happened, because the field that broke was one the spec never
     # stated an expectation for. These controls pin it.
+    # ---- EC-2, the possessive ----
+    #
+    # `Bartko's (1976)` and `Bartko (1976)` are one work. Carrying the `'s`
+    # into the derived identity split it in two and cost twice per work: a
+    # miss against the gold set's `bartko`, and a false positive for
+    # `bartko's`. Six of gold paper 1's nine discrepancies were three works
+    # counted that way, and repairing it took the paper over both acceptance
+    # thresholds. Ruled by Alex Zamurko on 18 September as an extractor error
+    # rather than an annotation one.
+    print("\nthe possessive is not part of the identity")
+    case("a possessive surname keys to the bare name",
+         "Following Bartko's (1976) formula, we did this.", ["bartko|1976"])
+    case("the bare form keys identically",
+         "Following Bartko (1976) we did this.", ["bartko|1976"])
+    case("a possessive on the last of several authors",
+         "We follow McGraw and Wong's (1996) method.", ["mcgraw|1996"])
+    # rc3 §A: author_phrase records the complete source phrase. The manuscript
+    # wrote the possessive, so the record keeps it and only the identity moves.
+    case("author_phrase keeps what the manuscript wrote",
+         "Following Bartko's (1976) formula, we did this.",
+         ["bartko|1976"], want_authors=["Bartko's"])
+    # A possessive inside a name is not a trailing one.
+    case("a name is not truncated at an internal apostrophe",
+         "As shown (O'Brien, 2020).", ["o'brien|2020"])
+
     print("\nauthor_phrase carries the whole production")
     case("comma-separated authors are not cut at the first comma",
          "Work follows (Duru, Therond, and Fares, 2015).",

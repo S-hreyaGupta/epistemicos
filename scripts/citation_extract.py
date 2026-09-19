@@ -469,8 +469,32 @@ def build_patterns(fixes: set[str]):
     }
 
 
+POSSESSIVE = re.compile(r"['’]s\b")
+
+
 def first_core(authors: str) -> str:
-    """The first author's full SURNAME, particles included, single-spaced."""
+    """The first author's full SURNAME, particles included, single-spaced.
+
+    A trailing possessive is not part of the surname. `Bartko's (1976)` and
+    `Bartko (1976)` are one work, and carrying the `'s` into the derived
+    identity split it into two: the gold set held `bartko 1976` and this
+    produced `bartko's 1976`, so the same single cause scored as a miss *and*
+    as a false positive. Six of gold paper 1's nine remaining discrepancies
+    were three works counted that way.
+
+    Worse than a miss, because the record is `parsed` with a well-formed key
+    and is indistinguishable in the output from a correct one. In ea07e5f5 it
+    produced the paper's only unmatched citation key, against a reference
+    sitting in the same document.
+
+    Recorded as EC-2, ruled by Alex Zamurko on 18 September as an extractor
+    grammar error rather than an annotation error, so the gold sets keep the
+    bare form and this is the side that moves.
+
+    Stripped here, when deriving the identity, and *not* from `author_phrase`:
+    rc3 §A requires author_phrase to record the complete source candidate
+    phrase, and the possessive is part of what the manuscript wrote.
+    """
     toks = authors.split()
     out = []
     for t in toks:
@@ -479,7 +503,7 @@ def first_core(authors: str) -> str:
             continue
         out.append(t.rstrip(","))
         break
-    return " ".join(out)
+    return POSSESSIVE.sub("", " ".join(out))
 
 
 def is_all_caps(core: str) -> bool:

@@ -181,6 +181,15 @@ def main() -> int:
     # which is the most complete form the manuscript used; the rest travel
     # alongside so a gold set keyed on any of them still matches.
     for key, w in works.items():
+        # A possessive is not part of a name. rc3 §A keeps `Bartko's` in
+        # author_phrase because that is what the manuscript wrote, and an
+        # annotation records the work as `bartko`, so the comparable form has
+        # to be offered here rather than by altering the record. Normalising
+        # for comparison, not editing what was extracted.
+        for v in list(w["variants"]):
+            bare = re.sub(r"['’]s\b", "", v).strip()
+            if bare and bare != v:
+                w["variants"].add(bare)
         variants = sorted(w["variants"], key=lambda s: (-len(s), s))
         items.append({
             "author_phrase": variants[0],

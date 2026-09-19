@@ -91,6 +91,11 @@ MUTATIONS = [
      "STYLE_MIN_SAMPLE = 10",
      "STYLE_MIN_SAMPLE = 0",
      "too few parentheticals to judge a style"),
+
+    ("the possessive is carried into the identity again",
+     '    return POSSESSIVE.sub("", " ".join(out))',
+     '    return " ".join(out)',
+     "a possessive surname keys to the bare name"),
 ]
 
 # The STOP mutation needs to empty the set rather than edit its opening line.

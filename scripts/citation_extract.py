@@ -126,6 +126,46 @@ HEAD_MD = re.compile(r"^(#{1,6})[ \t]+(.*)$")
 HEAD_HTML = re.compile(r"^[ \t]*<h([1-6])(?:[ \t][^>]*)?>(.*?)</h\1>[ \t]*$",
                        re.I)
 REF_NAMES = {"references", "bibliography", "works cited"}
+
+# §10 exit 2, the author-date style guard.
+#
+# The existing exit-2 test looks for numeric and superscript citations, and
+# c22df19f has neither — yet it scores 30.5% because its style is comma-less
+# author-date, `(Smith 2020)`, throughout. Nothing in the implementation
+# detected that. It was classified as out of apa7_like_v1 in August by a person
+# reading a report, which is a judgement rather than a rule, and it has been
+# quoted as a result ever since.
+#
+# Alex Zamurko, 18 September: *add a deterministic author-date style check for
+# that pattern; do not treat the existing numeric/superscript guard as
+# sufficient.*
+#
+# The discriminator is the comma before the year. APA writes `(Smith, 2020)`;
+# author-date styles write `(Smith 2020)`. Measured over all fourteen papers:
+#
+#     thirteen papers    0-2% comma-less
+#     c22df19f           100% comma-less
+#
+# So the threshold is not fitted to the corpus. A majority sits twenty-five
+# times above the highest in-profile paper, and any line between 3% and 99%
+# would separate the same way — a majority is simply the least arbitrary of
+# them. The minimum sample exists because a ratio over three parentheticals
+# means nothing.
+STYLE_MIN_SAMPLE = 10
+STYLE_COMMA_LESS_MAX = 0.50
+
+_APA_PAREN = re.compile(
+    r"\([^()]*?[A-ZÀ-Þ][\w'’\-]+(?:[^()]*?),\s(?:1[5-9]|20)\d{2}[a-z]?\)")
+_BARE_PAREN = re.compile(
+    r"\([^()]*?[A-ZÀ-Þ][\w'’\-]+\s(?:1[5-9]|20)\d{2}[a-z]?(?:[;,][^()]*)?\)")
+
+
+def comma_less_share(body: str) -> tuple[float, int]:
+    """(share, total) of author-year parentheticals written without a comma."""
+    apa = len(_APA_PAREN.findall(body))
+    bare = len(_BARE_PAREN.findall(body))
+    total = apa + bare
+    return (bare / total if total else 0.0), total
 ENTRY_START = re.compile(rf"^(?:(?:{PARTICLE})[ ])*{CORE},[ ]{INITIALS}",
                          re.I | re.U)
 YEAR_RE = re.compile(YEAR)
@@ -753,6 +793,13 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     n = len(NUMCITE.findall(body)) + len(SUPCITE.findall(body))
     if n >= 3 and n > 10 * len(cits):
         raise Abort(2, "unsupported citation style")
+
+    share, total = comma_less_share(body)
+    if total >= STYLE_MIN_SAMPLE and share > STYLE_COMMA_LESS_MAX:
+        raise Abort(2, f"unsupported citation style: {share:.0%} of "
+                       f"{total} author-year parentheticals omit the comma "
+                       f"before the year, which is author-date rather than "
+                       f"APA")
 
     refs, ref_unres = assemble_references(section, sec_off)
 

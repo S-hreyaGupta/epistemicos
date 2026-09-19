@@ -81,6 +81,16 @@ MUTATIONS = [
      "        if ascending / max(1, len(surnames) - 1) < MIN_ASCENDING:",
      "        if False:",
      "entries below the label are not in order"),
+
+    ("the author-date style guard never fires",
+     "    if total >= STYLE_MIN_SAMPLE and share > STYLE_COMMA_LESS_MAX:",
+     "    if False:",
+     "a comma-less author-date document is refused"),
+
+    ("the style guard has no sample floor",
+     "STYLE_MIN_SAMPLE = 10",
+     "STYLE_MIN_SAMPLE = 0",
+     "too few parentheticals to judge a style"),
 ]
 
 # The STOP mutation needs to empty the set rather than edit its opening line.

@@ -386,6 +386,73 @@ def main() -> int:
         ok("exit 5: invalid utf-8") if a.code == 5 else failures.append(
             f"invalid UTF-8 aborted {a.code}, expected 5")
 
+    # ---- §10 exit 2, the author-date style guard ----
+    #
+    # The existing exit-2 test looks for numeric and superscript citations.
+    # c22df19f has neither and still scores 30.5%, because its style is
+    # comma-less author-date throughout — which nothing detected. It was
+    # classified out of profile in August by a person reading a report, and
+    # that judgement has been quoted as a result ever since. Alex Zamurko
+    # ruled on 18 September that it needs an implemented rule.
+    print("\nauthor-date style guard")
+
+    import tempfile as _tf
+
+    def through_cli(body: str, fixes=frozenset({"ampersand"})):
+        doc = (HEAD + body + "\n\n## References\n\n"
+               "Smith, J. (2020). A paper. Journal, 1(1), 1-10.\n")
+        p = Path(_tf.mkdtemp()) / "p.md"
+        p.write_bytes(doc.encode("utf-8"))
+        return ce.run(p, set(fixes))
+
+    APA_12 = " ".join(f"Work follows (Smith{i}, 20{10+i})." for i in range(12))
+    BARE_12 = " ".join(f"Work follows (Smith{i} 20{10+i})." for i in range(12))
+
+    try:
+        through_cli(APA_12)
+        ok("an APA document passes the style guard")
+    except ce.Abort as a:
+        failures.append(f"an all-APA document aborted {a.code}; the guard "
+                        f"fires on the style it exists to accept")
+
+    try:
+        through_cli(BARE_12)
+        failures.append("a wholly comma-less author-date document was "
+                        "accepted; the guard did not fire")
+    except ce.Abort as a:
+        if a.code != 2:
+            failures.append(f"comma-less document aborted {a.code}, expected 2")
+        else:
+            ok("exit 2: a comma-less author-date document is refused")
+
+    # A ratio over three parentheticals means nothing, so there is a floor.
+    try:
+        through_cli("Work follows (Smith 2010). And (Jones 2011).")
+        ok("too few parentheticals to judge a style: not refused")
+    except ce.Abort as a:
+        failures.append(f"two comma-less parentheticals aborted {a.code}; "
+                        f"the sample floor did not hold")
+
+    # And the in-profile papers sit at 0-2%, so a couple of stray ones must
+    # not trip it.
+    try:
+        through_cli(APA_12 + " Work follows (Odd 1999).")
+        ok("a stray comma-less citation among APA ones does not trip it")
+    except ce.Abort as a:
+        failures.append(f"one comma-less citation among twelve APA ones "
+                        f"aborted {a.code}")
+
+    # Surnames of two characters or more, because CORE is `\p{Lu}NAMECHAR+`
+    # and a one-letter name is not a surname. The first version of this
+    # fixture used `(A, 2022)` and counted two of three.
+    share, total = ce.comma_less_share(
+        "(Smith, 2020) (Jones 2021) (Brown, 2022)")
+    if total != 3 or abs(share - 1/3) > 1e-9:
+        failures.append(f"comma_less_share counted {total} at {share:.2f}, "
+                        f"expected 3 at 0.33")
+    else:
+        ok("comma_less_share counts both forms and reports the ratio")
+
     # ---- the four August corrections, each behind its flag ----
     print("\nthe four corrections, on and off")
     amp = "As shown (Ahnert \\& Fink, 2008)."

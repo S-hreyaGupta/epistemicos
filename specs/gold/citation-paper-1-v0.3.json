@@ -1,0 +1,621 @@
+{
+  "gold_set": "citation-paper-1-v0.3",
+  "unit": "distinct cited work",
+  "not_unit": "citation occurrence — see the module docstring",
+  "corpus_paper": "ad1e3ff9",
+  "key_fields": [
+    "author_phrase",
+    "year"
+  ],
+  "provenance": {
+    "annotator": "Alex Zamurko and Mohit",
+    "annotated": "2026-09-17",
+    "method": "in-text citations and reference list read from the manuscript and written out by hand",
+    "independent_of_extractor_output": "asserted by the annotator; not verifiable from the spreadsheet",
+    "spreadsheet_sha256": "102571276ef70d197374c2a51d4446dde308e6238aefec3e2a819934355df5c4",
+    "manuscript_pdf_sha256": "209af10a1a02c047b089d572a74dd99b48873a31c3d85701b8e98c77334b37f2",
+    "additions": {
+      "v0.2": {
+        "added": "2026-09-18",
+        "count": 5,
+        "method": "works the candidate produced and v0.1 lacked, each checked for a prose citation in the body and a matching entry in the manuscript's reference list",
+        "independent_of_extractor_output": false,
+        "why_not": "these five were found by reading the candidate's output. A different extractor would have surfaced a different five, so the set improves in the direction this implementation looks. Any score computed against v0.2 carries that and is not an independent result.",
+        "not_added": {
+          "table_only": [
+            "basole et al. 2017",
+            "dong et al. 2015",
+            "park et al. 2018"
+          ],
+          "why": "each appears solely as a row in a Summary of empirical studies table whose first column is Author-Year, and whether that counts as citing them is an open question about annotation scope"
+        }
+      },
+      "v0.3": {
+        "added": "2026-09-18",
+        "count": 3,
+        "method": "works appearing only in a table with an Author-Year column, each checked for the table row, for absence from prose, and for a matching reference entry",
+        "independent_of_extractor_output": false,
+        "why_not": "found by reading the candidate's output, as with v0.2. The verification is independent; the discovery is not.",
+        "score_label": "post-adjudication performance on an amended gold set. Not independent holdout performance, and must not be presented as such.",
+        "unchanged": {
+          "possessives": [
+            "bartko 1976",
+            "fine 1998",
+            "mcgraw and wong 1996"
+          ],
+          "why": "extractor grammar errors rather than annotation errors, so the gold set is already correct and EC-2 is the extractor's to fix"
+        }
+      }
+    },
+    "table_scope_rule": {
+      "ruled": "2026-09-18",
+      "by": "Alex Zamurko",
+      "rule": "Citations appearing in manuscript tables count when the table identifies scholarly works by author/year or equivalent citation information, unless the annotation protocol explicitly excludes that table type.",
+      "prospective": true,
+      "why": "excluding them would create an undocumented prose-only rule; a table of empirical studies with an Author-Year column is part of the manuscript's scholarly content"
+    }
+  },
+  "source": {
+    "sha256": "cff9bb85d74fbac8ffd69fd0c258812cb1d051b2963cbc8b8df8ebe447264615",
+    "what": "papers.markdown for this row — the bytes the extractor reads",
+    "corpus_paper": "ad1e3ff9",
+    "annotated_from_pdf_sha256": "209af10a1a02c047b089d572a74dd99b48873a31c3d85701b8e98c77334b37f2",
+    "note": "the annotation was made from a different copy of this paper than the corpus holds. 192 of the 193 annotated citations across both papers are present in these bytes; any that are not carry absent_from_source and are excluded from scoring."
+  },
+  "reference_list_entries": 97,
+  "items": [
+    {
+      "author_phrase": "sodhi and tang",
+      "year": "2019",
+      "as_annotated": "(Sodhi and Tang, 2019)"
+    },
+    {
+      "author_phrase": "jira and toffel",
+      "year": "2013",
+      "as_annotated": "Jira and Toffel, 2013"
+    },
+    {
+      "author_phrase": "gualandris et al.",
+      "year": "2015",
+      "as_annotated": "Gualandris et al., 2015"
+    },
+    {
+      "author_phrase": "kim and davis",
+      "year": "2016",
+      "as_annotated": "Kim and Davis, 2016"
+    },
+    {
+      "author_phrase": "swift et al.",
+      "year": "2019",
+      "as_annotated": "Swift et al., 2019"
+    },
+    {
+      "author_phrase": "marquis et al.",
+      "year": "2016",
+      "as_annotated": "Marquis et al., 2016"
+    },
+    {
+      "author_phrase": "ostrom",
+      "year": "2000",
+      "as_annotated": "Ostrom, 2000"
+    },
+    {
+      "author_phrase": "mena et al.",
+      "year": "2013",
+      "as_annotated": "Mena et al., 2013"
+    },
+    {
+      "author_phrase": "tachizawa and wong",
+      "year": "2014",
+      "as_annotated": "Tachizawa and Wong, 2014"
+    },
+    {
+      "author_phrase": "wilhelm et al.",
+      "year": "2016",
+      "as_annotated": "Wilhelm et al., 2016"
+    },
+    {
+      "author_phrase": "roberts",
+      "year": "2003",
+      "as_annotated": "Roberts, 2003"
+    },
+    {
+      "author_phrase": "fontana and egels-zanden",
+      "year": "2019",
+      "as_annotated": "Fontana and Egels-Zandén, 2019"
+    },
+    {
+      "author_phrase": "sharma et al.",
+      "year": "2019a",
+      "as_annotated": "Sharma et al., 2019a"
+    },
+    {
+      "author_phrase": "lu and shang",
+      "year": "2017",
+      "as_annotated": "Lu and Shang, 2017"
+    },
+    {
+      "author_phrase": "kolaczyk and csardi",
+      "year": "2014",
+      "as_annotated": "Kolaczyk and Csárdi, 2014"
+    },
+    {
+      "author_phrase": "chen et al.",
+      "year": "2018",
+      "as_annotated": "Chen et al., 2018"
+    },
+    {
+      "author_phrase": "busse et al.",
+      "year": "2017",
+      "as_annotated": "Busse et al., 2017"
+    },
+    {
+      "author_phrase": "marshall et al.",
+      "year": "2016",
+      "as_annotated": "Marshall et al., 2016"
+    },
+    {
+      "author_phrase": "kolk",
+      "year": "2004",
+      "as_annotated": "Kolk, 2004"
+    },
+    {
+      "author_phrase": "flammer and kacperczyk",
+      "year": "2016",
+      "as_annotated": "Flammer and Kacperczyk, 2016"
+    },
+    {
+      "author_phrase": "marquis et al.",
+      "year": "2018",
+      "as_annotated": "Marquis et al., 2018"
+    },
+    {
+      "author_phrase": "villena and gioia",
+      "year": "2018",
+      "as_annotated": "Villena and Gioia, 2018"
+    },
+    {
+      "author_phrase": "carlos and lewis",
+      "year": "2018",
+      "as_annotated": "Carlos and Lewis, 2018"
+    },
+    {
+      "author_phrase": "fabrizio and kim",
+      "year": "2019",
+      "as_annotated": "Fabrizio and Kim, 2019"
+    },
+    {
+      "author_phrase": "carter and washispack",
+      "year": "2018",
+      "as_annotated": "Carter and Washispack, 2018"
+    },
+    {
+      "author_phrase": "choi et al.",
+      "year": "2001",
+      "as_annotated": "Choi et al., 2001"
+    },
+    {
+      "author_phrase": "carter et al.",
+      "year": "2015",
+      "as_annotated": "Carter et al., 2015"
+    },
+    {
+      "author_phrase": "choi and krause",
+      "year": "2006",
+      "as_annotated": "Choi and Krause, 2006"
+    },
+    {
+      "author_phrase": "pathak et al.",
+      "year": "2014",
+      "as_annotated": "Pathak et al., 2014"
+    },
+    {
+      "author_phrase": "brandon-jones et al.",
+      "year": "2015",
+      "as_annotated": "Brandon-Jones et al., 2015"
+    },
+    {
+      "author_phrase": "gao et al.",
+      "year": "2015",
+      "as_annotated": "Gao et al., 2015"
+    },
+    {
+      "author_phrase": "fagiolo",
+      "year": "2007",
+      "as_annotated": "Fagiolo, 2007"
+    },
+    {
+      "author_phrase": "carnovale and yeniyurt",
+      "year": "2015",
+      "as_annotated": "Carnovale and Yeniyurt, 2015"
+    },
+    {
+      "author_phrase": "olson",
+      "year": "1965",
+      "as_annotated": "Olson, 1965"
+    },
+    {
+      "author_phrase": "ostrom",
+      "year": "1990",
+      "as_annotated": "Ostrom, 1990"
+    },
+    {
+      "author_phrase": "samuelson",
+      "year": "1954",
+      "as_annotated": "Samuelson, 1954"
+    },
+    {
+      "author_phrase": "connolly and thorn",
+      "year": "1990",
+      "as_annotated": "Connolly and Thorn, 1990"
+    },
+    {
+      "author_phrase": "frischmann",
+      "year": "2013",
+      "as_annotated": "Frischmann, 2013"
+    },
+    {
+      "author_phrase": "fulk et al.",
+      "year": "1996",
+      "as_annotated": "Fulk et al., 1996"
+    },
+    {
+      "author_phrase": "bimber et al.",
+      "year": "2005",
+      "as_annotated": "Bimber et al., 2005"
+    },
+    {
+      "author_phrase": "wilhoit and kisselburgh",
+      "year": "2015",
+      "as_annotated": "Wilhoit and Kisselburgh, 2015"
+    },
+    {
+      "author_phrase": "reed et al.",
+      "year": "2014",
+      "as_annotated": "Reed et al., 2014"
+    },
+    {
+      "author_phrase": "madison et al.",
+      "year": "2010",
+      "as_annotated": "Madison et al., 2010"
+    },
+    {
+      "author_phrase": "von krogh et al.",
+      "year": "2003",
+      "as_annotated": "von Krogh et al., 2003"
+    },
+    {
+      "author_phrase": "yan et al.",
+      "year": "2015",
+      "as_annotated": "Yan et al., 2015"
+    },
+    {
+      "author_phrase": "kim et al.",
+      "year": "2011",
+      "as_annotated": "Kim et al., 2011"
+    },
+    {
+      "author_phrase": "gould",
+      "year": "1993",
+      "as_annotated": "Gould, 1993"
+    },
+    {
+      "author_phrase": "ostrom and walker",
+      "year": "2003",
+      "as_annotated": "Ostrom and Walker, 2003"
+    },
+    {
+      "author_phrase": "rivera et al.",
+      "year": "2010",
+      "as_annotated": "Rivera et al., 2010"
+    },
+    {
+      "author_phrase": "wenger",
+      "year": "1998",
+      "as_annotated": "Wenger, 1998"
+    },
+    {
+      "author_phrase": "marwell and oliver",
+      "year": "1988",
+      "as_annotated": "Marwell and Oliver, 1988"
+    },
+    {
+      "author_phrase": "fu and shumate",
+      "year": "2016",
+      "as_annotated": "Fu and Shumate, 2016"
+    },
+    {
+      "author_phrase": "choi and wu",
+      "year": "2009",
+      "as_annotated": "Choi and Wu, 2009"
+    },
+    {
+      "author_phrase": "kim and choi",
+      "year": "2015",
+      "as_annotated": "Kim and Choi, 2015"
+    },
+    {
+      "author_phrase": "schilling and phelps",
+      "year": "2007",
+      "as_annotated": "Schilling and Phelps, 2007"
+    },
+    {
+      "author_phrase": "centola",
+      "year": "2013",
+      "as_annotated": "Centola, 2013"
+    },
+    {
+      "author_phrase": "poteete and ostrom",
+      "year": "2004",
+      "as_annotated": "Poteete and Ostrom, 2004"
+    },
+    {
+      "author_phrase": "bode and wagner",
+      "year": "2015",
+      "as_annotated": "Bode and Wagner, 2015"
+    },
+    {
+      "author_phrase": "jacobs and subramanian",
+      "year": "2012",
+      "as_annotated": "Jacobs and Subramanian, 2012"
+    },
+    {
+      "author_phrase": "hall and matos",
+      "year": "2010",
+      "as_annotated": "Hall and Matos, 2010"
+    },
+    {
+      "author_phrase": "parmigiani and rivera-santos",
+      "year": "2015",
+      "as_annotated": "Parmigiani and Rivera-Santos, 2015"
+    },
+    {
+      "author_phrase": "marques et al.",
+      "year": "2019",
+      "as_annotated": "Marques et al., 2019"
+    },
+    {
+      "author_phrase": "van den brink and van der woerd",
+      "year": "2004",
+      "as_annotated": "Van den Brink and Van der Woerd, 2004"
+    },
+    {
+      "author_phrase": "leven et al.",
+      "year": "2014",
+      "as_annotated": "Leven et al., 2014"
+    },
+    {
+      "author_phrase": "enkel and gassmann",
+      "year": "2010",
+      "as_annotated": "Enkel and Gassmann, 2010"
+    },
+    {
+      "author_phrase": "osadchiy et al.",
+      "year": "2015",
+      "as_annotated": "Osadchiy et al., 2015"
+    },
+    {
+      "author_phrase": "park and ravenel",
+      "year": "2013",
+      "as_annotated": "Park and Ravenel, 2013"
+    },
+    {
+      "author_phrase": "lai et al.",
+      "year": "2016",
+      "as_annotated": "Lai et al., 2016"
+    },
+    {
+      "author_phrase": "qiu et al.",
+      "year": "2016",
+      "as_annotated": "Qiu et al., 2016"
+    },
+    {
+      "author_phrase": "wang et al.",
+      "year": "2018",
+      "as_annotated": "Wang et al., 2018",
+      "absent_from_source": "the paper's only occurrence is inside a methods table that the corpus copy of this paper does not contain. Verified by the absence of Step 4, Step 5, Isolate 245, NACE, CIE_DES and 27,973 from the corpus markdown, all of which are present in the annotated PDF."
+    },
+    {
+      "author_phrase": "rice",
+      "year": "2006",
+      "as_annotated": "Rice, 2006"
+    },
+    {
+      "author_phrase": "ahnert and fink",
+      "year": "2008",
+      "as_annotated": "Ahnert and Fink, 2008"
+    },
+    {
+      "author_phrase": "borgatti and li",
+      "year": "2009",
+      "as_annotated": "Borgatti and Li, 2009"
+    },
+    {
+      "author_phrase": "ostrom",
+      "year": "2003",
+      "as_annotated": "Ostrom, 2003"
+    },
+    {
+      "author_phrase": "darnall et al.",
+      "year": "2010",
+      "as_annotated": "Darnall et al., 2010"
+    },
+    {
+      "author_phrase": "reverte",
+      "year": "2009",
+      "as_annotated": "Reverte, 2009"
+    },
+    {
+      "author_phrase": "fine",
+      "year": "1998",
+      "as_annotated": "Fine, 1998"
+    },
+    {
+      "author_phrase": "oyserman",
+      "year": "2011",
+      "as_annotated": "Oyserman, 2011"
+    },
+    {
+      "author_phrase": "schmidt et al.",
+      "year": "2017",
+      "as_annotated": "Schmidt et al., 2017"
+    },
+    {
+      "author_phrase": "darnall et al.",
+      "year": "2009",
+      "as_annotated": "Darnall et al., 2009"
+    },
+    {
+      "author_phrase": "kolbel et al.",
+      "year": "2017",
+      "as_annotated": "Kölbel et al., 2017"
+    },
+    {
+      "author_phrase": "reprisk",
+      "year": "2016",
+      "as_annotated": "RepRisk, 2016"
+    },
+    {
+      "author_phrase": "world bank",
+      "year": "2016",
+      "as_annotated": "World Bank, 2016"
+    },
+    {
+      "author_phrase": "abadie et al.",
+      "year": "2017",
+      "as_annotated": "Abadie et al., 2017"
+    },
+    {
+      "author_phrase": "wooldridge",
+      "year": "2015",
+      "as_annotated": "Wooldridge, 2015"
+    },
+    {
+      "author_phrase": "bliese",
+      "year": "2000",
+      "as_annotated": "Bliese, 2000"
+    },
+    {
+      "author_phrase": "bartko",
+      "year": "1976",
+      "as_annotated": "Bartko, 1976"
+    },
+    {
+      "author_phrase": "mcgraw and wong",
+      "year": "1996",
+      "as_annotated": "McGraw and Wong, 1996"
+    },
+    {
+      "author_phrase": "dooley et al.",
+      "year": "2019",
+      "as_annotated": "Dooley et al., 2019"
+    },
+    {
+      "author_phrase": "gardner and cooper",
+      "year": "2003",
+      "as_annotated": "Gardner and Cooper, 2003"
+    },
+    {
+      "author_phrase": "sharma et al.",
+      "year": "2019b",
+      "as_annotated": "Sharma et al., 2019b"
+    },
+    {
+      "author_phrase": "bellamy et al.",
+      "year": "2014",
+      "as_annotated": "Bellamy et al. (2014)",
+      "added_in": "v0.2",
+      "found_by": "candidate_adjudication",
+      "found_by_note": "present in the candidate and absent from v0.1; verified here against the manuscript's own reference list, which the paper's authors wrote and the extractor cannot produce. The verification is independent of the extractor; the discovery is not.",
+      "reference_entry": "Bellamy, M. A., Ghosh, S., \\& Hora, M. (2014). The influence of supply network structure on firm innovation. Journal of Operations Management, 32(6), 357-373.",
+      "adjudicated_in": "specs/gold/ADJUDICATION-paper-1.md"
+    },
+    {
+      "author_phrase": "ellram et al.",
+      "year": "2004",
+      "as_annotated": "(Sampson and Froehle, 2006; Ellram et al., 2004)",
+      "added_in": "v0.2",
+      "found_by": "candidate_adjudication",
+      "found_by_note": "present in the candidate and absent from v0.1; verified here against the manuscript's own reference list, which the paper's authors wrote and the extractor cannot produce. The verification is independent of the extractor; the discovery is not.",
+      "reference_entry": "Ellram, L. M., Tate, W. L., \\& Billington, C. (2004). Understanding and managing the services supply chain. Journal of Supply Chain Management, 40(3), 17-32.",
+      "adjudicated_in": "specs/gold/ADJUDICATION-paper-1.md"
+    },
+    {
+      "author_phrase": "sampson and froehle",
+      "year": "2006",
+      "as_annotated": "(Sampson and Froehle, 2006; Ellram et al., 2004)",
+      "added_in": "v0.2",
+      "found_by": "candidate_adjudication",
+      "found_by_note": "present in the candidate and absent from v0.1; verified here against the manuscript's own reference list, which the paper's authors wrote and the extractor cannot produce. The verification is independent of the extractor; the discovery is not.",
+      "reference_entry": "Sampson, S. E., \\& Froehle, C. M. (2006). Foundations and implications of a proposed unified services theory. Production and Operations Management, 15(2), 329-343.",
+      "adjudicated_in": "specs/gold/ADJUDICATION-paper-1.md"
+    },
+    {
+      "author_phrase": "shao et al.",
+      "year": "2018",
+      "as_annotated": "Shao et al. (2018)",
+      "added_in": "v0.2",
+      "found_by": "candidate_adjudication",
+      "found_by_note": "present in the candidate and absent from v0.1; verified here against the manuscript's own reference list, which the paper's authors wrote and the extractor cannot produce. The verification is independent of the extractor; the discovery is not.",
+      "reference_entry": "Shao, B. B., Shi, Z. M., Choi, T. Y., \\& Chae, S. 2018. A data analytics approach to identifying hidden critical suppliers in supply networks: Development of nexus supplier index. Decision Support Systems, 114, 37-48",
+      "adjudicated_in": "specs/gold/ADJUDICATION-paper-1.md"
+    },
+    {
+      "author_phrase": "unruh et al.",
+      "year": "2016",
+      "as_annotated": "(Unruh et al., 2016; Marquis et al., 2018)",
+      "added_in": "v0.2",
+      "found_by": "candidate_adjudication",
+      "found_by_note": "present in the candidate and absent from v0.1; verified here against the manuscript's own reference list, which the paper's authors wrote and the extractor cannot produce. The verification is independent of the extractor; the discovery is not.",
+      "reference_entry": "Unruh, G., Kiron, D., Kruschwitz, N., Reeves, M., Rubel, H. \\& Meyer zum Felde, A. (2016). Investing for a sustainable future: Investors care more about sustainability than many executives believe. MIT Sloan Management Review, 57(4), 3-29.",
+      "adjudicated_in": "specs/gold/ADJUDICATION-paper-1.md"
+    },
+    {
+      "author_phrase": "basole et al.",
+      "year": "2017",
+      "as_annotated": "| Basole et al. (2017) | - | Structural prominence; density | - | Alliance network (tier 1 and 2) | Focal firm economic performance | Social network theory |",
+      "added_in": "v0.3",
+      "found_by": "candidate_adjudication",
+      "source_location": "table",
+      "table": "Summary of empirical studies on supply chain structure",
+      "found_by_note": "table-only: identified in the Author-Year column of a table of empirical studies, not cited in prose, present in the reference list. Admitted under the table-scope rule recorded in provenance. Found by reading the candidate's output; the verification against the reference list is independent of the extractor, the discovery is not.",
+      "reference_entry": "Basole, R. C., Ghosh, S., \\& Hora, M. S. (2017). Supply network structure and firm performance: Evidence from the electronics industry. IEEE Transactions on Engineering Management, 65(1), 141-154.",
+      "adjudicated_in": "specs/gold/ADJUDICATION-paper-1.md",
+      "ruling": "Alex Zamurko, 2026-09-18"
+    },
+    {
+      "author_phrase": "dong et al.",
+      "year": "2015",
+      "as_annotated": "| Dong et al. (2015) | - | Relational embeddedness; centrality | - | Focal firm | Focal firm opportunism | Social network theory |",
+      "added_in": "v0.3",
+      "found_by": "candidate_adjudication",
+      "source_location": "table",
+      "table": "Summary of empirical studies on supply chain structure",
+      "found_by_note": "table-only: identified in the Author-Year column of a table of empirical studies, not cited in prose, present in the reference list. Admitted under the table-scope rule recorded in provenance. Found by reading the candidate's output; the verification against the reference list is independent of the extractor, the discovery is not.",
+      "reference_entry": "Dong, M. C., Liu, Z., Yu, Y., \\& Zheng, J.-H. (2015). Opportunism in Distribution Networks: The Role of Network Embeddedness and Dependence. Production and Operations Management, 24(10), 1657-1670.",
+      "adjudicated_in": "specs/gold/ADJUDICATION-paper-1.md",
+      "ruling": "Alex Zamurko, 2026-09-18"
+    },
+    {
+      "author_phrase": "park et al.",
+      "year": "2018",
+      "as_annotated": "| Park et al. (2018) | - | Accessibility; interconnectedness | - | Supply base (tier 1) | Accessibility; interconnectedness | Social network theory |",
+      "added_in": "v0.3",
+      "found_by": "candidate_adjudication",
+      "source_location": "table",
+      "table": "Summary of empirical studies on supply chain structure",
+      "found_by_note": "table-only: identified in the Author-Year column of a table of empirical studies, not cited in prose, present in the reference list. Admitted under the table-scope rule recorded in provenance. Found by reading the candidate's output; the verification against the reference list is independent of the extractor, the discovery is not.",
+      "reference_entry": "Park, H., Bellamy, M. and Basole, R. (2018). Structural anatomy and evolution of supply chain alliance networks: A multi-method approach. Journal of Operations Management, 63, 79-96.",
+      "adjudicated_in": "specs/gold/ADJUDICATION-paper-1.md",
+      "ruling": "Alex Zamurko, 2026-09-18"
+    }
+  ],
+  "verified_against_manuscript": {
+    "text_sha256": "cff9bb85d74fbac8ffd69fd0c258812cb1d051b2963cbc8b8df8ebe447264615",
+    "checked": 91,
+    "not_found": [
+      "Wang et al., 2018"
+    ],
+    "means": "each annotated first author appears within 140 characters of its year somewhere in the manuscript. It establishes that the annotation was not invented. It does not establish that the annotation is complete — a citation nobody wrote down is invisible to this check and is exactly what recall is for."
+  }
+}

@@ -79,7 +79,7 @@ than a judgement about what counts.
 Worth noting that `shao et al. 2018` has a reference entry with no parentheses
 around the year — `Chae, S. 2018.` — a style variant the assembly handled.
 
-### Table-only — three works, and a scope question, not a defect
+### Table-only — three works, ruled on 18 September
 
 ```text
 | Basole et al. (2017) | - | Structural prominence; density | - | …
@@ -91,29 +91,85 @@ Each appears **only** as the first cell of a row in a table headed *Summary of
 empirical studies on supply chain structure*, whose first column is
 `Author-Year`. All three have reference entries.
 
-Whether a table of works counts as citing them is a question about what the
-gold set is for, and it has not been asked. The annotator may well have
-excluded table contents deliberately, and this file does not overrule that.
 `bellamy et al. 2014` is in this table too and is listed in the previous group
 instead, because it is also cited in prose.
 
-**This one needs a decision rather than a repair.**
+**Ruled by Alex Zamurko, 18 September: they count.**
+
+> A table titled "Summary of empirical studies" with an Author-Year column is
+> part of the manuscript's scholarly content, and Basole 2017, Dong 2015 and
+> Park 2018 are explicitly identified there and all appear in the reference
+> list. Unless the annotation protocol explicitly excluded tables, excluding
+> them would create an undocumented prose-only rule.
+
+And prospectively, so the next annotator does not face the same question:
+
+> Citations appearing in manuscript tables count when the table identifies
+> scholarly works by author/year or equivalent citation information, unless
+> the annotation protocol explicitly excludes that table type.
+
+Added in v0.3 by `scripts/build_gold_v03.py`, which checks the rule's own
+condition rather than assuming it: the table must identify works by
+Author-Year, the work must appear in a table row, it must *not* appear in
+prose, and it must have a reference entry. The rule travels with the data in
+`provenance.table_scope_rule`.
+
+The same ruling leaves the three possessives alone: they are extractor grammar
+errors, not annotation errors, so the gold set is already correct and EC-2 is
+the extractor's to fix.
 
 ## What the groups are worth
 
+These are measured, not projected. Every row after the first is a real run of
+`citation_extract.py` through `citation_candidate.py` and `gold_runner.py`.
+
 ```text
-                                            recall   precision
-as scored today                              0.933       0.884
-+ EC-2 repaired                              0.967       0.916
-+ the five prose omissions annotated         0.968       0.968
+                                              gold   recall   precision
+v0.1, as first scored                           90    0.933       0.884
+v0.1, after the particle fix                    90    0.944       0.876
+v0.2, + the five prose omissions                95    0.947       0.928
+v0.3, + the three table works                   98    0.949       0.959
+v0.3, + EC-2 repaired                           98    0.980       0.990
 ```
 
-Against Alex Zamurko's threshold of 0.95 on both, set 28 August. The bottom row
-meets it.
+Against Alex Zamurko's threshold of 0.95 on both, set 28 August. Precision
+crosses at v0.3. Recall is 0.949, one thousandth short, and **EC-2 alone takes
+both over**: 0.980 and 0.990.
 
-It is a projection and not a score. It assumes the five are accepted into the
-gold set and that EC-2 is repaired, and neither has happened. The table group
-is excluded from it entirely, since that is undecided.
+Only the last row is hypothetical, and it is hypothetical in a narrow way —
+EC-2's repair is not implemented, but the effect was measured by folding the
+possessive and rescoring rather than estimated.
+
+### How these numbers must be labelled
+
+Alex Zamurko, 18 September:
+
+> The 0.968 / 0.968 result is useful, but do not present it as independent
+> holdout performance. The five prose omissions and three table cases were
+> found through extractor-led adjudication, so label the result as
+> post-adjudication performance on an amended Gold Set.
+
+So: **post-adjudication performance on an amended gold set.** Not independent
+holdout performance, and not to be quoted as such. The gold set improved in the
+direction this implementation happens to look, and this file exists to record
+exactly what changed and why.
+
+The v0.1 row is the last one that is independent of the extractor, and it is
+0.933 / 0.884.
+
+## What remains on paper 1, and it is now fully accounted for
+
+Nine discrepancies at v0.3, every one with a named cause and none unexplained:
+
+```text
+6   EC-2          three works, each scored twice — a miss and a false positive
+1   EC-5          dooley et al. 2019, cited only in a footnote
+1   EC-3          den brink and van der woerd 2004, envelope truncation
+1   world bank    refused exactly as §12 requires for institutional authors
+```
+
+Which is the useful state to be in: nothing here is a mystery, and six of the
+nine are one defect.
 
 ## What this establishes, and what it does not
 

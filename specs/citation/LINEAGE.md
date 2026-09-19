@@ -63,8 +63,9 @@ files, and not three competing versions of one thing.
 
 ## Why consolidation is blocked
 
-rc3 amends rc2. rc2 amends rc1. Consolidating rc1 and rc3 without rc2 would
-silently drop whatever rc2 changed, and rc3 tells us rc2 changed real things:
+rc3 amends rc2, and rc2 stands between rc1 and rc3 in some relation nobody can
+currently name. Either way, consolidating without rc2 would silently drop
+whatever rc2 changed, and rc3 tells us rc2 changed real things:
 
 ```text
 rc2-A3   an EXCLUSION, not a recovery — rc3 B10 says this is worth 11 off

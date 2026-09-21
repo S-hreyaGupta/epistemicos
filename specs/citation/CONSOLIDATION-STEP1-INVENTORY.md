@@ -156,11 +156,16 @@ rc3's recorded hash          the records quote ddc6f1f8… since 3 September;
 ## 5. What Step 2 can proceed on now
 
 ```text
-v3.3           vs  rc1        two architectures, not two maturities
-rc1            vs  rc2        01 and 02 only; 03 and 04 blocked
-rc2            vs  rc3        amendment layer, and SIX places where rc3's
-                              description of rc2 does not match rc2 —
+architecture   rc1 vs rc2     DONE — CONSOLIDATION-STEP2-ARCHITECTURE.md
+               no DROP, no UNRESOLVED. rc2's text replaces throughout.
+execution      rc1 vs rc2     not started, 1402 -> 1576 lines, carries the
+conformance                   grammar. The largest remaining piece.
+matrix         rc1 vs rc2     not started
+register       rc1 vs rc2     not started, X-01..X-14 same titles
+rc2            vs  rc3        SEVEN discrepancies recorded —
                               RC2-RC3-DISCREPANCIES.md
+v3.3           vs  v3.4       a normative decision, not a comparison.
+                              Decision CIT-ARCH-01, pending.
 ```
 
 The six are already in the shape the workflow's consolidation table wants: each

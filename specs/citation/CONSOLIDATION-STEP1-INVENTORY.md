@@ -160,8 +160,9 @@ architecture   rc1 vs rc2     DONE — CONSOLIDATION-STEP2-ARCHITECTURE.md
                no DROP, no UNRESOLVED. rc2's text replaces throughout.
 execution      rc1 vs rc2     not started, 1402 -> 1576 lines, carries the
 conformance                   grammar. The largest remaining piece.
-matrix         rc1 vs rc2     not started
-register       rc1 vs rc2     not started, X-01..X-14 same titles
+matrix         rc1 vs rc2     DONE — C-087 resolved as MOVE, not DROP
+register       rc1 vs rc2     DONE — X-01..X-14 KEEP at title level
+               both in CONSOLIDATION-STEP2-MATRIX-AND-REGISTER.md
 rc2            vs  rc3        SEVEN discrepancies recorded —
                               RC2-RC3-DISCREPANCIES.md
 v3.3           vs  v3.4       DECIDED 21 September. CIT-ARCH-01: identity

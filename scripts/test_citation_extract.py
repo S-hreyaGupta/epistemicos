@@ -1455,17 +1455,31 @@ def main() -> int:
     else:
         ok("§9.4: all three repair rules pair their reference")
 
-    # REFERENCE order decides, not rule order. rc2: "scan unmatched references
-    # in source order and take the first rule that matches." That is
-    # reference-major, and this control was written rule-major first and
-    # failed against a correct implementation.
+    # REFERENCE order decides, not rule order. This control was written
+    # rule-major first and failed against a correct implementation.
     #
-    # rc2 also lists the rules "in precedence order", which reads as though it
-    # settles a contest between them. It cannot: rule 1 requires equal years
-    # and rules 2 and 3 require different ones, and no year pair is both
-    # transposed and adjacent — checked exhaustively over 1500-2099. So at
-    # most one rule can match any single reference and the precedence list is
-    # unexercisable. Recorded rather than asserted as behaviour.
+    # rc2 originally listed the rules "in precedence order" and said "take the
+    # first rule that matches", which read as though a contest between rules
+    # could arise. It cannot, and Alex Zamurko amended §9.4 on 21 September to
+    # say so: a pair qualifies when EXACTLY ONE rule matches, and ordering
+    # applies to the reference scan only.
+    #
+    # Why two rules can never match one reference, as a proof rather than the
+    # 1500-2099 enumeration first offered:
+    #
+    #   rule 1 vs 2 and 3   rule 1 requires cand_phrase != ref_phrase;
+    #                       rules 2 and 3 require them exactly equal
+    #   rule 2 vs rule 3    swapping digits at places a and b shifts the value
+    #                       by (d_a - d_b) * (10^a - 10^b), and 10^a - 10^b is
+    #                       a multiple of 9 for every a != b. So a
+    #                       transposition always moves a number by a multiple
+    #                       of 9 and can never move it by 1.
+    #
+    # That holds for digit strings of any length, not just four-digit years.
+    # So `len(matched) >= 2` in repair_rule is unreachable, and no control
+    # pins it — a control for a branch that cannot be entered would be green
+    # for a reason other than the one it names, which is the defect this file
+    # exists to catch.
     mr, pm = diag("As shown (Whiteman, 2000) here.",
                   "\n\n## References\n\nWhiteman, R. (1999). Year adjacent. "
                   "J, 1, 1.\nWhitman, R. (2000). Edit distance. J, 2, 1.\n"
@@ -1492,6 +1506,25 @@ def main() -> int:
         failures.append("§9.4: equal phrases and adjacent years is rule 2")
     else:
         ok("§9.4: the rules are mutually exclusive on one reference")
+
+    # The amendment's own words, pinned. A transposition shifts a number by a
+    # multiple of 9, so rules 2 and 3 cannot both match; verified here over
+    # every digit string of length 2 to 5 rather than asserted from the
+    # algebra alone.
+    both = [(s, t) for L in range(2, 6)
+            for n in range(10 ** (L - 1), 10 ** L)
+            for s in (str(n),)
+            for i in range(L - 1) if s[i] != s[i + 1]
+            for t in (s[:i] + s[i + 1] + s[i] + s[i + 2:],)
+            if abs(int(t) - int(s)) == 1]
+    if both:
+        failures.append(f"§9.4: a transposition that is also year_adjacent "
+                        f"would make two rules match — found {both[:3]}")
+    elif ce.repair_rule("person", "smith", "2000", "person", "smith", "2000"):
+        failures.append("§9.4: equal phrase and equal year matches no rule, "
+                        "so the pair does not qualify")
+    else:
+        ok("§9.4: EXACTLY ONE rule can match, so no pair is ever ambiguous")
 
     # The CORE length floor. rc2: "candidate CORE length >= 4 code points",
     # which is what stops short surnames pairing with anything one letter away.

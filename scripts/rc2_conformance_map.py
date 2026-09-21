@@ -115,12 +115,22 @@ CHECKS = {
               "PARTIAL", "null key pinned; identity_authority not emitted"),
     "C-054": ((), ("§9.4: a possible_mismatch establishes no citation_key",),
               "PARTIAL", "null key pinned; identity_authority not emitted"),
+    # These three were PARTIAL on 21 September because each case is named for
+    # a "precedence" that could not be exercised. Alex Zamurko amended §9.4
+    # that evening, replacing the precedence list with "a pair qualifies when
+    # EXACTLY ONE rule matches" and leaving ordering to the reference scan.
+    # The unexercisable thing is gone from the normative text, so what remains
+    # in each case is its acceptance column, and that is pinned.
+    #
+    # The case TITLES in rc2 file 03 still read "precedence"; the amendment
+    # arrived in Slack and file 03 has not been reissued. Same standing as the
+    # 20 September §9.3 amendment this implementation already follows.
     "C-056": ((), ("§9.4: the CORE length floor stops short surnames",),
-              "PARTIAL", "kind/year/CORE pinned; precedence unexercisable"),
-    "C-057": ((), ("§9.4: the rules are mutually exclusive",), "PARTIAL",
-              "rule pinned; precedence unexercisable"),
+              "MET", "kind/year/CORE bound pinned; precedence withdrawn"),
+    "C-057": ((), ("§9.4: EXACTLY ONE rule can match",), "MET",
+              "phrase equality and ±1 year pinned"),
     "C-058": ((), ("§9.4: all three repair rules pair their reference",),
-              "PARTIAL", "rule pinned; precedence unexercisable"),
+              "MET", "adjacent digit swap pinned"),
     "C-059": ((), ("§9.4: a person candidate never pairs with a non-person",),
               "MET", "cross-kind pairing refused"),
     "C-060": ((), ("§9.5: merge_suspected is targeted at the candidate",),

@@ -1463,26 +1463,47 @@ def _split_key(key: str):
 
 def repair_rule(cand_kind, cand_phrase, cand_year,
                 ref_kind, ref_phrase, ref_year):
-    """rc2 §9.4's first matching rule, or None. Precedence is the spec's."""
+    """rc2 §9.4: the rule qualifying this pair, or None.
+
+    Alex Zamurko, 21 September 2026, amending §9.4. "Rules, in precedence
+    order" and "take the first rule that matches" are replaced by:
+
+        A candidate/reference pair qualifies when EXACTLY ONE of the following
+        rules matches. [...] Take the first qualifying REFERENCE in source
+        order.
+
+    Precedence between rules is gone; ordering now lives entirely on the
+    reference scan, which is where §9.4 always had it and where this file
+    always implemented it.
+
+    Written as a literal count rather than a short-circuit return. The
+    short-circuit form is behaviourally identical here — see the suite for why
+    two rules cannot both match — but it encodes "the first that matches",
+    which is the sentence the amendment removed.
+    """
     # "A pair MUST have the same candidate/reference author kind."
     if cand_kind != ref_kind:
         return None
+
+    matched = []
     # 1. surname_edit_distance_1 — person only, same year, CORE >= 4.
     if (cand_kind == "person" and cand_year == ref_year
             and len(cand_phrase) >= 4
             and _osa(cand_phrase, ref_phrase) <= 1
             and cand_phrase != ref_phrase):
-        return "surname_edit_distance_1"
-    if cand_phrase != ref_phrase:
-        return None
-    # 2. year_adjacent — both numeric, difference exactly one.
-    if (cand_year.isdigit() and ref_year.isdigit()
-            and abs(int(cand_year) - int(ref_year)) == 1):
-        return "year_adjacent"
-    # 3. year_transposition — one adjacent digit pair swapped.
-    if _year_transposed(cand_year, ref_year):
-        return "year_transposition"
-    return None
+        matched.append("surname_edit_distance_1")
+    if cand_phrase == ref_phrase:
+        # 2. year_adjacent — both numeric, difference exactly one.
+        if (cand_year.isdigit() and ref_year.isdigit()
+                and abs(int(cand_year) - int(ref_year)) == 1):
+            matched.append("year_adjacent")
+        # 3. year_transposition — one adjacent digit pair swapped.
+        if _year_transposed(cand_year, ref_year):
+            matched.append("year_transposition")
+
+    # "EXACTLY ONE". Zero is no pair, and two would be an ambiguous repair,
+    # which under this wording is also no pair rather than a contest to settle.
+    return matched[0] if len(matched) == 1 else None
 
 
 def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,

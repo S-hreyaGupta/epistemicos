@@ -5,9 +5,12 @@ Against Alex Zamurko's consolidation workflow v6, 21 September 2026.
 > **Gate.** Every known relevant source is listed. Missing referenced material
 > is recorded explicitly; affected items cannot be treated as resolved.
 
-**The gate is not passed.** Three sources are known to exist, are named by an
-artefact already in hand, and are not here. Step 2 can begin on what is
-present; the rows those three govern stay `UNRESOLVED / blocked` per rule 4.
+**GATE PASSED, 21 September 21:58.** All five rc2 files are in hand. Alex
+Zamurko sent the three missing ones within minutes of being asked, and the two
+already held came back byte-identical, so the package is internally consistent.
+
+Thirteen sources, all hashed. Two artefacts remain unrecoverable and are
+recorded in §4 as history rather than as blockers.
 
 ---
 
@@ -49,6 +52,9 @@ sha256                                                            lines  file
 7d2414388cf019cca40361e42bdd6735b513c57a5fcce997ecbea9fc667db850    282  citation-v3.4-rc1-deferred-work-register.md
 4a60b994845a323d5ee1170559d3f9017abf62aeaf4bc7fc0bc1992e335adb9e    377  citation-v3.4-rc2-architecture.md
 4fa95af15755c569d5a5135321a22fdfab85464c4ee92c09a8808d73318aa466   1576  citation-v3.4-rc2-execution-conformance.md
+f0f1aa37603e20be650159cf8b91896ea222ad2562f40d55c3a9e804640566b8    138  citation-v3.4-rc2-conformance-matrix.md
+0bf1cc12e93ce1911916644d620d387f23ee0b14f41662b752846ba1858d5698    230  citation-v3.4-rc2-deferred-work-register.md
+a35e2ded9197cf683686c1f1a2f793cbe0f61160ec64562351994d04dd9bbaf2    223  citation-v3.4-rc2-gsd-pilot-contract.md
 c392982ef625aec03e8f52af51fc88138ea0e4e9c3bfb9795d62f9dfbf594d5b    735  citation-v3.4-rc3-amendments.md
 ```
 
@@ -86,31 +92,46 @@ rc3 amendments                CURRENT           amendment set over rc2, frozen
 rc1's own `spec_id` values at `candidate_revision: 2`. That answers the question
 `LINEAGE.md` carried open for two days.
 
-## 4. Missing referenced material — the gate
+## 4. The rc2 package, now complete
+
+All five arrived 21 September. What they turned out to contain:
 
 ```text
-03_citation_v3.4_conformance_matrix_freeze_checklist_rc2.md   NOT IN HAND
-04_citation_v3.4_dependency_deferred_work_register_rc2.md     NOT IN HAND
-05_citation_v3.4_gsd_pilot_task_contract_and_manual_comparator.md  NOT IN HAND
+03  conformance matrix and freeze checklist. EIGHTY-SIX conformance cases,
+    C-001 to C-086, every one DEFINED / PENDING_EXECUTION. Its front matter
+    binds to `4a60b994…` and `4fa95af1…`, which are exactly the 01 and 02 in
+    this repository, so the package hashes check against each other.
+04  dependency and deferred-work register. Fourteen deferred items X-01 to
+    X-14, identical in title to rc1's.
+05  GSD pilot task contract and manual comparator.
 ```
 
-**Known to exist**, not merely suspected: Alex Zamurko posted all five files to
-#citation on 28 August at 12:58 AM and they are listed in that channel's Files
-and links tab today. Two were downloaded on 21 September; three were not.
-
-What they govern, and therefore what cannot be resolved without them:
+Two things this settles immediately, both of which had been open:
 
 ```text
-03  the freeze checklist and conformance matrix. Any row whose disposition
-    depends on "is this conformance requirement still binding" is blocked.
-04  the dependency and deferred-work register. rc1's version carries the
-    limitation register including X-07, which rc3 §C3 says has lost its
-    evidence. Whether rc2 already moved it cannot be checked.
-05  the GSD pilot task contract and manual comparator, frozen at c27e647f
-    before onboarding. Governs the pilot scope boundary.
+leading_gloss          ZERO occurrences across all five rc2 files
+conversion_artifact    ZERO occurrences across all five rc2 files
 ```
 
-Also unrecoverable, and recorded rather than resolved:
+So rc3 A2's two undefined exclusion reasons are undefined in rc1, rc2 AND rc3.
+They appear exactly once each in the entire specification set, in rc3's own A2
+table, carrying a count and no rule. That is 14 of rc3's 30 exclusions, and it
+is now an `UNRESOLVED` row needing a normative decision rather than more
+evidence.
+
+`conversion_artifact` may be a forward reference: rc2 X-08 defers
+`ConversionArtifactAnnotations / conversion repair` entirely. If so the reason
+name was written against work that does not exist yet, which is worth Alex
+Zamurko confirming rather than my assuming.
+
+And one thing it confirms. rc2 X-07 defers "comma-containing organization
+authors" by name, and C-036 makes it a conformance case: "unsupported
+comma-containing organization remains unresolved / no guessed reference
+identity". That is exactly the FAO decision recorded as discrepancy 2. FAO is
+not an oversight in rc2; it is explicitly deferred work, and the implementation
+already satisfies C-036.
+
+Still unrecoverable, and recorded rather than resolved:
 
 ```text
 the August implementation    impl_v34.py and the corpus_run_2 outputs. The

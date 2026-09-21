@@ -6,8 +6,8 @@ brief asks for exactly this:
 > Where the evidence permits more than one reconstruction, identify the
 > ambiguity and resolve it explicitly rather than silently selecting one.
 
-Six so far. Every one was found by **implementing** the rule rather than by
-reading it, which is worth saying plainly: five of the six look fine on the
+Seven so far. Every one was found by **implementing** the rule rather than by
+reading it, which is worth saying plainly: six of the seven look fine on the
 page and only fail when run. Each entry records what was chosen and why, so the
 consolidation can overturn it knowingly rather than inherit it by accident.
 
@@ -66,7 +66,7 @@ consequence  rc3's institutional 8 is not reachable under rc2's own production.
 
 ## 3. rc2 §7.4's period rule defeats rc2's own person path.
 
-The sharpest of the six, and invisible on the page.
+The sharpest of the seven, and invisible on the page.
 
 ```text
 §7.4   reference_author_head is the trimmed text before the opening "(" ...
@@ -190,6 +190,43 @@ suite says so instead of a corpus figure moving quietly.
 
 ---
 
+## 7. rc3 §C3 names the wrong deferred item.
+
+rc3 §C3:
+
+> X-07 registers forename-first as a limitation. All four corpus instances turn
+> out to be publisher metadata (§E), not manuscript prose. The limitation may
+> still be right in principle; it now has **zero supporting occurrences**.
+
+X-07 is not that limitation. It reads identically in rc1 and rc2:
+
+> ### X-07 — Broader bibliography author grammars
+> Deferred. Includes comma-containing organization authors and richer
+> full-forename list parsing.
+
+That is about the BIBLIOGRAPHY side. The forename-first limitation rc3 means is
+in rc2's execution conformance, in a different list:
+
+> forename-first parentheticals surface as `no_grammar_match`
+
+```text
+chosen    the observation stands, the identifier does not
+because   rc3's point is correct — all four corpus instances are publisher
+          metadata and §E excludes them, so that limitation does have zero
+          supporting occurrences. It is the label that is wrong.
+consequence  anyone acting on rc3 §C3 would edit X-07, which is a live
+             deferral covering the FAO case, and would leave the limitation
+             rc3 actually meant untouched. Two wrong edits from one wrong
+             identifier.
+for the consolidation   correct the reference, and keep X-07 as it stands.
+```
+
+Found by reading rc2's register after it arrived, not by reading rc3. rc3 §C3
+is internally plausible and names a real identifier; only the two documents
+side by side show they are different things.
+
+---
+
 ## A measurement note, not a discrepancy: "worth" counts occurrences
 
 rc3 B6 is "Worth 2". Implemented, it recovers **4 occurrences and 0 works**.
@@ -223,6 +260,7 @@ fourteen papers and looking at what came out:
 4  found by nine mismatches all sharing one shape
 5  found by a conformance case producing an unresolved citation
 6  found by a transform working perfectly and recovering nothing
+7  found by rc2's register arriving and saying something else
 ```
 
 Number 3 is the one to dwell on. A check that finds nothing looks like a check

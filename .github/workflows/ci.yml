@@ -162,6 +162,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "rc2_conformance_map" python scripts/rc2_conformance_map.py
 
+      # The consolidation documents describe two review candidates that are
+      # not frozen. If either moves, the section comparison they rest on has
+      # to be re-run rather than trusted.
+      - name: rc1/rc2 section comparison
+        if: ${{ !cancelled() }}
+        run: bash .github/ci-step.sh "rc1_rc2_section_diff" python scripts/rc1_rc2_section_diff.py
+
       - name: citation controls can actually fail
         if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "mutate_citation_suite" python scripts/mutate_citation_suite.py

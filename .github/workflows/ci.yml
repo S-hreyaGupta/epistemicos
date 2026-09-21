@@ -155,6 +155,13 @@ jobs:
       # So this runs the mutation probe as well. It is the check on the check —
       # a control that cannot fail is not a control, and this suite has already
       # contained two of those. Half a second.
+      # rc2's own conformance matrix, 86 cases. Fails if a probe goes stale,
+      # because a coverage map that silently stops measuring is worse than
+      # none — it reports the same number while checking less.
+      - name: rc2 conformance coverage
+        if: ${{ !cancelled() }}
+        run: bash .github/ci-step.sh "rc2_conformance_map" python scripts/rc2_conformance_map.py
+
       - name: citation controls can actually fail
         if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "mutate_citation_suite" python scripts/mutate_citation_suite.py

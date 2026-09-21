@@ -1407,6 +1407,84 @@ def person_form(phrase: str):
     return "exact", visible, {"kind": "exact", "value": len(visible)}
 
 
+# ----------------------------------------- rc2 §9.4, candidate-level repair
+#
+# The three rules rc2 gives, in its precedence order. They exist to tell an
+# author "you probably meant this entry" without the record ever claiming the
+# citation resolved — rc2 is explicit that "neither diagnostic establishes
+# `citation_key`, `author_kind`, or `resolved_citation_occurrences`", and
+# CIT-ARCH-01 says the same thing from the other direction.
+#
+# Each is narrow on purpose. A repair rule that fires easily turns a missing
+# reference into a confident wrong pairing, which is the failure mode rc2
+# guards against everywhere else in this document.
+
+def _osa(a: str, b: str) -> int:
+    """Optimal string alignment distance. rc2 §1.4 names `osa` by that name."""
+    if a == b:
+        return 0
+    la, lb = len(a), len(b)
+    prev2, prev = None, list(range(lb + 1))
+    for i in range(1, la + 1):
+        cur = [i] + [0] * lb
+        for j in range(1, lb + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+            if (i > 1 and j > 1 and a[i - 1] == b[j - 2]
+                    and a[i - 2] == b[j - 1]):
+                cur[j] = min(cur[j], prev2[j - 2] + 1)
+        prev2, prev = prev, cur
+    return prev[lb]
+
+
+def _year_transposed(a: str, b: str) -> bool:
+    """One adjacent digit pair swapped, and nothing else."""
+    if len(a) != len(b) or not (a.isdigit() and b.isdigit()) or a == b:
+        return False
+    for i in range(len(a) - 1):
+        if a[:i] + a[i + 1] + a[i] + a[i + 2:] == b:
+            return True
+    return False
+
+
+def _split_key(key: str):
+    """A key back into (kind, phrase, year).
+
+    v3.3 keys are `surname|year` and rc2's non-person keys are
+    `non_person|label|year`. Both shapes are live at once while CIT-ARCH-01's
+    key migration is outstanding, so this reads either rather than assuming
+    the prefix is there.
+    """
+    parts = key.split("|")
+    if len(parts) == 3 and parts[0] in ("person", "non_person"):
+        return parts[0], parts[1], parts[2]
+    return "person", parts[0], parts[-1]
+
+
+def repair_rule(cand_kind, cand_phrase, cand_year,
+                ref_kind, ref_phrase, ref_year):
+    """rc2 §9.4's first matching rule, or None. Precedence is the spec's."""
+    # "A pair MUST have the same candidate/reference author kind."
+    if cand_kind != ref_kind:
+        return None
+    # 1. surname_edit_distance_1 — person only, same year, CORE >= 4.
+    if (cand_kind == "person" and cand_year == ref_year
+            and len(cand_phrase) >= 4
+            and _osa(cand_phrase, ref_phrase) <= 1
+            and cand_phrase != ref_phrase):
+        return "surname_edit_distance_1"
+    if cand_phrase != ref_phrase:
+        return None
+    # 2. year_adjacent — both numeric, difference exactly one.
+    if (cand_year.isdigit() and ref_year.isdigit()
+            and abs(int(cand_year) - int(ref_year)) == 1):
+        return "year_adjacent"
+    # 3. year_transposition — one adjacent digit pair swapped.
+    if _year_transposed(cand_year, ref_year):
+        return "year_transposition"
+    return None
+
+
 def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
             cits, author_phrase="", author_kind="person"):
     s_start, s_end, s_content_end = sent
@@ -2090,6 +2168,75 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     for i, a in enumerate(ambiguous_citations):
         a["index"] = i
         lines.append(a)
+
+    # ---------------------------------------------------- rc2 §9.4 and §9.5
+    #
+    # CIT-ARCH-01: "If no compatible entry exists, classify it as
+    # MISSING_REFERENCE while preserving the citation-derived candidate."
+    # This is that classification, and rc2 §9.4 is its rules.
+    #
+    # §8.4's two-candidate suppression does not bite here: with no STOP
+    # reduction there is only ever ONE internal candidate, so every
+    # identity_not_resolved occurrence qualifies. That is stated rather than
+    # relied on silently, because the day C-019 lands the suppression becomes
+    # live and this loop needs the check.
+    unresolved_cits = [c for c in cits
+                       if c["identity_class"] == "identity_not_resolved"]
+
+    # "Group such occurrences by that candidate key in FIRST-OCCURRENCE order."
+    grouped: dict[str, list[dict]] = {}
+    for c in unresolved_cits:
+        grouped.setdefault(c["candidate_key"], []).append(c)
+
+    # "Build the unmatched unique-reference pool in reference SOURCE order,
+    # excluding ... references already exactly matched by an authoritative
+    # citation identity." Ambiguity-reserved indices would be excluded too;
+    # nothing reserves any yet, so the set is empty rather than ignored.
+    authoritative = {c["candidate_key"] for c in cits
+                     if c["identity_class"] == "unique_reference_match"}
+    pool = [i for i, r in enumerate(refs)
+            if r["reference_key"] and r["reference_key"] not in authoritative]
+
+    # §9.5's merge qualification needs the suspect entries.
+    embedded = [r for r in refs
+                if "embedded_entry_pattern" in r.get("suspect_reasons", [])]
+
+    diagnostics = []
+    for cand_key, occs in grouped.items():
+        kind, phrase, year = _split_key(cand_key)
+        paired = None
+        for pi, ri in enumerate(pool):            # source order
+            r = refs[ri]
+            rk, rp, ry = _split_key(r["reference_key"])
+            rule = repair_rule(kind, phrase, year, rk, rp, ry)
+            if rule:
+                paired = (pi, ri, rule)
+                break                             # "the FIRST rule that matches"
+        if paired:
+            pi, ri, rule = paired
+            pool.pop(pi)                          # "remove from the pool"
+            diagnostics.append({
+                "type": "possible_mismatch", "index": 0,
+                "candidate_key": cand_key, "reference_index": ri,
+                "reference_key": refs[ri]["reference_key"],
+                "rule": rule, "occurrences": len(occs),
+                # rc2, twice over and in CIT-ARCH-01: this establishes nothing.
+                "citation_key": None, "author_kind": None,
+            })
+        else:
+            merge = any(
+                phrase in re.sub(r"\s+", " ", r["assembled"]).lower()
+                and year in r["assembled"] for r in embedded)
+            diagnostics.append({
+                "type": "missing_reference", "index": 0,
+                "candidate_key": cand_key, "occurrences": len(occs),
+                "merge_suspected": merge,
+                "citation_key": None, "author_kind": None,
+            })
+
+    for i, d in enumerate(diagnostics):
+        d["index"] = i
+        lines.append(d)
 
     # Alex Zamurko, 20 September, amending rc2:
     #

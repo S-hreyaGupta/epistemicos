@@ -1420,6 +1420,127 @@ def main() -> int:
     else:
         ok("§8.3: S is always no_match here, so six rows stay unreachable")
 
+    # ------------------- rc2 §9.4 / §9.5, candidate-level diagnostics
+    print("\nrc2 §9.4 — candidate-level missing reference and repair")
+
+    def diag(body_text, refs):
+        with _tf.TemporaryDirectory() as td:
+            p = Path(td) / "paper.md"
+            p.write_text(HEAD + body_text + refs, encoding="utf-8")
+            lines, _c = ce.run(p, {"ampersand", "segments"})
+        return ([l for l in lines if l.get("type") == "missing_reference"],
+                [l for l in lines if l.get("type") == "possible_mismatch"])
+
+    PAD = ("Jones, K. (2019). A. J, 1, 1.\nBrown, L. (2018). B. J, 2, 1.\n"
+           "Davis, M. (2017). C. J, 3, 1.\nEvans, N. (2016). D. J, 4, 1.\n")
+
+    # The three rules, each with the reference that should pair.
+    for label, cite, entry, rule in [
+            ("surname_edit_distance_1",
+             "(Whiteman, 2000)", "Whitman, R. (2000). A paper. J, 1, 1.",
+             "surname_edit_distance_1"),
+            ("year_adjacent",
+             "(Madison, 2010)", "Madison, R. (2009). A paper. J, 1, 1.",
+             "year_adjacent"),
+            ("year_transposition",
+             "(Larsen, 2019)", "Larsen, R. (2091). A paper. J, 1, 1.",
+             "year_transposition")]:
+        mr, pm = diag(f"As shown {cite} here.",
+                      "\n\n## References\n\n" + entry + "\n" + PAD)
+        if len(pm) != 1 or pm[0]["rule"] != rule:
+            failures.append(f"§9.4 {label}: expected one possible_mismatch "
+                            f"with rule {rule} — got "
+                            f"{[(x['rule']) for x in pm]}, {len(mr)} missing")
+            break
+    else:
+        ok("§9.4: all three repair rules pair their reference")
+
+    # REFERENCE order decides, not rule order. rc2: "scan unmatched references
+    # in source order and take the first rule that matches." That is
+    # reference-major, and this control was written rule-major first and
+    # failed against a correct implementation.
+    #
+    # rc2 also lists the rules "in precedence order", which reads as though it
+    # settles a contest between them. It cannot: rule 1 requires equal years
+    # and rules 2 and 3 require different ones, and no year pair is both
+    # transposed and adjacent — checked exhaustively over 1500-2099. So at
+    # most one rule can match any single reference and the precedence list is
+    # unexercisable. Recorded rather than asserted as behaviour.
+    mr, pm = diag("As shown (Whiteman, 2000) here.",
+                  "\n\n## References\n\nWhiteman, R. (1999). Year adjacent. "
+                  "J, 1, 1.\nWhitman, R. (2000). Edit distance. J, 2, 1.\n"
+                  + PAD)
+    if len(pm) != 1:
+        failures.append(f"§9.4: one candidate pairs at most once — got "
+                        f"{len(pm)}")
+    elif pm[0]["rule"] != "year_adjacent":
+        failures.append(f"§9.4: references are scanned in SOURCE order, so "
+                        f"the 1999 entry pairs first — got {pm[0]['rule']}")
+    else:
+        ok("§9.4: reference source order decides which entry pairs")
+
+    # And the claim the comment above rests on, pinned so it cannot rot.
+    if ce.repair_rule("person", "smith", "2020", "person", "smith", "2020"):
+        failures.append("§9.4: an exact match is not a repair; it would have "
+                        "resolved as a unique match")
+    elif (ce.repair_rule("person", "whitman", "2000",
+                         "person", "whiteman", "2000")
+          != "surname_edit_distance_1"):
+        failures.append("§9.4: equal years and one edit is rule 1")
+    elif (ce.repair_rule("person", "smith", "2000", "person", "smith", "1999")
+          != "year_adjacent"):
+        failures.append("§9.4: equal phrases and adjacent years is rule 2")
+    else:
+        ok("§9.4: the rules are mutually exclusive on one reference")
+
+    # The CORE length floor. rc2: "candidate CORE length >= 4 code points",
+    # which is what stops short surnames pairing with anything one letter away.
+    if ce.repair_rule("person", "wu", "2020", "person", "xu", "2020"):
+        failures.append("§9.4: a candidate CORE shorter than 4 code points "
+                        "must not pair by edit distance")
+    else:
+        ok("§9.4: the CORE length floor stops short surnames pairing")
+
+    # "A pair MUST have the same candidate/reference author kind."
+    if ce.repair_rule("person", "world bank", "2020",
+                      "non_person", "world bank", "2021"):
+        failures.append("§9.4: a pair must share author kind")
+    else:
+        ok("§9.4: a person candidate never pairs with a non-person reference")
+
+    # Nothing established. rc2 says it twice and CIT-ARCH-01 says it again.
+    mr, pm = diag("As shown (Smith, 2020) here.",
+                  "\n\n## References\n\n" + PAD)
+    if len(mr) != 1:
+        failures.append(f"§9.4: an unpairable candidate emits one "
+                        f"missing_reference — got {len(mr)}")
+    elif mr[0]["citation_key"] is not None or mr[0]["author_kind"] is not None:
+        failures.append("§9.4: neither diagnostic establishes citation_key "
+                        "or author_kind")
+    elif mr[0]["candidate_key"] != "smith|2020":
+        failures.append("CIT-ARCH-01: the candidate is preserved in the "
+                        "diagnostic")
+    else:
+        ok("§9.4: missing_reference preserves the candidate, establishes none")
+
+    # A paired reference leaves the pool, so a second candidate cannot claim
+    # the same entry. Without this, one typo'd reference repairs every
+    # citation that happens to be one letter away from it.
+    # BOTH candidates must be pairable with the one entry, or the control
+    # cannot see the pool at all. Written first with `Whitemen`, which is
+    # edit-distance TWO from `Whitman` and so was never a candidate for it —
+    # the control passed whether or not the pool was emptied. `Whitmen` is
+    # one edit, like `Whiteman`.
+    mr, pm = diag("As shown (Whiteman, 2000; Whitmen, 2000) here.",
+                  "\n\n## References\n\nWhitman, R. (2000). One entry. "
+                  "J, 1, 1.\n" + PAD)
+    if len(pm) != 1:
+        failures.append(f"§9.4: a paired reference is removed from the pool, "
+                        f"so exactly one of two equally close candidates "
+                        f"pairs — got {len(pm)}")
+    else:
+        ok("§9.4: a paired reference leaves the pool and pairs only once")
+
     print()
     if failures:
         for f in failures:

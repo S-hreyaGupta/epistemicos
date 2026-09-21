@@ -401,15 +401,46 @@ MUTATIONS = [
      '        if False:\n            ambiguous_citations.append',
      "§8.3: nonunique emits exactly one ambiguous_citation"),
 
-    ("CIT-ARCH-01: the unconfirmed candidate is discarded",
-     '        c["candidate_key"] = cand',
-     '        c["candidate_key"] = None',
-     "CIT-ARCH-01 preserves the citation-derived candidate"),
+    # Aimed at the DIAGNOSTIC rather than the citation record. Pointed at
+    # `c["candidate_key"] = cand` it took _split_key down with a TypeError,
+    # and a crash is not a control going red — the same distinction this file
+    # had to learn about extraction_accuracy earlier tonight.
+    ("CIT-ARCH-01: the diagnostic drops the candidate it must preserve",
+     '                "candidate_key": cand_key, "occurrences": len(occs),',
+     '                "candidate_key": None, "occurrences": len(occs),',
+     "CIT-ARCH-01: the candidate is preserved in the diagnostic"),
 
     ("rc2 §11.2: the identity partition double-counts",
      '                          if c["identity_class"] == "identity_not_resolved"),',
      '                          if c["identity_class"] != "unique_reference_match"),',
      "§11.2: the identity classes must partition"),
+
+    # ------------------------------- rc2 §9.4, candidate-level diagnostics
+
+    ("rc2 §9.4: the CORE length floor is removed",
+     "            and len(cand_phrase) >= 4",
+     "            and len(cand_phrase) >= 0",
+     "§9.4: a candidate CORE shorter than 4 code points"),
+
+    ("rc2 §9.4: a pair need not share author kind",
+     "    if cand_kind != ref_kind:\n        return None",
+     "    if False:\n        return None",
+     "§9.4: a pair must share author kind"),
+
+    ("rc2 §9.4: a paired reference stays in the pool",
+     "            pool.pop(pi)",
+     "            pass",
+     "§9.4: a paired reference is removed from the pool"),
+
+    ("CIT-ARCH-01: missing_reference establishes identity",
+     '                "merge_suspected": merge,\n                "citation_key": None, "author_kind": None,',
+     '                "merge_suspected": merge,\n                "citation_key": cand_key, "author_kind": kind,',
+     "§9.4: neither diagnostic establishes citation_key"),
+
+    ("rc2 §9.4: nothing is ever paired",
+     "            rule = repair_rule(kind, phrase, year, rk, rp, ry)",
+     "            rule = None",
+     "§9.4 surname_edit_distance_1: expected one possible_mismatch"),
 
     ("rc3 B1b: the parenthetical detection site is closed again",
      "        inner = body[c1s + 1:c1e - 1]\n        cut = YEAR_RE.search(inner)",

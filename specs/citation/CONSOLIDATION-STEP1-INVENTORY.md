@@ -39,31 +39,23 @@ nothing here, and a local search cannot find what was never downloaded.
 ## 2. Sources present, with hashes
 
 ```text
-SHA-256                                                           lines  file
-239ee6bd d6cbdaf9 4f3e007d 23fa4782 6ce2b11b 60a03da0 d9b667ba 1a0a980e   456
-    citation-spec-v3.3.md
-55fcc7b8 ce610c85 780737f7 b13fab6e 9a612160 b74488fd f81b7c09 c6411a71   274
-    citation-v3.4-pre-rc1-three-additions-first-draft.md
-0c93ee9c f6c6784f b55aff24 411886e9 425e1c16 a5325f3a 5b27bcd4 d64dd4ce   332
-    citation-v3.4-pre-rc1-three-additions.md
-6a615c81 36543ef2 98196a91 8b5e4c1b 62bb54fd b28fac68 2b4dc66c bb32b8e1   435
-    citation-v3.4-rc1-architecture.md
-11edbf89 18224c0e e1ac8542 3db1f676 fe49ca1f eceecf15 75c4a1da a2976695  1402
-    citation-v3.4-rc1-execution-conformance.md
-73f4ba54 cc045da9 547202fb f48946b2 9a5e7398 1b402ae1 554379cd 60a42612   227
-    citation-v3.4-rc1-conformance-matrix.md
-7d241438 8cf019cc a40361e4 2bdd6735 b513c57a 5fcce997 ecbea9fc 667db850   282
-    citation-v3.4-rc1-deferred-work-register.md
-4a60b994 845a323d 5ee11705 59d3f901 7abf62ae af4bc7fc 0bc1992e 335adb9e   377
-    citation-v3.4-rc2-architecture.md
-4fa95af1 5755c569 d5a51353 21a22fdf ab85464c 4ee92c09 a8808d73 318aa466  1576
-    citation-v3.4-rc2-execution-conformance.md
-c392982e f625aec0 3e8f52af 51fc8813 8ea0e4e9 c3bfb979 5d62f9df bf594d5b   735
-    citation-v3.4-rc3-amendments.md
+sha256                                                            lines  file
+239ee6bdd6cbdaf94f3e007d23fa47826ce2b11b60a03da0d9b667ba1a0a980e    456  citation-spec-v3.3.md
+55fcc7b8ce610c85780737f7b13fab6e9a612160b74488fdf81b7c09c6411a71    274  citation-v3.4-pre-rc1-three-additions-first-draft.md
+0c93ee9cf6c6784fb55aff24411886e9425e1c16a5325f3a5b27bcd4d64dd4ce    332  citation-v3.4-pre-rc1-three-additions.md
+6a615c8136543ef492598196a918b2c1e4b62bb54fdbcca4bd12af28bac66cb0    435  citation-v3.4-rc1-architecture.md
+11edbf8918224c0ee1ac85423db1f676fe49ca1feceecf1575c4a1daa2976695   1402  citation-v3.4-rc1-execution-conformance.md
+73f4ba54cc045da9547202fbf48946b29a5e73981b402ae1554379cd60a42612    227  citation-v3.4-rc1-conformance-matrix.md
+7d2414388cf019cca40361e42bdd6735b513c57a5fcce997ecbea9fc667db850    282  citation-v3.4-rc1-deferred-work-register.md
+4a60b994845a323d5ee1170559d3f9017abf62aeaf4bc7fc0bc1992e335adb9e    377  citation-v3.4-rc2-architecture.md
+4fa95af15755c569d5a5135321a22fdfab85464c4ee92c09a8808d73318aa466   1576  citation-v3.4-rc2-execution-conformance.md
+c392982ef625aec03e8f52af51fc88138ea0e4e9c3bfb9795d62f9dfbf594d5b    735  citation-v3.4-rc3-amendments.md
 ```
 
-Full single-line digests are in the repository; they are split here only to fit
-the page.
+Generated from the files, not transcribed. The first version of this table was
+hand-split into groups of eight and one digest came out wrong — in a document
+whose only job is to carry digests accurately. It is now produced by reading
+the bytes.
 
 ## 3. Status and relationship
 

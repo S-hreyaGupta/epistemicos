@@ -142,17 +142,24 @@ it requires a normative decision.
 Decision ID   CIT-ARCH-01
 Issue         v3.3 derives citation_key at extraction; rc1 and rc2 both
               forbid syntax from establishing identity
-Affected      ~10 conformance cases directly (C-037..C-045, C-052), and the
-              implementation's whole identity path
-Remainder     the implementation currently follows v3.3 for person authors
-              and rc2 for non-person authors, because rc3 B1b cannot work
-              the v3.3 way. So the code already sits across both.
-Decision      PENDING — Alex Zamurko
+Affected      ~26 conformance cases, and the implementation's identity path
+Remainder     EMPTY
+Decision      DECIDED — Alex Zamurko, 21 September 21:52
 ```
 
-Per the workflow's rule 6, an incomplete decision cannot change a row's
-disposition, so nothing above is contingent on it. It governs the *next*
-document pair, not this one.
+> In-text citation evidence may generate and narrow candidate reference
+> identities, but it may not independently confirm reference identity. A
+> citation is CONFIRMED only when it matches a compatible reference-list
+> entry. If no compatible entry exists, classify it as MISSING_REFERENCE while
+> preserving the citation-derived candidate. If multiple compatible entries
+> remain, classify it as AMBIGUOUS; do not guess.
+
+v3.4's model. Every clause has a counterpart already present in rc2, checked
+rather than assumed, so it is a `REPLACE` with text the table can point at —
+which the workflow requires before `REPLACE` is valid. The remainder is empty,
+so by rule 5 it may change dispositions.
+
+Full record in `DECISION-CIT-ARCH-01.md`.
 
 ---
 

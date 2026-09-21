@@ -164,8 +164,9 @@ matrix         rc1 vs rc2     not started
 register       rc1 vs rc2     not started, X-01..X-14 same titles
 rc2            vs  rc3        SEVEN discrepancies recorded —
                               RC2-RC3-DISCREPANCIES.md
-v3.3           vs  v3.4       a normative decision, not a comparison.
-                              Decision CIT-ARCH-01, pending.
+v3.3           vs  v3.4       DECIDED 21 September. CIT-ARCH-01: identity
+                              requires bibliography confirmation. v3.4's
+                              model. See DECISION-CIT-ARCH-01.md.
 ```
 
 The six are already in the shape the workflow's consolidation table wants: each

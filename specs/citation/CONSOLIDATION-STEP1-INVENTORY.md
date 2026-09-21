@@ -141,17 +141,23 @@ identity". That is exactly the FAO decision recorded as discrepancy 2. FAO is
 not an oversight in rc2; it is explicitly deferred work, and the implementation
 already satisfies C-036.
 
-Still unrecoverable, and recorded rather than resolved:
+Both items recorded here as unrecoverable were **recovered on 21 September**
+from the assistant's own outputs directory, which no search had covered:
 
 ```text
-the August implementation    impl_v34.py and the corpus_run_2 outputs. The
-                             hash is recorded and the artefact is gone;
-                             PROVENANCE-GAP.md has the detail. rc3 §I is
-                             frozen on figures produced by it.
-rc3's recorded hash          the records quote ddc6f1f8… since 3 September;
-                             the file in hand is c392982e…. No file anywhere
-                             hashes to the recorded value.
+the August implementation    impl_v34.py, hashing to the 50077031… recorded in
+                             CITATION_CORPUS_RUN_3.md, with all three corpus
+                             runs. Now at specs/gold/recovered/.
+rc3's frozen text            ddc6f1f8…, now at
+                             citation-v3.4-rc3-amendments-frozen.md. The copy
+                             already held is truncated by twenty lines; §A2 is
+                             byte-identical, so no implemented amendment moves.
 ```
+
+`GSD-FOLDER-RECOVERY.md` has the account, including what the recovered
+implementation settles about rc3 §A2's thirty exclusions: it has no
+candidate-exclusion machinery at all, so the counts came from a heuristic pass
+its own author labelled indicative rather than from the extractor.
 
 ## 5. What Step 2 can proceed on now
 

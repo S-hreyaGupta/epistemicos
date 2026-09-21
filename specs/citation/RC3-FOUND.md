@@ -51,35 +51,27 @@ them.
 **rc2 is still missing**, and rc3 amends it rather than replacing it, so rc3
 alone is not a complete specification either.
 
-## The recorded hash is wrong
+## The recorded hash is right. This copy is truncated.
 
 ```text
 recorded in the records   ddc6f1f80c93d12d6268cda03fffb6720adac3b4bb9bc5da351f8c5a28a108e2
 this file                 c392982ef625aec03e8f52af51fc88138ea0e4e9c3bfb9795d62f9dfbf594d5b
 ```
 
-The copy here is a second download — the filename ends `(2)` — so this file
-first read as possibly the same content under different line endings. **It is
-not.** Tested 21 September against nine normalisations of these bytes — LF,
-CRLF, with and without a trailing newline, with and without a BOM, trailing
-whitespace stripped — and none produces `ddc6f1f8…`. The two digests name
-genuinely different content, so `ddc6f1f8…` is a different revision of rc3 and
-not a different encoding of this one.
+**Resolved 21 September.** The `ddc6f1f8…` file was found in the assistant's
+own outputs directory, under `gsd/`, and is now in this repository as
+`citation-v3.4-rc3-amendments-frozen.md`. It hashes exactly.
 
-Four searches, none of which finds it:
+The copy here is a second download — the filename ends `(2)` — and it stops
+twenty lines early. The frozen file appends a governing-spec note and a pointer
+to its freeze record; the diff is append-only and **§A2 is byte-identical**, so
+nothing implemented from this copy needs revisiting.
 
-```text
-git history        rc3 committed exactly once, at c392982e…; no other version
-session uploads    1 file of 1099 contains `leading_gloss`, and it is this one
-Google Drive       fullText `leading_gloss` and `citation`+`rc3`: no results
-byte normalisation nine variants, none matches
-```
-
-The digest quoted since 3 September does not identify any file we hold.
-
-That is the same shape as `PROVENANCE-GAP.md`: a recorded hash naming an
-artifact nobody has. The difference is that here the artifact turned up and the
-hash did not match it.
+What this document got wrong is worth keeping. It read the mismatch as a
+recorded hash naming an artifact nobody has, the same shape as
+`PROVENANCE-GAP.md`. Both were wrong the same way, and for the same reason:
+neither search covered the directory the assistant writes into.
+`GSD-FOLDER-RECOVERY.md` has the full account.
 
 ## What it already decides
 

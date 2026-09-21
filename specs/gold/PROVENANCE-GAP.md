@@ -3,6 +3,16 @@
 Found 18 September 2026, while trying to produce a candidate to score the gold
 sets against.
 
+> **CLOSED, 21 September 2026.** `impl_v34.py` was recovered from the
+> assistant's own outputs directory under `gsd/`, hashes to the `50077031…`
+> recorded in `CITATION_CORPUS_RUN_3.md`, and is now in this repository at
+> `specs/gold/recovered/impl_v34.py`. The three corpus-run reports came with
+> it. The searches below are left intact because what they got wrong is the
+> useful part: none of them covered the directory the assistant writes into,
+> and a negative result was recorded as a fact about the artifact rather than
+> about the search. See `specs/citation/GSD-FOLDER-RECOVERY.md`, which also
+> records what the recovered implementation settles about rc3 §A2.
+
 ## What was looked for, and where
 
 ```text

@@ -13,9 +13,9 @@ citation-v3.4-rc2-architecture.md   4a60b994…  377 lines   CURRENT
 ```
 
 Taken first because it carries the decision that governs roughly a third of
-rc2's conformance matrix. The remaining pairs — execution conformance,
-conformance matrix, deferred-work register — are not covered here and Step 2 is
-not complete until they are.
+rc2's conformance matrix, now DECIDED. The remaining pairs — execution
+conformance is covered separately; the matrix and register are not, and Step 2
+is not complete until they are.
 
 ---
 

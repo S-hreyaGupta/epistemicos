@@ -29,24 +29,26 @@ v3.4 rc1 — a FOUR-file package, all present
   All four say content_state: review_candidate, frozen_at: null.
   Nothing implements any of them.
 
-v3.4 rc2 — MISSING
-  rc3 calls it "the four-file rc2 package" and cites `rc2-A3` and `rc2-B4`.
+v3.4 rc2 — FOUND 21 September, in #citation
+  citation-v3.4-rc2-architecture.md            4a60b994…   377 lines
+  citation-v3.4-rc2-execution-conformance.md   4fa95af1…  1576 lines
+  Both declare candidate_revision: 2. Alex Zamurko posted the five-file
+  package to #citation on 28 August at 12:58 AM; files 03, 04 and 05 are
+  still to be downloaded.
 
-  What that establishes: rc2 exists, is four files, and carries its own
-  A- and B-series identifiers.
+  Every search recorded below was of the local disk, and the files had never
+  been downloaded, so none of them could have found it. The guess this file
+  recorded — "#citation between 27 and 31 August" — was where it was.
 
-  What it does NOT establish, and an earlier version of this file asserted
-  anyway: whether rc2 is an amendment set over rc1 or a full revision of
-  rc1's four documents. **rc3 does not mention rc1 at all — zero
-  occurrences.** So the relationship between rc1 and rc2 is unknown, and the
-  A/B-series naming is suggestive rather than decisive: rc3 uses the same
-  scheme for its own amendments, but a four-file package could carry section
-  identifiers in that form too.
+  What it settles: rc2 IS four files plus a GSD pilot contract, and it
+  REVISES rc1 rather than amending it — 01 and 02 carry the same spec_ids as
+  rc1's 01 and 02 at candidate_revision 2. So rc2 + rc3 is the live lineage
+  and rc1 is superseded.
 
-  This matters for reconstruction. If rc2 revises rc1's documents, then
-  rc2 + rc3 is complete and rc1 is superseded. If rc2 amends rc1, then
-  rc1 + rc2 + rc3 is required and rc1's four files are load-bearing. Nobody
-  can tell which until rc2 is in hand.
+  Five places where rc3's description of rc2 does not match rc2 are recorded
+  in RC2-RC3-DISCREPANCIES.md, every one found by implementing rather than
+  reading.
+
 
 v3.4 rc3 — one document, present
   citation-v3.4-rc3-amendments.md              c392982e…  735 lines
@@ -117,31 +119,31 @@ So the shape is:
 
    v3.4 rc1  (4 files)     base package
         ↓
-   v3.4 rc2  (4 files)     MISSING — amends or revises rc1, unknown which
+   v3.4 rc2  (4 files)     REVISES rc1 — same spec_ids at revision 2
         ↓
    v3.4 rc3  (amendments)  present
 ```
 
-**Six documents in two lineages, with one amendment layer absent.** Not three
-files, and not three competing versions of one thing.
+**Eight documents in two lineages.** Not three files, and not three competing
+versions of one thing.
 
-## Why consolidation is blocked
+## What consolidation now needs — updated 21 September
 
-rc3 amends rc2, and rc2 stands between rc1 and rc3 in some relation nobody can
-currently name. Either way, consolidating without rc2 would silently drop
-whatever rc2 changed, and rc3 tells us rc2 changed real things:
+The question this section asked for two days, "is rc2 an amendment over rc1 or
+a revision of it", is answered. rc2's 01 and 02 carry rc1's own `spec_id`s at
+`candidate_revision: 2`, so rc2 REVISES rc1. **rc2 + rc3 is the live lineage
+and rc1 is superseded**, which is the lighter of the two outcomes this file
+described.
+
+What is still outstanding is narrower:
 
 ```text
-rc2-A3   an EXCLUSION, not a recovery — rc3 B10 says this is worth 11 off
-         the denominator, so rc2-A3 moves a measured figure
-rc2-B4   segment splitting, already in the baseline rc3 quotes:
-         1502 / 1611 = 93.2% "after \& + rc2-B4 segment splitting"
+1  rc2 files 03, 04 and 05, in #citation and not yet downloaded
+2  the five places rc3's description of rc2 does not match rc2
+   — RC2-RC3-DISCREPANCIES.md
 ```
 
-A consolidation missing rc2 would produce a document that looks complete,
-carries no marker of what is absent, and disagrees with rc3's own baseline
-figure. That is worse than the current state, where at least the gap is
-visible.
+Neither blocks consolidation the way the missing package did.
 
 ## The other thing consolidation has to decide
 
@@ -162,7 +164,9 @@ So consolidation is not merging four documents into one. It is choosing
 between two architectures and then rewriting the implementation to match
 whichever wins. The size of that is not visible from the file count.
 
-## What is available now without rc2, checked amendment by amendment
+## rc3's amendments, checked one by one
+
+Headed "what is available without rc2" until 21 September, when rc2 arrived.
 
 An earlier version of this file said rc3's grammar amendments are all
 self-contained. **One of them is not, and it is the one that matters most.**
@@ -200,9 +204,22 @@ And says why, in terms that rule out working around it:
 > label length; restating them here would create a second definition that can
 > disagree with the first.
 
-**So the institutional handling is genuinely gated on rc2**, and that is the
-amendment paper 2's recall is waiting on. Inventing a production to fill the
-gap is the one thing rc3 forbids by name.
+**So the institutional handling was genuinely gated on rc2**, and inventing a
+production to fill the gap was the one thing rc3 forbids by name.
+
+**UNGATED 21 September.** rc2 §7.4 is that production and it is implemented,
+called from both sides so there is one definition rather than two. It is
+simpler than rc3's description of it: the head is the text before the year
+paren with one trailing period removed, and it is non-person if it holds a
+letter, holds no comma, and is non-empty. The no-comma rule is the whole
+safeguard, and rc2 gives its reason — an organisation name with a comma cannot
+be told apart from an unsupported person list, so it is unresolved rather than
+guessed.
+
+rc2 §8 is the half rc3 never mentions and it is what makes the change safe.
+Syntax does not confer identity: `(Pircher Verdorfer, 2016)` and `(Population
+Pyramid, 2022)` are the same shape and one is a person, so a non-person
+citation is emitted only when a non-person reference confirms it.
 
 The other six are not gated, do not require resolving the architecture
 question, and are worth 38 between them.
@@ -216,6 +233,7 @@ B7    `and colleagues`                                              4   done
 B8    possessive, MAX_POSSESSIVE_YEAR_GAP_TOKENS = 3                7   done
 B1    no global token cap                                           —   done
 B1a   SURNAME, personal, two cores                                  9   REVERTED
+B1b   NON_PERSON_AUTHOR, citation side, from rc2 §7.4               8   done
 A1    candidate_state, three terminal states                            done
 A2    excluded_reason, closed set                                       done, 4 of 6
 A4    one candidate lifecycle                                           done

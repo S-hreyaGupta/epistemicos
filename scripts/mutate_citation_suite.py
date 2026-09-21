@@ -28,15 +28,35 @@ reported as caught, for years, on the strength of some other control failing.
 The same defect this file exists to find, one level up: "something failed" is
 not evidence that the named rule is held.
 
-Most were naming drift and are corrected. One is not, and is left as a finding:
+Most were naming drift and are corrected. One was not, and was chased rather
+than renamed away:
 
     "particles are dropped from the key" does NOT take
     `van der Maas particle surname` red.
 
-It is caught by `a lower-case core after a particle is a surname` instead. So
-the control named for particle identity may not be testing particle identity,
-and that wants looking at rather than renaming away. Recorded here because a
-correction that hides a question is worse than the question.
+INVESTIGATED AND CLOSED, 21 September. It is not a defect, and the answer is
+worth more than the question was.
+
+`first_core` reaches a leading-particle surname two ways: the leading-particle
+`while` loop, and rc3 B1a's optional second-core block below it. They overlap.
+Disabling the loop and comparing seventeen particle surnames, only three come
+out differently, and `van der Maas` is not among them — the second-core block
+produces it identically. So the control passes whether or not the rule it names
+is implemented, because another mechanism silently covers that exact input.
+
+Of the three shapes that DO distinguish the loop:
+
+    Da silva           reachable, and `a lower-case core after a particle is
+                       a surname` already pins it
+    da Silva Costa     NOT reachable — SURNAME is (PARTICLE WS)* CORE and the
+                       second core needs rc3 B1a, which is reverted, so the
+                       span never reaches first_core
+    van der van Maas   three particles, not a name anyone writes
+
+So the mutation is correctly caught by the B2 control, and no new control is
+added: the only input that would pin the loop on its own cannot be built. What
+the finding leaves behind is narrower and still true — `van der Maas particle
+surname` tests the outcome, not the mechanism, and reads like it tests both.
 """
 
 from __future__ import annotations

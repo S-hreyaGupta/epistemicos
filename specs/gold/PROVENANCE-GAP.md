@@ -131,6 +131,30 @@ What is no longer true is that six weeks of figures rest on nothing checkable.
 They rest on a specification that was kept, which turns out to have been the
 part that mattered.
 
+## One thing rc3 tells us about the lost implementation
+
+Added 21 September, after rc3 was found.
+
+rc3 §B2, written 31 August, says of a proposed amendment:
+
+> An earlier draft said "make particle matching case-insensitive". That is a
+> no-op — the implementation already applies `(?i:…)` to `PARTICLE`, so `Da`
+> matches as a particle today. **Verified against the source, not assumed.**
+
+The reconstruction in `scripts/citation_extract.py` did **not** apply `(?i:)`
+to `PARTICLE`. That was added on 18 September and recorded at the time as a
+deviation from §4's "compared via lower()", worth 35 citations corpus-wide.
+
+So it was a deviation in the reconstruction, not in the original. The lost
+August implementation had it right, and rc3 confirms it against the source.
+
+Which is a small piece of evidence about the lost artifact, arriving from an
+unexpected direction: rc3 reports one verified property of an implementation
+nobody can run. It also narrows what "91.2% against 91.2%" meant — the two
+implementations agreed on a total while differing on at least this rule, and
+the reconstruction reached the same figure with a defect the original did not
+have.
+
 ## What would close it
 
 Either the implementation turns up — another machine, a notebook, a container,

@@ -98,27 +98,59 @@ So consolidation is not merging four documents into one. It is choosing
 between two architectures and then rewriting the implementation to match
 whichever wins. The size of that is not visible from the file count.
 
-## What is available now without rc2
+## What is available now without rc2, checked amendment by amendment
 
-The conformance gap between the running implementation and rc3's amendments
-can be measured today, because rc3's grammar amendments are self-contained
-productions that do not depend on rc2 to be read:
+An earlier version of this file said rc3's grammar amendments are all
+self-contained. **One of them is not, and it is the one that matters most.**
+
+Implementable against v3.3 today — rc3 states the rule in full:
 
 ```text
-B1a   SURNAME = (PARTICLE WS)* CORE (WS (PARTICLE WS)? CORE)?      worth 9
-B1b   NON_PERSON_AUTHOR, citation side                             worth 8
-B8    NARRATIVE_POSSESSIVE_NORMALIZATION, 3-token gap              worth 7
-B1    "do not reintroduce a token cap"                             —
-B5    bounded lead-in cue                                          worth 17
-B7    "and colleagues"                                             worth 4
+B1    no global token cap                                          —    = EC-3
+B1a   SURNAME = (PARTICLE WS)* CORE (WS (PARTICLE WS)? CORE)?      9    = EC-4
+B2    lowercase CORE, but only immediately after a matched PARTICLE 1
+B5    LEAD_IN ","? CUE CITATION_LIST, CUE a closed set given here  17
+B7    `and colleagues`, a closed two-token form equivalent to et al. 4
+B8    possessive with MAX_POSSESSIVE_YEAR_GAP_TOKENS = 3            7
+                                                                   ──
+                                                                   38
 ```
 
-Those six are implementable against v3.3 without resolving the architecture
-question, and B1b is the institutional handling paper 2's recall is waiting on.
+Blocked on rc2:
 
-That is a better next step than consolidating, because it is not blocked, it
-moves a number Alex is measuring, and it does not require choosing an
-architecture first.
+```text
+B1b   NON_PERSON_AUTHOR, citation side                              8
+```
+
+rc3 is explicit that this one cannot be written from rc3 alone:
+
+> The citation-side `NON_PERSON_AUTHOR` path MUST reuse the exact lexical
+> production and boundary rules rc2 defines for the bibliography-side
+> `NON_PERSON_AUTHOR`. rc3 changes the permitted DETECTION SITE only. It does
+> not introduce a second organisational-author grammar.
+
+And says why, in terms that rule out working around it:
+
+> Two grammars for one object is how the boundaries drift. rc2's production
+> already carries the bound, the terminal-period handling and the maximum
+> label length; restating them here would create a second definition that can
+> disagree with the first.
+
+**So the institutional handling is genuinely gated on rc2**, and that is the
+amendment paper 2's recall is waiting on. Inventing a production to fill the
+gap is the one thing rc3 forbids by name.
+
+The other six are not gated, do not require resolving the architecture
+question, and are worth 38 between them.
+
+### A note on B2
+
+B2 records, of the August implementation, that it "already applies `(?i:…)` to
+`PARTICLE` … verified against the source, not assumed." The reconstruction did
+not, and that was added on 18 September as a deviation worth 35 citations. So
+the deviation was in the reconstruction rather than the original. Recorded in
+`PROVENANCE-GAP.md`, since it is a verified property of an artifact nobody can
+run.
 
 ## What would unblock consolidation
 

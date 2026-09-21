@@ -7,6 +7,14 @@ blocked on a fifth.
 ## What exists, and what it is
 
 ```text
+pre-rc1 — the scoping note rc1 was written from, found 21 September
+  citation-v3.4-pre-rc1-three-additions.md            0c93ee9c…  332 lines
+  citation-v3.4-pre-rc1-three-additions-first-draft.md 55fcc7b8… 274 lines
+  "Citation spec v3.3 → v3.4 — the three additions", 21 August, two revisions
+  52 minutes apart. Superseded by rc1, which absorbed every identifier in it.
+  Kept because it shows what rc1's scope actually is: four capabilities, not
+  just §2's architecture split. See RC1-IS-BIGGER-THAN-THE-SPLIT.md.
+
 v3.3 — one document, a different lineage
   citation-spec-v3.3.md                        239ee6bd…  456 lines
   "deterministic spec v3.3". Numbered §1-§12. THIS IS WHAT RUNS.
@@ -92,6 +100,14 @@ four-file rc2 package", which is rc1's shape rather than its own.
 
 So rc2 was most likely never shared here. #citation between 27 and 31 August,
 or Alex Zamurko's own machine, are where it would be.
+
+**That caveat was not hypothetical.** A fourth search, listing every markdown
+file in Downloads beside its actual first line so a mangled name could not hide
+a title, turned up `CITATI_3.MD` — a citation v3.4 document with no front matter
+that uses none of the search strings. It is not rc2; it predates rc1. But it
+establishes that the first three tests can miss a citation-lineage document, and
+that the only search which does not depend on what a file contains is the one
+that reads every title. Recorded in `RC1-IS-BIGGER-THAN-THE-SPLIT.md`.
 
 So the shape is:
 

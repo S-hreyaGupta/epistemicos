@@ -45,7 +45,7 @@ v3.4 rc2 — FOUND 21 September, in #citation
   rc1's 01 and 02 at candidate_revision 2. So rc2 + rc3 is the live lineage
   and rc1 is superseded.
 
-  Five places where rc3's description of rc2 does not match rc2 are recorded
+  Six places where rc3's description of rc2 does not match rc2 are recorded
   in RC2-RC3-DISCREPANCIES.md, every one found by implementing rather than
   reading.
 
@@ -139,7 +139,7 @@ What is still outstanding is narrower:
 
 ```text
 1  rc2 files 03, 04 and 05, in #citation and not yet downloaded
-2  the five places rc3's description of rc2 does not match rc2
+2  the six places rc3's description of rc2 does not match rc2
    — RC2-RC3-DISCREPANCIES.md
 ```
 
@@ -234,6 +234,11 @@ B8    possessive, MAX_POSSESSIVE_YEAR_GAP_TOKENS = 3                7   done
 B1    no global token cap                                           —   done
 B1a   SURNAME, personal, two cores                                  9   REVERTED
 B1b   NON_PERSON_AUTHOR, citation side, from rc2 §7.4               8   done
+B6    compact year-suffix, 2019a,b                                  2   done
+D2    math-wrapped year parentheticals                              3   done, 0
+§6.7  author_form / visible_authors / constraint       rc2              done
+§7.4  reference authors, author_count                  rc2              done
+§9.3  author_structure_mismatch                        rc2              done
 A1    candidate_state, three terminal states                            done
 A2    excluded_reason, closed set                                       done, 4 of 6
 A4    one candidate lifecycle                                           done
@@ -244,6 +249,12 @@ B1a was written and reverted: the production swallowed the word before the
 surname, turning `In Smith (2020)` into `in smith|2020` and `World Bank (2024)`
 into `world bank|2024`. The reasoning is kept in `citation_extract.py` rather
 than rediscovered.
+
+D2 is implemented faithfully and recovers nothing: the form it unwraps to is
+refused by the grammar D2 says it satisfies. Sixth entry in
+`RC2-RC3-DISCREPANCIES.md`, which also records that rc3's "worth" column counts
+occurrences while the gold sets score works — B6 is worth 4 occurrences here
+and moved recall by zero.
 
 A2 reaches four of its six reasons. `leading_gloss` and `conversion_artifact`
 appear exactly once each in the whole specs tree — in A2's own table, with a

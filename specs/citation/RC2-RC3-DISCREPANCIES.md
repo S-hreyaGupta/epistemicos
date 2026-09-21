@@ -6,8 +6,8 @@ brief asks for exactly this:
 > Where the evidence permits more than one reconstruction, identify the
 > ambiguity and resolve it explicitly rather than silently selecting one.
 
-Five so far. Every one was found by **implementing** the rule rather than by
-reading it, which is worth saying plainly: four of the five look fine on the
+Six so far. Every one was found by **implementing** the rule rather than by
+reading it, which is worth saying plainly: five of the six look fine on the
 page and only fail when run. Each entry records what was chosen and why, so the
 consolidation can overturn it knowingly rather than inherit it by accident.
 
@@ -66,7 +66,7 @@ consequence  rc3's institutional 8 is not reachable under rc2's own production.
 
 ## 3. rc2 §7.4's period rule defeats rc2's own person path.
 
-The sharpest of the five, and invisible on the page.
+The sharpest of the six, and invisible on the page.
 
 ```text
 §7.4   reference_author_head is the trimmed text before the opening "(" ...
@@ -145,6 +145,72 @@ for the consolidation   either the grammar admits the form, or §9.3's example
 
 ---
 
+## 6. rc3 D2 unwraps into a form the grammar refuses, and forbids fixing it.
+
+D2 is normative in rc3 §J, unimplemented, and counted in §I as **+3**.
+
+```text
+MATCH    $ ( YEAR_LIST ) $
+         where YEAR_LIST satisfies the citation year-list grammar IN FULL
+ACTION   strip the enclosing $ delimiters. NOTHING INSIDE IS ALTERED.
+```
+
+Implemented exactly, it finds every corpus case and strips the delimiters
+correctly. What it hands the parser is:
+
+```text
+Baron (2012,2016)
+```
+
+which does not parse, because the year-list production requires whitespace
+after the comma:
+
+```text
+v3.3 §4    CITE_NARR = AUTHORS_NARR WS \( WS? YEAR (?:, WS YEAR)* ... \)
+rc2 §6.2   prose only — "one or more YEAR_TOKEN values", separator
+           unspecified
+```
+
+So D2's two clauses cannot both hold. The contents do **not** satisfy the
+year-list grammar, and D2 forbids altering them.
+
+```text
+chosen    implemented faithfully, and left worth 0
+because   widening `(?:, WS YEAR)*` would change every citation in the corpus
+          rather than the eight D2 touches, on the strength of a clause rc3
+          does not contain. A transform that recovers nothing is a finding;
+          a grammar quietly widened to make §I's number appear is not.
+for the consolidation   either the year-list production drops the required
+                        whitespace, or D2's ACTION allows normalising the
+                        separator, or D2 is worth 0 and §I's +3 comes off.
+```
+
+Pinned as a conformance control, so if the production is ever widened the
+suite says so instead of a corpus figure moving quietly.
+
+---
+
+## A measurement note, not a discrepancy: "worth" counts occurrences
+
+rc3 B6 is "Worth 2". Implemented, it recovers **4 occurrences and 0 works**.
+
+Both corpus cases are `Sharma et al., 2019a,b` in `ad1e3ff9`, which is gold
+paper 1. Both `sharma|2019a` and `sharma|2019b` are in the gold set, and both
+were already being found — the paper writes each out in full elsewhere. So the
+compact form adds occurrences of works already matched.
+
+```text
+corpus parsed   2098 -> 2102    +4 occurrences
+gold recall     0.980 -> 0.980   unchanged
+```
+
+Neither figure is wrong. rc3's residual counts occurrences and the gold sets
+score distinct works, so an amendment can be worth its stated number and move
+recall by nothing. Worth stating before the consolidation puts the two columns
+side by side and someone reconciles them.
+
+---
+
 ## What these have in common
 
 None was visible from reading. Each was found by running the rule against
@@ -156,6 +222,7 @@ fourteen papers and looking at what came out:
 3  found by the check reporting ZERO mismatches, which was too clean
 4  found by nine mismatches all sharing one shape
 5  found by a conformance case producing an unresolved citation
+6  found by a transform working perfectly and recovering nothing
 ```
 
 Number 3 is the one to dwell on. A check that finds nothing looks like a check

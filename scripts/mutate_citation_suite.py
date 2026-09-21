@@ -325,6 +325,33 @@ MUTATIONS = [
      "    uniquely_matched = list(matched)",
      "an author_structure_mismatch occurrence must not count as matched"),
 
+    # --------------------------------------------------- rc3 B6 and D2
+
+    ("rc3 B6: the compact suffix list is out of the grammar again",
+     'YEAR = r"(?:1[5-9]|20)\\d{2}(?:[a-z](?:,[a-z])*)?|n\\.d\\."',
+     'YEAR = r"(?:1[5-9]|20)\\d{2}[a-z]?|n\\.d\\."',
+     "B6: 2019a,b expands to two occurrences"),
+
+    ("rc3 B6: the compact list matches but never expands",
+     "    m = COMPACT_YEAR.match(tok)\n    if not m:\n        return [norm_year(tok)]",
+     "    m = None\n    if not m:\n        return [norm_year(tok)]",
+     "B6: 2019a,b expands to two occurrences"),
+
+    ("rc3 B6: a bare year may take a suffix, so 2020,21 expands",
+     r'COMPACT_YEAR = re.compile(r"\A((?:1[5-9]|20)\d{2})([a-z])((?:,[a-z])+)\Z")',
+     r'COMPACT_YEAR = re.compile(r"\A((?:1[5-9]|20)\d{2})([a-z]?)((?:,[a-z])+)\Z")',
+     "B6: a base year with no suffix of its own is not a compact list"),
+
+    ("rc3 D2: the author-context restriction is dropped",
+     "        if not D2_AUTHOR_LEFT.search(before):\n            return m.group(0)",
+     "        if False:\n            return m.group(0)",
+     "D2 negative — no preceding author"),
+
+    ("rc3 D2: nothing is ever unwrapped",
+     "    return D2_MATH_YEARS.sub(repl, text)",
+     "    return text",
+     "D2: a year-only math span with an author before it is unwrapped"),
+
     ("rc3 B1b: the parenthetical detection site is closed again",
      "        inner = body[c1s + 1:c1e - 1]\n        cut = YEAR_RE.search(inner)",
      "        inner = body[c1s + 1:c1e - 1]\n        cut = None",

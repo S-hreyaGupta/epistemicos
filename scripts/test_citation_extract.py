@@ -1133,6 +1133,78 @@ def main() -> int:
     else:
         ok("an et_al mismatch is reported without forcing exit 1 on its own")
 
+    # -------------------------------------------- rc3 B6 and D2
+    print("\nrc3 B6 compact year-suffix, D2 math-wrapped years")
+
+    case("B6: 2019a,b expands to two occurrences",
+         "As shown (Sharma et al., 2019a,b) here.",
+         ["sharma|2019a", "sharma|2019b"])
+    case("B6: three suffixes expand to three",
+         "As shown (Sharma et al., 2019a,b,c) here.",
+         ["sharma|2019a", "sharma|2019b", "sharma|2019c"])
+    case("B6: the narrative form expands too",
+         "Sharma et al. (2019a,b) argue this.",
+         ["sharma|2019a", "sharma|2019b"])
+    # "Do not generalise to arbitrary year inference." A base with no suffix
+    # cannot take a bare one, which is what keeps an ordinary multi-year
+    # parenthetical out of the production.
+    case("B6: an ordinary multi-year list is not a compact suffix list",
+         "As shown (Smith, 2020, 2021) here.", ["smith|2020", "smith|2021"])
+    case("B6: a single suffixed year is unchanged",
+         "As shown (Smith, 2020a) here.", ["smith|2020a"])
+
+    if ce.expand_year("2019") != ["2019"] or ce.expand_year("n.d.") != ["nd"]:
+        failures.append("B6: expand_year leaves an ordinary year alone")
+    else:
+        ok("B6: expand_year leaves an ordinary year and n.d. alone")
+
+    # `BASE_YEAR SUFFIX ("," SUFFIX)+` requires the suffix ON THE BASE. A bare
+    # base followed by suffixes is not the production and must not expand.
+    # Pinned here rather than through a document because the grammar cannot
+    # build `2020,a` — a mutation making the base suffix optional was
+    # unreachable end to end and survived, which is how this control exists.
+    if ce.expand_year("2020,a") != ["2020,a"]:
+        failures.append(f"B6: a base year with no suffix of its own is not a "
+                        f"compact list — got {ce.expand_year('2020,a')}")
+    else:
+        ok("B6: a bare base year does not take a following suffix")
+
+    # D2's MATCH and its three NEGATIVEs, stated as rules rather than advice
+    # because "without the year-only and author-context restrictions, 'fix
+    # upstream' leaves the implementer to decide which math spans are
+    # citations, which is the discretion the rule exists to remove."
+    d2 = ce.unwrap_math_years
+    if d2(r"Additional work by Baron $(2012,2016)$ found.") != \
+            "Additional work by Baron (2012,2016) found.":
+        failures.append("D2: a year-only math span with an author before it "
+                        "is unwrapped")
+    else:
+        ok("D2: a year-only span with an author context is unwrapped")
+
+    for neg, why in [
+            (r"The model $(2012,2016) + x$ converged.", "span is not year-only"),
+            (r"We set $\alpha=0.96$ here.", "not a year list"),
+            (r"A standalone $(2014)$ sits here.", "no preceding author")]:
+        if d2(neg) != neg:
+            failures.append(f"D2 negative — {why}: {neg!r} was altered")
+            break
+    else:
+        ok("D2: all three of rc3's negatives are left alone")
+
+    # And the finding. D2 unwraps correctly and recovers nothing, because the
+    # form it produces is refused by the grammar D2 says it satisfies. Pinned
+    # as a control so that if the year-list production is ever widened, this
+    # says so out loud rather than a corpus number quietly moving.
+    cits, unres, _x = extract("Additional work by Baron (2012,2016) found.")
+    if keys(cits):
+        failures.append(f"the year-list production has been widened to accept "
+                        f"a comma with no whitespace. v3.3 §4 is "
+                        f"`(?:, WS YEAR)*`; if this is now intended, D2 is "
+                        f"worth its +3 and RC2-RC3-DISCREPANCIES.md #6 is "
+                        f"resolved. Got {keys(cits)}")
+    else:
+        ok("D2: the unwrapped form still does not parse — worth 0, not +3")
+
     print()
     if failures:
         for f in failures:

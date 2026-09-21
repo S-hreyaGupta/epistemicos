@@ -170,7 +170,11 @@ CORE_AFTER_PARTICLE = r"[A-Za-zÀ-þ][\w'’\-]+"
 # and broke `van der maas`, which needs two. The `*` is load-bearing.
 _LEAD = rf"(?:(?:{PARTICLE}){WS})+{CORE_AFTER_PARTICLE}|{CORE}"
 SURNAME = rf"(?:{_LEAD})"
-YEAR = r"(?:1[5-9]|20)\d{2}[a-z]?|n\.d\."
+# rc3 B6 admits `2019a,b` here so the GROUP matches; the expansion into
+# separate year tokens happens at record time via `expand_year`. The
+# suffix on the base is required before any bare suffix may follow, which
+# is what keeps `(Smith, 2020, 2021)` out of the production.
+YEAR = r"(?:1[5-9]|20)\d{2}(?:[a-z](?:,[a-z])*)?|n\.d\."
 INITIALS = r"[A-Z]\.(?:[- ]?[A-Z]\.)*"
 
 # rc3 B7, "`and colleagues`. Worth 4":
@@ -817,6 +821,28 @@ def norm_year(y: str) -> str:
     return "nd" if y == "n.d." else y
 
 
+# rc3 B6, worth 2, both in `ad1e3ff9` — which is gold paper 1, so this moves a
+# measured figure rather than a projected one.
+#
+#     2019a,b   →   2019a + 2019b
+#     BASE_YEAR SUFFIX ("," SUFFIX)+
+#
+# rc3 adds: "Deterministic expansion. Do not generalise to arbitrary year
+# inference." So `2019a,b` expands and `2019,20` does not — the production
+# requires a suffix on the base before any bare suffix can follow, which is
+# what keeps `(Smith, 2020, 2021)` out of it.
+COMPACT_YEAR = re.compile(r"\A((?:1[5-9]|20)\d{2})([a-z])((?:,[a-z])+)\Z")
+
+
+def expand_year(tok: str) -> list[str]:
+    """One year token in, one or more out. Only B6's shape expands."""
+    m = COMPACT_YEAR.match(tok)
+    if not m:
+        return [norm_year(tok)]
+    base, first, rest = m.groups()
+    return [base + first] + [base + s for s in rest.split(",") if s]
+
+
 def split_segments(inner: str) -> list[str]:
     """Top-level `;` split. Used only under the `segments` fix."""
     return [s for s in inner.split(";")]
@@ -874,6 +900,68 @@ ENVELOPE_OUT_NAMES = {"citation information"}
 
 
 MATH_SPAN = re.compile(r"\$[^$\n]{1,400}\$")
+
+
+# rc3 D2, `math_wrapped_year_parenthetical_unwrap_v1`. Worth 3 in-profile,
+# eight corpus-wide, and rc3 §J records it as normative and unimplemented.
+#
+#     MATCH      $ ( YEAR_LIST ) $
+#                where YEAR_LIST satisfies the citation year-list grammar in
+#                full, and the math span contains NOTHING else
+#     CONTEXT    an eligible narrative author expression immediately precedes
+#     ACTION     strip the enclosing $ delimiters. Nothing inside is altered.
+#     NEGATIVE   $(2012,2016) + x$   → no match, span is not year-only
+#                $\alpha=0.96$       → no match
+#                standalone $(2014)$ with no preceding author → no match
+#
+# rc3 on why the restrictions are part of the rule rather than advice:
+#
+#     Without the year-only and author-context restrictions, "fix upstream"
+#     leaves the implementer to decide which math spans are citations, which
+#     is the discretion the rule exists to remove.
+#
+# Same family as `\&` — Mathpix wrapping an ordinary parenthetical in math
+# mode — and applied at the same point, as a flag. rc3 §J requires both to run
+# before canonicalisation in ingest; neither does here, and that is the same
+# open item `\&` already carries rather than a new one.
+#
+# MEASURED: this recovers ZERO citations, and the reason is in D2 itself.
+#
+# The unwrap works — every corpus case is found and its `$` stripped. What it
+# produces is `Baron (2012,2016)`, and that does not parse:
+#
+#     v3.3 §4    CITE_NARR = AUTHORS_NARR WS \( WS? YEAR (?:, WS YEAR)* ...
+#     rc2 §6.2   prose only — "one or more YEAR_TOKEN values", separator
+#                unspecified
+#
+# `WS` after the comma is required, and `2012,2016` has none. D2 asserts the
+# span's contents "satisfy the citation year-list grammar in full" and then
+# says "Nothing inside is altered". Both cannot hold: the form D2 hands to the
+# parser is one the parser's own grammar refuses.
+#
+# So the transform is implemented faithfully and left worth 0, rather than
+# widening `(?:, WS YEAR)*` to make §I's +3 appear. Widening it would change
+# every citation in the corpus, not only the eight D2 touches, on the strength
+# of a clause rc3 does not contain. Recorded in RC2-RC3-DISCREPANCIES.md as
+# the sixth.
+D2_MATH_YEARS = re.compile(
+    r"\$\(\s*((?:1[5-9]|20)\d{2}(?:[a-z](?:,[a-z])*)?"
+    r"(?:\s*[,;]\s*(?:1[5-9]|20)\d{2}(?:[a-z](?:,[a-z])*)?)*)\s*\)\$")
+# "an eligible narrative author expression immediately precedes it" — the same
+# eligibility §6.1 uses to build a token run, checked on the token to the left.
+D2_AUTHOR_LEFT = re.compile(
+    rf"(?:[A-ZÀ-Þ][\w'’\-]+|et{WS}al\.|and{WS}colleagues|&"
+    rf"|(?:{PARTICLE}))[ \t]*\Z", re.U)
+
+
+def unwrap_math_years(text: str) -> str:
+    """rc3 D2. Strips the `$` around a year-only parenthetical with an author."""
+    def repl(m):
+        before = text[:m.start()]
+        if not D2_AUTHOR_LEFT.search(before):
+            return m.group(0)        # rc3's third negative: no author context
+        return "(" + m.group(1) + ")"
+    return D2_MATH_YEARS.sub(repl, text)
 
 
 def math_spans(body: str) -> list[tuple[int, int]]:
@@ -1187,9 +1275,10 @@ def _emit_narr(body, span_start, c1e, sent, heads, cits, unres, pat,
         _unres(body, span_start, c1e, "stopword_surname", sent, heads, unres)
         return
     years = YEAR_RE.findall(body[body.rindex("(", span_start, c1e):c1e])
-    for y in years:
-        _record(body, span_start, c1e, span_start, c1e, text, core, y,
-                "narrative", sent, heads, cits, author_phrase=authors)
+    for tok in years:
+        for y in expand_year(tok):
+            _record(body, span_start, c1e, span_start, c1e, text, core, y,
+                    "narrative", sent, heads, cits, author_phrase=authors)
 
 
 def _emit_segment(body, gs, ge, ss, se, seg_text, style, sent, heads, cits,
@@ -1225,9 +1314,10 @@ def _emit_segment(body, gs, ge, ss, se, seg_text, style, sent, heads, cits,
             return
         _unres(body, ss, se, "all_caps_surname", sent, heads, unres)
         return
-    for y in YEAR_RE.findall(rest[comma:] if comma > 0 else rest):
-        _record(body, gs, ge, ss, se, seg_text, core, y, style, sent, heads,
-                cits, author_phrase=authors)
+    for tok in YEAR_RE.findall(rest[comma:] if comma > 0 else rest):
+        for y in expand_year(tok):
+            _record(body, gs, ge, ss, se, seg_text, core, y, style, sent,
+                    heads, cits, author_phrase=authors)
 
 
 ET_AL_CITE = re.compile(r"\bet\s+al\.?|\band\s+colleagues\b", re.I)
@@ -1677,7 +1767,7 @@ def assemble_references(section: str, base: int):
 
 # ---------------------------------------------------------------- cli
 
-FIXES = ("ampersand", "segments", "colon", "cp")
+FIXES = ("ampersand", "segments", "colon", "cp", "mathyear")
 
 
 def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
@@ -1686,6 +1776,12 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     if "ampersand" in fixes:
         body = body.replace("\\&", "&")
         section = section.replace("\\&", "&")
+    if "mathyear" in fixes:
+        # rc3 §J fixes the order: ampersand first, then this. The two are
+        # independent — a year-only span contains no ampersand — but rc3 pins
+        # it anyway, "because two orders that happen to agree today are still
+        # two orders".
+        body = unwrap_math_years(body)
     sents = sentences(body)
 
     # rc2 §8 runs citation identity AFTER the bibliography, because authority

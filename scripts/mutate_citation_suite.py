@@ -352,6 +352,33 @@ MUTATIONS = [
      "    return text",
      "D2: a year-only math span with an author before it is unwrapped"),
 
+    # ------------------------------------------------ rc3 §C, citation errors
+
+    ("rc3 §C1: one record per DEFECT instead of per group",
+     '        if defects:\n            lv, nm, _, _ = section_stack_at(heads, c1s)',
+     '        for defects in [[d] for d in defects]:\n            lv, nm, _, _ = section_stack_at(heads, c1s)',
+     "§C1: ONE record per parenthetical group"),
+
+    ("rc3 §C: the comma-before-et-al shape is not a defect",
+     '    r"\\bet[ \\t]+al(?![.\\w])|\\bat[ \\t]+al\\.|,[ \\t]*et[ \\t]+al\\.", re.I)',
+     '    r"\\bet[ \\t]+al(?![.\\w])|\\bat[ \\t]+al\\.", re.I)',
+     "§C1: the Gualandris group carries two defects"),
+
+    ("rc3 §C2: the locator separator is matched case-sensitively",
+     r'ERR_LOCATOR_SEP = re.compile(r";[ \t]*(?:[Pp]{1,2}|[Pp]ara|[Cc]hap)\.[ \t]*\d")',
+     r'ERR_LOCATOR_SEP = re.compile(r";[ \t]*(?:p{1,2}|para|chap)\.[ \t]*\d")',
+     "§C2: the uppercase `P.` must be recognised"),
+
+    ("rc3 §C: nothing is ever reported as a citation error",
+     "    found = []\n    if ERR_ET_AL.search(group):",
+     "    found = []\n    if False and ERR_ET_AL.search(group):",
+     "§C1: the Gualandris group carries two defects"),
+
+    ("rc3 §C: the STOP guard is dropped, so `(See 2020)` is a defect",
+     '    if m and m.group(1).lower() not in STOP:',
+     '    if m:',
+     "§C: (See 2020) is not a citation error"),
+
     ("rc3 B1b: the parenthetical detection site is closed again",
      "        inner = body[c1s + 1:c1e - 1]\n        cut = YEAR_RE.search(inner)",
      "        inner = body[c1s + 1:c1e - 1]\n        cut = None",

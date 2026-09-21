@@ -1080,7 +1080,7 @@ def extract_citations(body: str, sents, heads, fixes: set[str],
     which is what it is today and the safe direction to be wrong in.
     """
     pat = build_patterns(fixes)
-    cits, unres, excl = [], [], []
+    cits, unres, excl, errs = [], [], [], []
     maths = math_spans(body)
 
     for c1s, c1e in c1_spans(body):
@@ -1090,6 +1090,24 @@ def extract_citations(body: str, sents, heads, fixes: set[str],
         if reason is not None:
             _excl(body, c1s, c1e, reason, sentence_of(sents, c1s), heads, excl)
             continue
+
+        # rc3 §C. Emitted here, once per group, BEFORE the grammar runs and
+        # regardless of what the grammar then does with it — the class is
+        # orthogonal to `candidate_state`, so the same group can be parsed and
+        # still carry an error. rc3 forbids only one combination: a malformed
+        # group is never `excluded_candidate`, which is why this sits after
+        # the exclusion check rather than before it.
+        defects = citation_errors(body[c1s:c1e])
+        if defects:
+            lv, nm, _, _ = section_stack_at(heads, c1s)
+            errs.append({
+                "type": "citation_error", "index": 0,
+                "diagnostic_class": "citation_error",
+                "scope": "parenthetical_group",
+                "text": body[c1s:c1e], "start": c1s, "end": c1e,
+                "defects": defects,
+                "section_level": lv, "section_name": nm,
+            })
 
         sent = sentence_of(sents, c1s)
         if sent is None:
@@ -1189,7 +1207,8 @@ def extract_citations(body: str, sents, heads, fixes: set[str],
     cits.sort(key=lambda r: (r["group_start"], r["segment_start"]))
     unres.sort(key=lambda r: r["start"])
     excl.sort(key=lambda r: r["start"])
-    return cits, unres, excl
+    errs.sort(key=lambda r: r["start"])
+    return cits, unres, excl, errs
 
 
 def _offset_of_token(body, c1_start, sent_start, toks, index):
@@ -1427,6 +1446,92 @@ def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
         "section_level": lv, "section_name": nm, "section_type": ty,
         "section_roles": rs,
     })
+
+
+# ------------------------------------------------- rc3 §C, citation errors
+#
+# A diagnostic class, not a limitation. rc3:
+#
+#     `citation_error` is ORTHOGONAL to `candidate_state`. A malformed group
+#     MAY be `parsed` or `unresolved_citation`, depending on whether a valid
+#     citation was extracted from it. It MUST NOT be `excluded_candidate` —
+#     malformed input is not correct refusal.
+#
+#     The grammar MUST NOT be loosened to accept these forms. The record names
+#     what is wrong so an author can fix it.
+#
+# And C1, which rc3 calls "the part a naive implementation gets wrong":
+#
+#     One `citation_error` record per parenthetical group, carrying a list of
+#     defects. NEVER one record per defect.
+#
+# The reason is the reader, not the schema. `(Gualandris, et al., 2024; p.56)`
+# has two defects; as two records an author sees two unrelated problems and
+# fixes neither.
+CITATION_ERROR_DEFECTS = (
+    "et_al_punctuation",           # 9   Whiteman et al, 2013 · Choi at al.
+    "wrong_locator_separator",     # 2   (Barbier, 2022; P.923)
+    "missing_comma_before_year",   # 2   (Lu and Shang 2017)
+    "non_numeric_year",            # 1   (Smith, Weed, & Ramsay, 2005-present)
+)
+
+# Three shapes, all `et_al_punctuation`:
+#   a missing period      Whiteman et al, 2013
+#   the `at` typo         Choi at al., 2001
+#   a comma before it     Gualandris, et al., 2024
+#
+# The third is rc3's own two-defect exemplar and was missed at first, because
+# `(Gualandris, et al., 2024; p.56)` has its period and reads as correct. The
+# defect is the comma between the surname and `et al.`, which APA does not
+# take. rc3 lists that group as carrying et_al_punctuation AND
+# wrong_locator_separator, and without this shape it carried only one — the
+# case rc3 uses to distinguish a case count from a defect count would have
+# been indistinguishable from the single-defect one.
+ERR_ET_AL = re.compile(
+    r"\bet[ \t]+al(?![.\w])|\bat[ \t]+al\.|,[ \t]*et[ \t]+al\.", re.I)
+# C2: "`p.56` with no space matches, so the semicolon is the SOLE locator
+# defect in both cases — one character." And: "`P.923` matches only because
+# the pattern is applied case-insensitively. That dependency is load-bearing
+# and should be explicit in the rule rather than inherited from a flag." So
+# the case-insensitivity is written here rather than carried by re.I over the
+# whole module.
+ERR_LOCATOR_SEP = re.compile(r";[ \t]*(?:[Pp]{1,2}|[Pp]ara|[Cc]hap)\.[ \t]*\d")
+# A year sitting directly after the author phrase with no comma. The word
+# before it must be capital-initial and not a STOP word, or the rule fires on
+# things that are not authors at all: `(running since 2005)` and the
+# `(2011, 2012, and 2013)` §F names as a non-citation year were both reported
+# before this narrowed, because `since` and `and` sit in the same position a
+# surname does.
+ERR_NO_COMMA_YEAR = re.compile(
+    r"(?<![,;])\b([A-ZÀ-Þ][\w'’\-]+)\)?[ \t]+(?:1[5-9]|20)\d{2}[a-z]?[ \t]*[);,]")
+# A year whose range end is not a year. rc3's instance is `2005-present`.
+ERR_NON_NUMERIC_YEAR = re.compile(
+    r"(?:1[5-9]|20)\d{2}[ \t]*[–—-][ \t]*(?!\d)[A-Za-z]")
+
+
+def citation_errors(group: str) -> list[str]:
+    """rc3 §C's defects for ONE parenthetical group, in declaration order.
+
+    Order is fixed rather than discovery order so two implementations emit the
+    same list for the same group, which §9's determinism claim needs.
+
+    Four of rc3's seven defect classes are detected. `wrong separator` (4),
+    `prose-embedded citation` (1) and `incomplete citation` (1) are named in
+    the table with an example apiece and no rule, and the same discipline
+    applies as to A2's undefined exclusion reasons: the vocabulary is kept and
+    nothing is emitted under it. See RC2-RC3-DISCREPANCIES.md.
+    """
+    found = []
+    if ERR_ET_AL.search(group):
+        found.append("et_al_punctuation")
+    if ERR_LOCATOR_SEP.search(group):
+        found.append("wrong_locator_separator")
+    m = ERR_NO_COMMA_YEAR.search(group)
+    if m and m.group(1).lower() not in STOP:
+        found.append("missing_comma_before_year")
+    if ERR_NON_NUMERIC_YEAR.search(group):
+        found.append("non_numeric_year")
+    return [d for d in CITATION_ERROR_DEFECTS if d in found]
 
 
 def _non_person_citation(body, gs, ge, ss, se, phrase, style, sent, heads,
@@ -1795,8 +1900,8 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
         r["reference_key"] for r in refs
         if r.get("author_kind") == "non_person" and r["reference_key"])
 
-    cits, unres, excl = extract_citations(body, sents, heads, fixes,
-                                          non_person_keys)
+    cits, unres, excl, errs = extract_citations(body, sents, heads, fixes,
+                                                non_person_keys)
 
     # §10 exit 2, computed on the body and the parse count.
     n = len(NUMCITE.findall(body)) + len(SUPCITE.findall(body))
@@ -1822,6 +1927,9 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     for i, x in enumerate(excl):
         x["index"] = i
         lines.append(x)
+    for i, e in enumerate(errs):
+        e["index"] = i
+        lines.append(e)
     for i, r in enumerate(refs):
         r["index"] = i
         lines.append(r)
@@ -1940,6 +2048,10 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                   "matched_works": len({c["citation_key"]
                                         for c in uniquely_matched}),
                   "author_structure_mismatches": len(mismatches),
+                  # rc3 §C partitions CASES, not defects: one record per
+                  # group, however many defects that group carries.
+                  "citation_error_cases": len(errs),
+                  "citation_error_defects": sum(len(e["defects"]) for e in errs),
                   "parsed": n_parsed,
                   "unresolved": n_unres,
                   "excluded": n_excl,

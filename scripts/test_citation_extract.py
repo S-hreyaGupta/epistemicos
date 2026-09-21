@@ -55,7 +55,7 @@ def extract(body_text: str, fixes=frozenset()):
     if "ampersand" in fixes:
         body = body.replace("\\&", "&")
     sents = ce.sentences(body)
-    return ce.extract_citations(body, sents, heads, set(fixes))
+    return ce.extract_citations(body, sents, heads, set(fixes))[:3]
 
 
 def keys(cits):
@@ -614,7 +614,7 @@ def main() -> int:
                         if r.get("author_kind") == "non_person"
                         and r["reference_key"])
         return (body,) + ce.extract_citations(body, sents, heads,
-                                              {"ampersand", "segments"}, npk)
+                                              {"ampersand", "segments"}, npk)[:3]
 
     def excluded(body_text, head=HEAD):
         return doc(body_text, head)[3]
@@ -1204,6 +1204,97 @@ def main() -> int:
                         f"resolved. Got {keys(cits)}")
     else:
         ok("D2: the unwrapped form still does not parse — worth 0, not +3")
+
+    # -------------------------------------------- rc3 §C, citation errors
+    print("\nrc3 §C — citation errors, a diagnostic class")
+
+    def errs_for(body_text, refs=REFS):
+        with _tf.TemporaryDirectory() as td:
+            p = Path(td) / "paper.md"
+            p.write_text(HEAD + body_text + refs, encoding="utf-8")
+            lines, _c = ce.run(p, {"ampersand", "segments"})
+        return [l for l in lines if l.get("type") == "citation_error"], lines
+
+    # rc3's two exemplars, and the pair is what distinguishes a case count
+    # from a defect count.
+    e, lines = errs_for("As shown (Gualandris, et al., 2024; p.56) here.")
+    if len(e) != 1:
+        failures.append(f"§C1: ONE record per parenthetical group, never one "
+                        f"per defect — got {len(e)} records")
+    elif e[0]["defects"] != ["et_al_punctuation", "wrong_locator_separator"]:
+        failures.append(f"§C1: the Gualandris group carries two defects — "
+                        f"got {e[0]['defects']}")
+    elif e[0]["scope"] != "parenthetical_group":
+        failures.append("§C1: scope is the parenthetical group")
+    else:
+        ok("§C1: one record per group, two defects listed, group-scoped")
+
+    e, lines = errs_for("As shown (Barbier, 2022; P.923) here.")
+    cit = [l for l in lines if l.get("type") == "citation"]
+    if len(e) != 1 or e[0]["defects"] != ["wrong_locator_separator"]:
+        failures.append(f"§C: the Barbier group carries ONE defect — got "
+                        f"{[x['defects'] for x in e]}")
+    elif not cit:
+        failures.append("§C: `citation_error` is ORTHOGONAL to "
+                        "candidate_state — Barbier parses AND carries an "
+                        "error, and here it did not parse")
+    else:
+        ok("§C: Barbier parses and still carries one error — orthogonal axes")
+
+    # C2 names the case-insensitivity as load-bearing: `P.923` is only a
+    # locator because the pattern ignores case.
+    if not ce.citation_errors("(Barbier, 2022; P.923)"):
+        failures.append("§C2: the uppercase `P.` must be recognised; C2 calls "
+                        "that dependency load-bearing")
+    else:
+        ok("§C2: an uppercase locator is recognised, as C2 requires")
+
+    for text, want in [
+            ("(Whiteman et al, 2013)", "et_al_punctuation"),
+            ("(Choi at al., 2001)", "et_al_punctuation"),
+            ("(Lu and Shang 2017)", "missing_comma_before_year"),
+            ("(Smith, Weed, & Ramsay, 2005-present)", "non_numeric_year")]:
+        got = ce.citation_errors(text)
+        if want not in got:
+            failures.append(f"§C: {text} should carry {want} — got {got}")
+            break
+    else:
+        ok("§C: each of rc3's named defect shapes is detected")
+
+    # The negatives. A well-formed group carries no error, and the two that
+    # fired before the rule was narrowed stay quiet.
+    # The last three are the ones that fired before the rule was narrowed.
+    # `since` and `and` are excluded by the capital-initial requirement;
+    # `See` and `Table` are capitalised and need the STOP guard, which is a
+    # separate mechanism and is why both appear here.
+    for clean in ["(Smith et al., 2020)", "(Smith, 2020, p. 14)",
+                  "(running since 2005)", "(2011, 2012, and 2013)",
+                  "(See 2020)", "(Table 2020)"]:
+        if ce.citation_errors(clean):
+            failures.append(f"§C: {clean} is not a citation error — got "
+                            f"{ce.citation_errors(clean)}")
+            break
+    else:
+        ok("§C: well-formed groups, stop words and non-author years are clean")
+
+    # "The grammar MUST NOT be loosened to accept these forms."
+    cits, unres, _x = extract("As shown (Lu and Shang 2017) here.")
+    if keys(cits):
+        failures.append(f"§C: the grammar was loosened to accept a malformed "
+                        f"form; rc3 forbids it. Got {keys(cits)}")
+    else:
+        ok("§C: naming the defect did not loosen the grammar")
+
+    # And the defect list is ordered by declaration, not by discovery, so two
+    # implementations emit the same list for the same group.
+    if ce.citation_errors("(Gualandris, et al., 2024; p.56)") != \
+            ce.citation_errors("(Gualandris, et al., 2024; p.56)"):
+        failures.append("§C: the defect list must be deterministic")
+    elif ce.CITATION_ERROR_DEFECTS.index("et_al_punctuation") > \
+            ce.CITATION_ERROR_DEFECTS.index("wrong_locator_separator"):
+        failures.append("§C: defects are listed in declaration order")
+    else:
+        ok("§C: the defect list is in declaration order, not discovery order")
 
     print()
     if failures:

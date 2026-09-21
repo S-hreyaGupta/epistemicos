@@ -73,7 +73,7 @@ def run(mod, raw: bytes):
     if "ampersand" in FIXES:
         body = body.replace("\\&", "&")
         section = section.replace("\\&", "&")
-    cits, unres, _excl = mod.extract_citations(
+    cits, unres, _excl, _errs = mod.extract_citations(
         body, mod.sentences(body), heads, set(FIXES))
     return body, section, cits, unres
 

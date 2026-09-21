@@ -227,6 +227,57 @@ side by side show they are different things.
 
 ---
 
+## 8. rc3 §A2 closes a set on two members that no document defines. DECIDED.
+
+`leading_gloss` (11) and `conversion_artifact` (3) are 14 of A2's 30
+exclusions. Each appears **exactly once in the entire specification set**: in
+A2's own table, carrying a count and no rule.
+
+```text
+leading_gloss        0 occurrences in rc1, 0 in all five rc2 files
+conversion_artifact  0 occurrences in rc1, 0 in all five rc2 files
+```
+
+The other four reasons are defined and implemented. These two cannot be, so
+nothing classifies into them and their spans fall to `unresolved_citation`
+instead. That is not cosmetic: by A5, `excluded` leaves the extraction
+denominator and `unresolved` stays in it, so spans rc3 calls correct refusals
+are scored as parser failures. The parse rate is conservative rather than
+wrong, which is the safer direction, but it is off.
+
+**What the recovered August implementation settles.** `impl_v34.py`, recovered
+21 September and hashing to the `50077031…` its own corpus run recorded, has no
+candidate-exclusion machinery at all — no `excluded`, no `candidate_state`, and
+none of the six reason names. So A2's counts were never produced by the
+extractor. `CITATION_RESIDUAL_142.md` says what produced them:
+
+> Treat these as indicative. The classification is a heuristic pass and the 45
+> are subject to gold adjudication; it is evidence that the gold set is the
+> highest-value remaining item, not a substitute for one.
+
+That applies to all six counts, not only the two without rules.
+`GSD-FOLDER-RECOVERY.md` has the detail, including a candidate definition for
+`leading_gloss` reconstructed from the residual evidence.
+
+```text
+Decision ID   CIT-EXCL-01
+Decided       Alex Zamurko, 21 September 2026, in WhatsApp
+Decision      (a) both names STAY in rc3's closed set, marked undefined and
+              unimplementable until X-08 lands. They do not move into X-08's
+              scope and the set is not reduced to four.
+              Deferred for now; no code change follows.
+consequence   A2 remains a closed set of six of which four are actionable. The
+              14 spans stay in unresolved_citation and stay in the denominator.
+for the consolidation   carry A2 through unchanged, with the two members
+              annotated as awaiting definition. Revisit when X-08 lands.
+```
+
+Still genuinely open, and not covered by this decision: what
+`leading_gloss` would mean once someone does define it. The candidate
+definition has evidence behind it; `conversion_artifact` has none.
+
+---
+
 ## A measurement note, not a discrepancy: "worth" counts occurrences
 
 rc3 B6 is "Worth 2". Implemented, it recovers **4 occurrences and 0 works**.
@@ -261,6 +312,8 @@ fourteen papers and looking at what came out:
 5  found by a conformance case producing an unresolved citation
 6  found by a transform working perfectly and recovering nothing
 7  found by rc2's register arriving and saying something else
+8  found by implementing four of six reasons and having nothing to write
+   for the other two
 ```
 
 Number 3 is the one to dwell on. A check that finds nothing looks like a check

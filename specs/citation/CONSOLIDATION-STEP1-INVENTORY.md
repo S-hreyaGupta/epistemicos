@@ -78,15 +78,25 @@ pre-rc1 three-additions       SUPERSEDED        21 Aug. rc1 absorbed every
                                                 it establishes rc1's scope
 rc1 architecture              SUPERSEDED by rc2 same spec_id, revision 1
 rc1 execution conformance     SUPERSEDED by rc2 same spec_id, revision 1
-rc1 conformance matrix        SUPERSEDED?       no rc2 counterpart IN HAND
-rc1 deferred-work register    SUPERSEDED?       no rc2 counterpart IN HAND
+rc1 conformance matrix        SUPERSEDED by rc2 rc2's has 86 cases to rc1's set
+rc1 deferred-work register    SUPERSEDED by rc2 X-01..X-14, same titles
 rc2 architecture              CURRENT           candidate_revision: 2,
                                                 content_state: review_candidate,
                                                 frozen_at: null
 rc2 execution conformance     CURRENT           as above
+rc2 conformance matrix        CURRENT           binds to 4a60b994… and
+                                                4fa95af1…, which are this
+                                                repository's 01 and 02
+rc2 deferred-work register    CURRENT           X-07 and X-08 are load-bearing
+                                                for discrepancies 2 and 7
+rc2 GSD pilot contract        CURRENT           pilot scope boundary
 rc3 amendments                CURRENT           amendment set over rc2, frozen
                                                 3 September per the records
 ```
+
+All four rc1 files are superseded. rc1 is history, not a source for the
+consolidation, and the only reason to open it now is to check what rc2
+changed.
 
 `rc2 REVISES rc1` is established rather than inferred: rc2's two files carry
 rc1's own `spec_id` values at `candidate_revision: 2`. That answers the question

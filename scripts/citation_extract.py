@@ -1230,6 +1230,74 @@ def _emit_segment(body, gs, ge, ss, se, seg_text, style, sent, heads, cits,
                 cits, author_phrase=authors)
 
 
+ET_AL_CITE = re.compile(r"\bet\s+al\.?|\band\s+colleagues\b", re.I)
+# A visible surname inside a citation's author phrase: particles, then a core,
+# and NOT one of the joiners or `et al.` itself.
+VISIBLE_UNIT = re.compile(
+    rf"(?:(?:{PARTICLE}){WS})*[A-ZÀ-Þ][\w'’\-]+", re.U)
+
+
+def person_form(phrase: str):
+    """rc2 §6.7. Returns (author_form, visible_authors, constraint) or Nones.
+
+    §6.7 applies "when the source citation author syntax fully matches the
+    person grammar", so a non-person candidate gets three nulls — rc2 says so
+    in terms, and a constraint on an organisation would be meaningless.
+
+    Normalization is rc2's: lowercase, internal whitespace collapsed to one
+    ASCII space, PARTICLES RETAINED. The last clause matters. `van der maas`
+    and `maas` are different authors, and dropping the particle here while
+    keeping it in the identity key would make the structure check disagree
+    with the key built from the same phrase.
+    """
+    if not phrase:
+        return None, None, None
+    et_al = bool(ET_AL_CITE.search(phrase))
+    stem = ET_AL_CITE.split(phrase)[0] if et_al else phrase
+    # Comma, `&` and `and` all separate authors. Splitting on the joiners
+    # alone read `Smith, Jones, and Brown` as two authors, which is worse than
+    # useless: it would report a count mismatch against a correct three-author
+    # reference.
+    # The comma-then-joiner form has to be consumed as ONE separator, longest
+    # alternative first. Splitting on the comma alone left `and Brown` as a
+    # part, which failed to consume and turned every serial list into a null.
+    parts = [p.strip() for p in re.split(
+        r"\s*,\s*(?:and|&)\s+|\s*,\s*|\s*&\s*|\s+and\s+", stem, flags=re.I)]
+    visible = []
+    for part in parts:
+        if not part or re.fullmatch(r"(?:[A-Z]\.\s*)+", part):
+            continue          # a stray initial, not a surname
+        m = VISIBLE_UNIT.fullmatch(part)
+        if not m:
+            # rc2's discipline from §7.4, applied on this side: a part that
+            # does not fully consume as one surname means the list is not
+            # confidently derivable, so there is NO structure rather than a
+            # partial one. `El Akremi et al.` lands here — a compound surname
+            # rc3 B1a would express and this implementation does not — and a
+            # partial `['el']` would have produced a false mismatch against a
+            # correct reference. rc2 is explicit that a false mismatch is
+            # worse than no check, because it teaches a reviewer to ignore
+            # the field.
+            return None, None, None
+        # rc2 §6.8 strips the possessive "only when deriving a person identity
+        # candidate surname". `visible_authors` is §6.7 and is not named
+        # there, so the literal reading leaves it attached — and that reading
+        # produced nine false mismatches on this corpus, every one of the
+        # shape `["tepper's"]` against a reference `['tepper']`. A citation
+        # written `Tepper's (2000)` is the same author as `Tepper`, and a
+        # check that cannot pass on a correct pair is the false mismatch rc2
+        # says is worse than no check at all. These ARE surnames used for
+        # identity comparison, so §6.8 applies to them.
+        visible.append(POSSESSIVE.sub(
+            "", re.sub(r"\s+", " ", m.group(0)).strip()).lower())
+    if not visible:
+        return None, None, None
+    if et_al:
+        return "et_al", visible, {"kind": "minimum",
+                                  "value": ET_AL_MIN_AUTHORS}
+    return "exact", visible, {"kind": "exact", "value": len(visible)}
+
+
 def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
             cits, author_phrase="", author_kind="person"):
     s_start, s_end, s_content_end = sent
@@ -1251,6 +1319,11 @@ def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
         # author_phrase mandatory for the same reason, so this is forward
         # compatible rather than an invention.
         "author_phrase": re.sub(r"\s+", " ", author_phrase).strip(),
+        # rc2 §6.7. Null for a non-person candidate, per the section's own
+        # last line.
+        **dict(zip(("author_form", "visible_authors", "author_count_constraint"),
+                   person_form(author_phrase)
+                   if author_kind == "person" else (None, None, None))),
         "candidate_state": "parsed",
         "citation_group": body[gs:ge], "citation_segment": seg_text,
         "citation_key": key, "author_kind": author_kind,
@@ -1384,10 +1457,88 @@ def reference_author_head(assembled: str):
         if not YEAR_RE.search(rest[:close_at + 1]):
             continue
         head = assembled[:m.start()].rstrip()
-        if head.endswith("."):          # "one trailing period removed"
+        # rc2 §7.4: "with one trailing period removed". Taken literally that
+        # rule defeats rc2's own primary path, and this was found by running
+        # it rather than by reading it: only 1 of 1036 corpus references
+        # produced an author list.
+        #
+        #     `Bartko, J. (1976).`  head -> `Bartko, J.`  -> strip -> `Bartko, J`
+        #     rc2 §2: INITIALS = \p{Lu}\.(?:[- ]?\p{Lu}\.)*
+        #
+        # The period that was removed IS the initial, so the person unit
+        # `SURNAME, WS INITIALS` can never match and every person reference
+        # falls through to the non-person branch. rc2 §7.4 also says the list
+        # must consume the head "after ordinary separator punctuation
+        # normalization", which may be where the original intended to resolve
+        # this, but that phrase is nowhere defined.
+        #
+        # So the period is removed only when it does not belong to an initial.
+        # `World Bank.` still loses it, which is the case the rule exists for.
+        if head.endswith(".") and not re.search(r"(?:^|[ \-])[A-ZÀ-Þ]\.$", head):
             head = head[:-1]
         return head.rstrip()
     return None
+
+
+# ------------------------------------- rc2 §6.7 / §7.4 / §9.3, author structure
+#
+# The defect this closes, in rc2's own framing and measured here on 21
+# September: §8 reconciles on `surname|year` and discards everything else the
+# in-text form asserts. `Smith et al. (2020)` asserts a work with three or more
+# authors; a reference reading `Smith, J. (2020).` has the identical key and
+# matches cleanly. Two different works, and nothing in the output says so.
+#
+# 790 of this corpus's 2094 citations carry `et al.` or `and colleagues`, so
+# the form is not rare. The check is what is missing, not the cases.
+#
+# rc2 §1.1 pins the constant rather than leaving it to the implementation,
+# because older APA and several other styles begin `et al.` at a different
+# author and an implementation that picks its own value produces different
+# output from the same bytes.
+ET_AL_MIN_AUTHORS = 3
+
+# rc2 §7.4's person unit: SURNAME, WS INITIALS, separated by comma, `&` or
+# `and`, and it must consume the entire head. Anything less is not a
+# confidently derivable list, and rc2 says a null "takes no part in the check"
+# — a false mismatch against a pair that genuinely matched is worse than no
+# check at all, because it teaches a reviewer to ignore the field.
+_PERSON_UNIT = rf"(?:(?:{PARTICLE})[ ])*{CORE},[ ]{INITIALS}"
+PERSON_LIST_UNIT = re.compile(_PERSON_UNIT, re.I | re.U)
+# `and` MUST be followed by whitespace. Written first as `(?:&|and)\s*`, which
+# let the joiner glue onto the next name: `Faems, D., De Visser, M., Andries,
+# P.` split as `... and` + `ries, P.` and reported `ries` as an author. It then
+# disagreed with the citation's `andries` and emitted a mismatch that was
+# entirely this regex's doing. `&` needs no such guard.
+PERSON_LIST_SEP = re.compile(
+    r"\A\s*(?:,\s*&\s*|,\s*and\s+|,\s*|\s*&\s*|\s+and\s+)", re.I)
+
+
+def reference_authors(head: str):
+    """rc2 §7.4's ordered surname list, or None when not confidently derivable.
+
+    None is a deliberate output, not a failure to try. rc2 reaches it for a
+    full-forename reference such as `Smith, John. (2020).` and for any entry
+    whose author field contains `et al.` itself, and in both cases the entry
+    takes no part in author-structure validation.
+    """
+    if head is None or re.search(r"\bet\s+al", head, re.I):
+        return None
+    out, pos = [], 0
+    while pos < len(head):
+        m = PERSON_LIST_UNIT.match(head, pos)
+        if not m:
+            return None
+        got = m.group(0)
+        out.append(re.sub(r"\s+", " ", got[:got.index(",")]).strip().lower())
+        pos = m.end()
+        if pos >= len(head):
+            break
+        sep = PERSON_LIST_SEP.match(head[pos:])
+        if not sep:
+            return None
+        pos += sep.end()
+    # "it must consume the entire reference_author_head"
+    return out or None
 
 
 def non_person_head(head: str):
@@ -1427,8 +1578,13 @@ def assemble_references(section: str, base: int):
         # holds several words.
         author_kind = "person" if surname else None
         label = None
+        head = reference_author_head(assembled)
+        # rc2 §7.4: the ordered list where it is derivable, null otherwise. It
+        # is what §9.3 compares the in-text form against, and a null is not a
+        # gap — it is the entry declining to take part.
+        authors = reference_authors(head) if surname else None
         if not surname:
-            label = non_person_head(reference_author_head(assembled))
+            label = non_person_head(head)
             if label and year:
                 author_kind = "non_person"
 
@@ -1461,6 +1617,8 @@ def assemble_references(section: str, base: int):
             "type": "reference", "index": 0, "assembled": assembled,
             "reference_key": ref_key,
             "author_kind": author_kind,
+            "authors": authors,
+            "author_count": len(authors) if authors else None,
             "surname": surname, "year": year, "start": start, "end": end,
             "validation_state": "suspect" if reasons else "ok",
             "suspect_reasons": reasons,
@@ -1582,6 +1740,55 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
             cite_keys.append(c["citation_key"])
     matched = [c for c in cits if c["citation_key"] in keyed]
 
+    # rc2 §9.3. The check that was missing, and the reason `Smith et al.
+    # (2020)` and a one-author `Smith, J. (2020).` have been matching cleanly.
+    #
+    #     exact  passes iff reference.author_count == len(visible_authors)
+    #            AND reference.authors[i] == visible_authors[i] for every i
+    #     et_al  passes iff reference.author_count >= ET_AL_MIN_AUTHORS
+    #            AND reference.authors[i] == visible_authors[i] for every
+    #            visible i
+    #
+    # The et_al rule compares every visible author, not only the first, so
+    # `Smith, Jones, et al. (2020)` is checked on both.
+    by_key = {}
+    for r in refs:
+        if r["reference_key"] and r.get("authors"):
+            by_key.setdefault(r["reference_key"], r)
+
+    mismatches = []
+    for c in cits:
+        ref = by_key.get(c["citation_key"])
+        vis = c.get("visible_authors")
+        # "For person citations with NON-NULL person-form data and a matched
+        # reference with NON-NULL authors/author_count." A null on either side
+        # takes no part, which is rc2's protection against a confident wrong
+        # answer from a fragile parse.
+        if ref is None or not vis or c.get("author_kind") != "person":
+            continue
+        ra, rn = ref["authors"], ref["author_count"]
+        if c["author_form"] == "exact":
+            count_ok = rn == len(vis)
+        else:
+            count_ok = rn >= ET_AL_MIN_AUTHORS
+        order_ok = all(i < len(ra) and ra[i] == v for i, v in enumerate(vis))
+        if count_ok and order_ok:
+            continue
+        # rc2: "If count and order both fail, failed=count." Which half failed
+        # is the whole point of the field — `Smith & Jones` against
+        # Smith-and-Brown and `Smith & Jones` against three authors are
+        # different faults with different repairs.
+        mismatches.append({
+            "type": "author_structure_mismatch", "index": 0,
+            "citation_index": c["index"] if "index" in c else None,
+            "citation_key": c["citation_key"],
+            "citation_author_form": c["author_form"],
+            "visible_authors": vis,
+            "author_count_constraint": c["author_count_constraint"],
+            "reference_authors": ra, "reference_author_count": rn,
+            "failed": "count" if not count_ok else "order",
+        })
+
     # rc3 A5, normative:
     #
     #     detected_candidates    = parsed + unresolved + excluded
@@ -1606,11 +1813,37 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     # — segment splitting turns one failed parenthesis into several failed
     # segments, so absolute counts survive detection changes and rates do not.
     # Both are emitted; the counts are the ones to compare across runs.
+    for i, m in enumerate(mismatches):
+        m["index"] = i
+        lines.append(m)
+
+    # Alex Zamurko, 20 September, amending rc2:
+    #
+    #     A citation is `unique_reference_match` only when exactly one
+    #     bibliography entry matches the citation identity AND all applicable
+    #     author-structure checks pass. [...] `author_structure_mismatch`
+    #     occurrences MUST NOT contribute to `uniquely_matched_occurrences`
+    #     or `uniquely_matched_works`.
+    #
+    # rc2 §9.3 says the opposite about identity — "a unique exact key match
+    # remains an established identity even if author-structure validation
+    # emits a mismatch" — and the two are compatible. The identity stands; the
+    # match does not count as unique. So the key is kept and the occurrence is
+    # subtracted from the matched counts rather than erased.
+    mismatched_keys = {m["citation_key"] for m in mismatches}
+    uniquely_matched = [c for c in matched
+                        if c["citation_key"] not in mismatched_keys]
+
     n_parsed, n_unres, n_excl = len(cits), len(unres), len(excl)
     denom = n_parsed + n_unres
     lines.append({"type": "summary",
-                  "matched_occurrences": len(matched),
-                  "matched_works": len({c["citation_key"] for c in matched}),
+                  # v3.3's fields keep v3.3's meaning. rc2 renames them
+                  # `uniquely_matched_*`, which is the consolidation's change
+                  # to make, not this one's.
+                  "matched_occurrences": len(uniquely_matched),
+                  "matched_works": len({c["citation_key"]
+                                        for c in uniquely_matched}),
+                  "author_structure_mismatches": len(mismatches),
                   "parsed": n_parsed,
                   "unresolved": n_unres,
                   "excluded": n_excl,
@@ -1622,7 +1855,15 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                       r: sum(1 for x in excl if x["excluded_reason"] == r)
                       for r in EXCLUDED_REASONS
                       if any(x["excluded_reason"] == r for x in excl)},
-                  "exit": 0 if len(matched) == len(cits) and not unres else 1})
+                  # rc2 §9.3: "An `exact` mismatch forces exit 1. An `et_al`
+                  # mismatch is reported but does not by itself force exit 1
+                  # in v3.4." The split is deliberate — an exact mismatch is
+                  # wrong in every style, while et_al depends on
+                  # ET_AL_MIN_AUTHORS and is style-dependent.
+                  "exit": 0 if (len(uniquely_matched) == len(cits)
+                                and not unres
+                                and not any(m["citation_author_form"] == "exact"
+                                            for m in mismatches)) else 1})
     return lines, lines[-1]["exit"]
 
 

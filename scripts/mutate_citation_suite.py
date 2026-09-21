@@ -214,14 +214,13 @@ MUTATIONS = [
      "    if False:\n        return None",
      "rc2 §7.4: no comma, at least one letter, non-empty"),
 
-    ("rc2 §7.4: the head keeps its trailing period",
-     '        if head.endswith("."):          # "one trailing period removed"\n'
+    ("rc2 §7.4: the head never drops its trailing period",
      "            head = head[:-1]",
-     '        if False:\n            head = head[:-1]',
+     "            pass",
      "rc2 §7.4: the head stops at the year paren, one period removed"),
 
     ("rc2 §7.4: the reference side never takes the non-person path",
-     "            label = non_person_head(reference_author_head(assembled))",
+     "            label = non_person_head(head)",
      "            label = None",
      "rc2 §7.4: an institutional reference entry is keyed, not refused"),
 
@@ -242,6 +241,69 @@ MUTATIONS = [
     # could not be reached by any control, fired zero times across the corpus,
     # and was removed from the extractor rather than left as a branch nothing
     # tests. The probe earning a deletion is the point of it.
+
+    # ------------------------- rc2 §6.7 / §9.3, author-structure coherence
+    #
+    # Two of these model defects that were actually present and found by
+    # running the check rather than reading the spec: the trailing period that
+    # is an initial, and the `and` separator gluing onto a surname. Both
+    # produced silently wrong output, and one of them produced a confident
+    # wrong mismatch, which is the failure rc2 says is worse than no check.
+
+    ("rc2 §9.3: the structure check never runs",
+     "        if ref is None or not vis or c.get(\"author_kind\") != \"person\":\n"
+     "            continue",
+     "        if True:\n            continue",
+     "§9.3: exact fails on count"),
+
+    ("rc2 §9.3: et al. is compared as a count, not a minimum",
+     "            count_ok = rn >= ET_AL_MIN_AUTHORS",
+     "            count_ok = rn == len(vis)",
+     "§9.3: et_al passes against three authors"),
+
+    ("rc2 §9.3: order is never checked",
+     "        order_ok = all(i < len(ra) and ra[i] == v for i, v in enumerate(vis))",
+     "        order_ok = True",
+     "§9.3: exact fails on order"),
+
+    ("rc2 §9.3: order wins over count when both fail",
+     '            "failed": "count" if not count_ok else "order",',
+     '            "failed": "order" if not order_ok else "count",',
+     "§9.3: exact fails on count — got ['order']"),
+
+    ("rc2 §1.1: ET_AL_MIN_AUTHORS is chosen by the implementation",
+     "\nET_AL_MIN_AUTHORS = 3\n",
+     "\nET_AL_MIN_AUTHORS = 2\n",
+     "§9.3: et_al fails below ET_AL_MIN_AUTHORS"),
+
+    ("rc2 §7.4: the trailing period is stripped even from an initial",
+     '        if head.endswith(".") and not re.search(r"(?:^|[ \\-])[A-ZÀ-Þ]\\.$", head):',
+     '        if head.endswith("."):',
+     "rc2 §7.4: a trailing period that IS an initial must survive"),
+
+    ("rc2 §7.4: the `and` separator glues onto the next surname",
+     r'    r"\A\s*(?:,\s*&\s*|,\s*and\s+|,\s*|\s*&\s*|\s+and\s+)", re.I)',
+     r'    r"\A\s*(?:,\s*(?:&|and)\s*|,\s*|\s*&\s*|\s+and\s+)", re.I)',
+     "the `and` separator consumed the start of a surname"),
+
+    ("rc2 §6.8: the possessive is compared against the bare surname",
+     "        visible.append(POSSESSIVE.sub(\n"
+     '            "", re.sub(r"\\s+", " ", m.group(0)).strip()).lower())',
+     '        visible.append(re.sub(r"\\s+", " ", m.group(0)).strip().lower())',
+     "§6.8: the possessive is stripped before comparison"),
+
+    ("rc2 §7.4: a reference list is guessed rather than refused",
+     "        m = PERSON_LIST_UNIT.match(head, pos)\n        if not m:\n"
+     "            return None",
+     "        m = PERSON_LIST_UNIT.match(head, pos)\n        if not m:\n"
+     "            break",
+     "a list that parses partway must yield nothing, not a partial list"),
+
+    ("Alex Zamurko: a mismatched occurrence still counts as matched",
+     "    uniquely_matched = [c for c in matched\n"
+     '                        if c["citation_key"] not in mismatched_keys]',
+     "    uniquely_matched = list(matched)",
+     "an author_structure_mismatch occurrence must not count as matched"),
 
     ("rc3 B1b: the parenthetical detection site is closed again",
      "        inner = body[c1s + 1:c1e - 1]\n        cut = YEAR_RE.search(inner)",

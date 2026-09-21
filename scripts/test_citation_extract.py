@@ -918,6 +918,221 @@ def main() -> int:
     else:
         ok("rc2 §7.4: an institutional reference entry is keyed, not refused")
 
+    # --------------------------- rc2 §6.7 / §9.3, author-structure coherence
+    #
+    # The check that was missing. §8 reconciled on `surname|year` and threw
+    # away everything else the in-text form asserts, so `Smith et al. (2020)`
+    # and a one-author `Smith, J. (2020).` matched cleanly. 790 of this
+    # corpus's 2094 citations carry the et al. form, so it is the check that
+    # was rare, not the cases.
+
+    print("\nrc2 §6.7 / §9.3 — author-structure coherence")
+
+    import tempfile as _tf
+
+    def run_doc(body_text, refs):
+        with _tf.TemporaryDirectory() as td:
+            p = Path(td) / "paper.md"
+            p.write_text(HEAD + body_text + refs, encoding="utf-8")
+            return ce.run(p, {"ampersand", "segments"})
+
+    def mism(body_text, refs):
+        lines, _code = run_doc(body_text, refs)
+        return [l for l in lines
+                if l.get("type") == "author_structure_mismatch"]
+
+    R2 = ("\n\n## References\n\nSmith, J., & Brown, K. (2020). A paper. "
+          "Journal, 1(1), 1-10.\n")
+    R1 = ("\n\n## References\n\nSmith, J. (2020). A paper. Journal, "
+          "1(1), 1-10.\n")
+    R3 = ("\n\n## References\n\nSmith, J., Brown, K., & Davis, L. (2020). "
+          "A paper. Journal, 1(1), 1-10.\n")
+
+    # §6.7, the fields themselves.
+    f, v, c = ce.person_form("Smith & Jones")
+    if (f, v, c) != ("exact", ["smith", "jones"],
+                     {"kind": "exact", "value": 2}):
+        failures.append(f"§6.7: exact form, visible authors and constraint — "
+                        f"got {(f, v, c)}")
+    else:
+        ok("§6.7: exact form carries its visible authors and count")
+
+    f, v, c = ce.person_form("Smith et al.")
+    if (f, v, c) != ("et_al", ["smith"],
+                     {"kind": "minimum", "value": ce.ET_AL_MIN_AUTHORS}):
+        failures.append(f"§6.7: et al. is a MINIMUM constraint of "
+                        f"ET_AL_MIN_AUTHORS — got {(f, v, c)}")
+    else:
+        ok("§6.7: et al. is a minimum constraint, not a count")
+
+    # Particles retained, which rc2 states and which matters because the
+    # identity key retains them too. Dropping them on one side only would make
+    # the structure check disagree with the key built from the same phrase.
+    _f, v, _c = ce.person_form("van der Maas & de Vries")
+    if v != ["van der maas", "de vries"]:
+        failures.append(f"§6.7: normalization retains particles — got {v}")
+    else:
+        ok("§6.7: particles are retained in visible_authors")
+
+    # §9.3's two rules, each way round.
+    if mism("As shown (Smith & Brown, 2020) here.", R2):
+        failures.append("§9.3: exact passes when count and order agree — a "
+                        "correct pair emitted a mismatch")
+    else:
+        ok("§9.3: exact passes when count and order agree")
+
+    m = mism("As shown (Smith & Brown, 2020) here.", R1)
+    if not m or m[0]["failed"] != "count":
+        failures.append(f"§9.3: exact fails on count — got "
+                        f"{[x['failed'] for x in m]}")
+    else:
+        ok("§9.3: exact fails on count against a one-author reference")
+
+    m = mism("As shown (Smith & Jones, 2020) here.", R2)
+    if not m or m[0]["failed"] != "order":
+        failures.append(f"§9.3: exact fails on order — two authors each side "
+                        f"and the second differs, got "
+                        f"{[x['failed'] for x in m]}")
+    else:
+        ok("§9.3: exact fails on order when the second author differs")
+
+    # "If count and order both fail, failed=count."
+    m = mism("As shown (Jones & Davis & Lee, 2020) here.", R2)
+    if m and m[0]["failed"] != "count":
+        failures.append(f"§9.3: when count and order both fail, failed=count "
+                        f"— got {m[0]['failed']}")
+    else:
+        ok("§9.3: count takes precedence when both halves fail")
+
+    if mism("As shown (Smith et al., 2020) here.", R3):
+        failures.append("§9.3: et_al passes against three authors — a correct "
+                        "pair emitted a mismatch")
+    else:
+        ok("§9.3: et_al passes against a three-author reference")
+
+    m = mism("As shown (Smith et al., 2020) here.", R2)
+    if not m or m[0]["failed"] != "count":
+        failures.append(f"§9.3: et_al fails below ET_AL_MIN_AUTHORS — a "
+                        f"two-author work never takes et al., got "
+                        f"{[x['failed'] for x in m]}")
+    else:
+        ok("§9.3: et_al fails against a two-author reference")
+
+    # "The et_al rule compares every visible author, not only the first, so
+    # `Smith, Jones, et al. (2020)` is checked on both."
+    #
+    # That form does NOT parse under v3.3: AUTHORS_PAREN admits `SURNAME WS et
+    # WS al.` or a surname list, not a list followed by et al. Written as an
+    # end-to-end control it produced an unresolved citation and no mismatch,
+    # and asserting a rule through input the grammar cannot build would test
+    # nothing. So the property is pinned where it IS reachable — the phrase
+    # carries every visible author, which is what the comparison consumes —
+    # and the end-to-end case waits on the grammar rc2 §2 specifies.
+    _f, v, c = ce.person_form("Smith, Jones, et al.")
+    if v != ["smith", "jones"]:
+        failures.append(f"§9.3: an et_al phrase must carry EVERY visible "
+                        f"author, since the rule compares all of them — "
+                        f"got {v}")
+    elif c != {"kind": "minimum", "value": ce.ET_AL_MIN_AUTHORS}:
+        failures.append(f"§9.3: two visible names plus et al. is still a "
+                        f"minimum constraint — got {c}")
+    else:
+        ok("§9.3: an et_al phrase carries every visible author, not just one")
+
+    # The nulls. rc2: "A null takes no part in the check", because a false
+    # mismatch against a pair that genuinely matched is worse than no check.
+    NULL_REF = ("\n\n## References\n\nSmith, John. (2020). A paper. Journal, "
+                "1(1), 1-10.\n")
+    if mism("As shown (Smith & Brown, 2020) here.", NULL_REF):
+        failures.append("a reference whose author list is not confidently "
+                        "derivable must take no part in the check")
+    else:
+        ok("a full-forename reference takes no part in the check")
+
+    if ce.reference_authors("Smith, J., et al.") is not None:
+        failures.append("a reference containing et al. itself is not a "
+                        "derivable author list")
+    else:
+        ok("a reference containing et al. yields no author list")
+
+    # The partial case, which is the one that matters and which the two
+    # controls above do NOT reach: both fail at the FIRST unit, so an
+    # implementation returning whatever it had collected so far would still
+    # return an empty list and look correct. Here the first unit parses and
+    # the second does not, so a partial list is `['smith']` — a confident
+    # wrong answer about a two-author work. rc2 §7.4 requires the list to
+    # consume the ENTIRE head or yield nothing. Found by a surviving mutation,
+    # not by reading.
+    if ce.reference_authors("Smith, J., Brown, John") is not None:
+        failures.append(f"a list that parses partway must yield nothing, not "
+                        f"a partial list — got "
+                        f"{ce.reference_authors('Smith, J., Brown, John')}")
+    else:
+        ok("a list that parses partway yields nothing, not a partial list")
+
+    # The citation-side null, which is what stops a compound surname the
+    # grammar cannot express from producing a confident wrong answer.
+    _f, v, _c = ce.person_form("El Akremi et al.")
+    if v is not None:
+        failures.append(f"a compound surname outside the grammar must yield "
+                        f"no structure rather than a partial one — got {v}")
+    else:
+        ok("a surname the grammar cannot express yields no structure")
+
+    # §6.8's possessive, on this side too. Nine corpus mismatches were this
+    # and this alone.
+    _f, v, _c = ce.person_form("Tepper's")
+    if v != ["tepper"]:
+        failures.append(f"§6.8: the possessive is stripped before comparison "
+                        f"— got {v}, which cannot match any reference")
+    else:
+        ok("§6.8: a possessive surname compares as the bare name")
+
+    # rc2 §7.4's head, and the period that is an initial rather than a
+    # terminator. Taken literally this rule left 1 of 1036 corpus references
+    # with a derivable author list.
+    if ce.reference_author_head("Bartko, J. (1976). Title.") != "Bartko, J.":
+        failures.append("rc2 §7.4: a trailing period that IS an initial must "
+                        "survive, or no person list can ever parse")
+    else:
+        ok("rc2 §7.4: a period belonging to an initial is not stripped")
+
+    # `and` as a separator must not glue onto the next surname.
+    if ce.reference_authors("Faems, D., De Visser, M., Andries, P.") != \
+            ["faems", "de visser", "andries"]:
+        failures.append("the `and` separator consumed the start of a surname; "
+                        "Andries became ries")
+    else:
+        ok("a surname beginning with `and` is not split by the separator")
+
+    # rc2 §9.3: identity survives. Alex Zamurko, 20 September: the occurrence
+    # does not count as uniquely matched. Both, in one document.
+    lines, code = run_doc("As shown (Smith & Brown, 2020) here.", R1)
+    s = lines[-1]
+    cit = next(l for l in lines if l.get("type") == "citation")
+    if cit["citation_key"] != "smith|2020":
+        failures.append("a mismatch must not erase the established identity")
+    elif s["matched_occurrences"] != 0:
+        failures.append(f"an author_structure_mismatch occurrence must not "
+                        f"count as matched — got "
+                        f"{s['matched_occurrences']}")
+    elif code != 1:
+        failures.append(f"an exact mismatch forces exit 1 — got {code}")
+    else:
+        ok("a mismatch keeps the identity, loses the match, and exits 1")
+
+    lines, code = run_doc("As shown (Smith et al., 2020) here.", R2)
+    if not any(l.get("type") == "author_structure_mismatch" for l in lines):
+        failures.append("the et_al exit control ran on a document with no "
+                        "mismatch, so it would pass either way")
+    elif code != 1:
+        # This document also has an unresolved-free, fully matched profile,
+        # so exit 1 here comes from the mismatch alone being subtracted from
+        # matched_occurrences — not from the et_al rule forcing it.
+        ok("an et_al mismatch does not itself force exit 1")
+    else:
+        ok("an et_al mismatch is reported without forcing exit 1 on its own")
+
     print()
     if failures:
         for f in failures:

@@ -598,14 +598,23 @@ def main() -> int:
 
     print("\nrc3 §A output contract — three terminal states")
 
-    def doc(body_text, head=HEAD):
-        """Run the whole pipeline and hand back the emitted record stream."""
-        text = ce.normalise((head + body_text + REFS).encode("utf-8"))
+    def doc(body_text, head=HEAD, refs=REFS):
+        """Run the whole pipeline and hand back the emitted record stream.
+
+        References are assembled first and their non-person keys passed in,
+        which is rc2 §8's ordering: authority comes from the bibliography, not
+        from citation syntax.
+        """
+        text = ce.normalise((head + body_text + refs).encode("utf-8"))
         body, section, off, heads = ce.split_body_and_references(text)
         body = body.replace("\\&", "&")
         sents = ce.sentences(body)
+        bib, _bib_unres = ce.assemble_references(section, off)
+        npk = frozenset(r["reference_key"] for r in bib
+                        if r.get("author_kind") == "non_person"
+                        and r["reference_key"])
         return (body,) + ce.extract_citations(body, sents, heads,
-                                              {"ampersand", "segments"})
+                                              {"ampersand", "segments"}, npk)
 
     def excluded(body_text, head=HEAD):
         return doc(body_text, head)[3]
@@ -805,6 +814,109 @@ def main() -> int:
                         "extraction_denominator")
     else:
         ok("A5: candidate_parse_rate is over the corrected denominator")
+
+    # ------------------------------------- rc2 §7.4 / rc3 B1b, non-person
+    #
+    # rc3 B1b is the amendment rc3 forbids writing from rc3 alone. rc2 arrived
+    # 21 September with the production, and these are §G's three cases plus the
+    # negatives that make the rule safe rather than merely effective.
+
+    print("\nrc2 §7.4 / rc3 B1b — institutional authors")
+
+    IMF = ("\n\n## References\n\nInternational Monetary Fund. (2022). "
+           "War sets back the global recovery. IMF.\n")
+
+    # §G: "International Monetary Fund, 2022 → non_person via reconciliation"
+    body, cits, unres, x = doc("Growth slowed (International Monetary Fund, "
+                               "2022) sharply.", refs=IMF)
+    if keys(cits) != ["non_person|international monetary fund|2022"]:
+        failures.append(f"§G: (International Monetary Fund, 2022) keys the "
+                        f"complete label — got {keys(cits)}")
+    else:
+        ok("§G: (International Monetary Fund, 2022) keys the complete label")
+
+    # §G: "National Statistical Institute, 2022 → 3 cores, MUST reach a
+    # candidate". Three cores is what defeated the merged B1/B1a production
+    # rc3 corrected, so the control names the count.
+    NSI = ("\n\n## References\n\nNational Statistical Institute. (2022). "
+           "Active companies by economic sector. INE.\n")
+    body, cits, unres, x = doc("Spain has 3,430,663 enterprises (National "
+                               "Statistical Institute, 2022) today.", refs=NSI)
+    if keys(cits) != ["non_person|national statistical institute|2022"]:
+        failures.append(f"§G: a three-core institutional name reaches a "
+                        f"candidate — got {keys(cits)}")
+    else:
+        ok("§G: a three-core institutional name reaches a candidate")
+
+    # §G: "World Bank (2024) → MUST NOT yield bank|2024". The narrative form,
+    # where `Bank (2024)` on its own satisfies AUTHORS_NARR and the wrong
+    # answer is one discard away.
+    WB = ("\n\n## References\n\nWorld Bank. (2024). Governance indicators. "
+          "World Bank Group.\n")
+    body, cits, unres, x = doc("Provided by the World Bank (2024) annually.",
+                               refs=WB)
+    if "bank|2024" in keys(cits):
+        failures.append("§G: World Bank (2024) keys the whole label, never "
+                        "bank|2024 — it degraded to bank|2024")
+    elif keys(cits) != ["non_person|world bank|2024"]:
+        failures.append(f"§G: World Bank (2024) keys the whole label, never "
+                        f"bank|2024 — got {keys(cits)}")
+    else:
+        ok("§G: World Bank (2024) keys the whole label, never bank|2024")
+
+    # rc2 §8, the negative that matters most: syntax does not confer identity.
+    # Same sentence, no bibliography entry, and the span must stay unresolved.
+    body, cits, unres, x = doc("Provided by the World Bank (2024) annually.")
+    if cits:
+        failures.append(f"rc2 §8: with no reference entry, the institution stays "
+                        f"unresolved — it was keyed {keys(cits)}")
+    else:
+        ok("rc2 §8: with no reference entry, the institution stays unresolved")
+
+    # The safeguard rc2 §7.4 states in terms. `Pircher Verdorfer` is a PERSON
+    # with a compound surname and is the same shape as `Population Pyramid`:
+    # two capitalised words, no comma, a year. Only the bibliography separates
+    # them, and here it says person.
+    PV = ("\n\n## References\n\nPircher Verdorfer, A. (2016). Mindfulness and "
+          "leadership. Journal, 1(1), 1-10.\n")
+    body, cits, unres, x = doc("Varies across individuals (Pircher Verdorfer, "
+                               "2016) markedly.", refs=PV)
+    if any(c["citation_key"].startswith("non_person|") for c in cits):
+        failures.append(f"a compound personal surname is not read as an "
+                        f"institution — got {keys(cits)}")
+    else:
+        ok("a compound personal surname is not read as an institution")
+
+    # rc2 §7.4's no-comma rule, on the reference side, with rc2's own reason:
+    # a comma-containing organisation author cannot be told apart from an
+    # unsupported person-list form, so it is unresolved rather than guessed.
+    if ce.non_person_head("FAO, 2005") is not None:
+        failures.append("rc2 §7.4: no comma, at least one letter, non-empty — a "
+                        "comma-containing head was accepted")
+    elif ce.non_person_head("World Bank") != "world bank":
+        failures.append("rc2 §7.4: no comma, at least one letter, non-empty — a "
+                        "clean head was not normalised")
+    else:
+        ok("rc2 §7.4: no comma, at least one letter, non-empty")
+
+    # §7.4's head boundary and its one trailing period.
+    got = ce.reference_author_head("World Bank. (2016). Available at: x")
+    if got != "World Bank":
+        failures.append(f"rc2 §7.4: the head stops at the year paren, one period "
+                        f"removed — got {got!r}")
+    else:
+        ok("rc2 §7.4: the head stops at the year paren, one period removed")
+
+    # The reference side end to end, which is what the citation side matches
+    # against. Four corpus entries were unresolved_reference before this.
+    bib, bib_unres = ce.assemble_references(
+        "World Bank. (2016). Governance indicators. World Bank Group.\n", 0)
+    if not bib or bib[0].get("reference_key") != "non_person|world bank|2016":
+        failures.append(f"rc2 §7.4: an institutional reference entry is keyed, "
+                        f"not refused — got "
+                        f"{[r.get('reference_key') for r in bib]}")
+    else:
+        ok("rc2 §7.4: an institutional reference entry is keyed, not refused")
 
     print()
     if failures:

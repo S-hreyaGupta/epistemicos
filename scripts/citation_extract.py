@@ -967,7 +967,30 @@ def classify_exclusion(body: str, s: int, e: int, heads, maths=None):
     return None
 
 
-def extract_citations(body: str, sents, heads, fixes: set[str]):
+def extract_citations(body: str, sents, heads, fixes: set[str],
+                      non_person_keys=frozenset()):
+    """`non_person_keys` is rc2 §8's bibliography evidence, and without it the
+    institutional path stays shut.
+
+    rc2 §8, in terms this implementation had no way to honour until rc2
+    arrived:
+
+        Syntax does not confer authoritative `author_kind` or `citation_key`.
+        Pass 1 syntax creates deterministic identity candidates only.
+        Authority is acquired only through exact bibliography resolution.
+
+    That is not pedantry here, it is the difference between right and wrong on
+    real corpus text. `(Pircher Verdorfer, 2016)` and `(Population Pyramid,
+    2022)` are the same shape — two capitalised words, no comma, a year — and
+    one is a person with a compound surname while the other is an
+    organisation. Nothing in the citation can separate them. The bibliography
+    can: `Pircher Verdorfer, A. (2016)` takes rc2 §7.4's person path,
+    `Population Pyramid. (2022)` takes the non-person one.
+
+    So a non-person citation is emitted only when a non-person REFERENCE with
+    the identical key exists. Where it does not, the span stays unresolved,
+    which is what it is today and the safe direction to be wrong in.
+    """
     pat = build_patterns(fixes)
     cits, unres, excl = [], [], []
     maths = math_spans(body)
@@ -990,7 +1013,8 @@ def extract_citations(body: str, sents, heads, fixes: set[str]):
         m = pat["cite_paren"].fullmatch(c1)
         if m:
             segs = _paren_segments(c1, pat)
-            _emit_paren(body, c1s, c1e, segs, sent, heads, cits, unres)
+            _emit_paren(body, c1s, c1e, segs, sent, heads, cits, unres,
+                        non_person_keys)
             continue
 
         if "segments" in fixes:
@@ -998,7 +1022,7 @@ def extract_citations(body: str, sents, heads, fixes: set[str]):
             # §6.2's atomic reading. Each segment is parsed on its own and a
             # failure is reported for that segment alone.
             done = _segmented_paren(body, c1s, c1e, pat, sent, heads,
-                                    cits, unres)
+                                    cits, unres, non_person_keys)
             if done:
                 continue
 
@@ -1020,11 +1044,57 @@ def extract_citations(body: str, sents, heads, fixes: set[str]):
             span_start, L = parsed
             discarded = toks[:len(toks) - L]
             if all(_discardable(t) for t in discarded):
-                _emit_narr(body, span_start, c1e, sent, heads, cits, unres, pat)
+                _emit_narr(body, span_start, c1e, sent, heads, cits, unres, pat,
+                           non_person_keys)
+                continue
+            # rc3 B1b reaches here too, and this is the branch that matters
+            # most. `World Bank (2016)` DOES find a matching suffix — `Bank
+            # (2016)` satisfies AUTHORS_NARR on its own — and is then refused
+            # because `World` is not discardable. §6.2 doing its job: rc3 §G
+            # requires `World Bank (2024)` MUST NOT yield `bank|2024`, and it
+            # does not.
+            #
+            # But a refusal is not an identification, and until now that was
+            # the end of it. The complete run is the institutional phrase, so
+            # it is offered whole. `bank|2016` is never constructed; either
+            # `non_person|world bank|2016` is confirmed by the bibliography or
+            # the span stays unresolved exactly as before.
+            narr = body[run_start:c1s].rstrip()
+            if narr and _non_person_citation(
+                    body, run_start, c1e, run_start, c1e, narr, "narrative",
+                    sent, heads, cits, non_person_keys):
                 continue
             _unres(body, run_start, c1e, "no_grammar_match", sent, heads, unres)
             continue
 
+        # rc3 B1b's detection site. Everything the person grammar can express
+        # has been tried and refused. Two shapes reach here and both are in
+        # the corpus:
+        #
+        #   (International Monetary Fund, 2022)   parenthetical, phrase before
+        #                                         the separator comma
+        #   World Bank (2016)                     narrative, the run before
+        #                                         the year paren
+        #
+        # Only the phrase is offered; `_non_person_citation` applies rc2
+        # §7.4's test and refuses unless a non-person reference confirms it.
+        inner = body[c1s + 1:c1e - 1]
+        cut = YEAR_RE.search(inner)
+        if cut:
+            phrase = inner[:cut.start()].rstrip().rstrip(",;:").rstrip()
+            if phrase and _non_person_citation(
+                    body, c1s, c1e, c1s, c1e, phrase, "parenthetical",
+                    sent, heads, cits, non_person_keys):
+                continue
+
+        # A narrative branch sat here and has been removed. It fired zero
+        # times across all fourteen papers, because reaching it needs the last
+        # token before the year paren to fail CORE — and any single
+        # capitalised word satisfies CORE, so `International Monetary Fund
+        # (2022)` matches on `Fund` and is handled in the `if parsed:` branch
+        # above instead. A branch no control can reach is not coverage, and
+        # the mutation probe reported exactly that by refusing to call it
+        # caught. If a case turns up, it comes back with a control.
         span = (run_start, c1e) if toks else (c1s, c1e)
         _unres(body, span[0], span[1], "no_grammar_match", sent, heads, unres)
 
@@ -1061,17 +1131,20 @@ def _paren_segments(c1: str, pat):
     return [m.group(0) for m in pat["seg"].finditer(inner)]
 
 
-def _emit_paren(body, c1s, c1e, segs, sent, heads, cits, unres):
+def _emit_paren(body, c1s, c1e, segs, sent, heads, cits, unres,
+                non_person_keys=frozenset()):
     inner_off = c1s + 1
     for seg_text in segs:
         pos = body.find(seg_text, inner_off, c1e)
         if pos < 0:
             continue
         _emit_segment(body, c1s, c1e, pos, pos + len(seg_text), seg_text,
-                      "parenthetical", sent, heads, cits, unres)
+                      "parenthetical", sent, heads, cits, unres,
+                      non_person_keys)
 
 
-def _segmented_paren(body, c1s, c1e, pat, sent, heads, cits, unres) -> bool:
+def _segmented_paren(body, c1s, c1e, pat, sent, heads, cits, unres,
+                     non_person_keys=frozenset()) -> bool:
     inner = body[c1s + 1:c1e - 1]
     pieces, off, any_ok = [], c1s + 1, False
     for piece in inner.split(";"):
@@ -1084,7 +1157,8 @@ def _segmented_paren(body, c1s, c1e, pat, sent, heads, cits, unres) -> bool:
         if pat["seg_anchored"].fullmatch(stripped):
             s = body.find(stripped, p_start, p_end + 1)
             _emit_segment(body, c1s, c1e, s, s + len(stripped), stripped,
-                          "parenthetical", sent, heads, cits, unres)
+                          "parenthetical", sent, heads, cits, unres,
+                          non_person_keys)
             any_ok = True
         else:
             pieces.append((p_start, p_end, stripped))
@@ -1097,11 +1171,16 @@ def _segmented_paren(body, c1s, c1e, pat, sent, heads, cits, unres) -> bool:
     return True
 
 
-def _emit_narr(body, span_start, c1e, sent, heads, cits, unres, pat):
+def _emit_narr(body, span_start, c1e, sent, heads, cits, unres, pat,
+               non_person_keys=frozenset()):
     text = body[span_start:c1e]
     authors = text[:text.rindex("(")].rstrip()
     core = first_core(authors)
     if is_all_caps(core):
+        if _non_person_citation(body, span_start, c1e, span_start, c1e,
+                                authors, "narrative", sent, heads, cits,
+                                non_person_keys):
+            return
         _unres(body, span_start, c1e, "all_caps_surname", sent, heads, unres)
         return
     if core.lower() in STOP:
@@ -1114,7 +1193,7 @@ def _emit_narr(body, span_start, c1e, sent, heads, cits, unres, pat):
 
 
 def _emit_segment(body, gs, ge, ss, se, seg_text, style, sent, heads, cits,
-                  unres):
+                  unres, non_person_keys=frozenset()):
     # The cue is not part of the author phrase, and the segment text still
     # carries it. B5's LEAD_IN cues belong here alongside §4's PREFIX cues:
     # without them `(for a review, Smith, 2020)` fell through AUTHORS_PAREN to
@@ -1137,6 +1216,13 @@ def _emit_segment(body, gs, ge, ss, se, seg_text, style, sent, heads, cits,
     comma = len(authors)
     core = first_core(authors)
     if is_all_caps(core):
+        # rc3 B1b. An all-caps head does not satisfy the person grammar, so
+        # rc2 §8.1's "otherwise" branch applies and it is a non-person
+        # candidate rather than a refusal. `(FAO, 2018)` is in this corpus
+        # twice with a matching bibliography entry, and v3.3 refused both.
+        if _non_person_citation(body, gs, ge, ss, se, authors.strip(),
+                                style, sent, heads, cits, non_person_keys):
+            return
         _unres(body, ss, se, "all_caps_surname", sent, heads, unres)
         return
     for y in YEAR_RE.findall(rest[comma:] if comma > 0 else rest):
@@ -1145,11 +1231,17 @@ def _emit_segment(body, gs, ge, ss, se, seg_text, style, sent, heads, cits,
 
 
 def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
-            cits, author_phrase=""):
+            cits, author_phrase="", author_kind="person"):
     s_start, s_end, s_content_end = sent
     lv, nm, ty, rs = section_stack_at(heads, gs)
     surname = re.sub(r"\s+", " ", core).strip().lower()
     y = norm_year(year)
+    # rc2 §7.5. The non-person key is the COMPLETE label, never its last token
+    # — `world bank`, never `bank`. rc3 §G makes that a conformance case, and
+    # it is the whole reason the institutional path is keyed separately rather
+    # than fed through the surname grammar.
+    key = f"non_person|{surname}|{y}" if author_kind == "non_person" \
+        else f"{surname}|{y}"
     cits.append({
         "type": "citation", "index": 0,
         # Not in v3.3's §9 contract. Emitted because a gold set annotated by
@@ -1161,7 +1253,8 @@ def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
         "author_phrase": re.sub(r"\s+", " ", author_phrase).strip(),
         "candidate_state": "parsed",
         "citation_group": body[gs:ge], "citation_segment": seg_text,
-        "citation_key": f"{surname}|{y}", "surname": surname, "year": y,
+        "citation_key": key, "author_kind": author_kind,
+        "surname": surname, "year": y,
         "style": style,
         "group_start": gs, "group_end": ge,
         "segment_start": ss, "segment_end": se,
@@ -1171,6 +1264,41 @@ def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
         "section_level": lv, "section_name": nm, "section_type": ty,
         "section_roles": rs,
     })
+
+
+def _non_person_citation(body, gs, ge, ss, se, phrase, style, sent, heads,
+                         cits, non_person_keys) -> bool:
+    """rc3 B1b, the citation side. ONE production, reused from rc2 §7.4.
+
+    rc2 §8.1:
+
+        if `author_phrase` fully matches the applicable person citation
+        grammar: `candidate_key = person|<first visible surname>|<year>`;
+        otherwise: `candidate_key = non_person|<normalized complete
+        author_phrase>|<year>`.
+
+    rc3 B1b changes only where the detector is allowed to propose such a
+    phrase. The test applied to the phrase is `non_person_head`, the same
+    function the bibliography side calls, because rc3 says restating the rules
+    here "would create a second definition that can disagree with the first".
+
+    Returns True when a citation was emitted.
+    """
+    label = non_person_head(phrase)
+    if not label:
+        return False
+    years = YEAR_RE.findall(body[ss:se])
+    if not years:
+        return False
+    # rc2 §8: the bibliography, not the syntax, is what makes this a citation.
+    if not all(f"non_person|{label}|{norm_year(y)}" in non_person_keys
+               for y in years):
+        return False
+    for y in years:
+        _record(body, gs, ge, ss, se, body[ss:se], label, norm_year(y),
+                style, sent, heads, cits, author_phrase=phrase,
+                author_kind="non_person")
+    return True
 
 
 def _unres(body, start, end, reason, sent, heads, unres):
@@ -1213,6 +1341,67 @@ def _excl(body, start, end, reason, sent, heads, excl):
 
 # ---------------------------------------------------------------- §7
 
+# --------------------------------------------- rc2 §7.4, non-person authors
+#
+# rc3 B1b is worth 8 citations and rc3 forbids writing it from rc3 alone:
+#
+#     The citation-side `NON_PERSON_AUTHOR` path MUST reuse the exact lexical
+#     production and boundary rules rc2 defines for the bibliography-side
+#     `NON_PERSON_AUTHOR`. rc3 changes the permitted DETECTION SITE only. It
+#     does not introduce a second organisational-author grammar.
+#
+#     Two grammars for one object is how the boundaries drift.
+#
+# rc2 arrived 21 September. §7.4 is that production, and this is it:
+#
+#     `reference_author_head` is the trimmed text before the opening `(`
+#     immediately containing the first YEAR token, with one trailing period
+#     removed and trailing whitespace trimmed.
+#
+#     If neither person path applies, a non-person head is accepted only if:
+#     it contains at least one Unicode letter; it contains no comma; after
+#     trimming it is non-empty.
+#
+# The no-comma rule is the whole safeguard, and rc2 says why: "A
+# comma-containing organization author that cannot be distinguished from an
+# unsupported person-list form is therefore unresolved rather than guessed."
+# Nothing here knows that the IMF is an institution. It knows the head has no
+# comma and so cannot be a person list.
+#
+# ONE DISCREPANCY, recorded rather than resolved. rc3 says rc2's production
+# "already carries the bound, the terminal-period handling and the maximum
+# label length". §7.4 carries the first two. There is no maximum label length
+# in rc2 at all, so none is implemented here, and a length bound is the kind
+# of constant that must come from the spec rather than from whoever is typing.
+
+def reference_author_head(assembled: str):
+    """rc2 §7.4's head, or None when the entry has no usable year paren."""
+    for m in re.finditer(r"\(", assembled):
+        rest = assembled[m.start():]
+        close_at = rest.find(")")
+        if close_at < 0:
+            continue
+        if not YEAR_RE.search(rest[:close_at + 1]):
+            continue
+        head = assembled[:m.start()].rstrip()
+        if head.endswith("."):          # "one trailing period removed"
+            head = head[:-1]
+        return head.rstrip()
+    return None
+
+
+def non_person_head(head: str):
+    """rc2 §7.4's three conditions. Returns the normalised label, or None."""
+    if head is None:
+        return None
+    if "," in head:
+        return None
+    if not any(c.isalpha() for c in head):
+        return None
+    label = re.sub(r"\s+", " ", head).strip().lower()
+    return label or None
+
+
 def assemble_references(section: str, base: int):
     refs, unres = [], []
     open_entry = None
@@ -1230,6 +1419,19 @@ def assemble_references(section: str, base: int):
             surname = re.sub(r"\s+", " ", got[:got.index(",")]).strip().lower()
         ym = YEAR_RE.search(assembled)
         year = norm_year(ym.group(0)) if ym else None
+
+        # rc2 §7.4, the person path first and only then the non-person one.
+        # The order is rc2's and it is load-bearing: `Van Den Brink, T. W., &
+        # van Der Woerd, F. (2004)` satisfies the person grammar and must
+        # never be read as an organisation merely because its author field
+        # holds several words.
+        author_kind = "person" if surname else None
+        label = None
+        if not surname:
+            label = non_person_head(reference_author_head(assembled))
+            if label and year:
+                author_kind = "non_person"
+
         reasons = []
         if not ym:
             reasons.append("no_year")
@@ -1241,9 +1443,24 @@ def assemble_references(section: str, base: int):
         em = re.search(rf"\. (?:(?:{PARTICLE}) )*{CORE}, (?:[A-Z]\. ?)+", assembled)
         if em and em.start() > 10:
             reasons.append("embedded_entry_pattern")
+        # rc2 §7.5 keys non-person entries `non_person|<label>|<year>`. Person
+        # entries keep v3.3's bare `surname|year` rather than gaining rc2's
+        # `person|` prefix: the prefixed form changes every existing key, every
+        # gold set and every conformance case asserting one, and that is the
+        # consolidation's decision rather than this change's. The namespaces
+        # cannot collide — a v3.3 surname never contains `|`, and rc2 §7.5's
+        # escaping exists for exactly that reason — so this is additive.
+        if author_kind == "non_person":
+            ref_key = f"non_person|{label}|{year}"
+        elif surname and year:
+            ref_key = f"{surname}|{year}"
+        else:
+            ref_key = None
+
         refs.append({
             "type": "reference", "index": 0, "assembled": assembled,
-            "reference_key": f"{surname}|{year}" if (surname and year) else None,
+            "reference_key": ref_key,
+            "author_kind": author_kind,
             "surname": surname, "year": year, "start": start, "end": end,
             "validation_state": "suspect" if reasons else "ok",
             "suspect_reasons": reasons,
@@ -1275,6 +1492,16 @@ def assemble_references(section: str, base: int):
                 or re.match(r"^[^.\n]{2,60}\.[ \t]+\(?(?:(?:1[5-9]|20)\d{2}|n\.d\.)",
                             stripped)):
             close()
+            # rc2 §7.4: before refusing, try the non-person path. Four corpus
+            # entries land here and every one is an institution the person
+            # grammar cannot express — International Monetary Fund, Population
+            # Pyramid, National Statistical Institute, World Bank. They were
+            # `unresolved_reference` with `entry_start_grammar`, which is the
+            # reason rc2 keeps for a head that satisfies NO path; these satisfy
+            # one.
+            if non_person_head(reference_author_head(stripped)):
+                open_entry = (span[0], span[1], [stripped])
+                continue
             unres.append({"type": "unresolved_reference", "index": 0,
                           "text": stripped, "start": span[0], "end": span[1],
                           "reason": "entry_start_grammar"})
@@ -1302,7 +1529,20 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
         body = body.replace("\\&", "&")
         section = section.replace("\\&", "&")
     sents = sentences(body)
-    cits, unres, excl = extract_citations(body, sents, heads, fixes)
+
+    # rc2 §8 runs citation identity AFTER the bibliography, because authority
+    # comes from the reference list rather than from citation syntax. v3.3
+    # assembled references last, which was fine while every key was
+    # `surname|year` derived at extraction; the non-person path cannot work
+    # that way and rc2 says so in terms. The references are assembled here and
+    # reused below, so nothing is parsed twice.
+    refs, ref_unres = assemble_references(section, sec_off)
+    non_person_keys = frozenset(
+        r["reference_key"] for r in refs
+        if r.get("author_kind") == "non_person" and r["reference_key"])
+
+    cits, unres, excl = extract_citations(body, sents, heads, fixes,
+                                          non_person_keys)
 
     # §10 exit 2, computed on the body and the parse count.
     n = len(NUMCITE.findall(body)) + len(SUPCITE.findall(body))
@@ -1315,8 +1555,6 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                        f"{total} author-year parentheticals omit the comma "
                        f"before the year, which is author-date rather than "
                        f"APA")
-
-    refs, ref_unres = assemble_references(section, sec_off)
 
     lines = [{"type": "meta", "spec_version": SPEC_VERSION,
               "implementation": "scripts/citation_extract.py",

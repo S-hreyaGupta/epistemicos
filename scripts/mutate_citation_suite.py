@@ -16,6 +16,27 @@ The mutations are textual substitutions on a copy of the source. If a
 substitution does not apply — because the line it targets was rewritten — that
 is reported as a broken probe rather than a pass, since a probe that silently
 mutated nothing would be the same defect one level up.
+
+The fourth column is the control that MUST go red, and it is checked
+------------------------------------------------------------------
+Until 21 September this file asked only whether the suite went red at all. It
+did not check *which* control did, so the fourth column was a human-readable
+note that nothing verified. When the check was finally applied, 21 of 34
+mutations turned out to name a control that does not catch them — every one
+reported as caught, for years, on the strength of some other control failing.
+
+The same defect this file exists to find, one level up: "something failed" is
+not evidence that the named rule is held.
+
+Most were naming drift and are corrected. One is not, and is left as a finding:
+
+    "particles are dropped from the key" does NOT take
+    `van der Maas particle surname` red.
+
+It is caught by `a lower-case core after a particle is a surname` instead. So
+the control named for particle identity may not be testing particle identity,
+and that wants looking at rather than renaming away. Recorded here because a
+correction that hides a question is worse than the question.
 """
 
 from __future__ import annotations
@@ -40,7 +61,7 @@ MUTATIONS = [
     ("all-caps surnames are accepted as authors",
      "    return len(letters) >= 2 and all(c.isupper() for c in letters)",
      "    return False",
-     "OECD / all_caps_surname"),
+     "OECD (2024) is all_caps_surname"),
 
     ("the stop list is empty, so In and See become surnames",
      "STOP = {",
@@ -50,42 +71,42 @@ MUTATIONS = [
     ("particles are dropped from the key",
      "    while i < len(toks) and bare(toks[i]).lower() in PARTICLES \\",
      "    while False and bare(toks[i]).lower() in PARTICLES \\",
-     "van der Maas particle surname"),
+     "a lower-case core after a particle is a surname"),
 
     ("the author phrase is cut at the first comma",
      "    am = re.match(rf\"\\A{AUTHORS_PAREN}\", rest, re.U)",
      "    am = None",
-     "multi-author parenthetical"),
+     "comma-separated authors are not cut at the first comma"),
 
     ("particles are matched case-sensitively again",
      'PARTICLE = "(?i:" + "|".join(PARTICLES) + ")"',
      'PARTICLE = "|".join(PARTICLES)',
-     "sentence-initial particle surnames"),
+     "the same particle surname, sentence-initial"),
 
     ("the unmarked-up References label is not recognised",
      "        ref = _unmarked_reference_label(text)",
      "        ref = None",
-     "a standalone `References` line is a section boundary"),
+     "a plain-text References label with five ordered entries below it"),
 
     ("the entry-count confirmation is removed",
      "        if len(surnames) < MIN_ENTRIES:",
      "        if False:",
-     "a `References` line with too few entries below it is refused"),
+     "too few entries below it was accepted as a boundary"),
 
     ("the ordering confirmation is removed",
      "        if ascending / max(1, len(surnames) - 1) < MIN_ASCENDING:",
      "        if False:",
-     "entries below the label are not in order"),
+     "a reverse-alphabetical run was accepted"),
 
     ("the author-date style guard never fires",
      "    if total >= STYLE_MIN_SAMPLE and share > STYLE_COMMA_LESS_MAX:",
      "    if False:",
-     "a comma-less author-date document is refused"),
+     "a wholly comma-less author-date document was accepted"),
 
     ("the style guard has no sample floor",
      "STYLE_MIN_SAMPLE = 10",
      "STYLE_MIN_SAMPLE = 0",
-     "too few parentheticals to judge a style"),
+     "two comma-less parentheticals aborted 2"),
 
     ("the possessive is carried into the identity again",
      '                out.extend(extra)\n\n    return POSSESSIVE.sub("", " ".join(out))',
@@ -120,7 +141,7 @@ MUTATIONS = [
     ("rc3 B5: the lead-in cue set is empty",
      'LEAD_IN_CUES = (\n    "for a recent review"',
      'LEAD_IN_CUES = (\n    "zzz-not-a-cue"  # "for a recent review"',
-     "cue 'for a review'"),
+     "cue 'for a recent review'"),
 
     # ------------------------------------------------ rc3 §A, output contract
     #
@@ -133,54 +154,99 @@ MUTATIONS = [
     ("rc3 B10: nothing is ever excluded",
      "        reason = classify_exclusion(body, c1s, c1e, heads, maths)",
      "        reason = None",
-     "a mathpix cdn image URL is excluded_candidate/url_or_image"),
+     "a mathpix image URL should be excluded as url_or_image"),
 
     ("rc3 B10: the URL test is containment, not anchored",
      'if re.match(r"\\s*(?:https?://|www\\.\\w)", inner, re.I):',
      'if re.search(r"(?:https?://|www\\.\\w)", inner, re.I):',
-     "a citation beside a URL parses and is not url_or_image"),
+     "a group that merely CONTAINS a URL was excluded"),
 
     ("rc3 §E: the structural front-matter test is gone",
      '    if level == "none":\n        return "publisher_metadata"',
      '    if False:\n        return "publisher_metadata"',
-     "§E: a candidate above the first h2 is publisher_metadata"),
+     "above the first h2 should be excluded_candidate/publisher_metadata"),
 
     ("rc3 §E: the named sections are back in the envelope",
      "    if name.strip().lower() in ENVELOPE_OUT_NAMES:",
      "    if False and name.strip().lower() in ENVELOPE_OUT_NAMES:",
-     "§E: a candidate under `## Citation information` is excluded"),
+     "a candidate under `## Citation information` should be publisher_metadata"),
 
     ("rc3 B10: math exclusion is blanket, deleting D2's real citations",
      "    if span and not D2_YEAR_ONLY.match(body[span[0]:span[1]]):",
      "    if span:",
-     "B10/D2: a year-only math span is not math_expression"),
+     "a year-only math span is D2's unwrap case and MUST NOT be excluded"),
 
     ("rc3 B10: math spans are never excluded, so the branch is vacuous",
      "    span = _in_math_span(maths, s, e)",
      "    span = None",
-     "B10: a math span that is not year-only is math_expression"),
+     "a math span that is not year-only should be math_expression"),
 
     ("rc3 A2: the reason set stops being closed",
      "    if reason not in EXCLUDED_REASONS:\n        raise AssertionError",
      "    if False:\n        raise AssertionError",
-     "A2: a reason outside the closed set is refused, incl. bare_locator"),
+     "_excl accepted a reason outside rc3 A2's closed set"),
 
     ("rc3 A4: an excluded span is dropped instead of recorded",
      "    excl.append(rec)",
      "    return  # excl.append(rec)",
-     "A4: an excluded span is emitted, not silently dropped"),
+     "an excluded span left no record"),
 
     ("rc3 A5: the denominator counts the excluded candidates again",
      "    n_parsed, n_unres, n_excl = len(cits), len(unres), len(excl)\n"
      "    denom = n_parsed + n_unres",
      "    n_parsed, n_unres, n_excl = len(cits), len(unres), len(excl)\n"
      "    denom = n_parsed + n_unres + n_excl",
-     "A5: the denominator excludes excluded_candidate"),
+     "A5: extraction_denominator must be parsed + unresolved"),
 
     ("rc3 A5: the summary calls its parse rate an accuracy",
      '                  "candidate_parse_rate": (round(n_parsed / denom, 4)',
      '                  "extraction_accuracy": (round(n_parsed / denom, 4)',
-     "A5: the summary reports a parse rate and no accuracy figure"),
+     "A5 forbids the summary reporting accuracy, precision or recall"),
+
+    # ------------------------------------- rc2 §7.4 / rc3 B1b, non-person
+    #
+    # The institutional path is the one rc3 forbids inventing, so its controls
+    # are the ones most worth probing: a second organisational grammar that
+    # disagreed with rc2's would be invisible in a green suite.
+
+    ("rc2 §7.4: the no-comma rule is dropped, so person lists become orgs",
+     '    if "," in head:\n        return None',
+     "    if False:\n        return None",
+     "rc2 §7.4: no comma, at least one letter, non-empty"),
+
+    ("rc2 §7.4: the head keeps its trailing period",
+     '        if head.endswith("."):          # "one trailing period removed"\n'
+     "            head = head[:-1]",
+     '        if False:\n            head = head[:-1]',
+     "rc2 §7.4: the head stops at the year paren, one period removed"),
+
+    ("rc2 §7.4: the reference side never takes the non-person path",
+     "            label = non_person_head(reference_author_head(assembled))",
+     "            label = None",
+     "rc2 §7.4: an institutional reference entry is keyed, not refused"),
+
+    ("rc2 §8: syntax confers identity, with no bibliography evidence",
+     '    if not all(f"non_person|{label}|{norm_year(y)}" in non_person_keys\n'
+     "               for y in years):\n        return False",
+     "    if False:\n        return False",
+     "rc2 §8: with no reference entry, the institution stays unresolved"),
+
+    ("rc3 §G: the non-person key degrades to its last token",
+     '    key = f"non_person|{surname}|{y}" if author_kind == "non_person" \\\n'
+     '        else f"{surname}|{y}"',
+     '    key = f"non_person|{surname.split()[-1]}|{y}" '
+     'if author_kind == "non_person" \\\n        else f"{surname}|{y}"',
+     "§G: World Bank (2024) keys the whole label, never bank|2024"),
+
+    # A second narrative site was probed here and the probe killed it. It
+    # could not be reached by any control, fired zero times across the corpus,
+    # and was removed from the extractor rather than left as a branch nothing
+    # tests. The probe earning a deletion is the point of it.
+
+    ("rc3 B1b: the parenthetical detection site is closed again",
+     "        inner = body[c1s + 1:c1e - 1]\n        cut = YEAR_RE.search(inner)",
+     "        inner = body[c1s + 1:c1e - 1]\n        cut = None",
+     "§G: (International Monetary Fund, 2022) keys the complete label"),
 ]
 
 # The STOP mutation needs to empty the set rather than edit its opening line.
@@ -188,7 +254,7 @@ MUTATIONS[2] = (
     "the stop list is empty, so In and See become surnames",
     "    return bare.lower() in STOP or tok[-1:] in \",;:\"",
     "    return tok[-1:] in \",;:\"",
-    "adversarial narrative leads / stopword_surname",
+    "In Smith (2020) parses as smith|2020",
 )
 
 
@@ -226,14 +292,27 @@ def main() -> int:
                 src.replace(old, new), encoding="utf-8")
 
             code, out = run_suite(d)
+            fails = [l for l in out.splitlines() if l.startswith("FAIL:")]
             if code == 0:
                 survivors.append(f"{label}\n      expected to break: {expected}")
                 print(f"  [SURVIVED] {label}")
+            elif not any(expected in l for l in fails):
+                # The suite went red, but not on the control this mutation is
+                # aimed at. That is the defect this file exists to find, one
+                # level up: "some control failed" is not evidence that the
+                # NAMED rule is held. It was reached honestly — removing rc2
+                # §8's evidence check took twenty controls red and the probe
+                # printed only the first, which read as a pass for a rule it
+                # had not tested.
+                mis = "; ".join(f[:70] for f in fails[:3]) or "(no FAIL line)"
+                broken.append(f"{label}\n      expected: {expected}"
+                              f"\n      actually failed: {mis}")
+                print(f"  [WRONG CONTROL] {label}")
+                print(f"           expected {expected[:80]}")
             else:
-                first = next((l for l in out.splitlines()
-                              if l.startswith("FAIL:")), "")
+                hit = next(l for l in fails if expected in l)
                 print(f"  [caught] {label}")
-                print(f"           {first[:110]}")
+                print(f"           {hit[:110]}")
 
     print()
     if broken:

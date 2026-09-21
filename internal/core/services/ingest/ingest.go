@@ -11,6 +11,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -96,9 +97,31 @@ func (s *Service) fromReader(ctx context.Context, url string, r io.Reader) (*pap
 	}
 
 	// Dedupe: if a paper with the same hash already exists, return it.
-	if existing, err := s.store.GetByHash(ctx, hash); err == nil {
+	//
+	// The distinction between the two failure modes is load-bearing and was
+	// being discarded. This read `if err == nil { return existing }`, so an
+	// unreachable database during the lookup was indistinguishable from "no
+	// such paper" and ingest carried on to create a second row for a document
+	// it already had.
+	//
+	// papers_hash_unique catches the consequence today: the Save below
+	// violates the constraint and the request fails loudly. §7.5 of the Stage
+	// 1 spec drops that constraint, which turns this from a noisy insert error
+	// into a silent duplicate. So the repair belongs before §7.5, not after.
+	//
+	// The store already made the distinction — scanPaper returns
+	// ports.ErrNotFound for no rows and a wrapped error otherwise. Only the
+	// caller was throwing it away.
+	existing, err := s.store.GetByHash(ctx, hash)
+	switch {
+	case err == nil:
 		_ = os.Remove(tmpPath)
 		return existing, nil
+	case errors.Is(err, ports.ErrNotFound):
+		// Genuinely new. Proceed.
+	default:
+		_ = os.Remove(tmpPath)
+		return nil, fmt.Errorf("dedupe lookup: %w", err)
 	}
 
 	// Persist a pending row so failures are visible.

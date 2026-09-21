@@ -48,14 +48,9 @@ MUTATIONS = [
      "(intentionally inert, replaced below)"),
 
     ("particles are dropped from the key",
-     "        if t.lower().rstrip(\",\") in PARTICLES:",
-     "        if False:",
+     "    while i < len(toks) and bare(toks[i]).lower() in PARTICLES \\",
+     "    while False and bare(toks[i]).lower() in PARTICLES \\",
      "van der Maas particle surname"),
-
-    ("the C2 run has no six-token cap",
-     "    while len(toks) < 6:",
-     "    while len(toks) < 60:",
-     "World Bank must not degrade / C2 boundary"),
 
     ("the author phrase is cut at the first comma",
      "    am = re.match(rf\"\\A{AUTHORS_PAREN}\", rest, re.U)",
@@ -93,9 +88,39 @@ MUTATIONS = [
      "too few parentheticals to judge a style"),
 
     ("the possessive is carried into the identity again",
-     '    return POSSESSIVE.sub("", " ".join(out))',
-     '    return " ".join(out)',
+     '                out.extend(extra)\n\n    return POSSESSIVE.sub("", " ".join(out))',
+     '                out.extend(extra)\n\n    return " ".join(out)',
      "a possessive surname keys to the bare name"),
+
+    ("rc3 B1: the six-token cap comes back",
+     "    while True:\n        j = i",
+     "    while len(toks) < 6:\n        j = i",
+     "a seven-token author list is reached in full"),
+
+    ("rc3 B2: a lower-case core after a particle is refused again",
+     'CORE_AFTER_PARTICLE = r"[A-Za-zÀ-þ][\\w\'’\\-]+"',
+     "CORE_AFTER_PARTICLE = CORE",
+     "a lower-case core after a particle is a surname"),
+
+    ("rc3 B7: `and colleagues` is not equivalent to et al.",
+     'ET_AL = rf"(?:et{WS}al\\.[\'’]?s?|and{WS}colleagues[\'’]?s?)"',
+     'ET_AL = rf"(?:et{WS}al\\.[\'’]?s?)"',
+     "Jost and colleagues, narrative"),
+
+    ("rc3 B8: the possessive gap is not reachable",
+     "            gap = _possessive_gap(body, k, sent_start)",
+     "            gap = None",
+     "three intervening tokens, the measured maximum"),
+
+    ("rc3 B8: the gap has no bound",
+     "\nMAX_POSSESSIVE_YEAR_GAP_TOKENS = 3\n",
+     "\nMAX_POSSESSIVE_YEAR_GAP_TOKENS = 9\n",
+     "four intervening tokens is too many"),
+
+    ("rc3 B5: the lead-in cue set is empty",
+     'LEAD_IN_CUES = (\n    "for a recent review"',
+     'LEAD_IN_CUES = (\n    "zzz-not-a-cue"  # "for a recent review"',
+     "cue 'for a review'"),
 ]
 
 # The STOP mutation needs to empty the set rather than edit its opening line.

@@ -141,11 +141,14 @@ def main() -> int:
     case("a particle inside the surname is still out of grammar",
          "As shown (Oliveira da Silva et al., 2024).", [],
          want_unres=["no_grammar_match"])
-    # CORE requires an upper-case initial, so this stays out too. It is a
-    # source typo rather than a name form.
-    case("a lower-case core is not a surname",
-         "As shown (Da silva et al., 2017).", [],
-         want_unres=["no_grammar_match"])
+    # rc3 B2: a lower-case core is admitted, but ONLY immediately after a
+    # matched particle. `Da silva` is a name; `smith` on its own is not, and
+    # relaxing CORE generally would admit ordinary prose into the candidate
+    # run. This control pinned the pre-B2 refusal and now pins the rule.
+    case("a lower-case core after a particle is a surname",
+         "As shown (Da silva et al., 2017).", ["da silva|2017"])
+    case("a lower-case core without a particle is not",
+         "As shown (smith, 2020).", [], want_unres=["no_grammar_match"])
 
     # ---- adversarial narrative, §12 row 6 ----
     # The discard constraint: a STOP word before the author is dropped and the
@@ -257,15 +260,25 @@ def main() -> int:
     print("\nC2 sentence boundary")
     case("a previous sentence's last token cannot enter the run",
          "Data came from the USA. Smith (2020) argues this.", ["smith|2020"])
-    # Also added after the probe. The case above passes with the six-token cap
-    # removed entirely, because the sentence start stops the walk first — it was
-    # testing the sentence bound and reporting the cap. The cap is observable
-    # only in how far back a rejected span reaches, so that is what to assert:
-    # six eligible tokens precede the year here, and "Alpha" is the seventh.
-    case("the run stops at six eligible tokens, not at the sentence start",
+    # rc3 B1 removes the six-token cap this used to pin:
+    #
+    #     Do not reintroduce a token cap. C2 removed the six-token cap for a
+    #     reason and the corpus still contains the case that removed it:
+    #     Van den Brink and Van der Woerd, 7 tokens, present twice.
+    #
+    # The cap produced EC-3 — four works attributed to the wrong author,
+    # silently, because the run began partway through the author list. So the
+    # control inverts: a run longer than six is reached in full, and what
+    # bounds it is eligibility and the sentence start rather than a count.
+    case("a seven-token author list is reached in full",
+         "In that context, Van den Brink and Van der Woerd (2004) show this.",
+         ["van den brink|2004"])
+    case("the run still stops at an ineligible token",
          "We used Alpha Beta Gamma Delta Epsilon Zeta Smith (2020) here.",
          [], want_unres=["no_grammar_match"],
-         want_text="Beta Gamma Delta Epsilon Zeta Smith (2020)")
+         want_text="Alpha Beta Gamma Delta Epsilon Zeta Smith (2020)")
+    case("and still never crosses the sentence start",
+         "Data came from the USA. Smith (2020) argues this.", ["smith|2020"])
 
     # ---- unicode, §12 row 9 ----
     print("\nunicode")
@@ -410,6 +423,62 @@ def main() -> int:
     except ce.Abort as a:
         ok("exit 5: invalid utf-8") if a.code == 5 else failures.append(
             f"invalid UTF-8 aborted {a.code}, expected 5")
+
+    # ---- rc3 B7, `and colleagues` ----
+    print("\nrc3 B7: and colleagues")
+    for n in ("Jost", "Colquitt", "Dalal"):
+        case(f"{n} and colleagues, narrative",
+             f"{n} and colleagues (2012) argue this.", [f"{n.lower()}|2012"])
+    case("parenthetical form", "As shown (Smith and colleagues, 2020).",
+         ["smith|2020"])
+    # Closed, so it must not generalise to "and <noun>" — that would make a
+    # real two-author pair ambiguous.
+    case("a real two-author pair is unaffected",
+         "Smith and Jones (2020) argue this.", ["smith|2020"],
+         want_authors=["Smith and Jones"])
+    case("the word alone is not a cue",
+         "We thanked colleagues (2020) for help.", [],
+         want_unres=["no_grammar_match"])
+
+    # ---- rc3 B8, the possessive gap ----
+    print("\nrc3 B8: possessive with a bounded gap")
+    case("simple possessive, which rc2 already covered",
+         "We follow Fine's (1998) here.", ["fine|1998"])
+    case("et al.'s, no gap",
+         "We follow Mackey et al.'s (2017) meta-analysis.", ["mackey|2017"])
+    case("one intervening noun",
+         "We follow Martinko et al.'s review (2013) here.", ["martinko|2013"])
+    case("three intervening tokens, the measured maximum",
+         "We follow Harter's definition of authenticity (2002) here.",
+         ["harter|2002"])
+    # The bound, and every terminator rc3 names.
+    case("four intervening tokens is too many",
+         "We follow Harter's very detailed definition of authenticity (2002).",
+         [], want_unres=["no_grammar_match"])
+    case("no possessive means no gap is allowed",
+         "We follow Smith review (2020) here.", [],
+         want_unres=["no_grammar_match"])
+    case("the gap does not cross a comma",
+         "We follow Harter's work, elsewhere (2002).", [],
+         want_unres=["no_grammar_match"])
+
+    # ---- rc3 B5, bounded lead-in cues ----
+    print("\nrc3 B5: lead-in cues, a closed set")
+    for cue in ("see", "see also", "see for example", "for an overview",
+                "for a review", "for a recent review", "for a meta-analysis",
+                "for a critique", "for critiques", "for a similar approach",
+                "for comparative examples", "for details"):
+        case(f"cue {cue!r}", f"Work follows ({cue}, Smith, 2020).",
+             ["smith|2020"])
+    case("the trailing form, where the cue follows the citation",
+         "Work follows (see Smith, 2013, for a critique).", ["smith|2013"])
+    # CLOSED is the safety argument: an open "for a <noun>" form would admit
+    # ordinary prose ahead of any parenthetical year.
+    case("a cue outside the set is not a cue",
+         "Work follows (for a banana, Smith, 2020).", [],
+         want_unres=["no_grammar_match"])
+    case("the §4 prefix cues still work",
+         "Work follows (e.g., Smith, 2020).", ["smith|2020"])
 
     # ---- §10 exit 2, the author-date style guard ----
     #

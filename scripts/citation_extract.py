@@ -79,13 +79,75 @@ PARTICLES = ("de", "del", "della", "der", "den", "di", "da", "dos", "du",
 # spans, and nothing lost on any paper.
 PARTICLE = "(?i:" + "|".join(PARTICLES) + ")"
 WS = r"[ \t\n]+"
-SURNAME = rf"(?:(?:{PARTICLE}){WS})*{CORE}"
+# rc3 B1a, "SURNAME — personal, two cores. Worth 9", is NOT implemented, and
+# the reason is worth keeping rather than rediscovering.
+#
+#     SURNAME = (PARTICLE WS)* CORE (WS (PARTICLE WS)? CORE)?
+#
+# It was implemented on 21 September and reverted the same day. It works —
+# `Carrieri de Souza`, `Oliveira da Silva`, `El Akremi`, `Pircher Verdorfer`
+# all key correctly, worth +0.011 recall on gold paper 1 and +0.040 on paper 2.
+# It also breaks four §12 conformance requirements, because a second CORE lets
+# SURNAME swallow the word in front of it:
+#
+#     In Smith (2020)            -> in smith|2020        §12: STOP discarded
+#     Following Bartko's (1976)  -> following bartko|1976
+#     World Bank (2024)          -> world bank|2024      §12: must NOT degrade
+#     (Adam Smith, 1776)         -> adam smith|1776      §12: forename-first
+#                                                        is unresolved
+#
+# rc3 says where the safety comes from, and it is not the grammar. B1b:
+#
+#     Under two-pass, Pass 1 assigns no identity, so the complete phrase
+#     reaches reconciliation and NON_PERSON_AUTHOR classifies it there.
+#
+# v3.3 is single-pass and assigns identity at extraction, so nothing
+# downstream catches these. B1a and B1b are a pair — B1b is itself blocked on
+# rc2, which rc3 amends and which nobody has — and B1a alone trades four
+# conformance requirements for recall. Implementing it needs either rc2 or
+# v3.4's two-pass split, which is the architecture decision, not a grammar fix.
+#
+# rc3 B2, "Lowercase core after a particle. Worth 1":
+#
+#     Da silva  →  Da matches PARTICLE, silva fails CORE
+#
+#     Permit a lowercase core ONLY immediately after a matched PARTICLE.
+#
+# The restriction is the whole safety argument, in rc3's words: "Relaxing
+# CORE's capital requirement generally would admit ordinary prose into the
+# candidate run, which is the hazard §6.1's eligibility test exists to
+# prevent." So this form appears only in the position a particle has already
+# established, never as the first core of a surname.
+CORE_AFTER_PARTICLE = r"[A-Za-zÀ-þ][\w'’\-]+"
+
+# rc3 B1a is `(PARTICLE WS)* CORE (WS (PARTICLE WS)? CORE)?` — a run of leading
+# particles, then one core, then optionally one more core with at most one
+# particle ahead of it. A first draft here allowed a single leading particle
+# and broke `van der maas`, which needs two. The `*` is load-bearing.
+_LEAD = rf"(?:(?:{PARTICLE}){WS})+{CORE_AFTER_PARTICLE}|{CORE}"
+SURNAME = rf"(?:{_LEAD})"
 YEAR = r"(?:1[5-9]|20)\d{2}[a-z]?|n\.d\."
 INITIALS = r"[A-Z]\.(?:[- ]?[A-Z]\.)*"
 
-AUTHORS_PAREN = (rf"(?:{SURNAME}{WS}et{WS}al\."
+# rc3 B7, "`and colleagues`. Worth 4":
+#
+#     Jost and colleagues (2003a)
+#     Colquitt and colleagues (2012)
+#     Dalal and colleagues (2009)
+#
+#     A closed two-token construction equivalent to `et al.`
+#
+# Closed, so it is spelled out rather than generalised to "and <noun>", which
+# would make `Smith and Jones (2020)` ambiguous with a two-author list.
+# The trailing possessive belongs to the whole author phrase, not to the last
+# surname: rc3 B8 writes `Mackey et al.'s (2017)` and `Martinko et al.'s review
+# (2013)`. Without the optional `'s` here, AUTHORS_NARR stops at `al.` and the
+# possessive is left outside the match, so B8's lookbehind never fires.
+ET_AL = rf"(?:et{WS}al\.['’]?s?|and{WS}colleagues['’]?s?)"
+
+AUTHORS_PAREN = (rf"(?:{SURNAME}{WS}{ET_AL}"
                  rf"|{SURNAME}(?:,{WS}?{SURNAME})*(?:,?{WS}(?:&|and){WS}{SURNAME})?)")
-AUTHORS_NARR = (rf"(?:{SURNAME}{WS}et{WS}al\."
+AUTHORS_NARR = (rf"(?:{SURNAME}{WS}{ET_AL}"
                 rf"|{SURNAME}(?:,{WS}{SURNAME})*,?{WS}(?:&|and){WS}{SURNAME}"
                 rf"|{SURNAME})")
 
@@ -94,7 +156,26 @@ AUTHORS_NARR = (rf"(?:{SURNAME}{WS}et{WS}al\."
 LOCATOR = r",[ \t\n]?(?:p\.|pp\.|para\.|chap\.)[ \t\n]?[^();]+"
 LOCATOR_COLON = r"(?::[ \t]*\d[^();]*)"
 PREFIX_CUES = ("e.g.", "i.e.", "cf.", "see also", "see", "but see")
+
+# rc3 B5, "Bounded lead-in cue. Worth 17". The cue set is CLOSED and is listed
+# in rc3 verbatim; it is not a pattern over "for a <noun>", because an open
+# form would admit ordinary prose ahead of any parenthetical year.
+#
+#     LEAD_IN ","? CUE CITATION_LIST, with CUE a CLOSED set.
+#
+# Longest first, so `see also` is not consumed as `see` leaving `also` to fail
+# the group.
+LEAD_IN_CUES = (
+    "for a recent review", "for comparative examples", "for a meta-analysis",
+    "for an overview", "for a similar approach", "for a critique",
+    "for critiques", "for a review", "for details", "see for example",
+    "see also", "see",
+)
+
 PREFIX_CUES_CP = PREFIX_CUES + ("cp.",)
+
+# rc3 B8. Named as the spec names it, so the number is findable from the text.
+MAX_POSSESSIVE_YEAR_GAP_TOKENS = 3
 
 NUMCITE = re.compile(r"\[\d{1,3}(?:[ \t]*[,–—-][ \t]*\d{1,3})*\]")
 SUPCITE = re.compile(r"[¹²³⁰⁴-⁹]+")
@@ -405,7 +486,12 @@ def guarded(para: str, t: int) -> bool:
 # ---------------------------------------------------------------- §6
 
 ELIGIBLE = re.compile(r"[A-ZÀ-Þ][\w'’.\-]*$", re.U)
-ELIGIBLE_LOWER = {"et", "al.", "and", "&"} | set(PARTICLES)
+# `colleagues` joins the eligible-lower set for rc3 B7. Without it the C2 run
+# stops before the word, so `Jost and colleagues (2003a)` never reaches the
+# grammar at all and B7's production is unreachable in narrative position —
+# which is the only position the construction occurs in. The parenthetical
+# form needs no run and worked without this.
+ELIGIBLE_LOWER = {"et", "al.", "and", "&", "colleagues"} | set(PARTICLES)
 
 
 def c1_spans(body: str) -> list[tuple[int, int]]:
@@ -425,11 +511,33 @@ def sentence_of(sents, offset: int):
 
 
 def token_run(body: str, c1_start: int, sent_start: int):
-    """§6.1 C2: walk left from C1, at most 6 eligible tokens, never past the
-    sentence start. Returns (run_start, [token strings]) innermost-last."""
+    """§6.1 C2: walk left from C1 while tokens are eligible, never past the
+    sentence start. Returns (run_start, [token strings]) innermost-last.
+
+    rc3 B1, on the six-token cap v3.3 §6.1 specifies:
+
+        Do not reintroduce a token cap. C2 removed the six-token cap for a
+        reason and the corpus still contains the case that removed it:
+        Van den Brink and Van der Woerd, 7 tokens, present twice.
+
+    and later, of whichever production is doing the work:
+
+        The span-length point stands unchanged: no global token cap.
+
+    The cap is what produced EC-3 — four works in the corpus attributed to the
+    wrong author, silently, because the run began partway through the author
+    list and §6.2's longest-admissible-suffix rule then parsed the remainder as
+    a shorter but well-formed list. `El Akremi, Gond, Swaen, De Roeck, and
+    Igalens (2015)` came out as `gond|2015`.
+
+    What still bounds the run, per rc3: eligibility and the sentence boundary,
+    exactly as they were. Every collected token must be `\\p{Lu}`-initial or in
+    the eligible-lower set, and none may start before sentence_start. Ordinary
+    prose is stopped by the eligibility test rather than by counting.
+    """
     i = c1_start
     toks, positions = [], []
-    while len(toks) < 6:
+    while True:
         j = i
         while j > sent_start and body[j - 1] in " \t\n":
             j -= 1
@@ -442,8 +550,39 @@ def token_run(body: str, c1_start: int, sent_start: int):
             break
         tok = body[k:j]
         bare = tok[:-1] if tok.endswith(",") else tok
-        if not (ELIGIBLE.match(bare) or bare.lower() in ELIGIBLE_LOWER):
-            break
+        # `al.'s` is `al.` wearing a possessive. Without stripping it the run
+        # stops on the tail of `Mackey et al.'s (2017)` and B8 is unreachable
+        # for every et-al. form, which is most of them.
+        unpossessed = POSSESSIVE.sub("", bare)
+        if not (ELIGIBLE.match(bare) or bare.lower() in ELIGIBLE_LOWER
+                or unpossessed.lower() in ELIGIBLE_LOWER):
+            # rc3 B8's gap is unreachable without this, and rc3 does not say
+            # so. It specifies what the gap terminates at — sentence boundary,
+            # comma, semicolon, parenthesis, another candidate — but not how
+            # the §6.1 envelope reaches across it, and §6.1 eligibility stops
+            # the walk at the first ordinary word. `Harter's definition of
+            # authenticity (2002)` collected an empty run.
+            #
+            # So: on hitting an ineligible token, look further left for a
+            # possessive within the bound. If one is there, the intervening
+            # words are the gap and the run continues through them. If not,
+            # stop exactly where eligibility said to. The exception cannot
+            # widen anything that does not end in `'s`.
+            gap = _possessive_gap(body, k, sent_start)
+            if gap is None:
+                break
+            # The token that triggered the look-ahead is itself part of the
+            # gap, and the loop walks leftward, so everything goes on in walk
+            # order: this token first, then the words beyond it, ending at the
+            # possessive. `positions` and `toks` are reversed together at the
+            # end, so inserting in any other order scrambles both.
+            toks.append(tok)
+            positions.append(k)
+            for g_tok, g_pos in gap:
+                toks.append(g_tok)
+                positions.append(g_pos)
+            i = gap[-1][1]
+            continue
         toks.append(tok)
         positions.append(k)
         i = k
@@ -452,18 +591,100 @@ def token_run(body: str, c1_start: int, sent_start: int):
     return (positions[0] if positions else c1_start), toks
 
 
+def _possessive_gap(body: str, upto: int, sent_start: int):
+    """The tokens of an rc3 B8 gap, or None.
+
+    Walks left from `upto` collecting at most
+    MAX_POSSESSIVE_YEAR_GAP_TOKENS words, and returns them only if the token
+    immediately beyond them ends in a possessive. Returns the gap *including*
+    that possessive token, in walk order — nearest first, possessive last —
+    which is the order the caller's loop builds `toks` in. An earlier version
+    reversed here and produced a run with tokens out of order and one of them
+    duplicated.
+
+    The terminators are rc3's: the gap does not cross a sentence boundary, a
+    comma or semicolon, or a parenthesis. A token carrying any of those ends
+    the attempt rather than being skipped over.
+    """
+    out, i = [], upto
+    for _ in range(MAX_POSSESSIVE_YEAR_GAP_TOKENS + 1):
+        j = i
+        while j > sent_start and body[j - 1] in " \t\n":
+            j -= 1
+        if j <= sent_start:
+            return None
+        k = j
+        while k > sent_start and body[k - 1] not in " \t\n":
+            k -= 1
+        if k < sent_start:
+            return None
+        tok = body[k:j]
+        if any(ch in tok for ch in ",;()"):
+            return None
+        out.append((tok, k))
+        if POSSESSIVE.search(tok):
+            return out
+        i = k
+    return None
+
+
 def build_patterns(fixes: set[str]):
     loc = LOCATOR + (f"|{LOCATOR_COLON}" if "colon" in fixes else "")
     cues = PREFIX_CUES_CP if "cp" in fixes else PREFIX_CUES
-    prefix = "(?:" + "|".join(re.escape(c) for c in cues) + r")[, ][ \t\n]?"
+    # rc3 B5: LEAD_IN ","? CUE CITATION_LIST, CUE a closed set, plus a bounded
+    # *trailing* form — `(see X, 2013, for a critique)`.
+    #
+    # The §4 PREFIX cues and B5's LEAD_IN cues are one optional element with an
+    # internal alternation, not two optional groups in sequence. Written as
+    # `(?:prefix)?(?:lead)?AUTHORS_PAREN…` the engine has to try every division
+    # of the text between two optionals before the authors, and with SURNAME
+    # now carrying its own alternations the segment pattern went exponential —
+    # a corpus run that had taken seconds did not finish in three minutes.
+    # Longest cue first inside the alternation, so `see also` is not consumed
+    # as `see`.
+    all_cues = tuple(sorted(set(cues) | set(LEAD_IN_CUES),
+                            key=lambda c: (-len(c), c)))
+    prefix = "(?:" + "|".join(re.escape(c) for c in all_cues) + r")[,]?[ \t\n]+"
+    trail = r",[ \t\n]*(?:" + \
+            "|".join(re.escape(c) for c in LEAD_IN_CUES) + ")"
     seg = (rf"(?:{prefix})?{AUTHORS_PAREN},{WS}(?:{YEAR})"
-           rf"(?:,{WS}(?:{YEAR}))*(?:{loc})?")
+           rf"(?:,{WS}(?:{YEAR}))*(?:{loc})?(?:{trail})?")
     return {
         "seg": re.compile(seg, re.U),
         "cite_paren": re.compile(rf"\([ \t\n]?{seg}(?:;[ \t\n]?{seg})*[ \t\n]?\)",
                                  re.U),
         "cite_narr": re.compile(
             rf"{AUTHORS_NARR}{WS}\([ \t\n]?(?:{YEAR})(?:,{WS}(?:{YEAR}))*"
+            rf"(?:{loc})?[ \t\n]?\)", re.U),
+        # rc3 B8, "Possessive narrative, with a bounded gap. Worth 7". rc2
+        # covers `Fine's (1998)`; new here is a noun between author and year:
+        #
+        #     Martinko et al.'s review (2013)
+        #     Harter's definition of authenticity (2002)
+        #
+        #     NARRATIVE_POSSESSIVE_NORMALIZATION MUST tolerate at most
+        #     MAX_POSSESSIVE_YEAR_GAP_TOKENS = 3 intervening tokens between
+        #     the possessive author and (YEAR).
+        #
+        #     The gap TERMINATES at, and does not cross: a sentence boundary,
+        #     a comma or semicolon, an opening or closing parenthesis, or any
+        #     other citation candidate.
+        #
+        # The lookbehind is what keeps this from becoming a general "author,
+        # some words, year" rule: without the possessive, `Smith review
+        # (2020)` would match and is not a citation. rc3 is explicit that the
+        # bound is legitimate here where B1's was not, because it limits a gap
+        # between two anchored elements rather than the length of the author
+        # expression.
+        #
+        # Three is the longest gap observed, so the bound sits at the measured
+        # maximum — rc3 calls that "also the weak point: one unseen paper with
+        # a four-token gap fails", and says the number should move only on
+        # evidence.
+        "cite_narr_poss": re.compile(
+            rf"{AUTHORS_NARR}(?<=['’]s){WS}"
+            rf"(?:[^\s,;().]+{WS}){{1,{MAX_POSSESSIVE_YEAR_GAP_TOKENS}}}"
+            rf"\([ \t\n]?(?:{YEAR})(?:,{WS}(?:{YEAR}))*"
             rf"(?:{loc})?[ \t\n]?\)", re.U),
         "seg_anchored": re.compile(rf"\A{seg}\Z", re.U),
     }
@@ -496,13 +717,49 @@ def first_core(authors: str) -> str:
     phrase, and the possessive is part of what the manuscript wrote.
     """
     toks = authors.split()
-    out = []
-    for t in toks:
-        if t.lower().rstrip(",") in PARTICLES:
-            out.append(t.rstrip(","))
-            continue
-        out.append(t.rstrip(","))
-        break
+    out: list[str] = []
+    i = 0
+
+    def bare(t: str) -> str:
+        return t.rstrip(",")
+
+    # Leading particles. A comma ends the surname, so a comma-terminated
+    # particle is not one — it is the last token of a previous author.
+    while i < len(toks) and bare(toks[i]).lower() in PARTICLES \
+            and not toks[i].endswith(","):
+        out.append(bare(toks[i]))
+        i += 1
+
+    if i >= len(toks):
+        return POSSESSIVE.sub("", " ".join(out))
+
+    first_ended_the_name = toks[i].endswith(",")
+    out.append(bare(toks[i]))
+    i += 1
+
+    # rc3 B1a's optional second core: (WS (PARTICLE WS)? CORE)?
+    #
+    # Only reachable when the first core was not comma-terminated, because a
+    # comma separates authors: `Smith, Jones, 2020` is two authors and
+    # `Carrieri de Souza, 2023` is one. Without that guard the key for a
+    # multi-author group would absorb the second author's surname.
+    #
+    # One repetition, not a loop — B1b is explicit that the production admits
+    # at most two CORE elements and that institutional authors are a separate
+    # path.
+    if not first_ended_the_name and i < len(toks):
+        j, extra = i, []
+        if bare(toks[j]).lower() in PARTICLES and not toks[j].endswith(","):
+            extra.append(bare(toks[j]))
+            j += 1
+        if j < len(toks):
+            nxt = bare(toks[j])
+            # A second CORE, and not a connective or the et-al. tail: those
+            # end the author phrase rather than continuing a surname.
+            if re.fullmatch(CORE, nxt) and nxt.lower() not in ("et", "al.", "and"):
+                extra.append(nxt)
+                out.extend(extra)
+
     return POSSESSIVE.sub("", " ".join(out))
 
 
@@ -558,7 +815,8 @@ def extract_citations(body: str, sents, heads, fixes: set[str]):
             k = len(toks) - L
             span_start = _offset_of_token(body, c1s, s_start, toks, k)
             cand = body[span_start:c1e]
-            if pat["cite_narr"].fullmatch(cand):
+            if pat["cite_narr"].fullmatch(cand) \
+                    or pat["cite_narr_poss"].fullmatch(cand):
                 parsed = (span_start, L)
                 break
         if parsed:
@@ -659,7 +917,15 @@ def _emit_narr(body, span_start, c1e, sent, heads, cits, unres, pat):
 
 def _emit_segment(body, gs, ge, ss, se, seg_text, style, sent, heads, cits,
                   unres):
-    m = re.match(rf"\A(?:(?:{'|'.join(re.escape(c) for c in PREFIX_CUES_CP)})[, ][ \t\n]?)?",
+    # The cue is not part of the author phrase, and the segment text still
+    # carries it. B5's LEAD_IN cues belong here alongside §4's PREFIX cues:
+    # without them `(for a review, Smith, 2020)` fell through AUTHORS_PAREN to
+    # the split-on-first-comma fallback and reported `for a review` as the
+    # author, keying `for|2020`. Longest first so `see also` is not consumed
+    # as `see`.
+    _CUES = tuple(sorted(set(PREFIX_CUES_CP) | set(LEAD_IN_CUES),
+                         key=lambda c: (-len(c), c)))
+    m = re.match(rf"\A(?:(?:{'|'.join(re.escape(c) for c in _CUES)})[, ][ \t\n]?)?",
                  seg_text)
     rest = seg_text[m.end():] if m else seg_text
     # The whole AUTHORS_PAREN production, not the text up to the first comma.

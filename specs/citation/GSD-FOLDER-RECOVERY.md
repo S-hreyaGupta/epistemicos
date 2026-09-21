@@ -118,46 +118,23 @@ not only the two that lack rules.
 
 ---
 
-## A candidate definition for `leading_gloss`
+## Both definitions are recoverable, and are in `A2-EXCLUSION-EVIDENCE.md`
 
-Recoverable from the evidence, and offered as a candidate rather than asserted.
+`CITATION_UNRESOLVED_109.md` came out of the same folder and lists all 109
+residual cases with sentence context, grouped into the seven classes A2's six
+reasons were drawn from. Both `leading_gloss` and `conversion_artifact` are
+defined by their cases there, and A2's total of thirty does not reconcile with
+the thirty it was taken from.
 
-`CITATION_RESIDUAL_142.md` names four examples of the 45 correctly-refused
-spans: `(2014)`, `i.e., respect and dignity`, `MBSR`, and mathpix image links.
-The second is a gloss. Filtering `CITATION_UNRESOLVED_109.md` for spans that
-open with a gloss marker and carry no year gives six:
+That file is what Alex Zamurko named as the missing piece on 21 September while
+reporting it could not be found.
 
-```text
-e.g., goal setting or intellectual stimulation
-e.g., using images and metaphors in a speech
-e.g., from the Minnesota Satisfaction Questionnaire
-e.g., emotional stability, conscientiousness, psychological capital, ...
-i.e., distributive, procedural, informational, and interpersonal
-i.e., respect and dignity
-```
-
-Each is a segment left behind by group splitting. The full parenthetical does
-contain citations — `(e.g., goal setting or intellectual stimulation; Barling,
-Weber, & Kelloway, 1996; …)` — and splitting on `;` leaves the lead-in text as
-its own detected occurrence with no author-year in it.
-
-```text
-candidate definition   a split-produced segment whose text opens with a gloss
-                       marker (e.g., i.e., viz., namely) and contains no YEAR
-```
-
-Six here against A2's eleven, but the 109 list is a subset of the residual the
-count was taken over, so the two are consistent rather than in conflict. The
-shape is what this establishes; the count is not re-derived.
-
-Note the distinction this has to keep. rc3 **B5**, "bounded lead-in cue, +17",
-is the *recovery* rule for `(e.g., Tepper, 2000)` — a real citation behind a
-gloss. `leading_gloss` is the *exclusion* for the gloss with no citation in it.
-Same marker, opposite dispositions, separated by whether a YEAR survives in the
-span. Any definition that misses that separation will delete seventeen real
-citations.
-
-`conversion_artifact` has no comparable evidence trail and stays undefined.
+**Worth recording that a reconstruction attempted here before the file was
+recovered was wrong.** From four examples, `leading_gloss` was guessed as "a
+segment opening with a gloss marker". Four of the eleven actual cases carry no
+marker at all, so the rule would have left them in the denominator. The guess
+was reasonable, it was offered as a candidate rather than asserted, and it was
+still wrong. Four examples looked like enough evidence and were not.
 
 ---
 

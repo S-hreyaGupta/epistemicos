@@ -1944,6 +1944,73 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
             cite_keys.append(c["citation_key"])
     matched = [c for c in cits if c["citation_key"] in keyed]
 
+    # ------------------------------------------- rc2 §8.2 and §8.3, identity
+    #
+    # Alex Zamurko, 21 September, Decision CIT-ARCH-01:
+    #
+    #     In-text citation evidence may generate and narrow candidate
+    #     reference identities, but it may not independently confirm reference
+    #     identity. A citation is CONFIRMED only when it matches a compatible
+    #     reference-list entry. If no compatible entry exists, classify it as
+    #     MISSING_REFERENCE while preserving the citation-derived candidate.
+    #     If multiple compatible entries remain, classify it as AMBIGUOUS; do
+    #     not guess.
+    #
+    # §8.2 gives the lookup result and §8.3 the exhaustive 3×3 table over the
+    # full candidate's match state F and the STOP-reduced candidate's S.
+    #
+    # ONLY THE FIRST COLUMN IS REACHABLE HERE, and saying so matters more than
+    # implementing the rest would. rc2 §6.3's additive STOP reduction is
+    # C-019 and is not implemented, so no STOP-reduced candidate is ever
+    # produced and §8.3's own rule applies: "If no STOP-reduced candidate
+    # exists, S is no_match." Six of the nine rows need S to be something
+    # else. Writing them would be writing code no input can reach, which this
+    # session has already deleted once tonight.
+    #
+    #     F=no_match   S=no_match   not_resolved, citation_key null
+    #     F=unique     S=no_match   full_phrase, the key is authoritative
+    #     F=nonunique  S=no_match   same key, and emit ambiguous_citation
+    #
+    # ADDITIVE. `citation_key` keeps v3.3's meaning for now and the new fields
+    # sit beside it, because retiring it changes both gold sets, the candidate
+    # adapter and every control asserting a key. What the record must not do
+    # is claim both things silently, so `identity_class` says plainly whether
+    # that key has been confirmed by a reference.
+    ref_index_by_key: dict[str, list[int]] = {}
+    for i, r in enumerate(refs):
+        if r["reference_key"]:
+            ref_index_by_key.setdefault(r["reference_key"], []).append(i)
+
+    ambiguous_citations = []
+    for c in cits:
+        cand = c["citation_key"]
+        idx = sorted(ref_index_by_key.get(cand, []))   # §8.2: ascending
+        if not idx:
+            state = "no_match"
+        elif len(idx) == 1:
+            state = "unique"
+        else:
+            state = "nonunique"
+
+        c["candidate_key"] = cand
+        c["match_state"] = state
+        c["reference_indices"] = idx
+        if state == "no_match":
+            c["author_resolution"] = "not_resolved"
+            c["identity_class"] = "identity_not_resolved"
+        else:
+            c["author_resolution"] = "full_phrase"
+            c["identity_class"] = ("bibliography_key_ambiguous"
+                                   if state == "nonunique"
+                                   else "unique_reference_match")
+        if state == "nonunique":
+            ambiguous_citations.append({
+                "type": "ambiguous_citation", "index": 0,
+                "citation_index": c["index"],
+                "candidate_key": cand,
+                "reference_indices": idx,
+            })
+
     # rc2 §9.3. The check that was missing, and the reason `Smith et al.
     # (2020)` and a one-author `Smith, J. (2020).` have been matching cleanly.
     #
@@ -2020,6 +2087,9 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     for i, m in enumerate(mismatches):
         m["index"] = i
         lines.append(m)
+    for i, a in enumerate(ambiguous_citations):
+        a["index"] = i
+        lines.append(a)
 
     # Alex Zamurko, 20 September, amending rc2:
     #
@@ -2050,6 +2120,18 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                   "author_structure_mismatches": len(mismatches),
                   # rc3 §C partitions CASES, not defects: one record per
                   # group, however many defects that group carries.
+                  # rc2 §11.2, over the three reachable identity
+                  # classes. The partition is exact by construction:
+                  # every parsed citation gets exactly one.
+                  "unique_reference_match_occurrences":
+                      sum(1 for c in cits
+                          if c["identity_class"] == "unique_reference_match"),
+                  "bibliography_key_ambiguous_occurrences":
+                      sum(1 for c in cits
+                          if c["identity_class"] == "bibliography_key_ambiguous"),
+                  "identity_not_resolved_occurrences":
+                      sum(1 for c in cits
+                          if c["identity_class"] == "identity_not_resolved"),
                   "citation_error_cases": len(errs),
                   "citation_error_defects": sum(len(e["defects"]) for e in errs),
                   "parsed": n_parsed,

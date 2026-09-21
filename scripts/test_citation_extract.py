@@ -1296,6 +1296,130 @@ def main() -> int:
     else:
         ok("§C: the defect list is in declaration order, not discovery order")
 
+    # ------------------------- rc2 §8.2 / §8.3, identity — CIT-ARCH-01
+    print("\nrc2 §8.2 / §8.3 — identity states, per CIT-ARCH-01")
+
+    R_ONE = ("\n\n## References\n\nSmith, J. (2020). A paper. Journal, "
+             "1(1), 1-10.\n")
+    R_DUP = ("\n\n## References\n\nSmith, J. (2020). A paper. Journal, "
+             "1(1), 1-10.\nSmith, J. (2020). A different paper. Other, "
+             "2(1), 1-9.\n")
+    R_NONE = ("\n\n## References\n\nJones, K. (2019). Unrelated. "
+              "Journal, 1(1), 1-10.\nBrown, L. (2018). Also unrelated. "
+              "Journal, 2(1), 1-9.\nDavis, M. (2017). Third. J, 3, 1.\n"
+              "Evans, N. (2016). Fourth. J, 4, 1.\nFord, O. (2015). "
+              "Fifth. J, 5, 1.\n")
+
+    def ident(body_text, refs):
+        with _tf.TemporaryDirectory() as td:
+            p = Path(td) / "paper.md"
+            p.write_text(HEAD + body_text + refs, encoding="utf-8")
+            lines, _c = ce.run(p, {"ampersand", "segments"})
+        cit = next((l for l in lines if l.get("type") == "citation"), None)
+        amb = [l for l in lines if l.get("type") == "ambiguous_citation"]
+        return cit, amb, lines[-1]
+
+    # §8.3 row 2: F=unique, S=no_match → full_phrase, key authoritative.
+    c, amb, _s = ident("As shown (Smith, 2020) here.", R_ONE)
+    if not c or c["match_state"] != "unique":
+        failures.append(f"§8.2: one keyed reference is a unique match — got "
+                        f"{c and c['match_state']}")
+    elif c["author_resolution"] != "full_phrase":
+        failures.append(f"§8.3 unique/no_match is full_phrase — got "
+                        f"{c['author_resolution']}")
+    elif c["identity_class"] != "unique_reference_match":
+        failures.append(f"§8.3: a unique match is unique_reference_match — "
+                        f"got {c['identity_class']}")
+    elif len(c["reference_indices"]) != 1:
+        failures.append("§8.2: unique means exactly one reference index")
+    elif amb:
+        failures.append("§8.3: a unique match emits no ambiguous_citation")
+    else:
+        ok("§8.3: unique/no_match → full_phrase, one reference index")
+
+    # §8.3 row 3: F=nonunique → same key, AND emit ambiguous_citation.
+    c, amb, _s = ident("As shown (Smith, 2020) here.", R_DUP)
+    if not c or c["match_state"] != "nonunique":
+        failures.append(f"§8.2: two references sharing a key is nonunique — "
+                        f"got {c and c['match_state']}")
+    elif len(c["reference_indices"]) != 2:
+        failures.append(f"§8.2: nonunique carries every index — got "
+                        f"{c['reference_indices']}")
+    elif c["reference_indices"] != sorted(c["reference_indices"]):
+        failures.append("§8.2: reference_indices are ascending")
+    elif len(amb) != 1:
+        failures.append(f"§8.3: nonunique emits exactly one "
+                        f"ambiguous_citation — got {len(amb)}")
+    elif c["identity_class"] != "bibliography_key_ambiguous":
+        failures.append(f"§8.3: nonunique is bibliography_key_ambiguous — "
+                        f"got {c['identity_class']}")
+    else:
+        ok("§8.3: nonunique/no_match → ambiguous_citation, key retained")
+
+    # §8.3 row 1: F=no_match → not_resolved. CIT-ARCH-01's core case: the
+    # citation parses, and identity is NOT established by that alone.
+    c, amb, _s = ident("As shown (Smith, 2020) here.", R_NONE)
+    if not c:
+        failures.append("the citation should still parse with no matching "
+                        "reference; extraction and identity are separate")
+    elif c["match_state"] != "no_match":
+        failures.append(f"§8.2: no keyed reference is no_match — got "
+                        f"{c['match_state']}")
+    elif c["author_resolution"] != "not_resolved":
+        failures.append(f"§8.3 no_match/no_match is not_resolved — got "
+                        f"{c['author_resolution']}")
+    elif c["identity_class"] != "identity_not_resolved":
+        failures.append(f"§8.3: got {c['identity_class']}")
+    elif c["reference_indices"] != []:
+        failures.append("§8.2: no_match carries zero reference indices")
+    else:
+        ok("§8.3: no_match → not_resolved, and the citation still parses")
+
+    # CIT-ARCH-01: "preserving the citation-derived candidate". The candidate
+    # survives the failure to confirm; it is not discarded.
+    if c and c.get("candidate_key") != "smith|2020":
+        failures.append(f"CIT-ARCH-01 preserves the citation-derived "
+                        f"candidate when nothing confirms it — got "
+                        f"{c and c.get('candidate_key')}")
+    else:
+        ok("CIT-ARCH-01: an unconfirmed candidate is preserved, not discarded")
+
+    # rc2 §11.2's partition, which is what makes the three classes countable.
+    #
+    # The fixture must contain ALL THREE classes at once. Written first with
+    # only unique and not_resolved, a mutation that double-counted the
+    # ambiguous class survived, because the class it double-counted was empty.
+    # A partition control over two of three parts is not a partition control.
+    R_MIX = ("\n\n## References\n\nSmith, J. (2020). A paper. Journal, "
+             "1(1), 1-10.\nSmith, J. (2020). A different paper. Other, "
+             "2(1), 1-9.\nBrown, L. (2018). Third. J, 3, 1.\n")
+    _c, _a, s = ident("As shown (Smith, 2020; Brown, 2018; Jones, 2019) here.",
+                      R_MIX)
+    counts = (s["unique_reference_match_occurrences"],
+              s["bibliography_key_ambiguous_occurrences"],
+              s["identity_not_resolved_occurrences"])
+    if sum(counts) != s["parsed"]:
+        failures.append(f"§11.2: the identity classes must partition the "
+                        f"parsed occurrences — {sum(counts)} vs "
+                        f"{s['parsed']}")
+    elif not all(counts):
+        failures.append(f"the partition control needs all three classes "
+                        f"present or it cannot see a double-count — got "
+                        f"{counts}")
+    else:
+        ok("§11.2: the identity classes partition the parsed occurrences")
+
+    # And the six rows that CANNOT be reached, said out loud rather than
+    # left as untested code. §8.3: "If no STOP-reduced candidate exists, S is
+    # no_match." rc2 §6.3's additive STOP reduction is C-019, unimplemented,
+    # so nothing here ever produces one.
+    if any(c.get("stop_reduced_phrase") for c in
+           [ident("As shown (Smith, 2020) here.", R_ONE)[0]] if c):
+        failures.append("a STOP-reduced candidate exists, so §8.3's other "
+                        "six rows are now reachable and must be implemented")
+    else:
+        ok("§8.3: S is always no_match here, so six rows stay unreachable")
+
     print()
     if failures:
         for f in failures:

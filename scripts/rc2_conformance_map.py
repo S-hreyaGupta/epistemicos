@@ -84,6 +84,17 @@ CHECKS = {
               "rc2 §7.4 non-person identity"),
     "C-036": ((), ("no comma, at least one letter",), "MET",
               "comma-containing organisation unresolved, not guessed"),
+    # rc2 §8.2 / §8.3, unblocked by CIT-ARCH-01 and implemented 21 September.
+    # Only §8.3's first column is reachable: no STOP-reduced candidate exists,
+    # so S is always no_match and six of the nine rows cannot be built.
+    "C-037": ((), ("§8.3: no_match → not_resolved",), "MET",
+              "F=no_match, S=no_match"),
+    "C-038": ((), ("§8.3: unique/no_match → full_phrase",), "MET",
+              "F=unique, S=no_match"),
+    "C-039": ((), ("§8.3: nonunique/no_match → ambiguous_citation",), "MET",
+              "F=nonunique, S=no_match"),
+    "C-052": ((), ("§11.2: the identity classes partition",), "MET",
+              "identity partition is exact"),
     "C-062": ((), ("exact fails on count",), "MET", "rc2 §9.3"),
     "C-063": ((), ("exact fails on order",), "MET", "rc2 §9.3"),
     "C-064": (("ET_AL_MIN_AUTHORS = 3",),
@@ -104,8 +115,8 @@ CHECKS = {
 # not sixty unrelated gaps.
 NOT_IMPLEMENTED = {
     **{c: "rc2 §8 two-pass identity model not implemented"
-       for c in ("C-037", "C-038", "C-039", "C-040", "C-041", "C-042",
-                 "C-043", "C-044", "C-045", "C-052")},
+       for c in ("C-040", "C-041", "C-042",
+                 "C-043", "C-044", "C-045")},
     **{c: "ambiguous_author_resolution not implemented"
        for c in ("C-048", "C-049", "C-050", "C-051")},
     **{c: "candidate-level diagnostics not implemented"

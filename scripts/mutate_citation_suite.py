@@ -379,6 +379,38 @@ MUTATIONS = [
      '    if m:',
      "§C: (See 2020) is not a citation error"),
 
+    # ---------------------------- rc2 §8.2 / §8.3, identity — CIT-ARCH-01
+
+    ("rc2 §8.2: every lookup reports a unique match",
+     '        elif len(idx) == 1:\n            state = "unique"',
+     '        elif True:\n            state = "unique"',
+     "§8.2: two references sharing a key is nonunique"),
+
+    ("rc2 §8.2: a no-match reports as resolved anyway",
+     '        if not idx:\n            state = "no_match"',
+     '        if False:\n            state = "no_match"',
+     "§8.2: no keyed reference is no_match"),
+
+    ("rc2 §8.2: reference indices are not sorted",
+     '        idx = sorted(ref_index_by_key.get(cand, []))',
+     '        idx = list(reversed(ref_index_by_key.get(cand, [])))',
+     "§8.2: reference_indices are ascending"),
+
+    ("rc2 §8.3: a nonunique match emits no ambiguous_citation",
+     '        if state == "nonunique":\n            ambiguous_citations.append',
+     '        if False:\n            ambiguous_citations.append',
+     "§8.3: nonunique emits exactly one ambiguous_citation"),
+
+    ("CIT-ARCH-01: the unconfirmed candidate is discarded",
+     '        c["candidate_key"] = cand',
+     '        c["candidate_key"] = None',
+     "CIT-ARCH-01 preserves the citation-derived candidate"),
+
+    ("rc2 §11.2: the identity partition double-counts",
+     '                          if c["identity_class"] == "identity_not_resolved"),',
+     '                          if c["identity_class"] != "unique_reference_match"),',
+     "§11.2: the identity classes must partition"),
+
     ("rc3 B1b: the parenthetical detection site is closed again",
      "        inner = body[c1s + 1:c1e - 1]\n        cut = YEAR_RE.search(inner)",
      "        inner = body[c1s + 1:c1e - 1]\n        cut = None",

@@ -143,6 +143,32 @@ gap is the one thing rc3 forbids by name.
 The other six are not gated, do not require resolving the architecture
 question, and are worth 38 between them.
 
+### Implemented as of 21 September
+
+```text
+B2    lowercase CORE after a matched PARTICLE                       1   done
+B5    LEAD_IN ","? CUE CITATION_LIST, closed cue set               17   done
+B7    `and colleagues`                                              4   done
+B8    possessive, MAX_POSSESSIVE_YEAR_GAP_TOKENS = 3                7   done
+B1    no global token cap                                           —   done
+B1a   SURNAME, personal, two cores                                  9   REVERTED
+A1    candidate_state, three terminal states                            done
+A2    excluded_reason, closed set                                       done, 4 of 6
+A4    one candidate lifecycle                                           done
+A5    denominator normative, parse rate is not accuracy                 done
+```
+
+B1a was written and reverted: the production swallowed the word before the
+surname, turning `In Smith (2020)` into `in smith|2020` and `World Bank (2024)`
+into `world bank|2024`. The reasoning is kept in `citation_extract.py` rather
+than rediscovered.
+
+A2 reaches four of its six reasons. `leading_gloss` and `conversion_artifact`
+appear exactly once each in the whole specs tree — in A2's own table, with a
+count and no definition — and `non_citation_year` has one instance and no rule
+that separates it from the eighteen corpus spans sharing its shape. See
+`EXCLUSION-COVERAGE.md`.
+
 ### A note on B2
 
 B2 records, of the August implementation, that it "already applies `(?i:…)` to

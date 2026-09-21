@@ -121,6 +121,66 @@ MUTATIONS = [
      'LEAD_IN_CUES = (\n    "for a recent review"',
      'LEAD_IN_CUES = (\n    "zzz-not-a-cue"  # "for a recent review"',
      "cue 'for a review'"),
+
+    # ------------------------------------------------ rc3 §A, output contract
+    #
+    # A1 gives a candidate three terminal states and A5 makes the denominator
+    # normative, so these mutations are aimed at the accounting rather than the
+    # grammar. The failure they model is the one rc3 A1 opens with: a mathpix
+    # image URL and a genuinely missed citation being byte-identical in the
+    # record. Each mutation puts that back a different way.
+
+    ("rc3 B10: nothing is ever excluded",
+     "        reason = classify_exclusion(body, c1s, c1e, heads, maths)",
+     "        reason = None",
+     "a mathpix cdn image URL is excluded_candidate/url_or_image"),
+
+    ("rc3 B10: the URL test is containment, not anchored",
+     'if re.match(r"\\s*(?:https?://|www\\.\\w)", inner, re.I):',
+     'if re.search(r"(?:https?://|www\\.\\w)", inner, re.I):',
+     "a citation beside a URL parses and is not url_or_image"),
+
+    ("rc3 §E: the structural front-matter test is gone",
+     '    if level == "none":\n        return "publisher_metadata"',
+     '    if False:\n        return "publisher_metadata"',
+     "§E: a candidate above the first h2 is publisher_metadata"),
+
+    ("rc3 §E: the named sections are back in the envelope",
+     "    if name.strip().lower() in ENVELOPE_OUT_NAMES:",
+     "    if False and name.strip().lower() in ENVELOPE_OUT_NAMES:",
+     "§E: a candidate under `## Citation information` is excluded"),
+
+    ("rc3 B10: math exclusion is blanket, deleting D2's real citations",
+     "    if span and not D2_YEAR_ONLY.match(body[span[0]:span[1]]):",
+     "    if span:",
+     "B10/D2: a year-only math span is not math_expression"),
+
+    ("rc3 B10: math spans are never excluded, so the branch is vacuous",
+     "    span = _in_math_span(maths, s, e)",
+     "    span = None",
+     "B10: a math span that is not year-only is math_expression"),
+
+    ("rc3 A2: the reason set stops being closed",
+     "    if reason not in EXCLUDED_REASONS:\n        raise AssertionError",
+     "    if False:\n        raise AssertionError",
+     "A2: a reason outside the closed set is refused, incl. bare_locator"),
+
+    ("rc3 A4: an excluded span is dropped instead of recorded",
+     "    excl.append(rec)",
+     "    return  # excl.append(rec)",
+     "A4: an excluded span is emitted, not silently dropped"),
+
+    ("rc3 A5: the denominator counts the excluded candidates again",
+     "    n_parsed, n_unres, n_excl = len(cits), len(unres), len(excl)\n"
+     "    denom = n_parsed + n_unres",
+     "    n_parsed, n_unres, n_excl = len(cits), len(unres), len(excl)\n"
+     "    denom = n_parsed + n_unres + n_excl",
+     "A5: the denominator excludes excluded_candidate"),
+
+    ("rc3 A5: the summary calls its parse rate an accuracy",
+     '                  "candidate_parse_rate": (round(n_parsed / denom, 4)',
+     '                  "extraction_accuracy": (round(n_parsed / denom, 4)',
+     "A5: the summary reports a parse rate and no accuracy figure"),
 ]
 
 # The STOP mutation needs to empty the set rather than edit its opening line.

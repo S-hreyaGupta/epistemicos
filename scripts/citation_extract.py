@@ -59,6 +59,50 @@ from pathlib import Path
 
 SPEC_VERSION = "3.3"
 
+# ------------------------------------------------- rc3 §A, the output contract
+#
+# rc3 A1, on what rc2 emitted and this implementation emitted until today:
+#
+#     rc2 emits every unresolved candidate as `unresolved_citation` with
+#     `no_grammar_match`. A mathpix image URL and a genuinely missed citation
+#     are byte-identical in the record.
+#
+# That was exactly true here. The corpus carried 247 unresolved spans and
+# nothing in the output distinguished a span the parser MISSED from one it was
+# RIGHT to refuse, so every accuracy figure computed over them was computed
+# over a denominator containing known non-citations.
+#
+# A1 gives three terminal states and A4 gives one lifecycle for reaching them:
+#
+#     raw detection → candidate → exclusion classification
+#                                     ├── excluded_candidate      terminal
+#                                     └── eligible candidate
+#                                             ├── parsed
+#                                             └── unresolved_citation
+#
+# "Exclusion classifies a candidate; it does not prevent one." So an excluded
+# span is EMITTED, with a reason, and is visible in the record. It is not
+# dropped — §G's A4 case is "excluded span → excluded_candidate, NOT absent".
+CANDIDATE_STATES = ("parsed", "unresolved_citation", "excluded_candidate")
+
+# rc3 A2. The set is CLOSED, and the counts are rc3's own, over its nine
+# in-profile papers. `bare_locator` is deliberately absent: rc3 puts
+# `(Barbier, 2022; P.923)` in §C's diagnostic class, because a semicolon where
+# APA wants a comma is an author error, not a correct refusal.
+#
+# WHAT IS IMPLEMENTED, AND WHAT IS NOT. Four of the six have a rule stated
+# somewhere in rc3; two do not. Detectors exist only where a rule does, and the
+# reason each of the others is absent was measured against the corpus rather
+# than assumed — see `classify_exclusion` and EXCLUSION-COVERAGE.md.
+EXCLUDED_REASONS = {
+    "leading_gloss":       11,   # NO RULE ANYWHERE IN rc3 — not implemented
+    "url_or_image":         8,   # B10 + §G case          — implemented
+    "publisher_metadata":   4,   # §E, by section name    — implemented
+    "math_expression":      3,   # B10, with D2 carve-out — implemented, 0 hits
+    "conversion_artifact":  3,   # NO RULE ANYWHERE IN rc3 — not implemented
+    "non_citation_year":    1,   # §F names ONE instance and no rule — see below
+}
+
 # ---------------------------------------------------------------- §4 grammar
 
 NAMECHAR = r"[^\W\d_]|['’\-]"
@@ -778,11 +822,164 @@ def split_segments(inner: str) -> list[str]:
     return [s for s in inner.split(";")]
 
 
+# ------------------------------------------------------- rc3 §A4 exclusion
+#
+# Runs BEFORE the grammar, per A4: every proposed span is a candidate, and
+# exclusion classifies it rather than stopping it from being one. rc3 is
+# explicit about why the distinction matters, in B10:
+#
+#     An earlier draft said A3 "prevents spans becoming candidates". That
+#     contradicted §A, where the same 11 instances are counted as
+#     `excluded_candidate` removals — if they were never candidates the
+#     accounting could not be reproduced from the output contract.
+
+# §E. "Sections identified as `front matter` or `Citation information` are OUT
+# of the in-text citation envelope." rc3 adds "No new detection is required —
+# the section map already labels both by name."
+#
+# It labels ONE of them by name. `section_stack_at` returns the literal string
+# "front matter" as its DEFAULT when no h2-h4 heading precedes the offset, so
+# testing `name == "front matter"` would pass for a reason other than the one
+# it is named for: not because a section was identified as front matter, but
+# because no section had started yet. Those two coincide in this corpus and
+# would stop coinciding the moment a paper carried an actual `## Front matter`
+# heading, or the default string changed.
+#
+# So the front-matter half is tested STRUCTURALLY as well, on the level:
+# "above every h2" is what a paper with an untitled preamble actually means,
+# and it is checkable without depending on a default string. Measured over all
+# fourteen papers before choosing it — six papers have exactly one C1 span
+# above their first h2, every one of them the journal's own "To cite this
+# article:" line, and the other eight have none. No abstract sits there: the
+# first h2 is `## Abstract` in thirteen of the fourteen.
+#
+# "front matter" is deliberately NOT in the name set below, and the reason is
+# a surviving mutation rather than a preference.
+#
+# §E's words are "sections identified as front matter", so listing the name
+# looked right and was added. The mutation probe then removed the structural
+# test and the suite stayed green: `section_stack_at` hands back the fabricated
+# name "front matter", the name test caught the same span, and the control
+# named for the structural rule had been passing through the other branch the
+# whole time. The same defect the whole milestone is about, one level up.
+#
+# Two overlapping branches where one of them matches an invented value cannot
+# both be held by a control, so the invented one goes. What remains: a paper
+# with an untitled preamble is handled structurally, which is every paper in
+# this corpus, and a paper carrying a real `## Front matter` heading is not
+# handled at all. That is a miss rather than an over-exclusion — those spans
+# stay unresolved and stay in A5's denominator, where they are visible — and it
+# is the safe direction to be wrong in.
+ENVELOPE_OUT_NAMES = {"citation information"}
+
+
+MATH_SPAN = re.compile(r"\$[^$\n]{1,400}\$")
+
+
+def math_spans(body: str) -> list[tuple[int, int]]:
+    """Every `$...$` span in the body, computed ONCE per document.
+
+    Scanning the body per candidate instead made the run quadratic — two
+    thousand candidates over two hundred kilobytes — and a corpus pass stopped
+    finishing. Worth recording, because the extractor's cost is normally
+    linear in the body and this is the first thing in it that was not.
+    """
+    return [(m.start(), m.end()) for m in MATH_SPAN.finditer(body)]
+
+
+def _in_math_span(spans, s: int, e: int):
+    """The enclosing `$...$` span, if the candidate sits inside one."""
+    for ms, me in spans:
+        if ms <= s and e <= me:
+            return ms, me
+        if ms > e:
+            break
+    return None
+
+
+# D2's MATCH clause, used here only to REFUSE to exclude. See below.
+D2_YEAR_ONLY = re.compile(
+    r"\A\$\(\s*(?:(?:1[5-9]|20)\d{2}[a-z]?|n\.d\.)"
+    r"(?:\s*[,;]\s*(?:(?:1[5-9]|20)\d{2}[a-z]?|n\.d\.))*\s*\)\$\Z")
+
+
+def classify_exclusion(body: str, s: int, e: int, heads, maths=None):
+    """rc3 A2's reason, or None if the span stays an eligible candidate."""
+    if maths is None:
+        maths = math_spans(body)
+    inner = body[s + 1:e - 1]
+
+    # B10 / §G: "mathpix cdn URL → excluded_candidate/url_or_image".
+    #
+    # The span must BE the URL, not merely contain one. `(BIS, 2014,
+    # https://www.gov.uk/...)` is a real citation with a link inside it, and it
+    # is in this corpus. A containment test excludes it; an anchored test does
+    # not. Eleven spans corpus-wide match anchored, all of them the URL of a
+    # `![](https://cdn.mathpix.com/...)` image whose pixel dimensions happen to
+    # parse as years.
+    if re.match(r"\s*(?:https?://|www\.\w)", inner, re.I):
+        return "url_or_image"
+
+    # §E, envelope. Two disjoint tests: no section has started yet, or the
+    # section we are in is named one of §E's two. Kept disjoint deliberately —
+    # `section_stack_at` returns the literal string "front matter" as its
+    # default name, so a single name test would swallow the structural case and
+    # neither could then be probed on its own.
+    level, name, _, _ = section_stack_at(heads, s)
+    if level == "none":
+        return "publisher_metadata"
+    if name.strip().lower() in ENVELOPE_OUT_NAMES:
+        return "publisher_metadata"
+
+    # B10, math. rc3 warns by name that this rule collides with D2:
+    #
+    #     Blanket math-span exclusion would delete three real citations —
+    #     `Baron $(2012,2016)$` and `Shepherd and Kay $(2012,2014)$`, where
+    #     Mathpix wrapped an ordinary parenthetical in math mode.
+    #
+    # So D2's own MATCH clause is applied here as a carve-out: a math span that
+    # is year-only is NOT excluded, because it is a citation awaiting D2's
+    # unwrapping, and excluding it would take a real citation off the
+    # denominator. Measured: every one of the eight math-wrapped candidates in
+    # the corpus is year-only, which is D2's "eight corpus-wide" exactly. This
+    # branch therefore fires zero times here, and that is the correct result
+    # rather than a missing detector — the three rc3 counts under
+    # `math_expression` are not among the candidates this detector produces.
+    span = _in_math_span(maths, s, e)
+    if span and not D2_YEAR_ONLY.match(body[span[0]:span[1]]):
+        return "math_expression"
+
+    # `non_citation_year` is NOT detected, and the reason is a measurement.
+    #
+    # rc3 §F gives one instance — "three consecutive (2011, 2012, and 2013)" —
+    # and no rule. The obvious rule, a pure year list with no reachable author
+    # run, was tried against the corpus first: it matches 19 spans, of which 8
+    # are D2's math-wrapped citations, one is §C's `Fremout et al (2022)`, and
+    # several more are narrative boundary failures that §F says in terms MUST
+    # NOT be removed from the denominator as false positives. One instance in
+    # nineteen is not a rule, so nothing is excluded under this reason until
+    # rc2 or Alex Zamurko supplies one.
+    #
+    # `leading_gloss` (11) and `conversion_artifact` (3) appear exactly once
+    # each in the whole specs tree — in A2's own table. They carry counts and
+    # no definition, so there is nothing to implement. Together with the above
+    # that is 18 of rc3's 30; see EXCLUSION-COVERAGE.md.
+    return None
+
+
 def extract_citations(body: str, sents, heads, fixes: set[str]):
     pat = build_patterns(fixes)
-    cits, unres = [], []
+    cits, unres, excl = [], [], []
+    maths = math_spans(body)
 
     for c1s, c1e in c1_spans(body):
+        # A4: classification precedes the grammar, and terminates the
+        # candidate when it fires.
+        reason = classify_exclusion(body, c1s, c1e, heads, maths)
+        if reason is not None:
+            _excl(body, c1s, c1e, reason, sentence_of(sents, c1s), heads, excl)
+            continue
+
         sent = sentence_of(sents, c1s)
         if sent is None:
             continue
@@ -833,7 +1030,8 @@ def extract_citations(body: str, sents, heads, fixes: set[str]):
 
     cits.sort(key=lambda r: (r["group_start"], r["segment_start"]))
     unres.sort(key=lambda r: r["start"])
-    return cits, unres
+    excl.sort(key=lambda r: r["start"])
+    return cits, unres, excl
 
 
 def _offset_of_token(body, c1_start, sent_start, toks, index):
@@ -980,10 +1178,37 @@ def _unres(body, start, end, reason, sent, heads, unres):
     lv, nm, _, _ = section_stack_at(heads, start)
     unres.append({
         "type": "unresolved_citation", "index": 0,
+        # rc3 A1. `type` already said this, but A1 makes the terminal state a
+        # named field on every candidate so the three states can be counted
+        # uniformly without knowing which record shapes exist.
+        "candidate_state": "unresolved_citation",
         "text": body[start:end], "start": start, "end": end, "reason": reason,
         "sentence": body[s_start:s_end], "sentence_start": s_start,
         "section_level": lv, "section_name": nm,
     })
+
+
+def _excl(body, start, end, reason, sent, heads, excl):
+    """rc3 A1's third terminal state. NOT a failure: it records that detection
+    proposed a span and the grammar was right to decline it."""
+    if reason not in EXCLUDED_REASONS:
+        raise AssertionError(f"excluded_reason not in rc3 A2's closed set: "
+                             f"{reason!r}")
+    lv, nm, _, _ = section_stack_at(heads, start)
+    rec = {
+        "type": "excluded_candidate", "index": 0,
+        "candidate_state": "excluded_candidate",
+        "text": body[start:end], "start": start, "end": end,
+        "excluded_reason": reason,
+        "section_level": lv, "section_name": nm,
+    }
+    # A candidate above the first heading has no sentence under §5, which is
+    # how the journal's "To cite this article:" line reaches here. The record
+    # is emitted either way — A4's case is that it must not be absent.
+    if sent is not None:
+        rec["sentence"] = body[sent[0]:sent[1]]
+        rec["sentence_start"] = sent[0]
+    excl.append(rec)
 
 
 # ---------------------------------------------------------------- §7
@@ -1077,7 +1302,7 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
         body = body.replace("\\&", "&")
         section = section.replace("\\&", "&")
     sents = sentences(body)
-    cits, unres = extract_citations(body, sents, heads, fixes)
+    cits, unres, excl = extract_citations(body, sents, heads, fixes)
 
     # §10 exit 2, computed on the body and the parse count.
     n = len(NUMCITE.findall(body)) + len(SUPCITE.findall(body))
@@ -1102,6 +1327,9 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     for i, u in enumerate(unres):
         u["index"] = i
         lines.append(u)
+    for i, x in enumerate(excl):
+        x["index"] = i
+        lines.append(x)
     for i, r in enumerate(refs):
         r["index"] = i
         lines.append(r)
@@ -1115,9 +1343,47 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
         if c["citation_key"] not in cite_keys:
             cite_keys.append(c["citation_key"])
     matched = [c for c in cits if c["citation_key"] in keyed]
+
+    # rc3 A5, normative:
+    #
+    #     detected_candidates    = parsed + unresolved + excluded
+    #     extraction_denominator = parsed + unresolved
+    #                              EXCLUDES excluded_candidate
+    #     candidate_parse_rate   = parsed / extraction_denominator
+    #
+    # and, in terms this summary is required to obey:
+    #
+    #     `candidate_parse_rate` is NOT accuracy. It measures how much of what
+    #     the detector proposed the parser could read. It says nothing about
+    #     detection recall, and a parser can successfully parse an incorrect
+    #     span. Extraction accuracy, precision and recall MUST NOT be reported
+    #     until a gold set exists. Naming a parse rate "accuracy" is the same
+    #     defect this whole milestone is about: a number that cannot come back
+    #     false.
+    #
+    # So this record carries a parse rate under its own name and no accuracy
+    # field of any kind. Precision and recall are computed in
+    # `scripts/gold_runner.py`, against the hand-annotated sets, and nowhere
+    # else. rc3 also warns that the rate is the less stable of the two figures
+    # — segment splitting turns one failed parenthesis into several failed
+    # segments, so absolute counts survive detection changes and rates do not.
+    # Both are emitted; the counts are the ones to compare across runs.
+    n_parsed, n_unres, n_excl = len(cits), len(unres), len(excl)
+    denom = n_parsed + n_unres
     lines.append({"type": "summary",
                   "matched_occurrences": len(matched),
                   "matched_works": len({c["citation_key"] for c in matched}),
+                  "parsed": n_parsed,
+                  "unresolved": n_unres,
+                  "excluded": n_excl,
+                  "detected_candidates": denom + n_excl,
+                  "extraction_denominator": denom,
+                  "candidate_parse_rate": (round(n_parsed / denom, 4)
+                                           if denom else None),
+                  "excluded_by_reason": {
+                      r: sum(1 for x in excl if x["excluded_reason"] == r)
+                      for r in EXCLUDED_REASONS
+                      if any(x["excluded_reason"] == r for x in excl)},
                   "exit": 0 if len(matched) == len(cits) and not unres else 1})
     return lines, lines[-1]["exit"]
 

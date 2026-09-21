@@ -34,6 +34,7 @@ target and is not reached through `bootstrap_gate.covered()`.
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -69,7 +70,7 @@ def main() -> int:
 
     def case(label: str, body: str, want_keys=None, want_unres=None,
              want_text=None, want_authors=None, fixes=frozenset()):
-        cits, unres = extract(body, fixes)
+        cits, unres, _excl = extract(body, fixes)
         got = keys(cits)
         if want_keys is not None and got != want_keys:
             failures.append(f"{label}\n      body {body!r}\n"
@@ -572,13 +573,13 @@ def main() -> int:
 
     # segments: one bad segment must not take the good ones with it.
     seg = "As shown (Smith, 2020; nonsense here; Jones, 2021) in that work."
-    cits, unres = extract(seg)
+    cits, unres, _excl = extract(seg)
     if keys(cits):
         failures.append("without the segments flag a damaged group still "
                         f"yielded {keys(cits)}; §6.2 is whole-span")
     else:
         ok("a damaged group loses everything without the segments flag")
-    cits, unres = extract(seg, {"segments"})
+    cits, unres, _excl = extract(seg, {"segments"})
     if keys(cits) != ["smith|2020", "jones|2021"]:
         failures.append(f"with the segments flag, expected both citations, "
                         f"got {keys(cits)}")
@@ -587,6 +588,223 @@ def main() -> int:
                         f"{[u['reason'] for u in unres]}")
     else:
         ok("with it, the good segments survive and the bad one is reported")
+
+    # ------------------------------------------------------ rc3 §A, §E, B10
+    #
+    # §G names six A-series conformance cases. All six are here; the two rc3
+    # lists under `non_citation_year`, `leading_gloss` and `conversion_artifact`
+    # are not, because no rule for them exists to test against — see
+    # EXCLUSION-COVERAGE.md, which records the measurement behind that.
+
+    print("\nrc3 §A output contract — three terminal states")
+
+    def doc(body_text, head=HEAD):
+        """Run the whole pipeline and hand back the emitted record stream."""
+        text = ce.normalise((head + body_text + REFS).encode("utf-8"))
+        body, section, off, heads = ce.split_body_and_references(text)
+        body = body.replace("\\&", "&")
+        sents = ce.sentences(body)
+        return (body,) + ce.extract_citations(body, sents, heads,
+                                              {"ampersand", "segments"})
+
+    def excluded(body_text, head=HEAD):
+        return doc(body_text, head)[3]
+
+    # B10 / §G: "mathpix cdn URL → excluded_candidate/url_or_image". The years
+    # are the image's pixel dimensions, which is why it is a candidate at all.
+    url = ("![](https://cdn.mathpix.com/cropped/f7ae2f9b-69c3-4256-a0e5-"
+           "7689118f0ca6-07.jpg?height=1895&width=1318&top_left_y=344)")
+    x = excluded(url)
+    if [r["excluded_reason"] for r in x] != ["url_or_image"]:
+        failures.append(f"a mathpix image URL should be excluded as "
+                        f"url_or_image, got {[r.get('excluded_reason') for r in x]}")
+    else:
+        ok("a mathpix cdn image URL is excluded_candidate/url_or_image")
+
+    # The negative that makes the rule anchored rather than containment-based:
+    # the span must BE a URL, not merely contain one.
+    body, cits, unres, x = doc("As reported (Smith, 2020; https://example.org/"
+                               "page) here.")
+    if x:
+        failures.append("a group that merely CONTAINS a URL was excluded; the "
+                        "rule is anchored, not containment")
+    elif keys(cits) != ["smith|2020"]:
+        failures.append(f"(Smith, 2020; https://…) should still parse under "
+                        f"segment splitting, got {keys(cits)}")
+    else:
+        ok("a citation beside a URL parses and is not url_or_image")
+
+    # The same shape as it actually occurs in the corpus: `(BIS, 2014,
+    # https://www.gov.uk/…)` in `2af68a7f`. An institutional author with the
+    # source URL inside the group. It does not parse — rc3 B1b, blocked on rc2,
+    # is what would recover it — and the control is that the URL does not turn a
+    # known gap into a correct refusal. Excluding it would take a citation B1b's
+    # recall is waiting for off A5's denominator, where it would stop being
+    # counted as missing.
+    #
+    # The expectation here was written as `all_caps_surname` first, from the
+    # rule that refuses `BIS`, and the extractor said `no_grammar_match`: the
+    # trailing URL stops the whole group matching before the surname is ever
+    # examined. Checked rather than predicted, which is the only reason the
+    # fixture is right.
+    body, cits, unres, x = doc("As reported (BIS, 2014, https://www.gov.uk/"
+                               "government/organisations) here.")
+    if x:
+        failures.append(f"(BIS, 2014, https://…) is an unresolved institutional "
+                        f"author, not a correct refusal; it was excluded as "
+                        f"{[r['excluded_reason'] for r in x]}")
+    elif [u["reason"] for u in unres] != ["no_grammar_match"]:
+        failures.append(f"(BIS, 2014, https://…) should be an unresolved "
+                        f"citation, got {[u['reason'] for u in unres]}")
+    else:
+        ok("an institutional author with a URL stays unresolved, not excluded")
+
+    # §E, front matter. Structural: above the first h2. The span below is the
+    # journal's own line, and six of the fourteen corpus papers carry one.
+    front = ("# Paper\n\nTo cite this article: Jesús Labrador Fernández, "
+             "Pedro César Martínez Morán & Gisela Delfino (2023) Lessons "
+             "learned, Cogent Business & Management, 10:3.\n\n## Introduction"
+             "\n\n")
+    x = excluded("Ordinary text here.", head=front)
+    if [r["excluded_reason"] for r in x] != ["publisher_metadata"]:
+        failures.append(f"'To cite this article:' above the first h2 should be "
+                        f"excluded_candidate/publisher_metadata, got "
+                        f"{[r.get('excluded_reason') for r in x]}")
+    else:
+        ok("§E: a candidate above the first h2 is publisher_metadata")
+
+    # §E, the other half, by section name this time.
+    x = excluded("Text.\n\n## Citation information\n\nCite this article as: "
+                 "Lessons learned, Cogent Business & Management (2023), 10.")
+    if [r["excluded_reason"] for r in x] != ["publisher_metadata"]:
+        failures.append(f"a candidate under `## Citation information` should be "
+                        f"publisher_metadata, got "
+                        f"{[r.get('excluded_reason') for r in x]}")
+    else:
+        ok("§E: a candidate under `## Citation information` is excluded")
+
+    # The negative for the envelope: an ordinary section is still in it.
+    body, cits, unres, x = doc("As shown (Smith, 2020) here.")
+    if x:
+        failures.append(f"an ordinary in-text citation was excluded: "
+                        f"{[r['excluded_reason'] for r in x]}")
+    else:
+        ok("a citation under an ordinary heading is not excluded")
+
+    # B10's named collision with D2. rc3: "Blanket math-span exclusion would
+    # delete three real citations — Baron $(2012,2016)$ …". It must NOT be
+    # excluded; it is a citation awaiting D2's unwrapping, and excluding it
+    # would take a real citation off A5's denominator.
+    body, cits, unres, x = doc("Additional work by Baron $(2012,2016)$ found.")
+    if x:
+        failures.append(f"a year-only math span is D2's unwrap case and MUST "
+                        f"NOT be excluded, got {[r['excluded_reason'] for r in x]}")
+    else:
+        ok("B10/D2: a year-only math span is not math_expression")
+
+    # And the positive, so the branch is not vacuous: math that is not
+    # year-only carries no citation and is a correct refusal.
+    x = excluded(r"The model $\alpha = 0.96 (2012) + x$ converged.")
+    if [r.get("excluded_reason") for r in x] != ["math_expression"]:
+        failures.append(f"a math span that is not year-only should be "
+                        f"math_expression, got "
+                        f"{[r.get('excluded_reason') for r in x]}")
+    else:
+        ok("B10: a math span that is not year-only is math_expression")
+
+    # A2: the set is closed, and the code says so rather than trusting itself.
+    if set(ce.EXCLUDED_REASONS) != {"leading_gloss", "url_or_image",
+                                    "publisher_metadata", "math_expression",
+                                    "conversion_artifact", "non_citation_year"}:
+        failures.append(f"rc3 A2's excluded_reason set is CLOSED and has "
+                        f"drifted: {sorted(ce.EXCLUDED_REASONS)}")
+    else:
+        ok("A2: excluded_reason is rc3's closed six-member set")
+
+    try:
+        ce._excl("x", 0, 1, "bare_locator", None, [], [])
+    except AssertionError:
+        ok("A2: a reason outside the closed set is refused, incl. bare_locator")
+    else:
+        failures.append("_excl accepted a reason outside rc3 A2's closed set; "
+                        "`bare_locator` belongs to §C, not to correct refusal")
+
+    # A1 + A3, the completeness invariant, over a document carrying all three
+    # states at once. "Every detected candidate terminates as parsed,
+    # unresolved, or correctly excluded. Nothing disappears silently."
+    mixed = ("As shown (Smith, 2020) here. Then " + url +
+             " and (nonsense here, 2021 unparseable) too.")
+    body, cits, unres, x = doc(mixed)
+    n_c1 = len(ce.c1_spans(body))
+    states = [c["candidate_state"] for c in cits] \
+        + [u["candidate_state"] for u in unres] \
+        + [r["candidate_state"] for r in x]
+    if not cits or not unres or not x:
+        failures.append(f"the mixed document should reach all three states, "
+                        f"got parsed {len(cits)} unres {len(unres)} excl {len(x)}")
+    elif any(s not in ce.CANDIDATE_STATES for s in states):
+        failures.append(f"a record carried a state outside A1's three: {states}")
+    elif len(states) != n_c1:
+        failures.append(f"A3 completeness: {n_c1} detected candidate(s) but "
+                        f"{len(states)} terminal state(s) — a candidate was "
+                        f"dropped or double-counted")
+    else:
+        ok("A1/A3: every detected candidate reaches exactly one of three states")
+
+    # A4: "excluded span → excluded_candidate, NOT absent". The earlier draft
+    # rc3 corrects had exclusion prevent candidacy, which would make this
+    # record vanish and the 30-item accounting unreproducible.
+    if not any(r["type"] == "excluded_candidate" for r in x):
+        failures.append("an excluded span left no record; A4 requires it to be "
+                        "present as excluded_candidate, not absent")
+    else:
+        ok("A4: an excluded span is emitted, not silently dropped")
+
+    # A5, on the summary this time, which needs the CLI path.
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "paper.md"
+        p.write_text(HEAD + mixed + REFS, encoding="utf-8")
+        lines, _code = ce.run(p, {"ampersand", "segments"})
+    s = lines[-1]
+    if s["extraction_denominator"] != s["parsed"] + s["unresolved"]:
+        failures.append(f"A5: extraction_denominator must be parsed + "
+                        f"unresolved, got {s['extraction_denominator']}")
+    elif s["detected_candidates"] != s["extraction_denominator"] + s["excluded"]:
+        failures.append("A5: detected_candidates must be parsed + unresolved "
+                        "+ excluded")
+    elif s["excluded"] == 0:
+        failures.append("A5's denominator control ran on a document with "
+                        "nothing excluded, so it would pass either way")
+    else:
+        ok("A5: the denominator excludes excluded_candidate")
+
+    # A5: "Extraction accuracy, precision and recall MUST NOT be reported until
+    # a gold set exists." The summary is the record that would carry them, so
+    # the control is that it does not.
+    #
+    # This runs BEFORE the parse-rate check below, and that ordering is load
+    # bearing. Probed the other way round, a mutation renaming
+    # `candidate_parse_rate` to `extraction_accuracy` was "caught" by a
+    # KeyError from the parse-rate check — a crash, not a control going red for
+    # its own reason, and the banned-name control never executed at all. The
+    # same shape as a build break being mistaken for a failing test.
+    banned = [k for k in s
+              if re.search(r"accuracy|precision|recall", k, re.I)]
+    if banned:
+        failures.append(f"A5 forbids the summary reporting accuracy, precision "
+                        f"or recall; found {banned}")
+    else:
+        ok("A5: the summary reports a parse rate and no accuracy figure")
+
+    if "candidate_parse_rate" not in s:
+        failures.append("A5: the summary carries no candidate_parse_rate")
+    elif abs(s["candidate_parse_rate"]
+             - s["parsed"] / s["extraction_denominator"]) > 1e-9:
+        failures.append("A5: candidate_parse_rate is parsed / "
+                        "extraction_denominator")
+    else:
+        ok("A5: candidate_parse_rate is over the corrected denominator")
 
     print()
     if failures:

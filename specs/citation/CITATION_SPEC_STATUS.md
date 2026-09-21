@@ -4,9 +4,29 @@ Written 19 September 2026, because "send me the final citations spec" turned
 out not to have a single answer.
 
 ```text
-VERSION GOVERNING THE CODE   v3.3
+VERSION GOVERNING THE CODE   v3.3, plus rc3's §A output contract
 AUTHORITATIVE                pending one confirmation from Alex Zamurko
 ```
+
+## Update, 21 September 2026
+
+Two things below are out of date and the newer documents supersede them rather
+than replace this record of what was known on 19 September.
+
+**rc3 is in the repository.** `citation-v3.4-rc3-amendments.md`, 735 lines,
+`c392982e…`. `RC3-FOUND.md` records where it came from and `LINEAGE.md` places
+it: six documents in two lineages, with rc2 — a four-file package rc3 amends —
+still missing.
+
+**rc3 §A is implemented.** The extractor now emits A1's three terminal states,
+A2's closed reason set, A4's one lifecycle and A5's normative denominator.
+`EXCLUSION-COVERAGE.md` records which of A2's six reasons have a rule stated in
+rc3 and which do not, with the corpus measurement behind each decision. The
+grammar amendments B2, B5, B7 and B8 are also in; B1a, B1b, B9 and B10's
+institutional path are blocked on rc2.
+
+So the governing-document question below is unchanged and still open. What has
+changed is that rc3 can now be read, hashed and diffed, and part of it runs.
 
 ## What exists
 

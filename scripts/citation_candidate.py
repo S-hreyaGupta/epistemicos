@@ -116,8 +116,17 @@ def main() -> int:
     counts = {s: 0 for s in STATES}
     unknown_state, no_phrase = 0, []
 
+    # The three record types rc3 A1 gives a detected candidate, plus None for
+    # the bare-record form. Filtering to `citation` alone — which is what this
+    # did until A1 was implemented — meant the state counts below could only
+    # ever report parsed, and the other two printed 0 on every run whatever the
+    # extractor found. A count that cannot come back non-zero is not a
+    # measurement, and this one was printed next to real ones.
+    CANDIDATE_TYPES = (None, "citation", "unresolved_citation",
+                       "excluded_candidate")
+
     for r in records(src):
-        if r.get("type") not in (None, "citation"):
+        if r.get("type") not in CANDIDATE_TYPES:
             continue
         state = r.get("candidate_state")
         if state is None:

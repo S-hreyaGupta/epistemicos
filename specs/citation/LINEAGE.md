@@ -1,8 +1,10 @@
 # The citation specification lineage
 
 Established 19 September 2026, after Alex Zamurko asked whether the next step
-is to consolidate the three files. It is not three files, and consolidation is
-blocked on a fifth.
+is to consolidate the three files. It is not three files.
+
+Updated through 21 September, when rc2 arrived. The blocker this file recorded
+for two days is gone; what remains is in "What consolidation now needs".
 
 ## What exists, and what it is
 

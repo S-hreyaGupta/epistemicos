@@ -45,6 +45,54 @@ v3.4 rc3 — one document, present
   "amendment set over rc2", 31 August. A- B- C- D-series amendments.
 ```
 
+### Searched for rc2 by contents, 21 September
+
+Alex Zamurko asked whether rc2 might simply have a different name, which is a
+good hypothesis: it is exactly why rc3 went unfound for two weeks, and rc3 was
+eventually located by searching file *contents* rather than names.
+
+The same search was run for rc2, three independent ways. All three come back
+empty across the uploads and this repository.
+
+```text
+1  BY DECLARED REVISION — name-independent, and the strongest of the three
+   Every file in this house style carries `candidate_revision` in its front
+   matter. Every citation-lineage file that carries one declares 1:
+
+       candidate_revision: 1    citation_architecture            (rc1)
+       candidate_revision: 1    citation_execution_conformance   (rc1)
+       candidate_revision: 1    citation_v3.4_conformance_matrix (rc1)
+       candidate_revision: 1    citation_v3.4_deferred_work      (rc1)
+
+   The only `candidate_revision: 2` anywhere belongs to LDVI v0.3, a
+   different specification.
+
+2  BY rc2's OWN CONTENT
+   rc3 says rc2 defines the bibliography-side NON_PERSON_AUTHOR production and
+   B4's segment splitting. Both strings appear in exactly ONE file in the
+   uploads, and that file is rc3 itself, referring to them. rc2's definitions
+   are not present.
+
+3  BY UPLOAD WINDOW
+   rc1's four files arrived as a batch within 71 seconds:
+
+       2026-08-27 18:17  citation_execution_conformance_v3.4_rc1
+       2026-08-27 18:17  citation_v3.4_dependency_deferred_work_register
+       2026-08-27 18:18  citation_architecture_v3.4_rc1
+       2026-08-27 18:18  citation_v3.4_conformance_matrix_freeze_checklist
+
+   rc3 arrived 31 August. Between those two dates there is no citation upload
+   of any kind, and a four-file package would be visible as a batch.
+```
+
+One caveat worth stating: rc3 itself carries **no front matter**, so test 1
+would miss an rc2 shaped like rc3 rather than like rc1. Tests 2 and 3 do not
+depend on front matter and also come back empty, and rc3 calls rc2 "the
+four-file rc2 package", which is rc1's shape rather than its own.
+
+So rc2 was most likely never shared here. #citation between 27 and 31 August,
+or Alex Zamurko's own machine, are where it would be.
+
 So the shape is:
 
 ```text

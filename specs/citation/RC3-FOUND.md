@@ -58,10 +58,24 @@ recorded in the records   ddc6f1f80c93d12d6268cda03fffb6720adac3b4bb9bc5da351f8c
 this file                 c392982ef625aec03e8f52af51fc88138ea0e4e9c3bfb9795d62f9dfbf594d5b
 ```
 
-The copy here is a second download — the filename ends `(2)` — so the original
-may have differed by line endings or by being a later revision. Either way the
-digest that has been quoted since 3 September does not identify this file, and
-no file in the uploads hashes to it.
+The copy here is a second download — the filename ends `(2)` — so this file
+first read as possibly the same content under different line endings. **It is
+not.** Tested 21 September against nine normalisations of these bytes — LF,
+CRLF, with and without a trailing newline, with and without a BOM, trailing
+whitespace stripped — and none produces `ddc6f1f8…`. The two digests name
+genuinely different content, so `ddc6f1f8…` is a different revision of rc3 and
+not a different encoding of this one.
+
+Four searches, none of which finds it:
+
+```text
+git history        rc3 committed exactly once, at c392982e…; no other version
+session uploads    1 file of 1099 contains `leading_gloss`, and it is this one
+Google Drive       fullText `leading_gloss` and `citation`+`rc3`: no results
+byte normalisation nine variants, none matches
+```
+
+The digest quoted since 3 September does not identify any file we hold.
 
 That is the same shape as `PROVENANCE-GAP.md`: a recorded hash naming an
 artifact nobody has. The difference is that here the artifact turned up and the

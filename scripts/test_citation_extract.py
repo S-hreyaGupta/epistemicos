@@ -1523,6 +1523,47 @@ def main() -> int:
     else:
         ok("§9.4: missing_reference preserves the candidate, establishes none")
 
+    # C-054 is that same rule on the other diagnostic, and it was unpinned
+    # until now. The emission sets both fields to None and no control asked,
+    # so the mutation probe had nothing to make red. rc2 states the rule for
+    # BOTH diagnostics; the suite only held one of them.
+    mr, pm = diag("As shown (Whiteman, 2000) here.",
+                  "\n\n## References\n\nWhitman, R. (2000). A paper. J, 1, 1."
+                  "\n" + PAD)
+    if len(pm) != 1:
+        failures.append(f"§9.4: the repair pairs — got {len(pm)}")
+    elif pm[0]["citation_key"] is not None or pm[0]["author_kind"] is not None:
+        failures.append("§9.4: a possible_mismatch establishes no citation_key "
+                        "or author_kind either")
+    elif pm[0]["candidate_key"] != "whiteman|2000":
+        failures.append("§9.4: possible_mismatch preserves the CANDIDATE, not "
+                        "the reference it paired with")
+    else:
+        ok("§9.4: a possible_mismatch establishes no citation_key")
+
+    # C-060. rc2 qualifies merge_suspected by the candidate's OWN phrase and
+    # year appearing inside a suspect entry — "targeted, not global". Both
+    # halves need pinning: a flag hardcoded True passes any control that only
+    # looks at the merged case, and one hardcoded False passes any control
+    # that only looks at the clean one.
+    MERGED = ("Kowalski, T. (2015). A paper. Smith, J. (2020). A merged "
+              "entry. J, 1, 1.\n" + PAD)
+    mr_hit, _ = diag("As shown (Smith, 2020) here.",
+                     "\n\n## References\n\n" + MERGED)
+    mr_miss, _ = diag("As shown (Smith, 2020) here.",
+                      "\n\n## References\n\n" + PAD)
+    if len(mr_hit) != 1 or len(mr_miss) != 1:
+        failures.append(f"§9.5: both candidates are unpairable and emit one "
+                        f"missing_reference each — got {len(mr_hit)}, "
+                        f"{len(mr_miss)}")
+    elif not mr_hit[0]["merge_suspected"]:
+        failures.append("§9.5: a candidate whose phrase and year sit inside a "
+                        "merged entry is merge_suspected")
+    elif mr_miss[0]["merge_suspected"]:
+        failures.append("§9.5: merge_suspected is targeted, not global")
+    else:
+        ok("§9.5: merge_suspected is targeted at the candidate, not global")
+
     # A paired reference leaves the pool, so a second candidate cannot claim
     # the same entry. Without this, one typo'd reference repairs every
     # citation that happens to be one letter away from it.

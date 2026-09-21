@@ -437,6 +437,21 @@ MUTATIONS = [
      '                "merge_suspected": merge,\n                "citation_key": cand_key, "author_kind": kind,',
      "§9.4: neither diagnostic establishes citation_key"),
 
+    ("CIT-ARCH-01: possible_mismatch establishes identity",
+     '                "rule": rule, "occurrences": len(occs),\n                # rc2, twice over and in CIT-ARCH-01: this establishes nothing.\n                "citation_key": None, "author_kind": None,',
+     '                "rule": rule, "occurrences": len(occs),\n                # rc2, twice over and in CIT-ARCH-01: this establishes nothing.\n                "citation_key": cand_key, "author_kind": kind,',
+     "§9.4: a possible_mismatch establishes no citation_key"),
+
+    ("rc2 §9.5: merge_suspected is set globally",
+     "            merge = any(",
+     "            merge = True or any(",
+     "§9.5: merge_suspected is targeted, not global"),
+
+    ("rc2 §9.5: merge_suspected never fires",
+     "            merge = any(",
+     "            merge = False and any(",
+     "§9.5: a candidate whose phrase and year sit inside"),
+
     ("rc2 §9.4: nothing is ever paired",
      "            rule = repair_rule(kind, phrase, year, rk, rp, ry)",
      "            rule = None",

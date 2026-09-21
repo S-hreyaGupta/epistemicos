@@ -21,13 +21,26 @@ WHAT A VERDICT MEANS, precisely
     PARTIAL       the behaviour exists but the case asks for more than is
                   pinned — usually a field rc2 requires that is not emitted,
                   or an exhaustiveness the suite does not have
-    NOT           not implemented, with the reason named
-    NOT ASSESSED  no honest probe was written. NEVER reported as met.
+    NOT           not implemented, with the reason named AND, where one
+                  exists, an anti-needle that makes the verdict falsifiable
+    NOT ASSESSED  no honest probe was written, or a probe went stale in
+                  either direction. NEVER reported as met.
 
 The distinction between MET and "it probably works" is the whole point. A case
 is only MET when a control would go red if the behaviour were removed, which
 this repository has learned twice is not the same as the behaviour appearing
 to be present.
+
+A NOT verdict needs the same treatment and did not have it. MET claims were
+already falsifiable — remove the control and the needle stops matching — but
+NOT claims were hand-maintained text that nothing could contradict. On
+21 September, C-053 to C-060 kept reading "not implemented" for a full commit
+after §9.4 landed, because implementing a behaviour gives this file no way to
+notice. Each NOT now carries an anti-needle: the string that would appear if
+the case WERE implemented. Its presence does not promote the case, it retires
+the verdict. Seventeen cases have no honest anti-needle; they say so, and the
+run counts them, because an unguarded claim that admits it is unguarded is a
+different thing from one that does not.
 """
 
 from __future__ import annotations
@@ -95,6 +108,23 @@ CHECKS = {
               "F=nonunique, S=no_match"),
     "C-052": ((), ("§11.2: the identity classes partition",), "MET",
               "identity partition is exact"),
+    # rc2 §9.4 / §9.5, implemented 21 September. These eight sat in
+    # NOT_IMPLEMENTED for a full commit after the behaviour landed, which is
+    # what the anti-needle guard below now exists to prevent.
+    "C-053": ((), ("§9.4: missing_reference preserves the candidate",),
+              "PARTIAL", "null key pinned; identity_authority not emitted"),
+    "C-054": ((), ("§9.4: a possible_mismatch establishes no citation_key",),
+              "PARTIAL", "null key pinned; identity_authority not emitted"),
+    "C-056": ((), ("§9.4: the CORE length floor stops short surnames",),
+              "PARTIAL", "kind/year/CORE pinned; precedence unexercisable"),
+    "C-057": ((), ("§9.4: the rules are mutually exclusive",), "PARTIAL",
+              "rule pinned; precedence unexercisable"),
+    "C-058": ((), ("§9.4: all three repair rules pair their reference",),
+              "PARTIAL", "rule pinned; precedence unexercisable"),
+    "C-059": ((), ("§9.4: a person candidate never pairs with a non-person",),
+              "MET", "cross-kind pairing refused"),
+    "C-060": ((), ("§9.5: merge_suspected is targeted at the candidate",),
+              "MET", "both halves pinned: targeted, and it does fire"),
     "C-062": ((), ("exact fails on count",), "MET", "rc2 §9.3"),
     "C-063": ((), ("exact fails on order",), "MET", "rc2 §9.3"),
     "C-064": (("ET_AL_MIN_AUTHORS = 3",),
@@ -110,42 +140,69 @@ CHECKS = {
               "out of envelope"),
 }
 
-# Not implemented, each with the reason. Grouped so the shape of what is
-# missing is legible: most of it is one architecture and one output contract,
+# Not implemented: (reason, anti-needle). Grouped so the shape of what is
+# missing is legible — most of it is one architecture and one output contract,
 # not sixty unrelated gaps.
+#
+# THE ANTI-NEEDLE, and why it exists
+# ----------------------------------
+# A CHECKS verdict degrades to NOT ASSESSED when its needle stops matching, so
+# a MET claim cannot outlive the control behind it. A NOT verdict had no such
+# guard, and on 21 September eight of them — C-053 to C-060 — went on reading
+# "not implemented" for a full commit after §9.4 landed. Nothing was wrong
+# except that a hand-maintained claim had no way to notice it had become false.
+#
+# The anti-needle is the string that would appear in the source IF the case
+# were implemented. Its presence does not mean the case is met; it means this
+# verdict can no longer be trusted, and the run says NOT ASSESSED and exits 1.
+#
+# Some cases have no honest anti-needle — a byte-offset contract or a
+# determinism golden leaves no distinctive identifier behind. Those carry None
+# and are COUNTED in the output, so the size of the unguarded set is visible
+# rather than silent. Inventing a needle for them would put this file back in
+# the business of green-for-the-wrong-reason.
 NOT_IMPLEMENTED = {
-    **{c: "rc2 §8 two-pass identity model not implemented"
-       for c in ("C-040", "C-041", "C-042",
-                 "C-043", "C-044", "C-045")},
-    **{c: "ambiguous_author_resolution not implemented"
+    # All blocked on the same missing thing: rc2's additive STOP reduction
+    # never builds a second candidate, so S is always no_match.
+    **{c: ("rc2 §8 two-pass identity: no stop-reduced second candidate exists",
+           "stop_reduced_candidate")
+       for c in ("C-019", "C-020", "C-040", "C-041", "C-042",
+                 "C-043", "C-044", "C-045", "C-055")},
+    **{c: ("ambiguous_author_resolution not implemented",
+           "ambiguous_author_resolution")
        for c in ("C-048", "C-049", "C-050", "C-051")},
-    **{c: "candidate-level diagnostics not implemented"
-       for c in ("C-053", "C-054", "C-055", "C-061")},
-    **{c: "§9.4 repair rules not implemented"
-       for c in ("C-056", "C-057", "C-058", "C-059", "C-060")},
-    **{c: "citation_surface_group_key not implemented"
+    "C-061": ("uncited_reference pool not implemented", "uncited_reference"),
+    **{c: ("citation_surface_group_key not implemented",
+           "citation_surface_group_key")
        for c in ("C-022", "C-023", "C-024", "C-025")},
-    **{c: "sentence-relative fields not emitted"
+    **{c: ("sentence-relative fields not emitted", "previous_sentence_end")
        for c in ("C-026", "C-027", "C-028")},
-    **{c: "bibliography_absent not implemented"
+    **{c: ("bibliography_absent not implemented", "bibliography_absent")
        for c in ("C-009", "C-066", "C-067")},
-    **{c: "exit 6 not allocated" for c in ("C-046", "C-047", "C-077")},
-    **{c: "file output contract not implemented"
+    **{c: ("exit 6 not allocated", "exit 6")
+       for c in ("C-046", "C-047", "C-077")},
+    **{c: ("file output contract not implemented", "canonical_sha256")
        for c in ("C-071", "C-072", "C-073")},
-    **{c: "byte-coordinate contract: offsets here are code points"
+    "C-017": ("PREFIX longest-match precedence not pinned", "longest-match"),
+    "C-078": ("the exit-1 finding set is not closed", "FINDINGS_FORCING_EXIT1"),
+
+    # No honest anti-needle. Each says why.
+    **{c: ("byte-coordinate contract: offsets here are code points; an "
+           "implementation leaves no distinctive identifier", None)
        for c in ("C-002", "C-003", "C-004")},
-    **{c: "determinism not byte-pinned"
+    **{c: ("determinism not byte-pinned; 'byte-identical' already appears in "
+           "prose, so it cannot serve as a needle", None)
        for c in ("C-029", "C-032", "C-068", "C-069", "C-070", "C-083")},
-    **{c: "outside the pilot scope" for c in ("C-084", "C-085", "C-086")},
-    "C-005": "heading contract only partially pinned",
-    "C-015": "verbatim span is kept but not pinned by a control",
-    "C-017": "PREFIX longest-match precedence not pinned",
-    "C-019": "STOP reduction is destructive here; rc2 requires additive",
-    "C-020": "author_phrase is complete, but no stop_reduced candidate exists",
-    "C-078": "the exit-1 finding set is not closed",
-    "C-080": "true but unpinned: numeric citations never become identity",
-    "C-081": "the corpus still carries unresolved findings",
-    "C-082": "no timed termination test",
+    **{c: ("outside the pilot scope — rc2 itself marks these OUTSIDE_PILOT, "
+           "so no local change can make the verdict stale", None)
+       for c in ("C-084", "C-085", "C-086")},
+    "C-005": ("heading contract only partially pinned; 'heading contract' "
+              "already names an existing exit-4 control", None),
+    "C-015": ("verbatim span is kept but not pinned by a control", None),
+    "C-080": ("true but unpinned: numeric citations never become identity",
+              None),
+    "C-081": ("the corpus still carries unresolved findings", None),
+    "C-082": ("no timed termination test", None),
 }
 
 
@@ -163,7 +220,8 @@ def main() -> int:
         print("no cases parsed from the matrix; the table shape has changed")
         return 1
 
-    rows, tally, broken = [], Counter(), []
+    both = impl + suite
+    rows, tally, broken, unguarded = [], Counter(), [], []
     for cid, desc, scope in cases:
         if cid in CHECKS:
             need_impl, need_suite, verdict, note = CHECKS[cid]
@@ -176,7 +234,17 @@ def main() -> int:
                 verdict, note = "NOT ASSESSED", f"probe stale: {missing[0][:40]!r}"
                 broken.append(cid)
         elif cid in NOT_IMPLEMENTED:
-            verdict, note = "NOT", NOT_IMPLEMENTED[cid]
+            reason, anti = NOT_IMPLEMENTED[cid]
+            if anti is None:
+                verdict, note = "NOT", reason
+                unguarded.append(cid)
+            elif anti in both:
+                # The thing this case said was missing is now present. The
+                # verdict is not wrong-and-failing, it is no longer evidence.
+                verdict, note = "NOT ASSESSED", f"NOT may be stale: {anti!r}"
+                broken.append(cid)
+            else:
+                verdict, note = "NOT", reason
         else:
             verdict, note = "NOT ASSESSED", "no probe written"
         tally[verdict] += 1
@@ -193,8 +261,13 @@ def main() -> int:
     print("  rc2 marks all 86 PENDING_EXECUTION, so these are the first that")
     print("  have been executed at all.")
 
+    if unguarded:
+        print(f"\n  {len(unguarded)} NOT verdict(s) carry no anti-needle and")
+        print("  so cannot notice if the behaviour is implemented. Each says")
+        print(f"  why: {', '.join(unguarded)}")
+
     if broken:
-        print(f"\n  {len(broken)} probe(s) went stale and are reported as NOT")
+        print(f"\n  {len(broken)} verdict(s) went stale and are reported as NOT")
         print(f"  ASSESSED rather than passing: {', '.join(broken)}")
         return 1
     return 0

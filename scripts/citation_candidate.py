@@ -9,11 +9,26 @@ Exit 1 = refused; nothing written.
 
 Why this is a separate step
 --------------------------
-The gold set keys on `author_phrase` plus year. rc3 §A already requires the
-extractor to emit exactly that: *`author_phrase` always records the complete
-source candidate phrase before STOP reduction, and STOP reduction MUST never
-alter it.* So the two meet without either bending toward the other, which is
-the property that makes the comparison worth anything.
+The gold set keys on an author phrase plus year. Which phrase took until
+22 September to state correctly, and this paragraph had it wrong.
+
+rc3 §A says *`author_phrase` always records the complete source candidate
+phrase before STOP reduction, and STOP reduction MUST never alter it.* So
+`author_phrase` is `As Podsakoff et al.`, lead-in included. The gold set, hand
+annotated by Alex Zamurko and Mohit, records `podsakoff et al.` — the author
+names, with no lead-in anywhere in either paper.
+
+Those are different fields wearing the same name. Until 22 September they
+appeared to agree only because the extractor was emitting the REDUCED phrase
+as `author_phrase`, dropping lead-in tokens on 20 of 368 narrative occurrences
+— matching gold and violating rc3 §A. This file used to claim "the two meet
+without either bending toward the other", which was true of neither.
+
+So: the extractor now emits both, per rc2 §6.3's additive reduction, and this
+adapter selects `stop_reduced_phrase` when one exists and `author_phrase`
+otherwise. That is what the annotators wrote down. The selection is stated here
+rather than left implicit, because a comparison is only worth something when
+both sides are naming the same thing.
 
 What it deliberately does not use is `citation_key`. That is the extractor's
 resolved identity — `person|smith|2020`, `non_person|world bank|2016` — and
@@ -142,7 +157,10 @@ def main() -> int:
         if state != PARSED:
             continue
 
-        phrase = r.get("author_phrase")
+        # rc2 §6.3: the reduced phrase when reduction happened, the full one
+        # otherwise. See the module docstring — these are two fields and gold
+        # annotates the first.
+        phrase = r.get("stop_reduced_phrase") or r.get("author_phrase")
         if not phrase:
             # rc3 §A requires it on every citation record. A parsed citation
             # without one cannot be scored against this gold set, and guessing

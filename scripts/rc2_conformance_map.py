@@ -41,6 +41,28 @@ the case WERE implemented. Its presence does not promote the case, it retires
 the verdict. Seventeen cases have no honest anti-needle; they say so, and the
 run counts them, because an unguarded claim that admits it is unguarded is a
 different thing from one that does not.
+
+WHAT AN ANTI-NEEDLE MUST BE, learned the hard way on 22 September
+-----------------------------------------------------------------
+The guard's first real outing produced both of its possible errors at once.
+
+    FALSE POSITIVE   `exit 6` and `ambiguous_author_resolution` were the bare
+                     concept names. Seven verdicts were retired by a COMMENT
+                     explaining why those things are absent. Prose about a
+                     missing feature is not the feature.
+
+    FALSE NEGATIVE   `stop_reduced_candidate` was an identifier invented when
+                     the case was written. The implementation calls it
+                     `stop_reduced_phrase`, so the needle never matched and
+                     five completed cases went on reading NOT — exactly the
+                     failure the guard exists to prevent, surviving inside the
+                     guard.
+
+So an anti-needle must name an ARTIFACT a working implementation emits — a
+serialized field, an emitted record type, a constant it must define — and it
+must be read off the implementation rather than guessed. A word that could
+appear in a sentence about the feature is not an anti-needle, and neither is
+a name nobody has written yet.
 """
 
 from __future__ import annotations
@@ -108,6 +130,21 @@ CHECKS = {
               "F=nonunique, S=no_match"),
     "C-052": ((), ("§11.2: the identity classes partition",), "MET",
               "identity partition is exact"),
+    # rc2 §6.3 / §8.1 / §8.4, implemented 22 September. The guard did NOT
+    # flag these, because their anti-needle was `stop_reduced_candidate` —
+    # a name guessed when the case was written, and the implementation calls
+    # it `stop_reduced_phrase`. A guessed identifier cannot go stale because
+    # it was never true.
+    "C-019": ((), ("§6.3: author_phrase is the full run",), "MET",
+              "reduction is additive, both phrases survive"),
+    "C-020": ((), ("C-020: the full surface is kept",), "MET",
+              "STOP reduction never rewrites author_phrase"),
+    "C-040": ((), ("§8.3 row 4: no_match/unique → stop_reduced",), "MET",
+              "F=no_match, S=unique"),
+    "C-041": ((), ("§8.3 row 5: no_match/nonunique → stop_reduced",), "MET",
+              "F=no_match, S=nonunique, plus ambiguous_citation"),
+    "C-055": ((), ("§8.4: two internal candidates suppress",), "MET",
+              "the corpus reaches none; the control builds the input"),
     # rc2 §9.4 / §9.5, implemented 21 September. These eight sat in
     # NOT_IMPLEMENTED for a full commit after the behaviour landed, which is
     # what the anti-needle guard below now exists to prevent.
@@ -185,15 +222,23 @@ CHECKS = {
 # rather than silent. Inventing a needle for them would put this file back in
 # the business of green-for-the-wrong-reason.
 NOT_IMPLEMENTED = {
-    # All blocked on the same missing thing: rc2's additive STOP reduction
-    # never builds a second candidate, so S is always no_match.
-    **{c: ("rc2 §8 two-pass identity: no stop-reduced second candidate exists",
-           "stop_reduced_candidate")
-       for c in ("C-019", "C-020", "C-040", "C-041", "C-042",
-                 "C-043", "C-044", "C-045", "C-055")},
-    **{c: ("ambiguous_author_resolution not implemented",
-           "ambiguous_author_resolution")
-       for c in ("C-048", "C-049", "C-050", "C-051")},
+    # Rows 6 to 9 of §8.3, and everything they need. All blocked on the same
+    # thing: an occurrence whose BOTH candidates match needs
+    # `ambiguous_author_resolution` for the different-key case and exit 6 for
+    # the same-key case, and neither exists. The extractor raises Abort(6) for
+    # both rather than guessing, which refuses correctly and implements
+    # neither.
+    #
+    # The anti-needle names the EMISSION, not the concept. An earlier version
+    # used the bare words `ambiguous_author_resolution` and `exit 6`, and both
+    # matched the prose explaining why those things are missing — so seven
+    # verdicts were retired on 22 September by a comment rather than by code.
+    **{c: ("rc2 §8.3 rows 6-9: needs ambiguous_author_resolution for the "
+           "different-key case and exit 6 for the same-key one",
+           '"type": "ambiguous_author_resolution"')
+       for c in ("C-042", "C-043", "C-044", "C-045",
+                 "C-046", "C-047", "C-048", "C-049", "C-050", "C-051",
+                 "C-077")},
     **{c: ("citation_surface_group_key not implemented",
            "citation_surface_group_key")
        for c in ("C-022", "C-023", "C-024", "C-025")},
@@ -201,8 +246,6 @@ NOT_IMPLEMENTED = {
        for c in ("C-026", "C-027", "C-028")},
     **{c: ("bibliography_absent not implemented", "bibliography_absent")
        for c in ("C-009", "C-066", "C-067")},
-    **{c: ("exit 6 not allocated", "exit 6")
-       for c in ("C-046", "C-047", "C-077")},
     **{c: ("file output contract not implemented", "canonical_sha256")
        for c in ("C-071", "C-072", "C-073")},
     "C-017": ("PREFIX longest-match precedence not pinned", "longest-match"),

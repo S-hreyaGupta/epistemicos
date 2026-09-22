@@ -233,12 +233,55 @@ def main() -> int:
          "We follow McGraw and Wong's (1996) method.", ["mcgraw|1996"])
     # rc3 §A: author_phrase records the complete source phrase. The manuscript
     # wrote the possessive, so the record keeps it and only the identity moves.
+    #
+    # This control asserted `Bartko's` until 22 September, which was the
+    # REDUCED phrase — `Following` had been dropped. It passed because the
+    # extractor was doing what rc3 §A forbids, so a control written to pin
+    # §A was in fact pinning its violation. It now asserts the complete run,
+    # which is what §A says, and the reduced form is pinned beside it.
     case("author_phrase keeps what the manuscript wrote",
          "Following Bartko's (1976) formula, we did this.",
-         ["bartko|1976"], want_authors=["Bartko's"])
+         ["bartko|1976"], want_authors=["Following Bartko's"])
     # A possessive inside a name is not a trailing one.
     case("a name is not truncated at an internal apostrophe",
          "As shown (O'Brien, 2020).", ["o'brien|2020"])
+
+    # ---- rc2 §6.3, C-019 and C-020: reduction is ADDITIVE ----
+    print("\nrc2 §6.3 — STOP reduction is additive, not destructive")
+
+    def phrases(body_text, fixes=frozenset()):
+        cits, _u, _e = extract(body_text, fixes)
+        return [(c["author_phrase"], c["stop_reduced_phrase"]) for c in cits]
+
+    got = phrases("As Podsakoff et al. (2003) showed, this holds.")
+    if got != [("As Podsakoff et al.", "Podsakoff et al.")]:
+        failures.append(f"§6.3: both phrases survive reduction — got {got}")
+    else:
+        ok("§6.3: author_phrase is the full run, the reduced form is separate")
+
+    # "If full_phrase fully satisfies AUTHORS_NARR" there is no reduction, and
+    # the field must be null rather than a copy. A copy would make the two
+    # indistinguishable and §8.1 would build a duplicate second candidate.
+    got = phrases("Podsakoff et al. (2003) showed this.")
+    if got != [("Podsakoff et al.", None)]:
+        failures.append(f"§6.3: no reduction means no reduced phrase — "
+                        f"got {got}")
+    else:
+        ok("§6.3: stop_reduced_phrase is null when nothing was removed")
+
+    # C-020, stated on its own: STOP reduction MUST never rewrite the source
+    # field. The identity still comes from the reduced phrase.
+    cits, _u, _e = extract("From Han and Kim (2010) we take this.")
+    if not cits:
+        failures.append("§6.3: the lead-in case still has to parse")
+    elif cits[0]["author_phrase"] != "From Han and Kim":
+        failures.append(f"C-020: the source surface is not rewritten — got "
+                        f"{cits[0]['author_phrase']!r}")
+    elif cits[0]["citation_key"] != "han|2010":
+        failures.append(f"§6.3: identity comes from the REDUCED phrase — got "
+                        f"{cits[0]['citation_key']!r}")
+    else:
+        ok("C-020: the full surface is kept and the identity still reduces")
 
     print("\nauthor_phrase carries the whole production")
     case("comma-separated authors are not cut at the first comma",
@@ -1413,12 +1456,77 @@ def main() -> int:
     # left as untested code. §8.3: "If no STOP-reduced candidate exists, S is
     # no_match." rc2 §6.3's additive STOP reduction is C-019, unimplemented,
     # so nothing here ever produces one.
+    # A PARENTHETICAL still has one candidate, so its S stays no_match and the
+    # first column is still what it reaches.
     if any(c.get("stop_reduced_phrase") for c in
            [ident("As shown (Smith, 2020) here.", R_ONE)[0]] if c):
-        failures.append("a STOP-reduced candidate exists, so §8.3's other "
-                        "six rows are now reachable and must be implemented")
+        failures.append("a parenthetical occurrence gained a reduced phrase; "
+                        "§6.3 creates one for NARRATIVE candidates only")
     else:
-        ok("§8.3: S is always no_match here, so six rows stay unreachable")
+        ok("§8.3: a parenthetical has one candidate, so its S is no_match")
+
+    # ---- §8.1's second candidate, and §8.3's rows 4 and 5 ----
+    #
+    # These were unreachable until C-019 landed on 22 September. The comment
+    # that used to sit here said implementing them would be writing code no
+    # input could reach; that is no longer true and both now have an input.
+
+    # Row 4: F=no_match, S=unique → author_resolution=stop_reduced, and the
+    # STOP key is the authoritative one.
+    cit, amb, _s = ident("As Smith et al. (2020) showed this.", R_ONE)
+    if cit is None:
+        failures.append("§8.3 row 4: the lead-in occurrence did not parse")
+    elif cit["author_resolution"] != "stop_reduced":
+        failures.append(f"§8.3 row 4: F=no_match, S=unique is stop_reduced — "
+                        f"got {cit['author_resolution']!r}")
+    elif cit["match_state_full"] != "no_match":
+        failures.append(f"§8.3 row 4: the FULL candidate must not match — got "
+                        f"{cit['match_state_full']!r}")
+    elif cit["candidate_key"] != "smith|2020":
+        failures.append(f"§8.3 row 4: the STOP key is authoritative — got "
+                        f"{cit['candidate_key']!r}")
+    elif cit["identity_class"] != "unique_reference_match":
+        failures.append(f"§8.3 row 4: identity is resolved — got "
+                        f"{cit['identity_class']!r}")
+    else:
+        ok("§8.3 row 4: no_match/unique → stop_reduced, STOP key authoritative")
+
+    # Row 5: F=no_match, S=nonunique → same STOP key, plus ambiguous_citation.
+    cit, amb, _s = ident("As Smith et al. (2020) showed this.", R_DUP)
+    if cit is None or cit["author_resolution"] != "stop_reduced":
+        failures.append(f"§8.3 row 5: still stop_reduced — got "
+                        f"{cit and cit['author_resolution']!r}")
+    elif cit["match_state_stop_reduced"] != "nonunique":
+        failures.append(f"§8.3 row 5: S must be nonunique — got "
+                        f"{cit['match_state_stop_reduced']!r}")
+    elif len(amb) != 1:
+        failures.append(f"§8.3 row 5: exactly one ambiguous_citation — got "
+                        f"{len(amb)}")
+    else:
+        ok("§8.3 row 5: no_match/nonunique → stop_reduced + ambiguous_citation")
+
+    # §9.4's precondition, now live. "exactly one deterministic internal
+    # candidate exists" — a reduced occurrence has two, so no candidate-level
+    # diagnostic may name either. Nothing in the corpus reaches this, so the
+    # input is built here; without it the rule would be implemented and
+    # unexercised.
+    with _tf.TemporaryDirectory() as td:
+        p = Path(td) / "paper.md"
+        p.write_text(HEAD + "As Nobody et al. (1999) argued this."
+                     + R_NONE, encoding="utf-8")
+        lines, _c = ce.run(p, {"ampersand", "segments"})
+    cit = next((l for l in lines if l.get("type") == "citation"), None)
+    mr = [l for l in lines if l.get("type") == "missing_reference"]
+    if cit is None or not cit.get("stop_reduced_phrase"):
+        failures.append("§8.4: the two-candidate fixture did not reduce")
+    elif cit["identity_class"] != "identity_not_resolved":
+        failures.append(f"§8.4: the fixture must resolve to nothing — got "
+                        f"{cit['identity_class']!r}")
+    elif mr:
+        failures.append(f"§8.4: two candidates suppress candidate-level "
+                        f"diagnostics — got {len(mr)} missing_reference")
+    else:
+        ok("§8.4: two internal candidates suppress the §9.4 diagnostic")
 
     # ------------------- rc2 §9.4 / §9.5, candidate-level diagnostics
     print("\nrc2 §9.4 — candidate-level missing reference and repair")

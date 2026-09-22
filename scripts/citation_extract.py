@@ -1153,8 +1153,11 @@ def extract_citations(body: str, sents, heads, fixes: set[str],
             span_start, L = parsed
             discarded = toks[:len(toks) - L]
             if all(_discardable(t) for t in discarded):
+                # §6.3's additive reduction. `run_start` is the complete C2
+                # run and `span_start` is what parsed; passing both is what
+                # lets author_phrase stay whole.
                 _emit_narr(body, span_start, c1e, sent, heads, cits, unres, pat,
-                           non_person_keys)
+                           non_person_keys, full_start=run_start)
                 continue
             # rc3 B1b reaches here too, and this is the branch that matters
             # most. `World Bank (2016)` DOES find a matching suffix — `Bank
@@ -1282,9 +1285,22 @@ def _segmented_paren(body, c1s, c1e, pat, sent, heads, cits, unres,
 
 
 def _emit_narr(body, span_start, c1e, sent, heads, cits, unres, pat,
-               non_person_keys=frozenset()):
+               non_person_keys=frozenset(), full_start=None):
+    """rc2 §6.3. `span_start` begins the phrase that PARSED; `full_start`
+    begins the complete collected C2 run.
+
+    They differ exactly when leading tokens were removed, and §6.3 requires
+    both to survive: `author_phrase` is the full run, `stop_reduced_phrase` is
+    what parsed. The caller has already checked every removed token is
+    discardable, which is §6.3's own condition for the reduction existing.
+    """
+    if full_start is None:
+        full_start = span_start
     text = body[span_start:c1e]
     authors = text[:text.rindex("(")].rstrip()
+    full_text = body[full_start:c1e]
+    full_phrase = full_text[:full_text.rindex("(")].rstrip()
+    reduced = authors if full_start != span_start else None
     core = first_core(authors)
     if is_all_caps(core):
         if _non_person_citation(body, span_start, c1e, span_start, c1e,
@@ -1300,7 +1316,8 @@ def _emit_narr(body, span_start, c1e, sent, heads, cits, unres, pat,
     for tok in years:
         for y in expand_year(tok):
             _record(body, span_start, c1e, span_start, c1e, text, core, y,
-                    "narrative", sent, heads, cits, author_phrase=authors)
+                    "narrative", sent, heads, cits, author_phrase=full_phrase,
+                    stop_reduced_phrase=reduced)
 
 
 def _emit_segment(body, gs, ge, ss, se, seg_text, style, sent, heads, cits,
@@ -1510,7 +1527,8 @@ def repair_rule(cand_kind, cand_phrase, cand_year,
 
 
 def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
-            cits, author_phrase="", author_kind="person"):
+            cits, author_phrase="", author_kind="person",
+            stop_reduced_phrase=None):
     s_start, s_end, s_content_end = sent
     lv, nm, ty, rs = section_stack_at(heads, gs)
     surname = re.sub(r"\s+", " ", core).strip().lower()
@@ -1530,6 +1548,25 @@ def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
         # author_phrase mandatory for the same reason, so this is forward
         # compatible rather than an invention.
         "author_phrase": re.sub(r"\s+", " ", author_phrase).strip(),
+        # rc2 §6.3, C-019 and C-020. Reduction is ADDITIVE: `author_phrase`
+        # above is `full_phrase`, the complete collected C2 text, and the
+        # reduced form lives here rather than overwriting it.
+        #
+        # Until 22 September the reduced form WAS author_phrase and the lead-in
+        # tokens were dropped, on 20 of 368 narrative occurrences. That
+        # satisfied the gold set, which annotates author names only, and broke
+        # rc3 §A, which says author_phrase "always records the complete source
+        # candidate phrase before STOP reduction". Both fields exist now, and
+        # `citation_candidate.py` selects the one gold actually annotates.
+        #
+        # 20, measured from this field. A first estimate said 129, counted by
+        # looking for discardable text between `sentence_start` and
+        # `group_start` — which finds prose the C2 walk never collected. The
+        # loose probe overstated by six times, and the number reached two
+        # docstrings before the real one was available. Fourth of its kind
+        # this week; see UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md.
+        "stop_reduced_phrase": (re.sub(r"\s+", " ", stop_reduced_phrase).strip()
+                                if stop_reduced_phrase else None),
         # rc2 §6.7. Null for a non-person candidate, per the section's own
         # last line.
         **dict(zip(("author_form", "visible_authors", "author_count_constraint"),
@@ -2083,25 +2120,69 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
         if r["reference_key"]:
             ref_index_by_key.setdefault(r["reference_key"], []).append(i)
 
+    def _lookup(key):
+        """§8.2. One candidate's match state and its ascending index array."""
+        if key is None:
+            return "no_match", []
+        idx = sorted(ref_index_by_key.get(key, []))
+        return ("no_match" if not idx else
+                "unique" if len(idx) == 1 else "nonunique"), idx
+
     ambiguous_citations = []
     for c in cits:
-        cand = c["citation_key"]
-        idx = sorted(ref_index_by_key.get(cand, []))   # §8.2: ascending
-        if not idx:
-            state = "no_match"
-        elif len(idx) == 1:
-            state = "unique"
+        # §8.1. Two candidates now, where there was one.
+        #
+        # `citation_key` has always been derived from the phrase that PARSED,
+        # which after §6.3 is the reduced one. So the key this file has been
+        # carrying is rc2's SECOND candidate, and the full-phrase candidate —
+        # the one §8.1 names first — was never built at all. That is why every
+        # reduced occurrence reported `author_resolution = full_phrase`: the
+        # only candidate present was labelled with the only label implemented.
+        reduced_key = c["citation_key"] if c.get("stop_reduced_phrase") else None
+        if reduced_key:
+            # §8.1's full candidate, built from author_phrase. A lead-in makes
+            # the complete phrase fail the person grammar, so it keys
+            # non-person over the whole surface and finds nothing — which is
+            # the correct answer, not a failure.
+            surface = re.sub(r"\s+", " ", c["author_phrase"]).strip().lower()
+            full_key = f"non_person|{surface}|{c['year']}"
         else:
-            state = "nonunique"
+            full_key, reduced_key = c["citation_key"], None
+
+        f_state, f_idx = _lookup(full_key)
+        s_state, s_idx = _lookup(reduced_key)
+
+        # §8.3's table. Rows 6 to 9 need BOTH candidates to match, and reaching
+        # them requires `ambiguous_author_resolution` (C-048 to C-051) and exit
+        # 6 (C-046, C-047, C-077), neither of which exists here. They are left
+        # unwritten rather than guessed at; the assertion below says so out
+        # loud instead of letting a silent `else` stand in for them.
+        if f_state != "no_match" and s_state != "no_match":
+            raise Abort(6, "rc2 §8.3 rows 6-9: both candidates matched, which "
+                           "needs ambiguous_author_resolution and exit 6")
+
+        if f_state != "no_match":
+            cand, state, idx, res = full_key, f_state, f_idx, "full_phrase"
+        elif s_state != "no_match":
+            cand, state, idx, res = reduced_key, s_state, s_idx, "stop_reduced"
+        else:
+            # Both no_match. The candidate retained for §9.4 is the reduced one
+            # where it exists, per §8.4 — it is the narrower of the two and the
+            # only one a repair rule can work with.
+            cand, state, idx, res = (reduced_key or full_key), "no_match", [], \
+                                    "not_resolved"
 
         c["candidate_key"] = cand
+        c["candidate_key_full"] = full_key
+        c["candidate_key_stop_reduced"] = reduced_key
         c["match_state"] = state
+        c["match_state_full"] = f_state
+        c["match_state_stop_reduced"] = s_state
         c["reference_indices"] = idx
+        c["author_resolution"] = res
         if state == "no_match":
-            c["author_resolution"] = "not_resolved"
             c["identity_class"] = "identity_not_resolved"
         else:
-            c["author_resolution"] = "full_phrase"
             c["identity_class"] = ("bibliography_key_ambiguous"
                                    if state == "nonunique"
                                    else "unique_reference_match")
@@ -2199,13 +2280,24 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     # MISSING_REFERENCE while preserving the citation-derived candidate."
     # This is that classification, and rc2 §9.4 is its rules.
     #
-    # §8.4's two-candidate suppression does not bite here: with no STOP
-    # reduction there is only ever ONE internal candidate, so every
-    # identity_not_resolved occurrence qualifies. That is stated rather than
-    # relied on silently, because the day C-019 lands the suppression becomes
-    # live and this loop needs the check.
+    # §8.4's two-candidate suppression is LIVE as of 22 September, which is
+    # the day C-019 landed. The note that used to sit here said this loop
+    # would need the check on exactly that day, and it does.
+    #
+    # §9.4's own precondition:
+    #
+    #     identity_class = identity_not_resolved
+    #     AND exactly one deterministic internal candidate exists
+    #
+    # An occurrence carrying a reduced phrase has TWO: the full-phrase
+    # candidate and the STOP-reduced one, always distinct because the first
+    # keys non-person over the whole surface and the second keys a surname.
+    # Identity is underdetermined for those before fuzzy repair even begins,
+    # so emitting a candidate-level diagnostic would name one of two — the
+    # guess CIT-ARCH-01 exists to prevent.
     unresolved_cits = [c for c in cits
-                       if c["identity_class"] == "identity_not_resolved"]
+                       if c["identity_class"] == "identity_not_resolved"
+                       and not c.get("stop_reduced_phrase")]
 
     # "Group such occurrences by that candidate key in FIRST-OCCURRENCE order."
     grouped: dict[str, list[dict]] = {}

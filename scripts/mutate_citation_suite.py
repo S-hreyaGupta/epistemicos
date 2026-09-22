@@ -381,19 +381,29 @@ MUTATIONS = [
 
     # ---------------------------- rc2 §8.2 / §8.3, identity — CIT-ARCH-01
 
+    # Re-aimed 22 September. §8.2's state derivation moved into `_lookup` when
+    # the second candidate arrived, and all three of these went stale at once.
+    # Reported as broken probes rather than passes, which is the whole point of
+    # this file checking itself.
+
     ("rc2 §8.2: every lookup reports a unique match",
-     '        elif len(idx) == 1:\n            state = "unique"',
-     '        elif True:\n            state = "unique"',
+     '                "unique" if len(idx) == 1 else "nonunique"), idx',
+     '                "unique" if True else "nonunique"), idx',
      "§8.2: two references sharing a key is nonunique"),
 
+    # Aimed at the branch selection, not at `_lookup`. Mutating `_lookup` makes
+    # EVERY lookup non-no_match, which means both candidates match, which trips
+    # §8.3's exit-6 abort — and an abort is a crash, not a control going red.
+    # This file has now made that mistake three times; the rule is that a
+    # mutation must leave the program runnable so a control can judge it.
     ("rc2 §8.2: a no-match reports as resolved anyway",
-     '        if not idx:\n            state = "no_match"',
-     '        if False:\n            state = "no_match"',
+     '            cand, state, idx, res = (reduced_key or full_key), "no_match", [], \\\n                                    "not_resolved"',
+     '            cand, state, idx, res = (reduced_key or full_key), "unique", [], \\\n                                    "full_phrase"',
      "§8.2: no keyed reference is no_match"),
 
     ("rc2 §8.2: reference indices are not sorted",
-     '        idx = sorted(ref_index_by_key.get(cand, []))',
-     '        idx = list(reversed(ref_index_by_key.get(cand, [])))',
+     '        idx = sorted(ref_index_by_key.get(key, []))',
+     '        idx = list(reversed(ref_index_by_key.get(key, [])))',
      "§8.2: reference_indices are ascending"),
 
     ("rc2 §8.3: a nonunique match emits no ambiguous_citation",
@@ -461,6 +471,39 @@ MUTATIONS = [
      '        fixes = (fixes - {"all"}) | set(FIXES)',
      '        fixes = (fixes - {"all"}) | (set(FIXES) - {"mathyear"})',
      "--fix all applied"),
+
+    # ------------------------------- rc2 §6.3 / §8.1 / §8.4, the second
+    # candidate. Unreachable before 22 September; these are its first probes.
+
+    ("rc2 §6.3: reduction goes back to destroying the source phrase",
+     "    reduced = authors if full_start != span_start else None",
+     "    reduced = None\n    authors = authors",
+     "§6.3: both phrases survive reduction"),
+
+    ("rc2 §6.3: the reduced phrase is set even when nothing was removed",
+     "    reduced = authors if full_start != span_start else None",
+     "    reduced = authors",
+     "§6.3: no reduction means no reduced phrase"),
+
+    ("C-020: author_phrase is rewritten by the reduction after all",
+     '"narrative", sent, heads, cits, author_phrase=full_phrase,',
+     '"narrative", sent, heads, cits, author_phrase=authors,',
+     "C-020: the source surface is not rewritten"),
+
+    ("rc2 §8.3: the stop-reduced candidate is never looked up",
+     "        s_state, s_idx = _lookup(reduced_key)",
+     "        s_state, s_idx = _lookup(None)",
+     "§8.3 row 4: F=no_match, S=unique is stop_reduced"),
+
+    ("rc2 §8.3: a stop_reduced result is labelled full_phrase",
+     '            cand, state, idx, res = reduced_key, s_state, s_idx, "stop_reduced"',
+     '            cand, state, idx, res = reduced_key, s_state, s_idx, "full_phrase"',
+     "§8.3 row 4: F=no_match, S=unique is stop_reduced"),
+
+    ("rc2 §8.4: two candidates no longer suppress the diagnostic",
+     '                       and not c.get("stop_reduced_phrase")]',
+     "                       ]",
+     "§8.4: two candidates suppress candidate-level diagnostics"),
 
     # ------------------------------- rc2 §9.6, the residual
 

@@ -534,6 +534,23 @@ MUTATIONS = [
      '                  "distinct_surface_groups": len([\n                      json.dumps(c["citation_surface_group_key"],\n                                 separators=(",", ":"), ensure_ascii=False)\n                      for c in cits]),',
      "C-023: two occurrences of ONE surface is one group"),
 
+    # ------------------------------- rc2 §12.4, §7.3, C-030
+
+    ("rc2 §12.4: multi-year citations keep source order",
+     "    cits.sort(key=lambda c: (",
+     "    [].sort(key=lambda c: (",
+     "C-070: two years in one segment order by year"),
+
+    ("rc2 C-030: a no-year entry is a keyless reference again",
+     '        if not ym:\n            unres.append({',
+     '        if False:\n            unres.append({',
+     "§7.3: suspect_reasons is closed at terminator"),
+
+    ("rc2 §7.3: suspect_reasons gains a fourth member",
+     '        if not ym:\n            reasons.append("no_year")',
+     '        if True:\n            reasons.append("no_year")',
+     "C-032: suspect_reasons are the closed three"),
+
     # ------------------------------- rc2 §13 / §12.1, bytes on disk
 
     ("rc2 §12.2: the two §9.4 diagnostics share one block again",

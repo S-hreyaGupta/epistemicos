@@ -150,8 +150,16 @@ CHECKS = {
               "the surface key never reaches identity"),
     "C-025": ((), ("C-025: the summary count and the null",), "MET",
               "emitted with a bibliography and without; C-009 landed"),
-    "C-030": (('reasons.append("no_year")',), (), "PARTIAL",
-              "emitted; no control pins it"),
+    # C-030 said "emitted" and was PARTIAL. It WAS emitted — as a keyless
+    # `reference` row carrying no_year in suspect_reasons, where the case says
+    # "no reference row/key" and §7.3 closes that list at three. Corrected
+    # 22 September; one corpus entry reached it, an "In press." reference.
+    "C-030": ((), ("C-030: a no-year entry is unresolved",), "MET",
+              "unresolved_reference(no_year), no row and no key"),
+    "C-032": ((), ("C-032: suspect_reasons are closed and ordered",), "MET",
+              "the closed three, in §7.3's order"),
+    "C-070": ((), ("C-070: multi-year citations order by year",), "MET",
+              "§12.4's year key breaks the position tie"),
     "C-031": (('"entry_start_grammar"', '"orphan_line"', '"no_year"'), (),
               "PARTIAL", "three reasons emitted, set not schema-enforced"),
     "C-033": ((), ("a list that parses partway",), "MET",
@@ -317,7 +325,7 @@ NOT_IMPLEMENTED = {
        for c in ("C-002", "C-003", "C-004")},
     **{c: ("determinism not byte-pinned; 'byte-identical' already appears in "
            "prose, so it cannot serve as a needle", None)
-       for c in ("C-029", "C-032", "C-070")},
+       for c in ("C-029", )},
     **{c: ("outside the pilot scope — rc2 itself marks these OUTSIDE_PILOT, "
            "so no local change can make the verdict stale", None)
        for c in ("C-084", "C-085", "C-086")},

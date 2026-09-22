@@ -2086,6 +2086,94 @@ def main() -> int:
             else:
                 ok("§12.2: blocks are in order and never interleave")
 
+        # ---- §12.4, total deterministic order ----
+        #
+        #     Every block MUST have a total deterministic ordering; two
+        #     distinct records may not remain tied on every declared key.
+        #
+        # C-070 is the reachable instance. Extraction walks left to right, so
+        # (group_start, segment_start) is ascending by construction and the
+        # `year` key that breaks a tie within one group was never applied:
+        # `(Smith, 2021, 2020)` emitted 2021 first until 22 September.
+        multi = d / "multi.md"
+        for order in (("2020", "2021"), ("2021", "2020")):
+            multi.write_text(
+                HEAD + f"As shown (Smith, {order[0]}, {order[1]}) here."
+                "\n\n## References\n\nSmith, J. (2020). A. J, 1, 1.\n"
+                "Smith, J. (2021). B. J, 2, 1.\n", encoding="utf-8")
+            ls, _c = ce.run(multi, {"ampersand", "segments"})
+            years = [x["year"] for x in ls if x.get("type") == "citation"]
+            if years != ["2020", "2021"]:
+                failures.append(f"C-070: two years in one segment order by "
+                                f"year, whichever way the manuscript writes "
+                                f"them — source {order} gave {years}")
+                break
+        else:
+            ok("C-070: multi-year citations order by year, not by source")
+
+        # §12.4's invariant itself, over a real paper: no two records of the
+        # same type may be tied on every declared key. Checked for the two
+        # blocks whose keys this implementation can evaluate.
+        ls, _c = ce.run(paper, {"ampersand", "segments"})
+        keyed = [(x["group_start"], x["segment_start"], x["year"],
+                  _json.dumps(x["citation_surface_group_key"],
+                              separators=(",", ":"), ensure_ascii=False))
+                 for x in ls if x.get("type") == "citation"]
+        if len(keyed) != len(set(keyed)):
+            failures.append("§12.4: two citation records are tied on every "
+                            "declared key")
+        elif keyed != sorted(keyed):
+            failures.append("§12.4: citations are not in the declared order")
+        else:
+            ok("§12.4: citations are totally ordered, no two tied")
+
+        # ---- C-030 and §7.3's closed suspect_reasons list ----
+        #
+        # "In press." is a real reference whose year does not exist yet. It
+        # was emitted as a `reference` row with a null key carrying `no_year`
+        # in suspect_reasons — but C-030 says "no reference row/key", and
+        # §7.3 closes suspect_reasons at three, none of them no_year.
+        inpress = d / "inpress.md"
+        inpress.write_text(
+            HEAD + "As shown (Smith, 2020) here.\n\n## References\n\n"
+            "Smith, J. (2020). A paper. Journal, 1(1), 1-10.\n"
+            "Bhattacharjee, A., Dana, J., & Baron, J. In press. Anti-profit "
+            "beliefs. Journal of Personality.\n", encoding="utf-8")
+        ls, _c = ce.run(inpress, {"ampersand", "segments"})
+        refs_out = [x for x in ls if x.get("type") == "reference"]
+        urefs = [x for x in ls if x.get("type") == "unresolved_reference"]
+        if any("no_year" in (r.get("suspect_reasons") or []) for r in refs_out):
+            failures.append("§7.3: suspect_reasons is closed at terminator, "
+                            "overlong, embedded_entry_pattern — no_year is "
+                            "not one of them")
+        elif any(r["reference_key"] is None for r in refs_out):
+            failures.append("C-030: a no-year entry produces no reference "
+                            "row and no key")
+        elif [u["reason"] for u in urefs] != ["no_year"]:
+            failures.append(f"C-030: it emits unresolved_reference(no_year) — "
+                            f"got {[u['reason'] for u in urefs]}")
+        else:
+            ok("C-030: a no-year entry is unresolved, not a keyless reference")
+
+        # C-032, the order. rc2 numbers them 1 terminator, 2 overlong,
+        # 3 embedded_entry_pattern, and a closed ORDERED list is only closed
+        # if nothing else gets in.
+        SUSPECT = ["terminator", "overlong", "embedded_entry_pattern"]
+        ls, _c = ce.run(paper, {"ampersand", "segments"})
+        offenders = []
+        for r in (x for x in ls if x.get("type") == "reference"):
+            rs = r.get("suspect_reasons") or []
+            if [x for x in rs if x in SUSPECT] != [x for x in SUSPECT
+                                                   if x in rs]:
+                offenders.append(rs)
+            elif set(rs) - set(SUSPECT):
+                offenders.append(rs)
+        if offenders:
+            failures.append(f"C-032: suspect_reasons are the closed three, in "
+                            f"§7.3's order — got {offenders[:3]}")
+        else:
+            ok("C-032: suspect_reasons are closed and ordered")
+
         # C-083. Same input, two runs, byte-identical output. The strongest
         # determinism statement available, and it costs one more process.
         r3 = cli([str(paper), "--fix", "all"])

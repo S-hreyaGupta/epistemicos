@@ -2042,6 +2042,27 @@ def assemble_references(section: str, base: int):
         else:
             ref_key = None
 
+        # C-030, and §7.3's closed list. An entry with no year is an
+        # `unresolved_reference`, not a keyless `reference` — the case says
+        # "no reference row/key" in as many words, and §7.3's `suspect_reasons`
+        # list for EMITTED references is closed at three: terminator,
+        # overlong, embedded_entry_pattern. `no_year` is not among them; it
+        # belongs to §6.4's unresolved-reference reasons.
+        #
+        # This emitted a reference row carrying `no_year` in its
+        # suspect_reasons and a null key. One entry corpus-wide reaches it —
+        # `Bhattacharjee, A., Dana, J., & Baron, J. In press.` — which is
+        # exactly the shape the rule is for: a real reference whose year does
+        # not exist yet.
+        if not ym:
+            unres.append({
+                "type": "unresolved_reference", "index": 0,
+                "reason": "no_year", "text": assembled,
+                "start": start, "end": end,
+            })
+            open_entry = None
+            return
+
         refs.append({
             "type": "reference", "index": 0, "assembled": assembled,
             "reference_key": ref_key,
@@ -2165,6 +2186,28 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
               # declared one.
               "references_source": ref_source}]
     absent = ref_source == "not_available"
+
+    # rc2 §12.4, total deterministic order:
+    #
+    #     citation  (group_start, segment_start, year,
+    #                canonical bytes of citation_surface_group_key)
+    #
+    # Sorted HERE, before `index` is assigned, because §12.4 also says "index
+    # is 0-based per record type in serialized order" and several later record
+    # types carry a `citation_index` pointing back at it. Sorting after
+    # indexing would leave those pointing at the wrong rows.
+    #
+    # Only multi-year groups move. Extraction already walks the body left to
+    # right, so `(group_start, segment_start)` is ascending by construction —
+    # but `(Smith, 2021, 2020)` emitted 2021 first, tied on both positions,
+    # with the `year` key that breaks the tie never applied. §12.4's whole
+    # point is that "two distinct records may not remain tied on every
+    # declared key", and those two were.
+    cits.sort(key=lambda c: (
+        c["group_start"], c["segment_start"], c["year"],
+        json.dumps(c["citation_surface_group_key"],
+                   separators=(",", ":"), ensure_ascii=False).encode("utf-8")))
+
     for i, c in enumerate(cits):
         c["index"] = i
         if absent:

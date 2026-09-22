@@ -272,9 +272,29 @@ for the consolidation   carry A2 through unchanged, with the two members
               annotated as awaiting definition. Revisit when X-08 lands.
 ```
 
-Still genuinely open, and not covered by this decision: what
-`leading_gloss` would mean once someone does define it. The candidate
-definition has evidence behind it; `conversion_artifact` has none.
+**The premise changed within the hour.** CIT-EXCL-01 was decided while both
+names were undefined and `CITATION_UNRESOLVED_109.md` was believed lost. That
+file was recovered the same evening and defines both from their cases:
+`conversion_artifact` is a year parenthetical the PDF converter wrapped in
+`$...$`, and `leading_gloss` is a split-off segment that glosses rather than
+cites. `A2-EXCLUSION-EVIDENCE.md` has both, with all fourteen cases.
+
+The decision itself still stands — deferred is deferred, and `conversion_artifact`
+still waits on X-08 whatever it means. But the *reason* recorded above, that
+they are unimplementable because undefined, is no longer the reason. Under the
+consolidation workflow's rule 5 an empty remainder may change dispositions, and
+this remainder is no longer empty.
+
+```text
+to re-ask    now that both are definable, does CIT-EXCL-01 still choose (a)?
+             leading_gloss needs no upstream work and could be implemented;
+             conversion_artifact genuinely cannot until X-08.
+             The two may no longer belong in the same disposition.
+```
+
+Not re-decided here. Flagged because a decision resting on a premise that has
+since failed is the kind of thing this repository has learned to write down
+rather than leave standing.
 
 ---
 

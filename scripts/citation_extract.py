@@ -2129,6 +2129,7 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                 "unique" if len(idx) == 1 else "nonunique"), idx
 
     ambiguous_citations = []
+    ambiguous_authors = []
     for c in cits:
         # §8.1. Two candidates now, where there was one.
         #
@@ -2152,29 +2153,53 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
         f_state, f_idx = _lookup(full_key)
         s_state, s_idx = _lookup(reduced_key)
 
-        # §8.3's table. Rows 6 to 9 need BOTH candidates to match. rc2 splits
-        # them: different keys → `ambiguous_author_resolution`, same key →
-        # exit 6. Neither exists here (C-048 to C-051, and C-046/047/077).
+        # §8.3's table. Rows 6 to 9 are the ones where BOTH candidates match,
+        # and rc2 splits them on whether the two keys are the same string.
         #
-        # A KNOWING DEVIATION, recorded rather than left to be discovered.
-        # This aborts for BOTH branches, where rc2 aborts for one and
-        # processes the other. It is therefore stricter than the spec and
-        # would refuse a manuscript rc2 says to carry on with.
-        #
-        # Chosen because the alternative is worse in the direction this
-        # repository cares about: the different-key branch needs an emission
-        # that does not exist, so the only ways to "handle" it are to invent
-        # the record or to pick one of two candidate identities silently. The
-        # second is precisely the guess CIT-ARCH-01 forbids.
-        #
-        # Unreachable on the corpus: the full candidate keys `non_person` over
-        # the entire surface including the lead-in, so matching it needs a
-        # bibliography entry labelled `as podsakoff et al.`. Unreachable is
-        # not impossible, which is why this is an abort with a message and not
-        # an assert.
+        # No corpus input reaches either, but one can be BUILT — a
+        # bibliography carrying both `From Tether (2018). A report.` and
+        # `Tether, B. (2018).` gets there. That is why these are implemented
+        # rather than left as an abort: reachable-in-principle code that
+        # refuses where the spec says carry on is a defect waiting for the
+        # manuscript that triggers it, not a safe simplification.
         if f_state != "no_match" and s_state != "no_match":
-            raise Abort(6, "rc2 §8.3 rows 6-9: both candidates matched, which "
-                           "needs ambiguous_author_resolution and exit 6")
+            # §8.6, verbatim: "If both full and STOP-reduced lookups are
+            # non-empty and serialize the same candidate key, abort." The
+            # section is explicit that this is "a system failure, not a
+            # manuscript diagnostic" — one occurrence resolved twice to one
+            # identity means the two-candidate construction itself is broken.
+            if full_key == reduced_key:
+                raise Abort(6, "same_candidate_identity_double_resolution")
+
+            # Different keys: ambiguous. §8.3 lists exactly what is NOT
+            # established, and CIT-ARCH-01 says why — two compatible entries
+            # remain and the rule is "do not guess".
+            c["candidate_key"] = None
+            c["candidate_key_full"] = full_key
+            c["candidate_key_stop_reduced"] = reduced_key
+            c["match_state"] = "ambiguous"
+            c["match_state_full"] = f_state
+            c["match_state_stop_reduced"] = s_state
+            c["reference_indices"] = []
+            c["author_resolution"] = "ambiguous"
+            c["identity_class"] = "author_resolution_ambiguous"
+            c["author_kind"] = "undetermined"
+            c["resolved_author_phrase"] = None
+            c["citation_key"] = None
+            # "Emit exactly one `ambiguous_author_resolution`." One per
+            # occurrence, carrying both candidates — never one per candidate,
+            # which is the shape rc3 §C1 calls the naive mistake elsewhere.
+            ambiguous_authors.append({
+                "type": "ambiguous_author_resolution", "index": 0,
+                "citation_index": c["index"],
+                "candidates": [
+                    {"candidate": "full", "candidate_key": full_key,
+                     "match_state": f_state, "reference_indices": f_idx},
+                    {"candidate": "stop_reduced", "candidate_key": reduced_key,
+                     "match_state": s_state, "reference_indices": s_idx},
+                ],
+            })
+            continue
 
         if f_state != "no_match":
             cand, state, idx, res = full_key, f_state, f_idx, "full_phrase"
@@ -2288,6 +2313,9 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     for i, a in enumerate(ambiguous_citations):
         a["index"] = i
         lines.append(a)
+    for i, a in enumerate(ambiguous_authors):
+        a["index"] = i
+        lines.append(a)
 
     # ---------------------------------------------------- rc2 §9.4 and §9.5
     #
@@ -2338,9 +2366,34 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     authoritative = {c["candidate_key"] for c in cits
                      if c["identity_class"] == "unique_reference_match"}
     unique_keys = {k for k, idx in ref_index_by_key.items() if len(idx) == 1}
+
+    # rc2 §8.5, ambiguity reservation. Two sources, and they behave
+    # differently here:
+    #
+    #   1. indices named by `ambiguous_author_resolution` — live since rows
+    #      6-9 landed, and the only reason this set is ever non-empty
+    #   2. indices belonging to a key that resolves nonuniquely and emits
+    #      `ambiguous_citation` — already excluded structurally, because a
+    #      nonunique key is by definition not in `unique_keys`
+    #
+    # The second is computed anyway rather than argued away. The argument is
+    # currently sound and it is one refactor away from not being, and this
+    # file has already watched a structural guarantee stop holding quietly.
+    reserved: set[int] = set()
+    for a in ambiguous_authors:
+        for cand in a["candidates"]:
+            reserved.update(cand["reference_indices"])
+    for a in ambiguous_citations:
+        reserved.update(a["reference_indices"])
+
+    # "Reserved indices are removed from the unmatched-reference pool", so
+    # they can neither pair in `possible_mismatch` nor surface as
+    # `uncited_reference` — §8.5 names both prohibitions, and both are served
+    # by the one exclusion because §9.6 emits what the pool has left.
     pool = [i for i, r in enumerate(refs)
             if r["reference_key"] in unique_keys
-            and r["reference_key"] not in authoritative]
+            and r["reference_key"] not in authoritative
+            and i not in reserved]
 
     # §9.5's merge qualification needs the suspect entries.
     embedded = [r for r in refs
@@ -2450,6 +2503,14 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                   "identity_not_resolved_occurrences":
                       sum(1 for c in cits
                           if c["identity_class"] == "identity_not_resolved"),
+                  # rc2 §9.2's fourth identity class, live since §8.3 rows 6-9
+                  # landed. Counted even though this corpus produces none:
+                  # a partition over three names when the code can emit four
+                  # is an invariant that holds only while the fourth stays
+                  # empty, which is not what an invariant is for.
+                  "author_resolution_ambiguous_occurrences":
+                      sum(1 for c in cits
+                          if c["identity_class"] == "author_resolution_ambiguous"),
                   "citation_error_cases": len(errs),
                   "citation_error_defects": sum(len(e["defects"]) for e in errs),
                   "parsed": n_parsed,

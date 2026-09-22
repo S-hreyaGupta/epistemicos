@@ -505,6 +505,38 @@ MUTATIONS = [
      "                       ]",
      "§8.4: two candidates suppress candidate-level diagnostics"),
 
+    # ------------------------------- rc2 §8.3 rows 6-9, §8.5, §8.6
+
+    # No mutation for §8.6's abort. It is implemented and UNREACHABLE — the
+    # two candidates live in different namespaces by rc2's own construction,
+    # so disabling the guard changes nothing and no control could go red. A
+    # probe for it would report "caught" off some other control and establish
+    # nothing, which is the exact defect this file exists to find.
+
+    ("rc2 §8.3: an ambiguous occurrence keeps its citation_key",
+     '            c["citation_key"] = None\n            # "Emit exactly one',
+     '            # "Emit exactly one',
+     "§8.3: an ambiguous occurrence establishes no citation_key"),
+
+    # Aimed to DROP the record rather than duplicate it. The duplicate form
+    # appended a bare `{}`, which §8.5's reservation loop then indexed — a
+    # crash, not a control going red, and the probe refused it on those
+    # grounds. Fourth time this file has had to relearn that distinction.
+    ("rc2 §8.3: the ambiguity record is never emitted",
+     '            ambiguous_authors.append({',
+     '            [].append({',
+     "§8.3: EXACTLY ONE ambiguous_author_resolution per occurrence"),
+
+    ("rc2 §8.5: ambiguity reserves nothing",
+     "    for a in ambiguous_authors:\n        for cand in a[\"candidates\"]:\n            reserved.update(cand[\"reference_indices\"])",
+     "    for a in []:\n        for cand in a[\"candidates\"]:\n            reserved.update(cand[\"reference_indices\"])",
+     "§8.5: reserved indices must not emit uncited_reference"),
+
+    ("rc2 §8.5: reserved indices stay in the pool",
+     "            and i not in reserved]",
+     "            and True]",
+     "§8.5: reserved indices must not emit uncited_reference"),
+
     # ------------------------------- rc2 §9.6, the residual
 
     ("rc2 §9.6: nothing is ever reported uncited",
@@ -518,8 +550,8 @@ MUTATIONS = [
      "§9.6: a duplicated key is not a UNIQUE keyed reference"),
 
     ("rc2 §9.6: exactly matched references stay in the residual",
-     "            and r[\"reference_key\"] not in authoritative]",
-     "            and r[\"reference_key\"] not in set()]",
+     "            and r[\"reference_key\"] not in authoritative\n",
+     "            and r[\"reference_key\"] not in set()\n",
      "§9.6: an exactly matched reference is not uncited"),
 
     ("rc3 B1b: the parenthetical detection site is closed again",

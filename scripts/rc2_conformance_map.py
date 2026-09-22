@@ -145,6 +145,25 @@ CHECKS = {
               "F=no_match, S=nonunique, plus ambiguous_citation"),
     "C-055": ((), ("§8.4: two internal candidates suppress",), "MET",
               "the corpus reaches none; the control builds the input"),
+    # §8.3 rows 6-9, §8.5, §8.6 — implemented 22 September. The anti-needle
+    # named the emission this time and fired correctly on all eleven.
+    "C-042": ((), ("§8.3 row 6: different keys → ambiguous",), "MET",
+              "unique/unique, different keys"),
+    # One `if` serves all four state pairs, so a control per row would pin the
+    # same line four times. C-042's fixture exercises it; nothing distinguishes
+    # the other three, and saying MET would claim four controls for one.
+    **{c: ((), ("§8.3 row 6: different keys → ambiguous",), "PARTIAL",
+           "same branch as C-042; no control fixes this state pair")
+       for c in ("C-043", "C-044", "C-045")},
+    "C-046": ((), ("§8.6: the two candidates cannot collide",), "PARTIAL",
+              "implemented; unreachable, so the control pins the namespaces"),
+    "C-048": ((), ("C-048: the record carries both candidates",), "PARTIAL",
+              "both candidates named; rc2 asks for a byte golden"),
+    "C-049": ((), ("§8.5: ambiguity-reserved references leave the pool",),
+              "MET", "reserved indices emit no uncited_reference"),
+    "C-050": ((), ("§9.6: a duplicated reference key is not a uncited",),
+              "PARTIAL",
+              "no false uncited; duplicate_reference_key not emitted"),
     # rc2 §9.4 / §9.5, implemented 21 September. These eight sat in
     # NOT_IMPLEMENTED for a full commit after the behaviour landed, which is
     # what the anti-needle guard below now exists to prevent.
@@ -233,12 +252,17 @@ NOT_IMPLEMENTED = {
     # used the bare words `ambiguous_author_resolution` and `exit 6`, and both
     # matched the prose explaining why those things are missing — so seven
     # verdicts were retired on 22 September by a comment rather than by code.
-    **{c: ("rc2 §8.3 rows 6-9: needs ambiguous_author_resolution for the "
-           "different-key case and exit 6 for the same-key one",
-           '"type": "ambiguous_author_resolution"')
-       for c in ("C-042", "C-043", "C-044", "C-045",
-                 "C-046", "C-047", "C-048", "C-049", "C-050", "C-051",
-                 "C-077")},
+    # Two of the eleven turned out to be unreachable rather than unbuilt, and
+    # they are different kinds of unreachable. Both are NOT, with the reason
+    # naming which.
+    "C-047": ("structurally impossible: a reference carries ONE key, so two "
+              "different candidate keys cannot both match the same index. "
+              "The case describes a state rc2's own model cannot produce",
+              None),
+    "C-051": ("reserved-is-not-uniquely-matched is unpinned; the summary has "
+              "no uniquely-matched-works count to assert +0 against", None),
+    "C-077": ("exit 6 is allocated and unreachable — see C-046. Its exact "
+              "meta+error shape is therefore unexercised", None),
     **{c: ("citation_surface_group_key not implemented",
            "citation_surface_group_key")
        for c in ("C-022", "C-023", "C-024", "C-025")},

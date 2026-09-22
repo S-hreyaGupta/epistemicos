@@ -298,38 +298,52 @@ rather than leave standing.
 
 ---
 
-## A deviation, not a discrepancy: §8.3 rows 6-9 abort where rc2 processes
+## 9. rc2 §8.6's abort cannot fire, by rc2's own construction
 
-Recorded here because it is the only place this implementation knowingly does
-something rc2 forbids, and a deviation nobody wrote down is indistinguishable
-from a bug.
-
-rc2 §8.3, for an occurrence where both candidates match:
+§8.6 aborts when both candidate lookups are non-empty **and serialize the same
+candidate key**:
 
 ```text
-different keys  →  ambiguous_author_resolution, and carry on
-same key        →  exit 6
+exit   = 6
+reason = same_candidate_identity_double_resolution
 ```
 
-This implementation aborts with exit 6 for both. It is **stricter than rc2**
-and would refuse a manuscript rc2 says to process.
+The two candidates can never carry the same key, and the reason is in §6.3 and
+§8.1 rather than in any implementation choice:
 
 ```text
-why       the different-key branch needs `ambiguous_author_resolution`, which
-          is C-048 to C-051 and does not exist. The alternatives are to invent
-          the record, or to silently pick one of two candidate identities —
-          the guess CIT-ARCH-01 exists to forbid.
-reach     no corpus input reaches it. The full candidate keys `non_person`
-          over the whole surface including the lead-in, so matching it needs a
-          bibliography entry labelled `as podsakoff et al.`.
-undo      implementing C-048 to C-051 removes the deviation. Until then the
-          abort carries its own explanation in the error message.
+§6.3   a stop_reduced_phrase is created ONLY when the full phrase FAILS the
+       person grammar
+§8.1   the full candidate is keyed `person|…` ONLY when the phrase PASSES it,
+       and `non_person|<complete phrase>|<year>` otherwise
 ```
 
-Worth noting what this is not. It is not a case of rc2 and rc3 disagreeing,
-and it is not an unimplemented case quietly reported as met. It is a refusal
-chosen over a guess, which the conformance map records as `NOT` for all four
-rows rather than claiming partial credit for the abort.
+So whenever both candidates exist, the full one is non-person and the reduced
+one is a bare surname. Different namespaces, never the same string.
+
+```text
+chosen       implement the abort anyway, and pin the namespace split instead
+because      the guard is correct and costs nothing; what cannot be claimed is
+             a control for it, since no input reaches the branch
+consequence  C-046 and C-077 are PARTIAL and NOT respectively, not MET. No
+             mutation probes the abort either — a probe that reported "caught"
+             off some other control would establish nothing.
+```
+
+**A second case in the same pair is unreachable for a different reason.**
+C-047 asks that "a shared reference index across different candidate keys is
+permitted and remains ordinary ambiguity". A reference carries one key, so two
+different candidate keys cannot both match the same index. The case describes a
+state rc2's own model cannot produce.
+
+This is the third rule in rc2 found to be well formed and unexercisable, after
+§9.4's precedence list and §8.3's own rows while C-019 was outstanding. Each
+was found by implementing it rather than by reading it.
+
+*An earlier version of this section recorded a deviation: rows 6-9 aborted for
+both branches, where rc2 aborts for one. That deviation no longer exists —
+rows 6-9 were implemented on 22 September — and the entry is replaced rather
+than marked superseded.*
 
 ---
 
@@ -369,6 +383,8 @@ fourteen papers and looking at what came out:
 7  found by rc2's register arriving and saying something else
 8  found by implementing four of six reasons and having nothing to write
    for the other two
+9  found by implementing the abort and then failing to build an input that
+   fires it
 ```
 
 Number 3 is the one to dwell on. A check that finds nothing looks like a check

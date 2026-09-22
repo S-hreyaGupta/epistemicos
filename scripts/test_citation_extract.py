@@ -1438,17 +1438,26 @@ def main() -> int:
              "2(1), 1-9.\nBrown, L. (2018). Third. J, 3, 1.\n")
     _c, _a, s = ident("As shown (Smith, 2020; Brown, 2018; Jones, 2019) here.",
                       R_MIX)
+    # FOUR classes since §8.3 rows 6-9 landed. This fixture produces three of
+    # them and no ambiguous one, so the fourth is asserted zero here and
+    # exercised by the row-6 control below — a partition summed over three
+    # names while the code can emit four holds only while the fourth stays
+    # empty, and that is not an invariant.
     counts = (s["unique_reference_match_occurrences"],
               s["bibliography_key_ambiguous_occurrences"],
-              s["identity_not_resolved_occurrences"])
+              s["identity_not_resolved_occurrences"],
+              s["author_resolution_ambiguous_occurrences"])
     if sum(counts) != s["parsed"]:
         failures.append(f"§11.2: the identity classes must partition the "
                         f"parsed occurrences — {sum(counts)} vs "
                         f"{s['parsed']}")
-    elif not all(counts):
-        failures.append(f"the partition control needs all three classes "
-                        f"present or it cannot see a double-count — got "
-                        f"{counts}")
+    elif not all(counts[:3]):
+        failures.append(f"the partition control needs all three reachable "
+                        f"classes present or it cannot see a double-count — "
+                        f"got {counts}")
+    elif counts[3] != 0:
+        failures.append(f"this fixture has no ambiguous occurrence; got "
+                        f"{counts[3]}")
     else:
         ok("§11.2: the identity classes partition the parsed occurrences")
 
@@ -1527,6 +1536,81 @@ def main() -> int:
                         f"diagnostics — got {len(mr)} missing_reference")
     else:
         ok("§8.4: two internal candidates suppress the §9.4 diagnostic")
+
+    # ---- §8.3 rows 6 to 9, §8.5 reservation, §8.6 double resolution ----
+    #
+    # No corpus input reaches these. The fixture is built, and it is buildable
+    # through the real pipeline rather than by injection: a bibliography
+    # carrying an institutional entry whose label IS the lead-in plus the
+    # surname, beside the person entry for the same surname.
+    R_BOTH = ("From Tether (2018). A report. Publisher.\n"
+              "Tether, B. (2018). A paper. Journal, 1(1), 1-10.\n"
+              "Brown, L. (2017). Unrelated. J, 2, 1.\n")
+
+    def amb(body_text, refs):
+        with _tf.TemporaryDirectory() as td:
+            p = Path(td) / "paper.md"
+            p.write_text(HEAD + body_text + "\n\n## References\n\n" + refs,
+                         encoding="utf-8")
+            lines, _c = ce.run(p, {"ampersand", "segments"})
+        return (next((l for l in lines if l.get("type") == "citation"), None),
+                [l for l in lines
+                 if l.get("type") == "ambiguous_author_resolution"],
+                [l for l in lines if l.get("type") == "uncited_reference"],
+                lines[-1])
+
+    cit, aar, unc, summ = amb("From Tether (2018) we take this.", R_BOTH)
+    if cit is None:
+        failures.append("§8.3 row 6: the fixture did not parse")
+    elif cit["author_resolution"] != "ambiguous":
+        failures.append(f"§8.3 row 6: two matching candidates with different "
+                        f"keys is ambiguous — got {cit['author_resolution']!r}")
+    elif cit["citation_key"] is not None or cit["author_kind"] != "undetermined":
+        failures.append("§8.3: an ambiguous occurrence establishes no "
+                        "citation_key and no author_kind")
+    elif len(aar) != 1:
+        failures.append(f"§8.3: EXACTLY ONE ambiguous_author_resolution per "
+                        f"occurrence, never one per candidate — got {len(aar)}")
+    elif [x["candidate"] for x in aar[0]["candidates"]] != ["full",
+                                                            "stop_reduced"]:
+        failures.append("C-048: the record carries both candidates, named")
+    elif summ["author_resolution_ambiguous_occurrences"] != 1:
+        failures.append("§11.2: the fourth identity class is counted")
+    else:
+        ok("§8.3 row 6: different keys → ambiguous, nothing established")
+
+    # §8.5. Both reserved indices must leave the pool, or ambiguity turns into
+    # two false uncited references — which is the one outcome the section
+    # names twice.
+    if any(u["reference_key"] in ("tether|2018", "non_person|from tether|2018")
+           for u in unc):
+        failures.append(f"§8.5: reserved indices must not emit "
+                        f"uncited_reference — got "
+                        f"{[u['reference_key'] for u in unc]}")
+    elif [u["reference_key"] for u in unc] != ["brown|2017"]:
+        failures.append(f"§8.5: only the genuinely unreserved entry is "
+                        f"uncited — got {[u['reference_key'] for u in unc]}")
+    else:
+        ok("§8.5: ambiguity-reserved references leave the pool")
+
+    # §8.6, and the finding that goes with it. The abort is implemented and
+    # CANNOT FIRE, by rc2's own construction rather than by ours: §6.3 creates
+    # a reduced phrase only when the full phrase FAILS the person grammar, and
+    # §8.1 keys the full candidate `person|` only when it PASSES. So whenever
+    # both candidates exist they are in different namespaces — `non_person|…`
+    # against a bare surname — and cannot serialize the same string.
+    #
+    # Same shape as §9.4's precedence list: well formed, and with no input.
+    # Recorded rather than asserted as behaviour, and the namespace split is
+    # pinned instead, since that is the thing actually holding.
+    if cit["candidate_key_full"] == cit["candidate_key_stop_reduced"]:
+        failures.append("§8.6: the two candidate keys collided, so the "
+                        "double-resolution abort is now reachable")
+    elif not cit["candidate_key_full"].startswith("non_person|"):
+        failures.append(f"§8.6: a reduced occurrence keys its FULL candidate "
+                        f"non-person — got {cit['candidate_key_full']!r}")
+    else:
+        ok("§8.6: the two candidates cannot collide, so exit 6 has no input")
 
     # ------------------- rc2 §9.4 / §9.5, candidate-level diagnostics
     print("\nrc2 §9.4 — candidate-level missing reference and repair")

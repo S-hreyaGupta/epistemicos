@@ -2020,6 +2020,72 @@ def main() -> int:
             ok("§13: an abort publishes the two-line error stream, not a "
                "partial artifact")
 
+        # ---- §12.2, block order ----
+        #
+        #     Empty blocks emit nothing. Blocks never interleave.
+        #
+        # Both halves are checked. "Never interleave" is the one that was
+        # being broken: the two §9.4 diagnostics shared a list, so
+        # missing_reference reopened seven times on paper ad1e3ff9 until
+        # 22 September.
+        SPEC_ORDER = ["meta", "citation", "unresolved_citation",
+                      "excluded_candidate", "citation_error",
+                      "bibliography_absent", "reference",
+                      "unresolved_reference", "ambiguous_author_resolution",
+                      "missing_reference", "uncited_reference",
+                      "duplicate_reference_key", "ambiguous_citation",
+                      "possible_mismatch", "author_structure_mismatch",
+                      "summary"]
+
+        def block_order(payload):
+            seen, order, reopened = set(), [], []
+            for ln in payload.rstrip(b"\n").split(b"\n"):
+                t = _json.loads(ln.decode("utf-8"))["type"]
+                if t not in seen:
+                    seen.add(t)
+                    order.append(t)
+                elif order[-1] != t:
+                    reopened.append(t)
+            return order, reopened
+
+        # A fixture producing BOTH §9.4 diagnostics, so the interleaving this
+        # control exists for is reachable. Built rather than hunted from the
+        # corpus: the first version searched `data/md_full` relative to
+        # ce.__file__, which resolves to a temp directory once the mutation
+        # probe copies the module, so the control failed for a reason that had
+        # nothing to do with block order.
+        mixed = d / "mixed.md"
+        mixed.write_text(
+            HEAD + "As shown (Whiteman, 2000) and (Smith, 2020) and "
+            "(Adams and Boyle, 2015) here.\n\n## References\n\n"
+            "Whitman, R. (2000). Pairs by edit distance. J, 1, 1.\n"
+            "Adams, J. (2015). One author, cited as two. J, 2, 1.\n"
+            "Jones, K. (2019). A. J, 3, 1.\nBrown, L. (2018). B. J, 4, 1.\n"
+            "Davis, M. (2017). C. J, 5, 1.\nEvans, N. (2016). D. J, 6, 1.\n",
+            encoding="utf-8")
+        ls, _c = ce.run(mixed, {"ampersand", "segments"})
+        got = {x["type"] for x in ls}
+        # Three blocks have to be non-empty or the control cannot see their
+        # order: the two §9.4 diagnostics, and author_structure_mismatch,
+        # which §12.2 puts LAST and which this implementation was emitting
+        # fourth. An empty block is unordered by definition.
+        need = {"possible_mismatch", "missing_reference",
+                "author_structure_mismatch"}
+        if not need <= got:
+            failures.append(f"§12.2: the fixture must populate {sorted(need)} "
+                            f"for their order to be observable — got "
+                            f"{sorted(got & need)}")
+        else:
+            order, reopened = block_order(ce.serialize(ls))
+            if reopened:
+                failures.append(f"§12.2: blocks never interleave — these "
+                                f"reopened: {sorted(set(reopened))}")
+            elif [t for t in order if t in SPEC_ORDER] != \
+                    [t for t in SPEC_ORDER if t in order]:
+                failures.append(f"§12.2: block order — got {order}")
+            else:
+                ok("§12.2: blocks are in order and never interleave")
+
         # C-083. Same input, two runs, byte-identical output. The strongest
         # determinism statement available, and it costs one more process.
         r3 = cli([str(paper), "--fix", "all"])

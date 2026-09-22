@@ -2186,34 +2186,28 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
             # "citation_surface_group_key = computed" — the one identity-ish
             # field that survives, because it is a surface property and never
             # needed the bibliography. C-025's "always emitted" is this half.
-        lines.append(c)
     for i, u in enumerate(unres):
         u["index"] = i
-        lines.append(u)
     for i, x in enumerate(excl):
         x["index"] = i
-        lines.append(x)
     for i, e in enumerate(errs):
         e["index"] = i
-        lines.append(e)
-    # §10's suppression list, applied at the one place every record passes
-    # through. Nine types must not be emitted when the bibliography is absent;
-    # `reference` and `unresolved_reference` are the two that could otherwise
-    # be produced from an empty section, and the remaining seven are guarded
-    # below where they are built.
-    for i, r in enumerate(refs if not absent else []):
+    # §10's suppression list. Nine types must not be emitted when the
+    # bibliography is absent; `reference` and `unresolved_reference` are the
+    # two that could otherwise come from an empty section, and the remaining
+    # seven are guarded where they are built.
+    refs_out = [] if absent else refs
+    ref_unres_out = [] if absent else ref_unres
+    for i, r in enumerate(refs_out):
         r["index"] = i
-        lines.append(r)
-    for i, u in enumerate(ref_unres if not absent else []):
+    for i, u in enumerate(ref_unres_out):
         u["index"] = i
-        lines.append(u)
-    if absent:
-        # "one bibliography_absent" — C-009. The record says the manuscript
-        # was read and the bibliography was not there, which is a different
-        # claim from the run having failed.
-        lines.append({"type": "bibliography_absent", "index": 0,
-                      "references_source": "not_available",
-                      "identity_resolution_performed": False})
+    # "one bibliography_absent" — C-009. The record says the manuscript was
+    # read and the bibliography was not there, which is a different claim from
+    # the run having failed.
+    bib_absent = [{"type": "bibliography_absent", "index": 0,
+                   "references_source": "not_available",
+                   "identity_resolution_performed": False}] if absent else []
 
     # §10: "Pass 2 identity resolution — not evaluated". With no references,
     # every lookup would be `no_match` and every occurrence would come out
@@ -2461,15 +2455,7 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     # — segment splitting turns one failed parenthesis into several failed
     # segments, so absolute counts survive detection changes and rates do not.
     # Both are emitted; the counts are the ones to compare across runs.
-    for i, m in enumerate(mismatches):
-        m["index"] = i
-        lines.append(m)
-    for i, a in enumerate(ambiguous_citations):
-        a["index"] = i
-        lines.append(a)
-    for i, a in enumerate(ambiguous_authors):
-        a["index"] = i
-        lines.append(a)
+    # Collected, not emitted. §12.2's order is applied in one place below.
 
     # ---------------------------------------------------- rc2 §9.4 and §9.5
     #
@@ -2591,9 +2577,13 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                 "citation_key": None, "author_kind": None,
             })
 
-    for i, d in enumerate(diagnostics):
-        d["index"] = i
-        lines.append(d)
+    # §12.2: "Blocks never interleave." `diagnostics` holds both kinds in
+    # pairing order, so emitting it as one run reopened the missing_reference
+    # block seven times on paper ad1e3ff9 — interleaved with possible_mismatch
+    # exactly as the section forbids. Split here; ordered below.
+    missing_refs = [d for d in diagnostics if d["type"] == "missing_reference"]
+    possible_mismatches = [d for d in diagnostics
+                           if d["type"] == "possible_mismatch"]
 
     # ---------------------------------------------------------- rc2 §9.6
     #
@@ -2614,12 +2604,52 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     # `reference_key`, so they never entered `ref_index_by_key`, never
     # appeared in `unique_keys`, and cannot reach the pool. Stated because a
     # reader should not have to rediscover that the guard is structural.
-    for i, ri in enumerate(pool):
-        lines.append({
-            "type": "uncited_reference", "index": i,
-            "reference_index": ri,
-            "reference_key": refs[ri]["reference_key"],
-        })
+    uncited = [{"type": "uncited_reference", "index": i,
+                "reference_index": ri,
+                "reference_key": refs[ri]["reference_key"]}
+               for i, ri in enumerate(pool)]
+
+    # ------------------------------------------------ rc2 §12.2, block order
+    #
+    #     Empty blocks emit nothing. Blocks never interleave.
+    #
+    # Stated once, here, rather than emerging from the order in which each
+    # block happens to be computed. It emerged that way until 22 September and
+    # the result was wrong in two ways at once: `author_structure_mismatch`
+    # came out fourth from the top instead of last, and the two §9.4
+    # diagnostics shared one list, so `missing_reference` reopened seven times
+    # on paper ad1e3ff9 — interleaved, which the section forbids in as many
+    # words.
+    #
+    # rc3's two additional record types are not in §12.2's list, which was
+    # written before them. They sit with the other Pass-1 candidate outcomes,
+    # immediately after `unresolved_citation`, and that placement is this
+    # implementation's choice rather than rc2's.
+    for i, m in enumerate(mismatches):
+        m["index"] = i
+    for i, a in enumerate(ambiguous_citations):
+        a["index"] = i
+    for i, a in enumerate(ambiguous_authors):
+        a["index"] = i
+    for i, d in enumerate(missing_refs):
+        d["index"] = i
+    for i, d in enumerate(possible_mismatches):
+        d["index"] = i
+
+    for block in (cits,                 # 2
+                  unres,                # 3
+                  excl, errs,           # rc3, placed here
+                  bib_absent,           # 4
+                  refs_out,             # 5
+                  ref_unres_out,        # 6
+                  ambiguous_authors,    # 7
+                  missing_refs,         # 8
+                  uncited,              # 9
+                  # 10 duplicate_reference_key — §9.1, not implemented
+                  ambiguous_citations,  # 11
+                  possible_mismatches,  # 12
+                  mismatches):          # 13
+        lines.extend(block)
 
     # Alex Zamurko, 20 September, amending rc2:
     #

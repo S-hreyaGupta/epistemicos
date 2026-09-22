@@ -98,6 +98,11 @@ CHECKS = {
               "byte properties pinned; rc2's exact key order not adopted"),
     "C-083": ((), ("C-083: the same input produces byte-identical output",),
               "MET", "two runs, same bytes"),
+    # §12.2's two halves. "Blocks never interleave" was being broken: the two
+    # §9.4 diagnostics shared one list, so missing_reference reopened seven
+    # times on paper ad1e3ff9.
+    "C-069": ((), ("§12.2: blocks are in order and never interleave",), "MET",
+              "block order stated once, and no block reopens"),
     # PARTIAL until 22 September for one reason — "references_source not
     # emitted" — which §10's work fixed as a side effect of needing the third
     # value, `not_available`.
@@ -312,7 +317,7 @@ NOT_IMPLEMENTED = {
        for c in ("C-002", "C-003", "C-004")},
     **{c: ("determinism not byte-pinned; 'byte-identical' already appears in "
            "prose, so it cannot serve as a needle", None)
-       for c in ("C-029", "C-032", "C-069", "C-070")},
+       for c in ("C-029", "C-032", "C-070")},
     **{c: ("outside the pilot scope — rc2 itself marks these OUTSIDE_PILOT, "
            "so no local change can make the verdict stale", None)
        for c in ("C-084", "C-085", "C-086")},

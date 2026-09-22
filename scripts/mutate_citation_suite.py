@@ -536,6 +536,23 @@ MUTATIONS = [
 
     # ------------------------------- rc2 §13 / §12.1, bytes on disk
 
+    ("rc2 §12.2: the two §9.4 diagnostics share one block again",
+     "    for block in (cits,                 # 2",
+     "    missing_refs = missing_refs + possible_mismatches\n    possible_mismatches = []\n    for block in (cits,                 # 2",
+     "§12.2: block order"),
+
+    # Duplicating a block makes it REOPEN, which the interleave branch
+    # catches. The order branch needs a pure swap, so it gets its own.
+    ("rc2 §12.2: author_structure_mismatch comes back to the top",
+     "                  ambiguous_authors,    # 7",
+     "                  mismatches, ambiguous_authors,    # 7",
+     "§12.2: blocks never interleave"),
+
+    ("rc2 §12.2: two blocks swap places",
+     "                  missing_refs,         # 8\n                  uncited,              # 9",
+     "                  uncited,              # 9\n                  missing_refs,         # 8",
+     "§12.2: block order"),
+
     ("rc2 §12.1: the stream goes back through text-mode print()",
      '    return b"".join(\n        json.dumps(r, separators=(",", ":"), ensure_ascii=False)\n        .encode("utf-8") + b"\\n" for r in records)',
      '    return b"".join(\n        (json.dumps(r, separators=(",", ":"), ensure_ascii=False)\n         + "\\r\\n").encode("utf-8") for r in records)',
@@ -659,8 +676,8 @@ MUTATIONS = [
     # ------------------------------- rc2 §9.6, the residual
 
     ("rc2 §9.6: nothing is ever reported uncited",
-     '            "type": "uncited_reference", "index": i,',
-     '            "type": "uncited_reference_DISABLED", "index": i,',
+     '    uncited = [{"type": "uncited_reference", "index": i,',
+     '    uncited = [{"type": "uncited_reference_OFF", "index": i,',
      "§9.6: every remaining keyed reference is uncited"),
 
     ("rc2 §9.6: the unique-key filter is removed, so duplicates qualify",

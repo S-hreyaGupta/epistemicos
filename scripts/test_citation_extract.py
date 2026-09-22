@@ -1868,6 +1868,167 @@ def main() -> int:
     else:
         ok("C-006: a marked-up References heading reports detected")
 
+    # ---- rc2 §13 and §12.1, file output and canonical bytes ----
+    #
+    # Every control here compares BYTES. §12.1's clauses are byte properties —
+    # UTF-8, no BOM, LF only, exactly one trailing LF — and a test that parses
+    # the lines back cannot see any of them. That is not hypothetical: until
+    # 22 September the stream went out through `print()`, which on Windows
+    # translates LF to CRLF, so every run on the author's machine violated
+    # §12.1 and no control noticed.
+    print("\nrc2 §13 / §12.1 — file output and canonical bytes")
+
+    # In-process rather than subprocess, and the reason is the mutation probe
+    # rather than taste. Six spawns per suite run, times roughly a hundred
+    # mutations, took the probe past its timeout — and a probe that cannot
+    # finish checks nothing. `main()` is the real entry point either way; only
+    # the process boundary is dropped.
+    import io as _io
+
+    class _Result:
+        __slots__ = ("stdout", "returncode")
+
+        def __init__(self, stdout, returncode):
+            self.stdout, self.returncode = stdout, returncode
+
+    class _BinStdout:
+        """Stands in for sys.stdout, carrying the .buffer main() writes to."""
+
+        def __init__(self):
+            self.buffer = _io.BytesIO()
+
+        def write(self, s):
+            self.buffer.write(s.encode("utf-8"))
+
+        def flush(self):
+            pass
+
+    def cli(args):
+        cap, old_out, old_argv = _BinStdout(), sys.stdout, sys.argv
+        sys.stdout, sys.argv = cap, [str(Path(ce.__file__))] + args
+        try:
+            code = ce.main()
+        finally:
+            sys.stdout, sys.argv = old_out, old_argv
+        return _Result(cap.buffer.getvalue(), code)
+
+    with _tf.TemporaryDirectory() as td:
+        d = Path(td)
+        paper = d / "paper.md"
+        paper.write_text(HEAD + "As shown (Smith, 2020) and Müller (2019).\n"
+                         "\n\n## References\n\nSmith, J. (2020). A. J, 1, 1.\n"
+                         "Müller, K. (2019). B. J, 2, 1.\n", encoding="utf-8")
+
+        r1 = cli([str(paper), "--fix", "all"])
+        out_file = d / "explicit.jsonl"
+        r2 = cli([str(paper), "--fix", "all", "--out", str(out_file)])
+
+        # C-071. "writes the byte-identical canonical stream that would be
+        # written to stdout" — so the comparison is the file against stdout,
+        # not the file against a re-serialization of it.
+        if not out_file.exists():
+            failures.append("C-071: --out wrote no file")
+        elif out_file.read_bytes() != r1.stdout:
+            failures.append("C-071: --out bytes differ from stdout bytes")
+        elif r2.stdout != r1.stdout:
+            failures.append("C-071: asking for --out changed stdout")
+        else:
+            ok("C-071: --out and stdout are byte-identical")
+
+        # §12.1, the four byte properties.
+        b = r1.stdout
+        if b.startswith(b"\xef\xbb\xbf"):
+            failures.append("§12.1: no BOM")
+        elif b"\r" in b:
+            failures.append("§12.1: LF line ending only — found a CR. On "
+                            "Windows this is what text-mode stdout does")
+        elif not b.endswith(b"\n") or b.endswith(b"\n\n"):
+            failures.append("§12.1: the final line ends with exactly one LF")
+        elif b"\n\n" in b:
+            failures.append("§12.1: no blank lines")
+        else:
+            ok("§12.1: UTF-8, no BOM, LF only, one trailing LF")
+
+        # "non-ASCII characters emitted raw" — not \u escapes.
+        if b"M\xc3\xbcller" not in b:
+            failures.append("§12.1: non-ASCII is emitted raw, not escaped")
+        else:
+            ok("§12.1: non-ASCII characters are emitted raw")
+
+        # C-072. The name is content-derived, so the same manuscript always
+        # publishes to the same filename and a different one never collides.
+        dirtarget = d / "bydir"
+        dirtarget.mkdir()
+        cli([str(paper), "--fix", "all", "--out", str(dirtarget)])
+        written = sorted(p.name for p in dirtarget.iterdir())
+        meta = _json.loads(r1.stdout.split(b"\n")[0].decode("utf-8"))
+        want = f"{meta['canonical_sha256']}.citations.jsonl"
+        if written != [want]:
+            failures.append(f"C-072: a directory target names the file "
+                            f"<canonical_sha256>.citations.jsonl — got "
+                            f"{written}")
+        elif (dirtarget / want).read_bytes() != r1.stdout:
+            failures.append("C-072: and it carries the same bytes")
+        else:
+            ok("C-072: a directory target is named for canonical_sha256")
+
+        # And the digest is over the INPUT, not the output — §2's
+        # canonical_manuscript_bytes, which is what makes the name stable.
+        import hashlib as _hl
+        canon = ce.normalise(paper.read_bytes()).encode("utf-8")
+        if meta["canonical_sha256"] != _hl.sha256(canon).hexdigest():
+            failures.append("§2: canonical_sha256 is over the normalised "
+                            "INPUT bytes, not over the output")
+        else:
+            ok("§2: canonical_sha256 is over canonical_manuscript_bytes")
+
+        # C-073. "no partial authoritative file". The scratch file lives in
+        # the destination directory so the rename is atomic, and it must not
+        # survive the run.
+        leftovers = [p.name for p in dirtarget.iterdir()
+                     if p.name.startswith(".citations-")
+                     or p.name.endswith(".tmp")]
+        if leftovers:
+            failures.append(f"C-073: publication left scratch files behind — "
+                            f"{leftovers}")
+        else:
+            ok("C-073: atomic publication leaves no scratch file")
+
+        # §13: "For exits 2-5, the two-line error stream is written to the
+        # requested file as the authoritative error artifact." An abort must
+        # not leave a previous run's normal output sitting at the target.
+        bad = d / "bad.md"
+        bad.write_bytes(b"# A\n\ntext\n\n# B\n\nmore\n")      # exit 4
+        reused = d / "reused.jsonl"
+        cli([str(paper), "--fix", "all", "--out", str(reused)])
+        before = reused.read_bytes()
+        rb = cli([str(bad), "--fix", "all", "--out", str(reused)])
+        after = reused.read_bytes()
+        if rb.returncode != 4:
+            failures.append(f"§13: the fixture should abort 4, got "
+                            f"{rb.returncode}")
+        elif after == before:
+            failures.append("§13: an abort left the previous normal artifact "
+                            "in place; the error stream is authoritative")
+        elif len(after.rstrip(b"\n").split(b"\n")) != 2:
+            failures.append(f"§13: exits 2-5 write EXACTLY the two-line error "
+                            f"stream — got {len(after.split(chr(10).encode()))}")
+        elif after != rb.stdout:
+            failures.append("§13: the file and stdout carry the same bytes "
+                            "on the abort path too")
+        else:
+            ok("§13: an abort publishes the two-line error stream, not a "
+               "partial artifact")
+
+        # C-083. Same input, two runs, byte-identical output. The strongest
+        # determinism statement available, and it costs one more process.
+        r3 = cli([str(paper), "--fix", "all"])
+        if r3.stdout != r1.stdout:
+            failures.append("C-083: two runs over the same input produced "
+                            "different bytes")
+        else:
+            ok("C-083: the same input produces byte-identical output twice")
+
     # ---- rc2 §15, the invariant-injection seam ----
     #
     # The `From Tether` fixture above reaches row 6 through real parsing, which

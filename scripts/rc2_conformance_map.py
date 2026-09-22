@@ -85,6 +85,19 @@ SUITE = REPO / "scripts/test_citation_extract.py"
 # PARTIAL at best.
 CHECKS = {
     "C-001": ((), ("exit 5: invalid utf-8",), "MET", "abort before processing"),
+    # rc2 §13 and §12.1, implemented 22 September. Every control here compares
+    # BYTES: §12.1's clauses are byte properties, and a test that parses the
+    # lines back cannot see a single one of them.
+    "C-071": ((), ("C-071: --out and stdout are byte-identical",), "MET",
+              "the file is the stdout stream, exactly"),
+    "C-072": ((), ("C-072: a directory target is named for canonical_sha256",),
+              "MET", "content-derived name, over the INPUT bytes"),
+    "C-073": ((), ("C-073: atomic publication leaves no scratch file",), "MET",
+              "temp in the destination dir, rename after completion"),
+    "C-068": ((), ("§12.1: UTF-8, no BOM, LF only, one trailing LF",), "PARTIAL",
+              "byte properties pinned; rc2's exact key order not adopted"),
+    "C-083": ((), ("C-083: the same input produces byte-identical output",),
+              "MET", "two runs, same bytes"),
     # PARTIAL until 22 September for one reason — "references_source not
     # emitted" — which §10's work fixed as a side effect of needing the third
     # value, `not_available`.
@@ -290,8 +303,6 @@ NOT_IMPLEMENTED = {
               '"code": 6, "reason"'),
     **{c: ("sentence-relative fields not emitted", "previous_sentence_end")
        for c in ("C-026", "C-027", "C-028")},
-    **{c: ("file output contract not implemented", "canonical_sha256")
-       for c in ("C-071", "C-072", "C-073")},
     "C-017": ("PREFIX longest-match precedence not pinned", "longest-match"),
     "C-078": ("the exit-1 finding set is not closed", "FINDINGS_FORCING_EXIT1"),
 
@@ -301,7 +312,7 @@ NOT_IMPLEMENTED = {
        for c in ("C-002", "C-003", "C-004")},
     **{c: ("determinism not byte-pinned; 'byte-identical' already appears in "
            "prose, so it cannot serve as a needle", None)
-       for c in ("C-029", "C-032", "C-068", "C-069", "C-070", "C-083")},
+       for c in ("C-029", "C-032", "C-069", "C-070")},
     **{c: ("outside the pilot scope — rc2 itself marks these OUTSIDE_PILOT, "
            "so no local change can make the verdict stale", None)
        for c in ("C-084", "C-085", "C-086")},

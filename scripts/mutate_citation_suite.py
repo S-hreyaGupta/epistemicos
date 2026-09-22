@@ -534,6 +534,43 @@ MUTATIONS = [
      '                  "distinct_surface_groups": len([\n                      json.dumps(c["citation_surface_group_key"],\n                                 separators=(",", ":"), ensure_ascii=False)\n                      for c in cits]),',
      "C-023: two occurrences of ONE surface is one group"),
 
+    # ------------------------------- rc2 §13 / §12.1, bytes on disk
+
+    ("rc2 §12.1: the stream goes back through text-mode print()",
+     '    return b"".join(\n        json.dumps(r, separators=(",", ":"), ensure_ascii=False)\n        .encode("utf-8") + b"\\n" for r in records)',
+     '    return b"".join(\n        (json.dumps(r, separators=(",", ":"), ensure_ascii=False)\n         + "\\r\\n").encode("utf-8") for r in records)',
+     "§12.1: LF line ending only"),
+
+    ("rc2 §12.1: non-ASCII is escaped rather than emitted raw",
+     '        json.dumps(r, separators=(",", ":"), ensure_ascii=False)\n        .encode("utf-8") + b"\\n" for r in records)',
+     '        json.dumps(r, separators=(",", ":"), ensure_ascii=True)\n        .encode("utf-8") + b"\\n" for r in records)',
+     "§12.1: non-ASCII is emitted raw, not escaped"),
+
+    ("rc2 §13: --out writes something other than the stdout bytes",
+     "    sys.stdout.buffer.write(payload)",
+     "    sys.stdout.buffer.write(payload + b'\\n')",
+     "C-071: --out bytes differ from stdout bytes"),
+
+    ("rc2 §13: the directory filename is not content-derived",
+     '        target = target / f"{digest}.citations.jsonl"',
+     '        target = target / "citations.jsonl"',
+     "C-072: a directory target names the file"),
+
+    ("rc2 §2: canonical_sha256 hashes the OUTPUT, not the manuscript",
+     '              "canonical_sha256": hashlib.sha256(\n                  text.encode("utf-8")).hexdigest(),',
+     '              "canonical_sha256": hashlib.sha256(\n                  body.encode("utf-8")).hexdigest(),',
+     "§2: canonical_sha256 is over the normalised INPUT bytes"),
+
+    ("rc2 §13: publication is not atomic — the target is written in place",
+     "        os.replace(tmp, target)",
+     "        target.write_bytes(payload)",
+     "C-073: publication left scratch files behind"),
+
+    ("rc2 §13: an abort leaves the previous artifact in place",
+     "    if a.out:\n        try:\n            publish(Path(a.out), payload, digest)",
+     "    if a.out and digest is not None:\n        try:\n            publish(Path(a.out), payload, digest)",
+     "§13: an abort left the previous normal artifact in place"),
+
     # ------------------------------- rc2 §10 / §11.3, bibliography absent
 
     ("rc2 §10: a missing bibliography aborts again, as v3.3 did",

@@ -54,9 +54,12 @@ it — which is the whole reason the old one's absence matters.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import sys
+import tempfile
 import unicodedata
 from pathlib import Path
 
@@ -2149,6 +2152,12 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     lines = [{"type": "meta", "spec_version": SPEC_VERSION,
               "implementation": "scripts/citation_extract.py",
               "fixes_applied": sorted(fixes),
+              # rc2 §2: "canonical_sha256 is lowercase hexadecimal SHA-256
+              # over exactly canonical_manuscript_bytes" — the INPUT after
+              # newline and NFC normalisation, not the output. No circularity,
+              # which is what lets §13 name an output file after it.
+              "canonical_sha256": hashlib.sha256(
+                  text.encode("utf-8")).hexdigest(),
               # rc2 §6.2, C-006 and C-007. Whether the bibliography was found
               # by a marked-up heading, inferred from a bare `References`
               # line, or absent entirely is a property of the run, and a
@@ -2732,6 +2741,74 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     return lines, lines[-1]["exit"]
 
 
+def serialize(records: list[dict]) -> bytes:
+    """rc2 §12.1's canonical stream, as BYTES.
+
+    Bytes rather than a string because three of §12.1's clauses are byte
+    properties and cannot be asserted on a `str`:
+
+        UTF-8, no BOM
+        LF line ending only
+        every line, including the final line, ends with exactly one LF
+
+    And because `print()` would break the second of those on Windows, where
+    text-mode stdout translates `\\n` to `\\r\\n`. The extractor emitted its
+    stream through `print()` until 22 September, so every run on this machine
+    was producing CRLF output that §12.1 forbids — invisible on Linux, and
+    invisible in any test that parsed the lines back rather than reading them.
+    """
+    return b"".join(
+        json.dumps(r, separators=(",", ":"), ensure_ascii=False)
+        .encode("utf-8") + b"\n" for r in records)
+
+
+def publish(target: Path, payload: bytes, digest: str | None) -> Path:
+    """rc2 §13's atomic publication.
+
+        1. build complete bytes in a temporary file in the destination
+           directory;
+        2. evaluate all abort-class conditions, including exit 6;
+        3. fsync/close as needed for safe rename;
+        4. atomically rename over the target only after complete output is
+           known.
+
+    Step 2 has already happened: `payload` exists, so either the run completed
+    or it aborted and this is the two-line error stream. That ordering is the
+    point of the section — a reader must never find a half-written normal
+    artifact, so nothing is placed at the target path until the whole of it is
+    known.
+
+    The temp file goes in the DESTINATION directory rather than /tmp, because
+    `os.replace` is only atomic within a filesystem.
+    """
+    if target.is_dir():
+        if digest is None:
+            # Exit 5: the manuscript has no canonical form, so it has no
+            # canonical_sha256 and no derived filename. rc2 does not cover
+            # this pairing; refusing to invent a name is the conservative
+            # reading.
+            raise Abort(5, "invalid utf-8: no canonical name for a directory "
+                           "target")
+        target = target / f"{digest}.citations.jsonl"
+    fd, tmp = tempfile.mkstemp(dir=str(target.parent), prefix=".citations-",
+                               suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, target)
+    except BaseException:
+        # A failed publish leaves the target untouched and takes its scratch
+        # file with it.
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    return target
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         prog="citation_extract.py", description=__doc__,
@@ -2741,6 +2818,10 @@ def main() -> int:
                     help="comma-separated: " + ", ".join(FIXES) +
                          "; or `all` for every one of them. Default none, "
                          "which is v3.3 as specified.")
+    ap.add_argument("--out", metavar="PATH",
+                    help="write the same canonical bytes here as well as to "
+                         "stdout, published atomically. A directory names the "
+                         "file <canonical_sha256>.citations.jsonl.")
     a = ap.parse_args()
 
     fixes = {f.strip() for f in a.fix.split(",") if f.strip()}
@@ -2757,18 +2838,34 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
+    digest = None
     try:
         lines, code = run(Path(a.paper), fixes)
+        digest = lines[0]["canonical_sha256"]
+        payload = serialize(lines)
     except Abort as ab:
-        print(json.dumps({"type": "meta", "spec_version": SPEC_VERSION},
-                         separators=(",", ":"), ensure_ascii=False))
-        print(json.dumps({"type": "error", "code": ab.code,
-                          "reason": ab.reason},
-                         separators=(",", ":"), ensure_ascii=False))
-        return ab.code
+        # §13: "For exits 2-5, the two-line error stream is written to the
+        # requested file as the authoritative error artifact." The same bytes
+        # go to stdout, so the two destinations never disagree.
+        code = ab.code
+        payload = serialize([
+            {"type": "meta", "spec_version": SPEC_VERSION},
+            {"type": "error", "code": ab.code, "reason": ab.reason}])
 
-    for rec in lines:
-        print(json.dumps(rec, separators=(",", ":"), ensure_ascii=False))
+    # §12.1: UTF-8, LF only. Written through the binary buffer so the
+    # platform's text layer cannot translate the line endings.
+    sys.stdout.buffer.write(payload)
+    sys.stdout.buffer.flush()
+
+    if a.out:
+        try:
+            publish(Path(a.out), payload, digest)
+        except Abort as ab:
+            print(f"--out: {ab.reason}", file=sys.stderr)
+            return ab.code
+        except OSError as e:
+            print(f"--out: {e}", file=sys.stderr)
+            return 1
     return code
 
 

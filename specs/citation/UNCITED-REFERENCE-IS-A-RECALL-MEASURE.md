@@ -3,62 +3,80 @@
 22 September 2026, found while implementing rc2 §9.6.
 
 ```text
-uncited_reference emitted            72
-of those, the reference IS cited     39
+uncited_reference emitted            57
+of those, the reference IS cited     28
                                      ──
-plausible residual                   33
+plausible residual                   29
 ```
 
-Fifty-four percent of the rows are wrong. Each of the 39 names a reference the
-paper does cite, in a span the grammar could not read.
+Just under half the rows are wrong. Each of the 28 names a reference the paper
+does cite, in a span the grammar could not read.
 
 The implementation is faithful to §9.6. That is the problem: the section is
 correctly implemented and the number it produces still does not mean what its
 name says.
 
+> **These figures replace an earlier version of this document that reported 72
+> and 39.** Those came from a corpus run with only two of the five canonical
+> fixes enabled. The correction is at the bottom, under "How this document was
+> wrong first", because it is the more useful half.
+
 ---
 
-## How the 39 were identified
+## How the 28 were identified
 
 For each `uncited_reference`, check whether its surname and year both appear
 inside a single span the extractor emitted as `unresolved_citation`. Same span,
 not the same document — a first attempt matched surname and year independently
-across all failed spans and returned 41, inflated by `kim` appearing once and
-three different years appearing elsewhere. The loose test looked like
-corroboration and was counting coincidence.
+across all failed spans and returned a higher number, inflated by `kim`
+appearing once and three different years appearing elsewhere. The loose test
+looked like corroboration and was counting coincidence.
 
-Reproducible; the reason field is the extractor's own, not a hand label.
+The reason field is the extractor's own, not a hand label.
 
 ```text
-no_grammar_match    35
+no_grammar_match    24
 stopword_surname     4
 ```
 
 ---
 
-## What the 39 actually are
+## What the 28 actually are
 
 ```text
-(M. Kim, 2020)                              forename initial first
+(M. Kim, 2020)                               forename initial first     4
 Y. J. Kim et al. (2013)
-However, Dahlander and Gann (2010)          lead-in cue, rc3 B5
+
+However, Dahlander and Gann (2010)           lead-in cue, rc3 B5        9
 Additionally, Bacq, Hartog, and Hoogendoorn (2016)
 (for a review, see Sonnentag & Frese, 2003)
-and Ohly, Sonnentag, Niessen, and Zapf (2010)   conjunction lead-in
-(Van Quaquebeke 2016)                       multi-token surname, rc3 B1a
+(for an overview, see, e.g., Iszatt-White & Kempster, 2018)
+
+and Ohly, Sonnentag, Niessen, and Zapf (2010)    conjunction lead-in    5
+and Sauer and Seuring (2023)
+
+(Van Quaquebeke 2016)                        multi-token surname, B1a   3
 Saeed & Binti Abdul Ghani Azmi, 2019
-(Gilliland, 2008: 271)                      colon locator
-(Colquitt, Scott, Judge, & Shaw, 2006: 114)
-Robbins, Ford, and Tetrick's (2012: 250)    possessive + colon locator
+Pérez-Luño, Wiklund, & Valle Cabrera, 2011
+
+Hayes (2012,2017)                            multi-year parenthetical   4
+Similarly, Bicen and Johnson (2014,2015)
+
 (conservation of resource theory, Hobfoll, 1989, and ego-depletion,
- Baumeister et al., 1998)                   gloss-prefixed group
+ Baumeister et al., 1998)                    gloss-prefixed group       2
+
+(Smith, Weed, & Ramsay, 2005-present)        one-off                    1
 ```
 
-Almost every shape is already specified work: rc3 **B5** bounded lead-in cue,
-**B1a** surname production, **B8** possessive, and the forename-first
-limitation rc3 §C3 discusses. The colon-locator group is the largest single
-shape and is worth its own look, since the records describe colon locators as
-already handled and fourteen of these carry one.
+Almost every shape is already-specified work: rc3 **B5** bounded lead-in cue,
+**B1a** surname production, and the forename-first limitation rc3 §C3
+discusses.
+
+The multi-year group is worth separate attention. `Hayes (2012,2017)` is the
+same shape as `conversion_artifact`'s `Baron $(2012,2016)$` with no math
+wrapping, so unwrapping alone cannot recover it. That is discrepancy 6 in
+`RC2-RC3-DISCREPANCIES.md` — "rc3 D2 unwraps into a form the grammar refuses"
+— now visible end-to-end rather than only at the transform.
 
 ---
 
@@ -72,15 +90,10 @@ its reference  → uncited_reference, a false residual
 ```
 
 `uncited_reference` is parse recall, inverted and relabelled. It reads as a
-property of the author's bibliography — "they listed something they never cited"
-— and is substantially a property of our grammar. Anyone reading the number
-without this document would draw a conclusion about the corpus from a
+property of the author's bibliography — "they listed something they never
+cited" — and is substantially a property of our grammar. Anyone reading the
+number without this document would draw a conclusion about the corpus from a
 measurement of the extractor.
-
-That is the defect shape this repository keeps meeting. A green suite that is
-green for another reason. A search result recorded as a fact about the world.
-A control that passes whether or not its rule holds. Here: a diagnostic whose
-name points at the manuscript while its value tracks our own failures.
 
 ---
 
@@ -93,24 +106,46 @@ failed span would be inventing a rule rc2 does not have, and would hide the
 recall problem inside the diagnostic that reveals it.
 
 The rule is implemented as written. The number is recorded as unreliable.
-Those are different jobs and both are done.
 
 ---
 
-## What follows
+## How this document was wrong first
+
+The original version reported 57 as 72 and 28 as 39, and named a
+fourteen-row colon-locator group as its largest open question — spans like
+`(Gilliland, 2008: 271)` failing against records that describe colon locators
+as handled.
+
+They are handled. `LOCATOR_COLON` is applied when `"colon"` is in the fix set,
+the canonical set is `("ampersand", "segments", "colon", "cp", "mathyear")`,
+and every corpus measurement behind the first version passed
+`{"ampersand", "segments"}`. With the canonical set, **zero** colon-locator
+rows remain.
+
+The reduced set is correct inside `test_citation_extract.py`, where a control
+isolates one behaviour deliberately. It was carried into corpus measurement by
+habit, where it is simply wrong.
 
 ```text
-now        do not report 72 as an uncited-reference count, in a corpus
-           report or anywhere else, without this caveat attached
-on B5/B1a  re-measure after each lands. The 39 should shrink, and by how
-           much is a better recall signal than the parse rate, because it
-           is end-to-end rather than per-span
-for rc2    §9.6 may warrant a note that the residual is only as good as
-           Pass 1 recall. Alex Zamurko's call, not this implementation's.
-open       the colon-locator group, fourteen rows, against records that
-           describe colon locators as handled
+                     two fixes      canonical five
+parsed                    2069                2102
+unresolved                 166                 133
+uncited_reference           72                  57
+   of those, false          39                  28
 ```
 
-The 33 that survive the check are the plausible residual. They are not
-verified as genuinely uncited — nothing here establishes that — they are
-simply the rows this test cannot show to be wrong.
+The right-hand column reproduces the corpus figures already on record, which
+is the check that should have been run first: a new measurement that disagrees
+with the established one is reporting on itself until that disagreement is
+explained.
+
+**This is the third measurement error of the same shape in two days**, and the
+other two are recorded in `GSD-FOLDER-RECOVERY.md`: a search whose negative
+result described the search rather than the world, and a surname/year test that
+matched across spans instead of within one. Each produced a number that looked
+like a finding. Each was caught by re-deriving rather than by anything going
+red.
+
+The defect class the conformance suite exists to catch does not stop at the
+suite. A measurement is a check, and a check that passes for a reason other
+than the one it names is the same failure wherever it happens.

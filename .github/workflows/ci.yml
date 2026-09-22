@@ -169,6 +169,16 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "rc1_rc2_section_diff" python scripts/rc1_rc2_section_diff.py
 
+      # Every corpus number quoted anywhere comes from here, under ce.FIXES.
+      # Added 22 September after a measurement using two of the five fixes
+      # reported 72 uncited references where the figure is 57, and disagreed
+      # with the parsed count already on record without that being noticed.
+      # Fails if the figures move, so a change has to be explained rather than
+      # absorbed.
+      - name: citation corpus figures
+        if: ${{ !cancelled() }}
+        run: bash .github/ci-step.sh "corpus_report" python scripts/corpus_report.py
+
       - name: citation controls can actually fail
         if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "mutate_citation_suite" python scripts/mutate_citation_suite.py

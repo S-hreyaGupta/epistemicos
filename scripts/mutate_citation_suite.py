@@ -534,6 +534,23 @@ MUTATIONS = [
      '                  "distinct_surface_groups": len([\n                      json.dumps(c["citation_surface_group_key"],\n                                 separators=(",", ":"), ensure_ascii=False)\n                      for c in cits]),',
      "C-023: two occurrences of ONE surface is one group"),
 
+    # ------------------------------- rc2 §5 / §6, sentence-relative fields
+
+    ("rc2 §5: sentence_index restarts at each paragraph",
+     "    return [(s, e, ce_, i, out[i - 1][2] if i else None)\n            for i, (s, e, ce_) in enumerate(out)]",
+     "    return [(s, e, ce_, 0, out[i - 1][2] if i else None)\n            for i, (s, e, ce_) in enumerate(out)]",
+     "C-026: sentence_index is continuous across headings"),
+
+    ("rc2 §5: previous_sentence_end points at the sentence's own end",
+     "out[i - 1][2] if i else None)",
+     "out[i][2] if i else None)",
+     "C-027: previous_sentence_end is the PRIOR sentence"),
+
+    ("rc2 §6: standalone ignores where the citation ends",
+     '        "standalone": gs == s_start and ge == s_content_end,',
+     '        "standalone": gs == s_start,',
+     "C-028: standalone needs BOTH ends"),
+
     # ------------------------------- rc2 §12.4, §7.3, C-030
 
     ("rc2 §12.4: multi-year citations keep source order",

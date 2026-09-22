@@ -2183,6 +2183,91 @@ def main() -> int:
         else:
             ok("C-083: the same input produces byte-identical output twice")
 
+    # ---- rc2 §5 and §6, the sentence-relative fields ----
+    print("\nrc2 §5 / §6 — sentence-relative fields")
+
+    with _tf.TemporaryDirectory() as td:
+        sp = Path(td) / "paper.md"
+        sp.write_text(
+            HEAD + "First sentence here.\n\n(Smith, 2020).\n\n"
+            "More text follows (Jones, 2019).\n\n## Method\n\n"
+            "After a heading, text (Brown, 2018) continues."
+            "\n\n## References\n\nSmith, J. (2020). A. J, 1, 1.\n"
+            "Jones, K. (2019). B. J, 2, 1.\nBrown, L. (2018). C. J, 3, 1.\n",
+            encoding="utf-8")
+        ls, _c = ce.run(sp, {"ampersand", "segments"})
+    sc = [l for l in ls if l.get("type") == "citation"]
+
+    # C-026. "0-based ordinal among body sentences, continuous across
+    # sections" — the counter does not restart at a heading, and `## Method`
+    # sits between the second and third of these.
+    if [c["sentence_index"] for c in sc] != [1, 2, 3]:
+        failures.append(f"C-026: sentence_index is continuous across "
+                        f"headings — got {[c['sentence_index'] for c in sc]}")
+    else:
+        ok("C-026: sentence_index continues across a heading")
+
+    # C-027. "previous sentence content_end, or null for the first body
+    # sentence." None of these is the first sentence, so all three carry a
+    # value; the null case needs its own fixture below.
+    # The value is the PREVIOUS sentence's content_end, which is necessarily
+    # before this sentence begins. Checking that it merely ascends is not
+    # enough: pointing each record at its OWN content_end also ascends, and
+    # the mutation probe caught that control passing.
+    if any(c["previous_sentence_end"] is None for c in sc):
+        failures.append("C-027: only the FIRST body sentence has a null "
+                        "previous_sentence_end")
+    elif any(c["previous_sentence_end"] >= c["sentence_start"] for c in sc):
+        failures.append(
+            f"C-027: previous_sentence_end is the PRIOR sentence's "
+            f"content_end, so it precedes this sentence's start — got "
+            f"{[(c['previous_sentence_end'], c['sentence_start']) for c in sc]}")
+    else:
+        ok("C-027: previous_sentence_end carries the prior content_end")
+
+    with _tf.TemporaryDirectory() as td:
+        sp = Path(td) / "paper.md"
+        sp.write_text(HEAD + "(Smith, 2020) opens the body.\n\n"
+                      "## References\n\nSmith, J. (2020). A. J, 1, 1.\n",
+                      encoding="utf-8")
+        ls, _c = ce.run(sp, {"ampersand", "segments"})
+    first = next(l for l in ls if l.get("type") == "citation")
+    if first["previous_sentence_end"] is not None:
+        failures.append(f"C-027: the first body sentence has null — got "
+                        f"{first['previous_sentence_end']!r}")
+    elif first["sentence_index"] != 0:
+        failures.append(f"C-026: the first body sentence is index 0 — got "
+                        f"{first['sentence_index']}")
+    # `(Smith, 2020) opens the body.` STARTS its sentence and does not end it.
+    # That pairing is what separates `standalone` from `sentence_position ==
+    # start`, and the first fixture had no case of it — so dropping the
+    # end-condition from standalone changed nothing there, and the probe
+    # reported the mutation surviving.
+    elif first["sentence_position"] != "start":
+        failures.append("C-028: this fixture must START the sentence for the "
+                        "next check to discriminate")
+    elif first["standalone"]:
+        failures.append("C-028: standalone needs BOTH ends; starting the "
+                        "sentence is not enough")
+    else:
+        ok("C-027/C-028: first sentence null, and start alone is not "
+           "standalone")
+
+    # C-028. "standalone = true iff group_start == sentence_start AND
+    # group_end == content_end", and §6 says what it is NOT: "positional
+    # only. It does not infer which claim the citation supports."
+    #
+    # `(Smith, 2020).` is its own paragraph and so its own sentence. The
+    # other two sit inside sentences with prose either side.
+    if [c["standalone"] for c in sc] != [True, False, False]:
+        failures.append(f"C-028: standalone is the citation-only sentence — "
+                        f"got {[c['standalone'] for c in sc]}")
+    elif sc[0]["sentence_position"] != "start":
+        failures.append("C-028: a standalone citation also starts its "
+                        "sentence")
+    else:
+        ok("C-028: standalone marks the citation-only sentence")
+
     # ---- rc2 §15, the invariant-injection seam ----
     #
     # The `From Tether` fixture above reaches row 6 through real parsing, which

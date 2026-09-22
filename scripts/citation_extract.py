@@ -518,7 +518,21 @@ def sentences(body: str) -> list[tuple[int, int, int]]:
             end = len(para.rstrip())
             out.append((para_start + sent_start, para_start + end,
                         para_start + end))
-    return out
+
+    # rc2 §5, the two sentence-relative quantities. Both are properties of a
+    # sentence's PLACE IN THE BODY rather than of its text, so they are
+    # attached here where the ordinal exists, not recomputed per citation.
+    #
+    #     sentence_index = 0-based ordinal among body sentences, CONTINUOUS
+    #                      across sections
+    #     previous_sentence_end = previous sentence content_end, or null for
+    #                      the first body sentence
+    #
+    # "Continuous across sections" is the part worth stating: paragraphs and
+    # headings break sentences, and the counter does not restart at either.
+    # C-026 tests exactly that.
+    return [(s, e, ce_, i, out[i - 1][2] if i else None)
+            for i, (s, e, ce_) in enumerate(out)]
 
 
 def paragraphs(body: str):
@@ -1135,7 +1149,7 @@ def extract_citations(body: str, sents, heads, fixes: set[str],
         sent = sentence_of(sents, c1s)
         if sent is None:
             continue
-        s_start, s_end, s_content_end = sent
+        s_start, s_end, s_content_end, s_index, s_prev_end = sent
         c1 = body[c1s:c1e]
 
         # 1. Parenthetical, full match over the whole C1 span.
@@ -1616,7 +1630,7 @@ def repair_rule(cand_kind, cand_phrase, cand_year,
 def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
             cits, author_phrase="", author_kind="person",
             stop_reduced_phrase=None):
-    s_start, s_end, s_content_end = sent
+    s_start, s_end, s_content_end, s_index, s_prev_end = sent
     lv, nm, ty, rs = section_stack_at(heads, gs)
     surname = re.sub(r"\s+", " ", core).strip().lower()
     y = norm_year(year)
@@ -1670,6 +1684,14 @@ def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
         "group_start": gs, "group_end": ge,
         "segment_start": ss, "segment_end": se,
         "sentence": body[s_start:s_end], "sentence_start": s_start,
+        # rc2 §6, the sentence-relative fields. C-026 to C-028.
+        "sentence_index": s_index,
+        "previous_sentence_end": s_prev_end,
+        # "standalone = true iff group_start == sentence_start AND
+        # group_end == content_end", and §6 is emphatic about what it is not:
+        # "`standalone` is positional only. It does not infer which claim the
+        # citation supports." A sentence that is nothing but a citation.
+        "standalone": gs == s_start and ge == s_content_end,
         "sentence_position": ("start" if gs == s_start else
                               "end" if ge == s_content_end else "middle"),
         "section_level": lv, "section_name": nm, "section_type": ty,
@@ -1799,7 +1821,7 @@ def _non_person_citation(body, gs, ge, ss, se, phrase, style, sent, heads,
 
 
 def _unres(body, start, end, reason, sent, heads, unres):
-    s_start, s_end, _ = sent
+    s_start, s_end = sent[:2]
     lv, nm, _, _ = section_stack_at(heads, start)
     unres.append({
         "type": "unresolved_citation", "index": 0,

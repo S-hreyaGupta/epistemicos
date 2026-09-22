@@ -120,6 +120,14 @@ CHECKS = {
               "undetermined kind, not_evaluated state, null key"),
     "C-067": ((), ("C-067: identity counts null, extraction counts real",),
               "MET", "null is not-evaluated; 0 would be a measurement"),
+    # rc2 §5 and §6, implemented 22 September. Additive fields on the
+    # citation record; nothing renamed, so the gold path is untouched.
+    "C-026": ((), ("C-026: sentence_index continues across a heading",),
+              "MET", "0-based, continuous across sections"),
+    "C-027": ((), ("C-027: previous_sentence_end carries the prior",), "MET",
+              "prior content_end, null for the first body sentence"),
+    "C-028": ((), ("C-028: standalone marks the citation-only sentence",),
+              "MET", "both ends, positional only"),
     "C-008": ((), ("too few entries below it",), "MET",
               "threshold does not overtrigger"),
     "C-010": ((), ("every detected candidate reaches exactly one",), "MET",
@@ -314,8 +322,6 @@ NOT_IMPLEMENTED = {
               "is unpinned is the two-line error stream's exact bytes, which "
               "needs a byte golden this repository does not have",
               '"code": 6, "reason"'),
-    **{c: ("sentence-relative fields not emitted", "previous_sentence_end")
-       for c in ("C-026", "C-027", "C-028")},
     "C-017": ("PREFIX longest-match precedence not pinned", "longest-match"),
     "C-078": ("the exit-1 finding set is not closed", "FINDINGS_FORCING_EXIT1"),
 

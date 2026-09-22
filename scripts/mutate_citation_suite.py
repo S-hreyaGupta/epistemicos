@@ -534,6 +534,23 @@ MUTATIONS = [
      '                  "distinct_surface_groups": len([\n                      json.dumps(c["citation_surface_group_key"],\n                                 separators=(",", ":"), ensure_ascii=False)\n                      for c in cits]),',
      "C-023: two occurrences of ONE surface is one group"),
 
+    # ------------------------------- rc2 §12.3 / §7.4, key order and naming
+
+    ("rc2 §12.3: the declared key order is not applied",
+     "    order = KEY_ORDER.get(rec.get(\"type\"))",
+     "    order = None",
+     "§12.3: declared key order"),
+
+    ("rc2 §12.3: two keys swap in the citation record",
+     '        "author_phrase", "resolved_author_phrase", "author_resolution",',
+     '        "resolved_author_phrase", "author_phrase", "author_resolution",',
+     "§12.3: declared key order"),
+
+    ("rc2 §7.4: the reference identity field keeps its old name",
+     '            "identity_author_phrase": surname,',
+     '            "surname": surname,',
+     "§7.4: the reference's identity field is named"),
+
     # ------------------------------- rc2 §5 / §6, sentence-relative fields
 
     ("rc2 §5: sentence_index restarts at each paragraph",
@@ -588,13 +605,13 @@ MUTATIONS = [
      "§12.2: block order"),
 
     ("rc2 §12.1: the stream goes back through text-mode print()",
-     '    return b"".join(\n        json.dumps(r, separators=(",", ":"), ensure_ascii=False)\n        .encode("utf-8") + b"\\n" for r in records)',
-     '    return b"".join(\n        (json.dumps(r, separators=(",", ":"), ensure_ascii=False)\n         + "\\r\\n").encode("utf-8") for r in records)',
+     '                   ensure_ascii=False).encode("utf-8") + b"\\n"',
+     '                   ensure_ascii=False).encode("utf-8") + b"\\r\\n"',
      "§12.1: LF line ending only"),
 
     ("rc2 §12.1: non-ASCII is escaped rather than emitted raw",
-     '        json.dumps(r, separators=(",", ":"), ensure_ascii=False)\n        .encode("utf-8") + b"\\n" for r in records)',
-     '        json.dumps(r, separators=(",", ":"), ensure_ascii=True)\n        .encode("utf-8") + b"\\n" for r in records)',
+     '        json.dumps(canonical_order(r), separators=(",", ":"),\n                   ensure_ascii=False)',
+     '        json.dumps(canonical_order(r), separators=(",", ":"),\n                   ensure_ascii=True)',
      "§12.1: non-ASCII is emitted raw, not escaped"),
 
     ("rc2 §13: --out writes something other than the stdout bytes",

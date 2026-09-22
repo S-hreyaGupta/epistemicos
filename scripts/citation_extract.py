@@ -1676,6 +1676,13 @@ def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
         **dict(zip(("author_form", "visible_authors", "author_count_constraint"),
                    person_form(author_phrase)
                    if author_kind == "person" else (None, None, None))),
+        # rc2's citation schema declares this and never says what it holds
+        # when identity IS resolved — §8.3 only ever sets it to null, for
+        # not_resolved and for ambiguous. The reading taken here is the
+        # phrase that established the identity, which the §8 block fills in
+        # once resolution has run; null until then, and null for good in the
+        # cases rc2 names.
+        "resolved_author_phrase": None,
         "candidate_state": "parsed",
         "citation_group": body[gs:ge], "citation_segment": seg_text,
         "citation_key": key, "author_kind": author_kind,
@@ -2091,7 +2098,13 @@ def assemble_references(section: str, base: int):
             "author_kind": author_kind,
             "authors": authors,
             "author_count": len(authors) if authors else None,
-            "surname": surname, "year": year, "start": start, "end": end,
+            # rc2 §7.4 names this `identity_author_phrase`: "authors[0]" for
+            # a person entry, "normalized leading SURNAME" otherwise. It was
+            # called `surname` here, which is the same value under a name
+            # that stops being accurate the moment the entry is
+            # institutional. Nothing downstream read it.
+            "identity_author_phrase": surname,
+            "year": year, "start": start, "end": end,
             "validation_state": "suspect" if reasons else "ok",
             "suspect_reasons": reasons,
         })
@@ -2433,6 +2446,10 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
         c["match_state_stop_reduced"] = s_state
         c["reference_indices"] = idx
         c["author_resolution"] = res
+        # The phrase that established the identity. Null where §8.3 says so.
+        c["resolved_author_phrase"] = (
+            c["author_phrase"] if res == "full_phrase" else
+            c.get("stop_reduced_phrase") if res == "stop_reduced" else None)
         if state == "no_match":
             c["identity_class"] = "identity_not_resolved"
         else:
@@ -2836,6 +2853,84 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     return lines, lines[-1]["exit"]
 
 
+# rc2 §12.3, the declared key order per record type.
+#
+#     keys in the exact order declared for each record below
+#
+# Applied in `serialize` rather than by reordering thirteen dict literals,
+# for the reason §12.2's block order is stated in one place: a rule spread
+# across thirteen constructors is a rule nobody can read, and the next field
+# added goes wherever the author happened to be typing.
+#
+# Two things this table does NOT do, both recorded rather than silently
+# handled:
+#
+#   1. It does not drop fields. This implementation carries more than rc2
+#      declares — `candidate_state` and `excluded_reason` from rc3 §A,
+#      `stop_reduced_phrase` from §6.3, the two candidate keys from §8.1.
+#      rc2's keys come first in rc2's order; ours follow. A byte golden
+#      against rc2 would still differ on the tail, which is why C-068 is not
+#      claimed as fully met.
+#   2. It does not rename the summary's counts. rc2 calls them
+#      `uniquely_matched_occurrences` and `uniquely_matched_works`; this file
+#      keeps v3.3's `matched_occurrences` and `matched_works`, as it has
+#      since before the consolidation, and that rename is the consolidation's
+#      to make.
+KEY_ORDER = {
+    "citation": [
+        "type", "index", "citation_group", "citation_segment",
+        "author_phrase", "resolved_author_phrase", "author_resolution",
+        "author_kind", "citation_surface_group_key", "citation_key", "year",
+        "style", "author_form", "visible_authors", "author_count_constraint",
+        "group_start", "group_end", "segment_start", "segment_end",
+        "sentence", "sentence_start", "sentence_position", "sentence_index",
+        "previous_sentence_end", "standalone", "section_level",
+        "section_name", "section_type", "section_roles"],
+    "unresolved_citation": [
+        "type", "index", "text", "start", "end", "reason",
+        "citation_surface_group_key", "sentence", "sentence_start",
+        "section_level", "section_name"],
+    "reference": [
+        "type", "index", "assembled", "author_kind",
+        "identity_author_phrase", "reference_key", "authors", "author_count",
+        "year", "start", "end", "validation_state", "suspect_reasons"],
+    "unresolved_reference": [
+        "type", "index", "text", "start", "end", "reason"],
+    "ambiguous_author_resolution": [
+        "type", "citation_index", "author_phrase", "full_match_state",
+        "full_candidate_key", "full_reference_indices", "stop_reduced_phrase",
+        "stop_reduced_match_state", "stop_reduced_candidate_key",
+        "stop_reduced_reference_indices"],
+    "missing_reference": [
+        "type", "candidate_key", "identity_authority", "example",
+        "occurrences", "merge_suspected"],
+    "uncited_reference": ["type", "reference_index", "reference_key"],
+    "duplicate_reference_key": [
+        "type", "reference_key", "reference_indices", "cited"],
+    "ambiguous_citation": [
+        "type", "citation_key", "example", "reference_indices"],
+    "possible_mismatch": [
+        "type", "candidate_key", "identity_authority", "reference_index",
+        "reference_key", "evidence"],
+    "author_structure_mismatch": [
+        "type", "citation_key", "reference_index", "citation_author_form",
+        "visible_authors", "author_count_constraint", "reference_authors",
+        "reference_author_count", "failed", "example"],
+    "bibliography_absent": ["type", "references_source"],
+    "error": ["type", "code", "reason"],
+}
+
+
+def canonical_order(rec: dict) -> dict:
+    """rc2's declared keys in rc2's order, then anything else this file adds."""
+    order = KEY_ORDER.get(rec.get("type"))
+    if not order:
+        return rec
+    out = {k: rec[k] for k in order if k in rec}
+    out.update({k: v for k, v in rec.items() if k not in out})
+    return out
+
+
 def serialize(records: list[dict]) -> bytes:
     """rc2 §12.1's canonical stream, as BYTES.
 
@@ -2853,8 +2948,9 @@ def serialize(records: list[dict]) -> bytes:
     invisible in any test that parsed the lines back rather than reading them.
     """
     return b"".join(
-        json.dumps(r, separators=(",", ":"), ensure_ascii=False)
-        .encode("utf-8") + b"\n" for r in records)
+        json.dumps(canonical_order(r), separators=(",", ":"),
+                   ensure_ascii=False).encode("utf-8") + b"\n"
+        for r in records)
 
 
 def publish(target: Path, payload: bytes, digest: str | None) -> Path:

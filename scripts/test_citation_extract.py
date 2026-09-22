@@ -2086,6 +2086,95 @@ def main() -> int:
             else:
                 ok("§12.2: blocks are in order and never interleave")
 
+        # ---- §12.3, declared key order per record ----
+        #
+        #     keys in the exact order declared for each record below
+        #
+        # Read off the serialized BYTES, not off the dicts, because the order
+        # only exists once the record is written. json.loads preserves it, so
+        # the comparison is against what a reader of the file would see.
+        #
+        # This asserts rc2's declared keys come first, in rc2's order. It does
+        # NOT assert the record stops there: this implementation carries
+        # `candidate_state`, `stop_reduced_phrase` and the two candidate keys
+        # beyond what rc2 declares, so a byte golden against rc2 would still
+        # differ on the tail. That is why C-068 stays PARTIAL.
+        # The declared order is read from rc2's OWN BYTES, not from
+        # ce.KEY_ORDER. Comparing the output against the table the output was
+        # built from is self-consistent by construction: it can show the table
+        # was not applied, never that the table is wrong. The mutation probe
+        # demonstrated exactly that — swapping two keys inside KEY_ORDER
+        # survived, because the control moved with it.
+        spec = None
+        probe = Path.cwd()
+        for _ in range(4):
+            cand = probe / "specs/citation/citation-v3.4-rc2-execution-conformance.md"
+            if cand.exists():
+                spec = cand
+                break
+            probe = probe.parent
+        declared_by_type = {}
+        if spec is not None:
+            for ln in spec.read_text(encoding="utf-8").splitlines():
+                if ln.startswith('{"type":'):
+                    try:
+                        parsed = _json.loads(ln)
+                    except ValueError:
+                        continue
+                    declared_by_type.setdefault(parsed["type"], list(parsed))
+            # `meta` and `summary` are excluded, and the reason is a real
+            # divergence rather than an inconvenience: for those two the
+            # field SET differs, not just its order. rc2's summary calls the
+            # counts `uniquely_matched_occurrences` and `uniquely_matched_works`
+            # where this file keeps v3.3's `matched_*`, and rc2's meta carries
+            # `citation_rule_version`, `citation_profile` and `mode` which this
+            # file does not emit. Ordering a set that does not match is not the
+            # check §12.3 asks for, and pretending otherwise would make this
+            # control pass on a document nobody could byte-compare.
+            declared_by_type.pop("meta", None)
+            declared_by_type.pop("summary", None)
+
+        rec_by_type = {}
+        for ln in ce.serialize(ls).rstrip(b"\n").split(b"\n"):
+            r = _json.loads(ln.decode("utf-8"))
+            rec_by_type.setdefault(r["type"], r)
+
+        if not declared_by_type:
+            failures.append("§12.3: rc2's execution-conformance document was "
+                            "not found, so the declared order could not be "
+                            "read. Not passing on a check that did not run")
+        else:
+            bad = []
+            for t, declared in declared_by_type.items():
+                r = rec_by_type.get(t)
+                if r is None:
+                    continue
+                want = [k for k in declared if k in r]
+                if list(r)[:len(want)] != want:
+                    bad.append(f"{t}: got {list(r)[:len(want)]}, want {want}")
+            checked = [t for t in declared_by_type if t in rec_by_type]
+            if bad:
+                failures.append("§12.3: declared key order — " + "; ".join(bad))
+            elif "citation" not in rec_by_type or "reference" not in rec_by_type:
+                failures.append("§12.3: the fixture must carry both a citation "
+                                "and a reference for this to check anything")
+            else:
+                ok(f"§12.3: {len(checked)} record types lead with the key "
+                   f"order rc2's own document declares")
+
+        # The two fields rc2 declares and this file did not emit until
+        # 22 September. `surname` held the right value under a name that
+        # stops being accurate for an institutional entry.
+        ref = rec_by_type.get("reference")
+        if ref is not None and "identity_author_phrase" not in ref:
+            failures.append("§7.4: the reference's identity field is named "
+                            "identity_author_phrase, not surname")
+        elif ref is not None and "surname" in ref:
+            failures.append("§7.4: `surname` should be gone from reference "
+                            "records, not carried alongside")
+        else:
+            ok("§7.4: references carry identity_author_phrase")
+
         # ---- §12.4, total deterministic order ----
         #
         #     Every block MUST have a total deterministic ordering; two

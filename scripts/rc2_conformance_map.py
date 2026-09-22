@@ -94,8 +94,18 @@ CHECKS = {
               "MET", "content-derived name, over the INPUT bytes"),
     "C-073": ((), ("C-073: atomic publication leaves no scratch file",), "MET",
               "temp in the destination dir, rename after completion"),
-    "C-068": ((), ("§12.1: UTF-8, no BOM, LF only, one trailing LF",), "PARTIAL",
-              "byte properties pinned; rc2's exact key order not adopted"),
+    # §12.1's byte properties and §12.3's key order, the latter checked
+    # against rc2's OWN declared records rather than against this file's
+    # table — comparing output to the table it was built from can only show
+    # the table was not applied, never that it is wrong.
+    #
+    # Still PARTIAL, for two divergences that are named rather than hidden:
+    # records carry fields beyond rc2's declared set (rc3's candidate_state,
+    # §6.3's stop_reduced_phrase, §8.1's two candidate keys), and `meta` and
+    # `summary` differ in field NAMES, not just order.
+    "C-068": ((), ("record types lead with the key ",),
+              "PARTIAL",
+              "bytes and key order pinned; meta and summary names differ"),
     "C-083": ((), ("C-083: the same input produces byte-identical output",),
               "MET", "two runs, same bytes"),
     # §12.2's two halves. "Blocks never interleave" was being broken: the two

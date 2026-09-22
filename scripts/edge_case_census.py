@@ -38,10 +38,19 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import citation_extract  # noqa: E402
+
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "scripts" / "citation_extract.py"
 CORPUS = REPO / "data" / "md_full"
-FIXES = {"ampersand", "segments", "colon", "cp"}
+# Taken from the extractor, never retyped. The literal set that used to sit
+# here had drifted: it was written before `mathyear` existed and never gained
+# it, so this census was measuring a pipeline that no longer matched the one
+# it claims to mirror. Corrected 22 September, the same day a corpus probe
+# using two of the five fixes reported 72 uncited references where the figure
+# is 57. Same mistake, same week, two files apart.
+FIXES = set(citation_extract.FIXES)
 
 EXACT, PATTERN = "exact", "pattern"
 
@@ -67,14 +76,54 @@ def run(mod, raw: bytes):
 
     Every ad-hoc corpus measurement made on 18 September took that shortcut and
     understated its numbers. This mirrors the CLI instead.
+
+    It has to be a mirror rather than a call to `mod.run()`, because the census
+    runs DELIBERATELY MODIFIED copies of the module — the eight-name envelope
+    for EC-3 — and needs the intermediate `body` and `section` that `run()`
+    does not return. That is a real reason. It is also how this function
+    drifted: a mirror has to be re-checked against the thing it mirrors, and
+    for a while nobody did.
+
+    Two things it was missing, both found on 22 September:
+
+        the `mathyear` transform   rc3 D2, added to run() and never here
+        the §10 exit-2 detector    so a paper the extractor REFUSES was
+                                   reported as in-profile with parse figures
+                                   beside it, and its numbers entered the
+                                   totals
     """
     text = mod.normalise(raw)
     body, section, off, heads = mod.split_body_and_references(text)
     if "ampersand" in FIXES:
         body = body.replace("\\&", "&")
         section = section.replace("\\&", "&")
+    if "mathyear" in FIXES:
+        body = mod.unwrap_math_years(body)
+
+    # rc3 B1b. run() assembles the references FIRST and passes the non-person
+    # keys into extraction, because the citation-side non-person path is only
+    # reachable when the bibliography has already proposed the label. Omitting
+    # the argument is silent — it defaults — and costs exactly the citations
+    # B1b exists to recover. This mirror omitted it and came out four short of
+    # the figure on record.
+    refs, _ru = mod.assemble_references(section, off)
+    non_person_keys = frozenset(
+        r["reference_key"] for r in refs
+        if r.get("author_kind") == "non_person" and r["reference_key"])
+
     cits, unres, _excl, _errs = mod.extract_citations(
-        body, mod.sentences(body), heads, set(FIXES))
+        body, mod.sentences(body), heads, set(FIXES), non_person_keys)
+
+    # §10 exit 2, in the order run() applies it: after extraction, because
+    # both tests are computed against the parse count.
+    n = len(mod.NUMCITE.findall(body)) + len(mod.SUPCITE.findall(body))
+    if n >= 3 and n > 10 * len(cits):
+        raise mod.Abort(2, "unsupported citation style")
+    share, total = mod.comma_less_share(body)
+    if total >= mod.STYLE_MIN_SAMPLE and share > mod.STYLE_COMMA_LESS_MAX:
+        raise mod.Abort(2, f"{share:.0%} of {total} author-year parentheticals "
+                           f"omit the comma before the year")
+
     return body, section, cits, unres
 
 
@@ -94,7 +143,7 @@ def census(real, cap8, path: Path) -> dict | None:
     try:
         body, refs, cits, unres = run(real, raw)
     except real.Abort as a:
-        return {"abort": a.code}
+        return {"abort": a.code, "why": a.reason}
 
     row: dict = {"abort": None, "parsed": len(cits), "unresolved": len(unres)}
 
@@ -164,8 +213,11 @@ def main() -> int:
     inprofile = 0
     for stem, r in rows.items():
         if r["abort"] is not None:
+            # The reason is the extractor's own. This line used to print
+            # "no references section found" whatever the exit code was, which
+            # was exit 3's reason attached to every refusal.
             print(f"{stem:10s} {'exit ' + str(r['abort']):>7s}"
-                  f"{'  — not in profile, no references section found':>0s}")
+                  f"  — refused: {r.get('why', '')}")
             continue
         inprofile += 1
         line = f"{stem:10s} {r['parsed']:>7d} {r['unresolved']:>6d}"

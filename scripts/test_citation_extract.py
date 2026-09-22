@@ -1612,6 +1612,116 @@ def main() -> int:
     else:
         ok("§8.6: the two candidates cannot collide, so exit 6 has no input")
 
+    # ---- rc2 §15, the invariant-injection seam ----
+    #
+    # The `From Tether` fixture above reaches row 6 through real parsing, which
+    # is worth keeping as an integration check. It is NOT how rc2 says to
+    # execute these cases: the matrix marks C-042 to C-047 `injection` in its
+    # Evidence column, and §15 exists because those states are not
+    # manuscript-reachable. Contriving a manuscript was doing by hand what the
+    # spec provides a seam for.
+    print("\nrc2 §15 — the invariant-injection seam")
+
+    INJ_BODY = "As shown (Smith, 2020) here."
+    INJ_REFS = ("\n\n## References\n\nSmith, J. (2020). A paper. Journal, "
+                "1(1), 1-10.\n")
+
+    def inject(full, reduced):
+        """Bind the seam, run, unbind. Returns (lines, abort_args)."""
+        ce._RESOLVER_SEAM = lambda _f, _s: (full, reduced)
+        try:
+            with _tf.TemporaryDirectory() as td:
+                p = Path(td) / "paper.md"
+                p.write_text(HEAD + INJ_BODY + INJ_REFS, encoding="utf-8")
+                return ce.run(p, {"ampersand", "segments"})[0], None
+        except ce.Abort as e:
+            return None, e.args
+        finally:
+            ce._RESOLVER_SEAM = None
+
+    # C-042 to C-045: every non-no_match pair with different keys is the same
+    # outcome. Four cases, four state pairs, one branch — and now each pair is
+    # actually exercised rather than one standing in for four.
+    pairs = [("C-042 unique/unique", ("a|2020", "unique", [0]),
+              ("b|2020", "unique", [1])),
+             ("C-043 unique/nonunique", ("a|2020", "unique", [0]),
+              ("b|2020", "nonunique", [1, 2])),
+             ("C-044 nonunique/unique", ("a|2020", "nonunique", [0, 1]),
+              ("b|2020", "unique", [2])),
+             ("C-045 nonunique/nonunique", ("a|2020", "nonunique", [0, 1]),
+              ("b|2020", "nonunique", [2, 3]))]
+    bad = []
+    for label, f, s in pairs:
+        lines, ab = inject(f, s)
+        if ab:
+            bad.append(f"{label} aborted: {ab}")
+            continue
+        c = next((l for l in lines if l.get("type") == "citation"), None)
+        aar = [l for l in lines
+               if l.get("type") == "ambiguous_author_resolution"]
+        if c is None or c["author_resolution"] != "ambiguous":
+            bad.append(f"{label} → {c and c['author_resolution']!r}")
+        elif len(aar) != 1 or c["citation_key"] is not None:
+            bad.append(f"{label}: one record, no key — got {len(aar)}, "
+                       f"{c['citation_key']!r}")
+    if bad:
+        failures.append("§8.3 rows 6-9 by injection: " + "; ".join(bad))
+    else:
+        ok("§15: all four different-key state pairs → ambiguous")
+
+    # C-047, and it is the one that would be easy to get wrong. Two DIFFERENT
+    # candidate keys naming the SAME reference index is explicitly "permitted
+    # and remains ordinary author-resolution ambiguity" — not exit 6. An
+    # implementation that guarded on overlapping indices instead of on equal
+    # keys passes every other case here and fails this one.
+    lines, ab = inject(("a|2020", "unique", [0]), ("b|2020", "unique", [0]))
+    if ab:
+        failures.append(f"C-047: a shared reference index across different "
+                        f"candidate keys must NOT abort — got exit {ab[0]}")
+    else:
+        c = next(l for l in lines if l.get("type") == "citation")
+        if c["author_resolution"] != "ambiguous":
+            failures.append(f"C-047: shared index is ordinary ambiguity — got "
+                            f"{c['author_resolution']!r}")
+        else:
+            ok("C-047: a shared reference index is ambiguity, not exit 6")
+
+    # §15's mandatory case, verbatim: "sets both candidates to non-empty
+    # results with the same candidate_key; expected result = exit 6".
+    lines, ab = inject(("a|2020", "unique", [0]), ("a|2020", "unique", [1]))
+    if not ab:
+        failures.append("§8.6: two non-empty lookups with the SAME "
+                        "candidate_key must abort")
+    elif ab[0] != 6:
+        failures.append(f"§8.6: exit 6, got {ab[0]}")
+    elif ab[1] != "same_candidate_identity_double_resolution":
+        failures.append(f"§8.6: rc2 names the reason — got {ab[1]!r}")
+    else:
+        ok("§15/§8.6: same candidate_key on both lookups → exit 6")
+
+    # "It MUST NOT alter Pass-1 parsing; candidate spans; ..." The seam sits
+    # after extraction, so this is structural — pinned anyway, because the
+    # seam's whole licence is that it cannot reach backwards.
+    lines, _ab = inject(("a|2020", "no_match", []), ("b|2020", "no_match", []))
+    c = next(l for l in lines if l.get("type") == "citation")
+    if c["author_phrase"] != "Smith" or c["group_start"] is None:
+        failures.append(f"§15: the seam must not alter Pass-1 parsing or "
+                        f"candidate spans — got {c['author_phrase']!r}")
+    else:
+        ok("§15: injection leaves Pass-1 parsing and spans untouched")
+
+    # "It MUST NOT be reachable through CLI flags, environment variables,
+    # config files, API parameters." The seam is a module attribute the
+    # harness rebinds; nothing on the command line can name it.
+    if ce._RESOLVER_SEAM is not None:
+        failures.append("§15: the seam is left bound after use; production "
+                        "must bind the real resolver")
+    elif "seam" in open(Path(ce.__file__)).read().split("def main()")[1]:
+        failures.append("§15: main() mentions the seam, so a flag could "
+                        "reach it")
+    else:
+        ok("§15: no CLI path can bind the seam, and it is unbound by default")
+
     # ------------------- rc2 §9.4 / §9.5, candidate-level diagnostics
     print("\nrc2 §9.4 — candidate-level missing reference and repair")
 

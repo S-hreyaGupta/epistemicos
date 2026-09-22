@@ -507,11 +507,26 @@ MUTATIONS = [
 
     # ------------------------------- rc2 §8.3 rows 6-9, §8.5, §8.6
 
-    # No mutation for §8.6's abort. It is implemented and UNREACHABLE — the
-    # two candidates live in different namespaces by rc2's own construction,
-    # so disabling the guard changes nothing and no control could go red. A
-    # probe for it would report "caught" off some other control and establish
-    # nothing, which is the exact defect this file exists to find.
+    # §8.6's abort IS probeable, now that §15's seam exists. The note that
+    # stood here said otherwise — that the branch was unreachable and a probe
+    # for it would establish nothing. True of manuscripts, false of the spec:
+    # the matrix marks these cases `injection`, and §15 supplies the seam.
+    # Corrected 22 September, the same afternoon the wrong version was written.
+
+    ("rc2 §8.6: double resolution no longer aborts",
+     '            if full_key == reduced_key:\n                raise Abort(6, "same_candidate_identity_double_resolution")',
+     '            if False:\n                raise Abort(6, "same_candidate_identity_double_resolution")',
+     "§8.6: two non-empty lookups with the SAME candidate_key must abort"),
+
+    ("rc2 §8.6: the guard fires on overlapping INDICES, not equal keys",
+     "            if full_key == reduced_key:",
+     "            if set(f_idx) & set(s_idx):",
+     "C-047: a shared reference index across different candidate keys"),
+
+    ("rc2 §15: the seam is ignored",
+     "        if _RESOLVER_SEAM is not None:",
+     "        if False:",
+     "§8.3 rows 6-9 by injection:"),
 
     ("rc2 §8.3: an ambiguous occurrence keeps its citation_key",
      '            c["citation_key"] = None\n            # "Emit exactly one',

@@ -298,52 +298,51 @@ rather than leave standing.
 
 ---
 
-## 9. rc2 §8.6's abort cannot fire, by rc2's own construction
+## 9. Not a discrepancy: the Evidence column already said `injection`
 
-§8.6 aborts when both candidate lookups are non-empty **and serialize the same
-candidate key**:
+This entry is kept as a correction rather than deleted, because what it got
+wrong is more useful than what it was trying to say.
 
-```text
-exit   = 6
-reason = same_candidate_identity_double_resolution
-```
+**The claim, made and committed on 22 September:** §8.3's rows 6-9 and §8.6's
+exit-6 abort cannot be reached. Whenever both candidates exist the full one is
+keyed `non_person|…` and the reduced one a bare surname — different namespaces,
+never the same string — so §8.6's guard can never fire. Filed as the third rule
+in rc2 found well formed and unexercisable, after §9.4's precedence list.
 
-The two candidates can never carry the same key, and the reason is in §6.3 and
-§8.1 rather than in any implementation choice:
-
-```text
-§6.3   a stop_reduced_phrase is created ONLY when the full phrase FAILS the
-       person grammar
-§8.1   the full candidate is keyed `person|…` ONLY when the phrase PASSES it,
-       and `non_person|<complete phrase>|<year>` otherwise
-```
-
-So whenever both candidates exist, the full one is non-person and the reduced
-one is a bare surname. Different namespaces, never the same string.
+**Why it was wrong.** Those states are not reachable *from a manuscript*, which
+is true and is the point. rc2 knew:
 
 ```text
-chosen       implement the abort anyway, and pin the namespace split instead
-because      the guard is correct and costs nothing; what cannot be claimed is
-             a control for it, since no input reaches the branch
-consequence  C-046 and C-077 are PARTIAL and NOT respectively, not MET. No
-             mutation probes the abort either — a probe that reported "caught"
-             off some other control would establish nothing.
+matrix Evidence column   C-042 … C-045   injection
+                         C-046           invariant injection
+                         C-047           injection
+                         C-077           injection
 ```
 
-**A second case in the same pair is unreachable for a different reason.**
-C-047 asks that "a shared reference index across different candidate keys is
-permitted and remains ordinary ambiguity". A reference carries one key, so two
-different candidate keys cannot both match the same index. The case describes a
-state rc2's own model cannot produce.
+And §15 is a whole section specifying the mechanism — "a substitutable resolver
+seam to the conformance harness immediately before the §8.3 decision table",
+injecting `match_state`, `candidate_key` and `reference_indices[]`
+independently per candidate. Its closing line names the exit-6 case as
+mandatory.
 
-This is the third rule in rc2 found to be well formed and unexercisable, after
-§9.4's precedence list and §8.3's own rows while C-019 was outstanding. Each
-was found by implementing it rather than by reading it.
+So the cases were unexecuted because **this implementation had no §15 seam**,
+not because rc2 had specified something unreachable. The seam was built the
+same afternoon and all seven now execute.
 
-*An earlier version of this section recorded a deviation: rows 6-9 aborted for
-both branches, where rc2 aborts for one. That deviation no longer exists —
-rows 6-9 were implemented on 22 September — and the entry is replaced rather
-than marked superseded.*
+C-047 is worth singling out. It was written up here as describing "a state
+rc2's own model cannot produce", on the reasoning that a reference carries one
+key so two candidate keys cannot share an index. Under injection they can, and
+the case turns out to be a sharp one: an implementation that guards on
+overlapping reference indices rather than on equal candidate keys passes every
+other row and fails this one. It is a trap for a specific wrong implementation,
+not an impossible state — and this repository briefly had the wrong
+implementation's reasoning written into a spec document as a finding about rc2.
+
+```text
+lesson   a case that cannot be reached the way you are testing is not a case
+         that cannot be reached. The matrix says how each case is meant to be
+         evidenced, in a column that had been read as metadata.
+```
 
 ---
 
@@ -383,8 +382,8 @@ fourteen papers and looking at what came out:
 7  found by rc2's register arriving and saying something else
 8  found by implementing four of six reasons and having nothing to write
    for the other two
-9  found by implementing the abort and then failing to build an input that
-   fires it
+9  NOT a discrepancy. Found by implementing the abort, failing to build an
+   input, concluding rc2 was at fault, and then reading the Evidence column
 ```
 
 Number 3 is the one to dwell on. A check that finds nothing looks like a check

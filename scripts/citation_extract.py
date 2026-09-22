@@ -1439,6 +1439,37 @@ def person_form(phrase: str):
 # reference into a confident wrong pairing, which is the failure mode rc2
 # guards against everywhere else in this document.
 
+# --------------------------------------- rc2 §15, invariant-injection seam
+#
+#     The implementation MUST expose a substitutable resolver seam to the
+#     conformance harness immediately before the §8.3 decision table.
+#
+#     The seam may inject, independently for full and STOP-reduced candidates:
+#     match_state, candidate_key, reference_indices[].
+#
+# Why a module attribute and not an argument. §15 is emphatic:
+#
+#     It MUST NOT be reachable through CLI flags, environment variables,
+#     config files, API parameters, or ordinary production dependency
+#     injection.
+#
+# A parameter on `run()` is an API parameter; an env read is an environment
+# variable. What is left is a name the harness rebinds after importing the
+# module, which no production caller passes and no configuration can set.
+#
+# WHAT THIS SEAM IS FOR, and it was nearly missed. §8.3's rows 6 to 9 and the
+# exit-6 case cannot be reached from a manuscript — the two candidates live in
+# different namespaces, so their keys never collide. On 22 September that was
+# written up as a defect in rc2: rules that are well formed and unexercisable.
+#
+# It is not. The conformance matrix marks C-042 through C-047 `injection` in
+# its Evidence column, and §15 exists precisely because those states are not
+# manuscript-reachable. rc2 anticipated this and supplied the mechanism; the
+# cases were unexecuted because this seam was missing, not because rc2 was
+# wrong. The Evidence column had the answer the whole time.
+_RESOLVER_SEAM = None
+
+
 def _osa(a: str, b: str) -> int:
     """Optimal string alignment distance. rc2 §1.4 names `osa` by that name."""
     if a == b:
@@ -2150,8 +2181,15 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
         else:
             full_key, reduced_key = c["citation_key"], None
 
+        # rc2 §15's seam sits exactly here: "immediately before the §8.3
+        # decision table". Production leaves `_RESOLVER_SEAM` None and binds
+        # the deterministic real resolver below.
         f_state, f_idx = _lookup(full_key)
         s_state, s_idx = _lookup(reduced_key)
+        if _RESOLVER_SEAM is not None:
+            (full_key, f_state, f_idx), (reduced_key, s_state, s_idx) = \
+                _RESOLVER_SEAM((full_key, f_state, f_idx),
+                               (reduced_key, s_state, s_idx))
 
         # §8.3's table. Rows 6 to 9 are the ones where BOTH candidates match,
         # and rc2 splits them on whether the two keys are the same string.

@@ -147,16 +147,18 @@ CHECKS = {
               "the corpus reaches none; the control builds the input"),
     # §8.3 rows 6-9, §8.5, §8.6 — implemented 22 September. The anti-needle
     # named the emission this time and fired correctly on all eleven.
-    "C-042": ((), ("§8.3 row 6: different keys → ambiguous",), "MET",
-              "unique/unique, different keys"),
-    # One `if` serves all four state pairs, so a control per row would pin the
-    # same line four times. C-042's fixture exercises it; nothing distinguishes
-    # the other three, and saying MET would claim four controls for one.
-    **{c: ((), ("§8.3 row 6: different keys → ambiguous",), "PARTIAL",
-           "same branch as C-042; no control fixes this state pair")
-       for c in ("C-043", "C-044", "C-045")},
-    "C-046": ((), ("§8.6: the two candidates cannot collide",), "PARTIAL",
-              "implemented; unreachable, so the control pins the namespaces"),
+    # All four state pairs are now injected individually through §15's seam,
+    # which is how the matrix says to evidence them. They were PARTIAL for
+    # half an hour on the reasoning that one `if` serves all four — true, and
+    # not what the case asks: rc2 wants each pair exercised, and injection is
+    # how.
+    **{c: ((), ("§15: all four different-key state pairs",), "MET",
+           "injected per rc2 §15, its own state pair")
+       for c in ("C-042", "C-043", "C-044", "C-045")},
+    "C-046": ((), ("§15/§8.6: same candidate_key on both lookups",), "MET",
+              "§15's mandatory case: exit 6, reason named"),
+    "C-047": ((), ("C-047: a shared reference index is ambiguity",), "MET",
+              "guards on equal keys, not overlapping indices"),
     "C-048": ((), ("C-048: the record carries both candidates",), "PARTIAL",
               "both candidates named; rc2 asks for a byte golden"),
     "C-049": ((), ("§8.5: ambiguity-reserved references leave the pool",),
@@ -255,14 +257,12 @@ NOT_IMPLEMENTED = {
     # Two of the eleven turned out to be unreachable rather than unbuilt, and
     # they are different kinds of unreachable. Both are NOT, with the reason
     # naming which.
-    "C-047": ("structurally impossible: a reference carries ONE key, so two "
-              "different candidate keys cannot both match the same index. "
-              "The case describes a state rc2's own model cannot produce",
-              None),
     "C-051": ("reserved-is-not-uniquely-matched is unpinned; the summary has "
               "no uniquely-matched-works count to assert +0 against", None),
-    "C-077": ("exit 6 is allocated and unreachable — see C-046. Its exact "
-              "meta+error shape is therefore unexercised", None),
+    "C-077": ("the exit-6 CONDITION is executed under §15 (see C-046); what "
+              "is unpinned is the two-line error stream's exact bytes, which "
+              "needs a byte golden this repository does not have",
+              '"code": 6, "reason"'),
     **{c: ("citation_surface_group_key not implemented",
            "citation_surface_group_key")
        for c in ("C-022", "C-023", "C-024", "C-025")},

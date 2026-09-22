@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Citation extraction, deterministic spec v3.3 — in version control this time.
 
-    python scripts/citation_extract.py <paper.md>
-    python scripts/citation_extract.py <paper.md> --fix ampersand,segments,colon,cp
+    python scripts/citation_extract.py <paper.md>              v3.3 as specified
+    python scripts/citation_extract.py <paper.md> --fix all    every rc3 fix
+
+`--fix all` rather than a typed list: this line used to name four of the five
+and had not gained `mathyear`, and it was not the only copy that drifted.
 
 Exit 0/1 = ran; 1 means the manuscript has coherence problems, per §10.
 Exit 2–5 = abort, and stdout is exactly two lines, per §10.
@@ -2372,10 +2375,18 @@ def main() -> int:
     ap.add_argument("paper")
     ap.add_argument("--fix", default="",
                     help="comma-separated: " + ", ".join(FIXES) +
-                         ". Default none, which is v3.3 as specified.")
+                         "; or `all` for every one of them. Default none, "
+                         "which is v3.3 as specified.")
     a = ap.parse_args()
 
     fixes = {f.strip() for f in a.fix.split(",") if f.strip()}
+    # `all` exists so the canonical set never has to be retyped. Two scripts
+    # had retyped it and both had drifted: one lost `mathyear` entirely, and
+    # one corpus measurement used two of the five and reported 72 uncited
+    # references where the figure is 57. A list a caller must keep in sync by
+    # hand is a list that goes stale.
+    if "all" in fixes:
+        fixes = (fixes - {"all"}) | set(FIXES)
     unknown = fixes - set(FIXES)
     if unknown:
         print(f"unknown fix(es): {sorted(unknown)}; known: {list(FIXES)}",

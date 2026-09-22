@@ -1615,6 +1615,35 @@ def main() -> int:
     else:
         ok("§9.4: a paired reference leaves the pool and pairs only once")
 
+    # ------------------- the CLI's fix set
+    print("\nthe canonical fix set")
+
+    # `--fix all` exists so no caller has to retype FIXES. Two that did had
+    # drifted. The control has to compare against ce.FIXES rather than a list
+    # written here, or it becomes the fourth copy to go stale.
+    import json as _json
+    import subprocess as _sp
+    with _tf.TemporaryDirectory() as td:
+        p = Path(td) / "paper.md"
+        p.write_text(HEAD + "As shown (Jones, 2019) here."
+                     "\n\n## References\n\nJones, K. (2019). A. J, 1, 1.\n",
+                     encoding="utf-8")
+        out = _sp.run([sys.executable, str(Path(ce.__file__)), str(p),
+                       "--fix", "all"], capture_output=True, text=True)
+    applied = None
+    for ln in out.stdout.splitlines():
+        if '"type":"meta"' in ln or '"type": "meta"' in ln:
+            applied = _json.loads(ln).get("fixes_applied")
+            break
+    if applied is None:
+        failures.append(f"--fix all produced no meta line (rc={out.returncode}, "
+                        f"stderr={out.stderr[:80]!r})")
+    elif sorted(applied) != sorted(ce.FIXES):
+        failures.append(f"--fix all applied {applied}, but FIXES is "
+                        f"{sorted(ce.FIXES)}")
+    else:
+        ok("--fix all expands to exactly FIXES, whatever FIXES becomes")
+
     # ------------------- rc2 §9.6, uncited references
     print("\nrc2 §9.6 — uncited references")
 

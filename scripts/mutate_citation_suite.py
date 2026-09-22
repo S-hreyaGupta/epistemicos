@@ -457,6 +457,11 @@ MUTATIONS = [
      "            rule = None",
      "§9.4 surname_edit_distance_1: expected one possible_mismatch"),
 
+    ("--fix all quietly drops one fix",
+     '        fixes = (fixes - {"all"}) | set(FIXES)',
+     '        fixes = (fixes - {"all"}) | (set(FIXES) - {"mathyear"})',
+     "--fix all applied"),
+
     # ------------------------------- rc2 §9.6, the residual
 
     ("rc2 §9.6: nothing is ever reported uncited",

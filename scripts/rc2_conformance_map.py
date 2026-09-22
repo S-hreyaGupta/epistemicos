@@ -85,10 +85,23 @@ SUITE = REPO / "scripts/test_citation_extract.py"
 # PARTIAL at best.
 CHECKS = {
     "C-001": ((), ("exit 5: invalid utf-8",), "MET", "abort before processing"),
-    "C-006": (("REF_NAMES",), (), "PARTIAL",
-              "heading detection exists; references_source not emitted"),
-    "C-007": (("_unmarked_reference_label",), (), "PARTIAL",
-              "inferred fallback exists; references_source not emitted"),
+    # PARTIAL until 22 September for one reason — "references_source not
+    # emitted" — which §10's work fixed as a side effect of needing the third
+    # value, `not_available`.
+    "C-006": (("REF_NAMES",), ("C-006: a marked-up References heading",),
+              "MET", "detected, from a marked-up heading"),
+    "C-007": (("_unmarked_reference_label",),
+              ("a standalone `References` line is a section boundary",),
+              "MET", "inferred, from a bare label with the confirmation"),
+    # rc2 §10 and §11.3, implemented 22 September. The abort these replace
+    # was v3.3's: rc2 §14 allocates exit 3 to "invalid section map" and gives
+    # a missing bibliography no exit at all.
+    "C-009": ((), ("§10: no bibliography is processed, not refused",), "MET",
+              "extract, no identity, one bibliography_absent"),
+    "C-066": ((), ("C-066: not_evaluated is a different state",), "MET",
+              "undetermined kind, not_evaluated state, null key"),
+    "C-067": ((), ("C-067: identity counts null, extraction counts real",),
+              "MET", "null is not-evaluated; 0 would be a measurement"),
     "C-008": ((), ("too few entries below it",), "MET",
               "threshold does not overtrigger"),
     "C-010": ((), ("every detected candidate reaches exactly one",), "MET",
@@ -107,6 +120,18 @@ CHECKS = {
               "STOP exists; rc2 wants one case per token"),
     "C-021": ((), ("a possessive surname keys to the bare name",), "MET",
               "person candidate only, surface unchanged"),
+    # These four were implemented and controlled BEFORE the anti-needle guard
+    # existed, and the map went on reporting them NOT. Caught 22 September by
+    # the guard, which is the case it was built for — and a reminder that the
+    # stale NOTs it finds are not always recent work.
+    "C-022": ((), ("C-022: the surface key is a JSON array",), "MET",
+              "JSON array, bare year an integer, suffixed year a string"),
+    "C-023": ((), ("C-023: punctuation and `and`/`&` remain",), "MET",
+              "lower and whitespace only; surfaces stay distinct"),
+    "C-024": ((), ("C-024: two surface groups, one identity",), "MET",
+              "the surface key never reaches identity"),
+    "C-025": ((), ("C-025: the summary count and the null",), "MET",
+              "emitted with a bibliography and without; C-009 landed"),
     "C-030": (('reasons.append("no_year")',), (), "PARTIAL",
               "emitted; no control pins it"),
     "C-031": (('"entry_start_grammar"', '"orphan_line"', '"no_year"'), (),
@@ -263,13 +288,8 @@ NOT_IMPLEMENTED = {
               "is unpinned is the two-line error stream's exact bytes, which "
               "needs a byte golden this repository does not have",
               '"code": 6, "reason"'),
-    **{c: ("citation_surface_group_key not implemented",
-           "citation_surface_group_key")
-       for c in ("C-022", "C-023", "C-024", "C-025")},
     **{c: ("sentence-relative fields not emitted", "previous_sentence_end")
        for c in ("C-026", "C-027", "C-028")},
-    **{c: ("bibliography_absent not implemented", "bibliography_absent")
-       for c in ("C-009", "C-066", "C-067")},
     **{c: ("file output contract not implemented", "canonical_sha256")
        for c in ("C-071", "C-072", "C-073")},
     "C-017": ("PREFIX longest-match precedence not pinned", "longest-match"),

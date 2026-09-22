@@ -96,7 +96,7 @@ def main() -> int:
 
     sys.path.insert(0, str(REPO / "scripts"))
     import citation_extract as ce  # noqa: E402
-    body, refs, _, _ = ce.split_body_and_references(ce.normalise(src.read_bytes()))
+    body, refs, _, _, _ = ce.split_body_and_references(ce.normalise(src.read_bytes()))
     body = body.replace("\\&", "&")
     entries = [" ".join(l.split()) for l in refs.splitlines() if l.strip()]
 

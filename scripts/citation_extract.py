@@ -361,6 +361,7 @@ def split_body_and_references(text: str):
 
     ref = next((h for h in heads
                 if 2 <= h[1] <= 4 and h[2].strip().lower() in REF_NAMES), None)
+    source = "detected" if ref is not None else None
 
     if ref is None:
         # §3, unmarked-up label. Four of the fourteen corpus papers aborted
@@ -382,14 +383,30 @@ def split_body_and_references(text: str):
         # gathered asked what the last *heading* before the block was and
         # never what the last *line* was.
         ref = _unmarked_reference_label(text)
+        if ref is not None:
+            source = "inferred"
 
     if ref is None:
-        raise Abort(3, "references section not found")
+        # rc2 §10, bibliography-absent mode. This used to `raise Abort(3,
+        # "references section not found")`, which is v3.3's behaviour and
+        # which rc2 replaced: §14's abort list allocates exit 3 to "invalid
+        # section map" and gives no exit at all for a missing bibliography.
+        #
+        #     If `references_source = not_available`:
+        #         Pass 1 extraction          performed
+        #         Pass 2 identity resolution not evaluated
+        #
+        # A manuscript with no reference list is a manuscript this tool can
+        # still read. Refusing it threw away every citation in the document to
+        # report one thing about the bibliography — which is the shape of the
+        # defect that cost this corpus four papers and 582 citations until
+        # 19 September, and is worth not repeating one rule over.
+        return text, "", len(text), heads, "not_available"
 
     after = [h for h in heads if h[3] > ref[3] and h[1] <= ref[1]]
     ref_end = after[0][3] if after else len(text)
     body = text[:ref[3]]
-    return body, text[ref[4] + 1:ref_end], ref[4] + 1, heads
+    return body, text[ref[4] + 1:ref_end], ref[4] + 1, heads, source
 
 
 # How much of the run after the label has to look like a bibliography, and how
@@ -1470,6 +1487,42 @@ def person_form(phrase: str):
 _RESOLVER_SEAM = None
 
 
+# ------------------------------------ rc2 §6.6, the surface grouping key
+#
+# rc2's architecture gives this its own section — "Surface grouping is not
+# identity" — and the execution spec says it twice more: the key "is
+# extraction/aggregation only and MUST NOT be consumed by identity resolution
+# or reconciliation", and §6.8's possessive stripping "does not modify
+# citation_surface_group_key".
+#
+# So the normalisation here is deliberately weaker than the identity path's,
+# and the difference is the whole point:
+#
+#     Smith and Jones (2020)   ->  ["smith and jones", 2020]
+#     Smith & Jones (2020)     ->  ["smith & jones", 2020]      DISTINCT
+#     Fine's (1998)            ->  ["fine's", 1998]   identity: fine|1998
+#
+# Two surfaces that mean one work stay separate here on purpose. Anything
+# that collapsed them would be doing identity work under an aggregation name,
+# which is the confusion rc2 §7 exists to prevent.
+def normalized_author_phrase(phrase: str) -> str:
+    """§6.6: lower(), whitespace runs to one ASCII space, trimmed. Nothing
+    else — no punctuation, possessive, particle or identity normalisation."""
+    return re.sub(r"\s+", " ", phrase).strip().lower()
+
+
+def surface_year_component(year: str):
+    """§6.6. A bare year is a JSON INTEGER; a suffixed year or `nd` is a
+    JSON string. The type carries meaning, so `2020` and `"2020"` are not
+    interchangeable and the serializer must not quote the first."""
+    return int(year) if year.isdigit() else year
+
+
+def surface_group_key(phrase: str, year: str) -> list:
+    """§6.6's JSON array, emitted as an array and never as a quoted string."""
+    return [normalized_author_phrase(phrase), surface_year_component(year)]
+
+
 def _osa(a: str, b: str) -> int:
     """Optimal string alignment distance. rc2 §1.4 names `osa` by that name."""
     if a == b:
@@ -1598,6 +1651,9 @@ def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
         # this week; see UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md.
         "stop_reduced_phrase": (re.sub(r"\s+", " ", stop_reduced_phrase).strip()
                                 if stop_reduced_phrase else None),
+        # §6.6. Built from `author_phrase` and the normalized year, and from
+        # nothing the identity path touches — see the note above the helper.
+        "citation_surface_group_key": surface_group_key(author_phrase, y),
         # rc2 §6.7. Null for a non-person candidate, per the section's own
         # last line.
         **dict(zip(("author_form", "visible_authors", "author_count_constraint"),
@@ -1749,6 +1805,11 @@ def _unres(body, start, end, reason, sent, heads, unres):
         # uniformly without knowing which record shapes exist.
         "candidate_state": "unresolved_citation",
         "text": body[start:end], "start": start, "end": end, "reason": reason,
+        # §12's unresolved_citation shape carries the field as null. It has to
+        # be PRESENT and null rather than absent: a consumer aggregating by
+        # surface group needs the key on every extracted candidate record, and
+        # an unresolved one has no author phrase to build it from.
+        "citation_surface_group_key": None,
         "sentence": body[s_start:s_end], "sentence_start": s_start,
         "section_level": lv, "section_name": nm,
     })
@@ -2047,7 +2108,7 @@ FIXES = ("ampersand", "segments", "colon", "cp", "mathyear")
 
 def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     text = normalise(path.read_bytes())
-    body, section, sec_off, heads = split_body_and_references(text)
+    body, section, sec_off, heads, ref_source = split_body_and_references(text)
     if "ampersand" in fixes:
         body = body.replace("\\&", "&")
         section = section.replace("\\&", "&")
@@ -2087,9 +2148,35 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
 
     lines = [{"type": "meta", "spec_version": SPEC_VERSION,
               "implementation": "scripts/citation_extract.py",
-              "fixes_applied": sorted(fixes)}]
+              "fixes_applied": sorted(fixes),
+              # rc2 §6.2, C-006 and C-007. Whether the bibliography was found
+              # by a marked-up heading, inferred from a bare `References`
+              # line, or absent entirely is a property of the run, and a
+              # reader cannot otherwise tell an inferred boundary from a
+              # declared one.
+              "references_source": ref_source}]
+    absent = ref_source == "not_available"
     for i, c in enumerate(cits):
         c["index"] = i
+        if absent:
+            # §10, verbatim. Identity was not evaluated, so nothing may claim
+            # it was — and `not_evaluated` is a different statement from
+            # `not_resolved`, which is why rc2 gives it its own value.
+            c["author_kind"] = "undetermined"
+            c["resolved_author_phrase"] = None
+            c["author_resolution"] = "not_evaluated"
+            c["citation_key"] = None
+            # C-066: "bibliography_absent uses not_evaluated identity state".
+            # A fourth value beside the three §9.2 assigns, and it has to be
+            # distinct from `identity_not_resolved` — that one means the
+            # lookup ran and matched nothing.
+            c["identity_class"] = "not_evaluated"
+            c["candidate_key"] = None
+            c["match_state"] = None
+            c["reference_indices"] = []
+            # "citation_surface_group_key = computed" — the one identity-ish
+            # field that survives, because it is a surface property and never
+            # needed the bibliography. C-025's "always emitted" is this half.
         lines.append(c)
     for i, u in enumerate(unres):
         u["index"] = i
@@ -2100,13 +2187,33 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     for i, e in enumerate(errs):
         e["index"] = i
         lines.append(e)
-    for i, r in enumerate(refs):
+    # §10's suppression list, applied at the one place every record passes
+    # through. Nine types must not be emitted when the bibliography is absent;
+    # `reference` and `unresolved_reference` are the two that could otherwise
+    # be produced from an empty section, and the remaining seven are guarded
+    # below where they are built.
+    for i, r in enumerate(refs if not absent else []):
         r["index"] = i
         lines.append(r)
-    for i, u in enumerate(ref_unres):
+    for i, u in enumerate(ref_unres if not absent else []):
         u["index"] = i
         lines.append(u)
+    if absent:
+        # "one bibliography_absent" — C-009. The record says the manuscript
+        # was read and the bibliography was not there, which is a different
+        # claim from the run having failed.
+        lines.append({"type": "bibliography_absent", "index": 0,
+                      "references_source": "not_available",
+                      "identity_resolution_performed": False})
 
+    # §10: "Pass 2 identity resolution — not evaluated". With no references,
+    # every lookup would be `no_match` and every occurrence would come out
+    # `identity_not_resolved` — which reads as "we looked and found nothing"
+    # when the truth is that we never looked. rc2 separates those two states
+    # deliberately, so the whole block is skipped rather than allowed to
+    # produce a confident-looking wrong answer.
+    if absent:
+        refs = []
     keyed = {r["reference_key"] for r in refs if r["reference_key"]}
     cite_keys = []
     for c in cits:
@@ -2161,7 +2268,7 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
 
     ambiguous_citations = []
     ambiguous_authors = []
-    for c in cits:
+    for c in (cits if not absent else []):
         # §8.1. Two candidates now, where there was one.
         #
         # `citation_key` has always been derived from the phrase that PARSED,
@@ -2289,7 +2396,7 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
             by_key.setdefault(r["reference_key"], r)
 
     mismatches = []
-    for c in cits:
+    for c in (cits if not absent else []):
         ref = by_key.get(c["citation_key"])
         vis = c.get("visible_authors")
         # "For person citations with NON-NULL person-form data and a matched
@@ -2376,9 +2483,14 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     # Identity is underdetermined for those before fuzzy repair even begins,
     # so emitting a candidate-level diagnostic would name one of two — the
     # guess CIT-ARCH-01 exists to prevent.
-    unresolved_cits = [c for c in cits
-                       if c["identity_class"] == "identity_not_resolved"
-                       and not c.get("stop_reduced_phrase")]
+    # §10 again: `missing_reference`, `possible_mismatch` and
+    # `uncited_reference` are all built from here down, and all three are on
+    # the suppression list. Empty in absent mode rather than guarded record by
+    # record, so a later addition to this block cannot forget.
+    unresolved_cits = [] if absent else [
+        c for c in cits
+        if c["identity_class"] == "identity_not_resolved"
+        and not c.get("stop_reduced_phrase")]
 
     # "Group such occurrences by that candidate key in FIRST-OCCURRENCE order."
     grouped: dict[str, list[dict]] = {}
@@ -2519,36 +2631,67 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
 
     n_parsed, n_unres, n_excl = len(cits), len(unres), len(excl)
     denom = n_parsed + n_unres
+    # rc2 §11.3. When identity resolution did not run, ten fields go `null`
+    # rather than `0`, and the section says why in one line: "null means the
+    # corresponding resolution/reconciliation quantity was not evaluated."
+    #
+    # `0` would be a measurement — we looked, and found none. `null` is the
+    # absence of a measurement. A downstream reader averaging match rates over
+    # a corpus has to be able to tell those apart, and a zero that means "not
+    # asked" is the same defect class as a green control that never ran.
+    #
+    # `resolved_citation_occurrences = 0` is the one exception §11.3 makes,
+    # and it is not an oversight: zero citations were resolved, and that IS a
+    # measurement.
+    def _n(value):
+        """§11.3: null in bibliography-absent mode, the count otherwise."""
+        return None if absent else value
+
     lines.append({"type": "summary",
+                  "identity_resolution_performed": not absent,
+                  "references_source": ref_source,
                   # v3.3's fields keep v3.3's meaning. rc2 renames them
                   # `uniquely_matched_*`, which is the consolidation's change
                   # to make, not this one's.
-                  "matched_occurrences": len(uniquely_matched),
-                  "matched_works": len({c["citation_key"]
-                                        for c in uniquely_matched}),
-                  "author_structure_mismatches": len(mismatches),
+                  "matched_occurrences": _n(len(uniquely_matched)),
+                  "matched_works": _n(len({c["citation_key"]
+                                           for c in uniquely_matched})),
+                  "author_structure_mismatches": _n(len(mismatches)),
                   # rc3 §C partitions CASES, not defects: one record per
                   # group, however many defects that group carries.
                   # rc2 §11.2, over the three reachable identity
                   # classes. The partition is exact by construction:
                   # every parsed citation gets exactly one.
-                  "unique_reference_match_occurrences":
+                  "unique_reference_match_occurrences": _n(
                       sum(1 for c in cits
-                          if c["identity_class"] == "unique_reference_match"),
-                  "bibliography_key_ambiguous_occurrences":
+                          if c["identity_class"] == "unique_reference_match")),
+                  "bibliography_key_ambiguous_occurrences": _n(
                       sum(1 for c in cits
-                          if c["identity_class"] == "bibliography_key_ambiguous"),
-                  "identity_not_resolved_occurrences":
+                          if c["identity_class"] == "bibliography_key_ambiguous")),
+                  "identity_not_resolved_occurrences": _n(
                       sum(1 for c in cits
-                          if c["identity_class"] == "identity_not_resolved"),
+                          if c["identity_class"] == "identity_not_resolved")),
                   # rc2 §9.2's fourth identity class, live since §8.3 rows 6-9
                   # landed. Counted even though this corpus produces none:
                   # a partition over three names when the code can emit four
                   # is an invariant that holds only while the fourth stays
                   # empty, which is not what an invariant is for.
-                  "author_resolution_ambiguous_occurrences":
+                  "author_resolution_ambiguous_occurrences": _n(
                       sum(1 for c in cits
-                          if c["identity_class"] == "author_resolution_ambiguous"),
+                          if c["identity_class"] == "author_resolution_ambiguous")),
+                  # §11: "unique citation_surface_group_key values among
+                  # extracted citations; ALWAYS emitted" — including in
+                  # bibliography-absent mode, where §10 keeps it computed
+                  # while nulling the identity counts. Aggregation survives
+                  # the absence of a bibliography because it never needed one.
+                  #
+                  # Keyed on the JSON bytes so ["smith", 2020] and
+                  # ["smith", "2020"] count as two, which is what §6.6's
+                  # integer-versus-string distinction is for.
+                  "distinct_surface_groups": len({
+                      json.dumps(c["citation_surface_group_key"],
+                                 separators=(",", ":"), ensure_ascii=False)
+                      for c in cits}),
                   "citation_error_cases": len(errs),
                   "citation_error_defects": sum(len(e["defects"]) for e in errs),
                   "parsed": n_parsed,
@@ -2567,10 +2710,25 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                   # in v3.4." The split is deliberate — an exact mismatch is
                   # wrong in every style, while et_al depends on
                   # ET_AL_MIN_AUTHORS and is style-dependent.
-                  "exit": 0 if (len(uniquely_matched) == len(cits)
-                                and not unres
-                                and not any(m["citation_author_form"] == "exact"
-                                            for m in mismatches)) else 1})
+                  #
+                  # Bibliography-absent mode is stated rather than inherited.
+                  # The test below asks whether every citation was uniquely
+                  # matched; under §10 none can be, because identity was never
+                  # evaluated. So absent mode would reach exit 1 through a
+                  # condition that is vacuous there — the right answer for a
+                  # reason that does not survive reading.
+                  #
+                  # It is exit 1 because a manuscript with no reference list
+                  # is a reportable condition about the document, and exit 0
+                  # would assert there is nothing to report. Recorded as this
+                  # implementation's reading, not as rc2's: §14 gives exit 1
+                  # to "one or more defined finding conditions" and never
+                  # closes that set, which is C-078 and unimplemented.
+                  "exit": 1 if absent else
+                          (0 if (len(uniquely_matched) == len(cits)
+                                 and not unres
+                                 and not any(m["citation_author_form"] == "exact"
+                                             for m in mismatches)) else 1)})
     return lines, lines[-1]["exit"]
 
 

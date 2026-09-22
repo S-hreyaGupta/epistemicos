@@ -93,7 +93,7 @@ def run(mod, raw: bytes):
                                    totals
     """
     text = mod.normalise(raw)
-    body, section, off, heads = mod.split_body_and_references(text)
+    body, section, off, heads, _src = mod.split_body_and_references(text)
     if "ampersand" in FIXES:
         body = body.replace("\\&", "&")
         section = section.replace("\\&", "&")

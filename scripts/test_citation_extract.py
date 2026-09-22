@@ -34,6 +34,7 @@ target and is not reached through `bootstrap_gate.covered()`.
 
 from __future__ import annotations
 
+import json as _json
 import re
 import sys
 from pathlib import Path
@@ -51,7 +52,7 @@ def extract(body_text: str, fixes=frozenset()):
     """Run the real pipeline over a minimal document containing body_text."""
     doc = HEAD + body_text + REFS
     text = ce.normalise(doc.encode("utf-8"))
-    body, section, off, heads = ce.split_body_and_references(text)
+    body, section, off, heads, _src = ce.split_body_and_references(text)
     if "ampersand" in fixes:
         body = body.replace("\\&", "&")
     sents = ce.sentences(body)
@@ -62,8 +63,24 @@ def keys(cits):
     return [c["citation_key"] for c in cits]
 
 
+# Module level so a crash cannot discard what has already been recorded.
+#
+# Seventeen controls index `cits[0]` or similar without first checking the
+# list is non-empty. Under a mutation that stops something parsing, one of
+# those raises IndexError — and the traceback replaces the report, so every
+# failure collected up to that point is lost. On 22 September the mutation
+# probe read that as "no control failed" for a mutation the suite HAD caught:
+# §6.3's control recorded the failure and a control 1400 lines later crashed
+# before it could be printed.
+#
+# Guarding all seventeen is the wrong shape; the defect is that the report is
+# only emitted on the happy path. `__main__` below now prints the failures
+# whatever happens, so a crash reports a crash AND the findings.
+FAILURES: list[str] = []
+
+
 def main() -> int:
-    failures: list[str] = []
+    failures: list[str] = FAILURES
 
     def ok(m: str) -> None:
         print(f"  [ok] {m}")
@@ -342,7 +359,12 @@ def main() -> int:
     # ---- aborts, §12 row 18 ----
     print("\naborts")
     for label, doc, code in (
-        ("no references section", "# P\n\n## Intro\n\nSmith (2020).\n", 3),
+        # "no references section" used to sit here expecting exit 3. rc2 §14
+        # allocates exit 3 to "invalid section map" and gives a missing
+        # bibliography no exit at all — §10 processes it instead. The case
+        # moved to the §10 block below rather than being deleted, because the
+        # behaviour it pinned is still pinned, just inverted.
+        #
         # §12 pins this as a boundary pair, and both sides matter: a document
         # whose sectioning really lives in h1 is refused rather than remapped,
         # while a stray second h1 alongside h2 structure is tolerated. Testing
@@ -389,8 +411,25 @@ def main() -> int:
     def splits(doc: str):
         return ce.split_body_and_references(ce.normalise(doc.encode()))
 
+    def source_of(doc: str, label: str):
+        """The references_source, or None having recorded the abort.
+
+        rc2 §10 removed the exit-3 refusal, so an Abort reaching here is the
+        defect rather than the expected outcome — and letting it propagate
+        would crash the run and discard every failure recorded before it,
+        which is exactly how a caught mutation came to read as uncaught on
+        22 September.
+        """
+        try:
+            return splits(doc)[4]
+        except ce.Abort as a:
+            failures.append(f"{label}: aborted exit {a.code}. rc2 §14 has no "
+                            f"exit for a missing bibliography; §10 processes "
+                            f"the manuscript instead")
+            return None
+
     try:
-        body, refs, _, _ = splits(
+        body, refs, _, _, _ = splits(
             "# P\n\n## Intro\n\nAs shown (Adams, 2001).\n\nReferences\n\n" + ENTRIES)
         if "Adams, J." not in refs:
             failures.append("the plain-text label was found but the section "
@@ -422,36 +461,37 @@ def main() -> int:
          "# P\n\n## Intro\n\nText.\n\nReferences\n\n"
          "were consulted throughout the study and are listed elsewhere.\n"),
     ):
-        try:
-            splits(doc)
+        # These asserted exit 3 until 22 September. rc2 §10 removed that abort,
+        # so refusal now shows as `not_available` rather than as a throw —
+        # which is a STRONGER assertion, not a weaker one: the old form passed
+        # on any abort for any reason, and this names the outcome.
+        src = source_of(doc, label)
+        if src is not None and src != "not_available":
             failures.append(f"a `References` line with {label} was accepted "
                             f"as a boundary; the confirmation check did not "
-                            f"hold")
-        except ce.Abort as a:
-            if a.code != 3:
-                failures.append(f"{label}: aborted {a.code}, expected 3")
-            else:
-                ok(f"refused: a `References` line with {label}")
+                            f"hold — got references_source {src!r}")
+        else:
+            ok(f"refused: a `References` line with {label}")
 
     # Out of order is the confirmation the ruling names.
-    try:
-        splits("# P\n\n## Intro\n\nText.\n\nReferences\n\n"
-               "Evans, T. (2005). A paper. Journal, 1(1), 1-10.\n"
-               "Dunn, M. (2004). Another. Journal, 2(1), 1-10.\n"
-               "Clark, S. (2003). A third. Journal, 3(1), 1-10.\n"
-               "Baker, R. (2002). A fourth. Journal, 4(1), 1-10.\n"
-               "Adams, J. (2001). A fifth. Journal, 5(1), 1-10.\n")
-        failures.append("a reverse-alphabetical run was accepted; the "
-                        "ordering confirmation did not hold")
-    except ce.Abort as a:
-        ok("refused: entries below the label are not in order") \
-            if a.code == 3 else failures.append(
-                f"reverse-alphabetical aborted {a.code}, expected 3")
+    src = source_of(
+        "# P\n\n## Intro\n\nText.\n\nReferences\n\n"
+        "Evans, T. (2005). A paper. Journal, 1(1), 1-10.\n"
+        "Dunn, M. (2004). Another. Journal, 2(1), 1-10.\n"
+        "Clark, S. (2003). A third. Journal, 3(1), 1-10.\n"
+        "Baker, R. (2002). A fourth. Journal, 4(1), 1-10.\n"
+        "Adams, J. (2001). A fifth. Journal, 5(1), 1-10.\n",
+        "reverse-alphabetical")
+    if src is not None and src != "not_available":
+        failures.append(f"a reverse-alphabetical run was accepted; the "
+                        f"ordering confirmation did not hold — got {src!r}")
+    else:
+        ok("refused: entries below the label are not in order")
 
     # A real heading still wins, so the fallback cannot change any paper that
     # already worked.
     try:
-        body, refs, _, _ = splits(
+        body, refs, _, _, _ = splits(
             "# P\n\n## Intro\n\nReferences were consulted.\n\n"
             "## References\n\n" + ENTRIES)
         if "Adams, J." in refs and "were consulted" in body:
@@ -649,7 +689,7 @@ def main() -> int:
         from citation syntax.
         """
         text = ce.normalise((head + body_text + refs).encode("utf-8"))
-        body, section, off, heads = ce.split_body_and_references(text)
+        body, section, off, heads, _src = ce.split_body_and_references(text)
         body = body.replace("\\&", "&")
         sents = ce.sentences(body)
         bib, _bib_unres = ce.assemble_references(section, off)
@@ -1612,6 +1652,222 @@ def main() -> int:
     else:
         ok("§8.6: the two candidates cannot collide, so exit 6 has no input")
 
+    # ---- rc2 §6.6, the surface grouping key ----
+    print("\nrc2 §6.6 — surface grouping is not identity")
+
+    def sgk(body_text, refs):
+        with _tf.TemporaryDirectory() as td:
+            p = Path(td) / "paper.md"
+            p.write_text(HEAD + body_text + refs, encoding="utf-8")
+            lines, _c = ce.run(p, {"ampersand", "segments"})
+        return ([l for l in lines if l.get("type") == "citation"],
+                [l for l in lines if l.get("type") == "unresolved_citation"],
+                lines[-1])
+
+    R_SG = ("\n\n## References\n\nSmith, J. (2020). A. J, 1, 1.\n"
+            "Jones, K. (2019). B. J, 2, 1.\nFine, R. (1998). C. J, 3, 1.\n")
+
+    # C-022. The type carries meaning: a bare year is a JSON INTEGER and a
+    # suffixed one a string, so `2020` and `"2020"` are different groups.
+    # Asserted on the serialized bytes, because "it is an array" is exactly
+    # the claim a quoted string would also satisfy in Python.
+    cits, _u, _s = sgk("As shown (Smith, 2020) here.", R_SG)
+    key = cits[0]["citation_surface_group_key"]
+    blob = _json.dumps(key, separators=(",", ":"), ensure_ascii=False)
+    if blob != '["smith",2020]':
+        failures.append(f"C-022: the key serializes as a JSON array with an "
+                        f"integer year — got {blob}")
+    elif not isinstance(key, list) or isinstance(key[1], str):
+        failures.append(f"C-022: a bare year is an integer, not a string — "
+                        f"got {key!r}")
+    else:
+        ok("C-022: the surface key is a JSON array, bare year an integer")
+
+    # And the two shapes that are NOT integers.
+    cits, _u, _s = sgk("See (Smith, n.d.) and (Smith, 2020a).", R_SG)
+    got = [c["citation_surface_group_key"][1] for c in cits]
+    if got != ["nd", "2020a"]:
+        failures.append(f"C-022: a suffixed year and n.d. stay strings — "
+                        f"got {got!r}")
+    else:
+        ok("C-022: a suffixed year and n.d. are strings, not integers")
+
+    # C-023, and this is the point of the whole section. Normalization is
+    # lower plus whitespace and NOTHING else, so two surfaces meaning one work
+    # stay separate. Anything that collapsed them would be doing identity work
+    # under an aggregation name.
+    cits, _u, summ = sgk("As shown (Smith and Jones, 2020) and "
+                         "(Smith & Jones, 2020) here.", R_SG)
+    surfaces = [c["citation_surface_group_key"][0] for c in cits]
+    if surfaces != ["smith and jones", "smith & jones"]:
+        failures.append(f"C-023: `and` and `&` remain surface-distinct — "
+                        f"got {surfaces!r}")
+    elif summ["distinct_surface_groups"] != 2:
+        failures.append(f"C-023: two surfaces, two groups — got "
+                        f"{summ['distinct_surface_groups']}")
+    else:
+        ok("C-023: punctuation and `and`/`&` remain surface-distinct")
+
+    # DISTINCT is the word doing the work, and the control above cannot see
+    # it: two occurrences with two surfaces give 2 either way, so a count of
+    # occurrences passes it. This repeats one surface, where the two figures
+    # diverge — 2 parsed, 1 group. Added 22 September after the mutation probe
+    # showed the occurrences-not-groups mutation surviving.
+    cits, _u, summ = sgk("As shown (Smith, 2020) and later (Smith, 2020) "
+                         "again.", R_SG)
+    if len(cits) != 2:
+        failures.append(f"§11: the repeated-surface fixture needs two "
+                        f"occurrences — got {len(cits)}")
+    elif summ["distinct_surface_groups"] != 1:
+        failures.append(f"C-023: two occurrences of ONE surface is one "
+                        f"group — got {summ['distinct_surface_groups']}")
+    else:
+        ok("C-023: the count is of distinct groups, not of occurrences")
+
+    # §6.8 names this field as one the possessive strip MUST NOT touch.
+    cits, _u, _s = sgk("Following Fine's (1998) formula, we did this.", R_SG)
+    if "fine's" not in cits[0]["citation_surface_group_key"][0]:
+        failures.append(f"§6.8: the possessive survives in the SURFACE key — "
+                        f"got {cits[0]['citation_surface_group_key']!r}")
+    elif cits[0]["citation_key"] != "fine|1998":
+        failures.append(f"§6.8: the identity still strips it — got "
+                        f"{cits[0]['citation_key']!r}")
+    else:
+        ok("§6.8: the possessive survives the surface key, not the identity")
+
+    # C-024. The instrumentation assertion rc2 asks for, as a behavioural one:
+    # two occurrences with DIFFERENT surface keys resolving to the SAME
+    # identity is only possible if identity never consumed the surface key.
+    cits, _u, _s = sgk("As shown (Smith and Jones, 2020) and "
+                       "(Smith & Jones, 2020) here.", R_SG)
+    ids = {c["citation_key"] for c in cits}
+    sks = {tuple(c["citation_surface_group_key"]) for c in cits}
+    if len(sks) != 2:
+        failures.append("C-024: the fixture needs two distinct surface keys")
+    elif ids != {"smith|2020"}:
+        failures.append(f"C-024: identity must not vary with the surface key "
+                        f"— got {ids}")
+    else:
+        ok("C-024: two surface groups, one identity — the key is not consumed")
+
+    # C-025, and it is PARTIAL rather than met. "Always emitted" includes
+    # bibliography-absent mode, which is C-009 and not implemented, so only
+    # half the claim can be exercised. Both halves that CAN be are.
+    cits, unres, summ = sgk("As shown (Smith, 2020) and (Nobody et al., "
+                            "1899 BCE) here.", R_SG)
+    if "distinct_surface_groups" not in summ:
+        failures.append("C-025: distinct_surface_groups is always emitted")
+    elif any("citation_surface_group_key" not in u for u in unres):
+        failures.append("§12: an unresolved_citation carries the field too")
+    elif any(u["citation_surface_group_key"] is not None for u in unres):
+        failures.append("§12: and it is null there, having no author phrase")
+    else:
+        ok("C-025: the summary count and the null on unresolved records")
+
+    # ---- rc2 §10 and §11.3, bibliography-absent mode ----
+    #
+    # This case used to live in the aborts block expecting exit 3. rc2 §14
+    # allocates exit 3 to "invalid section map" and gives a missing
+    # bibliography no exit at all: §10 processes the manuscript instead.
+    # Refusing it threw away every citation in the document to report one
+    # thing about the bibliography, which is the shape of the defect that
+    # cost this corpus four papers and 582 citations until 19 September.
+    print("\nrc2 §10 / §11.3 — bibliography-absent mode")
+
+    def absent(body_text):
+        """Catches Abort deliberately: the whole point of §10 is that there
+        is no longer an abort here, so a control that let one propagate would
+        report a crash where it should report a failure."""
+        with _tf.TemporaryDirectory() as td:
+            p = Path(td) / "paper.md"
+            p.write_text(HEAD + body_text, encoding="utf-8")
+            try:
+                lines, code = ce.run(p, {"ampersand", "segments"})
+            except ce.Abort as a:
+                return None, a.code, {}
+        return lines, code, lines[-1]
+
+    lines, code, summ = absent("As shown (Smith, 2020) here.")
+    if lines is None:
+        failures.append(f"§10: a manuscript with no bibliography is still "
+                        f"READ — got abort exit {code}, and rc2 §14 has no "
+                        f"exit for a missing bibliography")
+        lines, cit = [], None
+    cit = next((l for l in lines if l.get("type") == "citation"), None)
+    if lines and cit is None:
+        failures.append("§10: a manuscript with no bibliography is still "
+                        "READ — Pass 1 extraction is performed")
+    elif summ["references_source"] != "not_available":
+        failures.append(f"C-009: references_source is not_available — got "
+                        f"{summ['references_source']!r}")
+    elif not any(l.get("type") == "bibliography_absent" for l in lines):
+        failures.append("C-009: exactly one bibliography_absent record")
+    else:
+        ok("§10: no bibliography is processed, not refused")
+
+    # C-066, and the distinction the whole section turns on.
+    if cit is None:
+        failures.append("C-066: no citation to check, see above")
+    elif cit["author_resolution"] != "not_evaluated":
+        failures.append(f"C-066: author_resolution is not_evaluated, which is "
+                        f"NOT not_resolved — got {cit['author_resolution']!r}")
+    elif cit["identity_class"] != "not_evaluated":
+        failures.append(f"C-066: the identity state says not_evaluated — got "
+                        f"{cit['identity_class']!r}")
+    elif cit["author_kind"] != "undetermined" or cit["citation_key"] is not None:
+        failures.append("C-066: undetermined kind, null key")
+    elif cit["citation_surface_group_key"] is None:
+        failures.append("C-025: citation_surface_group_key stays COMPUTED — "
+                        "it is a surface property and never needed the "
+                        "bibliography")
+    else:
+        ok("C-066: not_evaluated is a different state from not_resolved")
+
+    # §10's suppression list, all nine. Emitting any of them would be claiming
+    # a reconciliation that never ran.
+    forbidden = {"reference", "unresolved_reference",
+                 "ambiguous_author_resolution", "missing_reference",
+                 "uncited_reference", "duplicate_reference_key",
+                 "ambiguous_citation", "possible_mismatch",
+                 "author_structure_mismatch"}
+    lines2, _c, _s = absent("As shown (Smith, 2020; Jones, 2019) and "
+                            "Brown (2018) argued this.")
+    leaked = sorted({l["type"] for l in lines2} & forbidden)
+    if leaked:
+        failures.append(f"§10: these MUST NOT be emitted with no "
+                        f"bibliography — got {leaked}")
+    else:
+        ok("§10: all nine reconciliation record types are suppressed")
+
+    # C-067. `0` is a measurement; `null` is the absence of one. A reader
+    # averaging match rates across a corpus has to be able to tell them apart.
+    nulled = ("matched_occurrences", "matched_works",
+              "unique_reference_match_occurrences",
+              "bibliography_key_ambiguous_occurrences",
+              "identity_not_resolved_occurrences",
+              "author_resolution_ambiguous_occurrences",
+              "author_structure_mismatches")
+    wrong = [k for k in nulled if summ.get(k, "missing") is not None]
+    if wrong:
+        failures.append(f"C-067: not-evaluated quantities are null, never 0 — "
+                        f"got {[(k, summ[k]) for k in wrong]}")
+    elif summ["identity_resolution_performed"] is not False:
+        failures.append("§11.4: identity_resolution_performed says so plainly")
+    elif summ["parsed"] != 1 or summ["distinct_surface_groups"] != 1:
+        failures.append(f"§11.1: extraction figures are REAL, not null — "
+                        f"Pass 1 ran. Got parsed={summ['parsed']}")
+    else:
+        ok("C-067: identity counts null, extraction counts real")
+
+    # The other two sources, so the field is not just a constant.
+    lines3, _c, s3 = absent("Smith (2020) argued this.\n\n## References\n\n"
+                            "Smith, J. (2020). A paper. Journal, 1(1), 1-10.\n")
+    if s3["references_source"] != "detected":
+        failures.append(f"C-006: a marked-up heading is `detected` — got "
+                        f"{s3['references_source']!r}")
+    else:
+        ok("C-006: a marked-up References heading reports detected")
+
     # ---- rc2 §15, the invariant-injection seam ----
     #
     # The `From Tether` fixture above reaches row 6 through real parsing, which
@@ -1923,7 +2179,6 @@ def main() -> int:
     # `--fix all` exists so no caller has to retype FIXES. Two that did had
     # drifted. The control has to compare against ce.FIXES rather than a list
     # written here, or it becomes the fourth copy to go stale.
-    import json as _json
     import subprocess as _sp
     with _tf.TemporaryDirectory() as td:
         p = Path(td) / "paper.md"
@@ -2038,4 +2293,17 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except BaseException:
+        import traceback
+        print("\nCRASHED before the report. Controls that had already failed:")
+        for _f in FAILURES:
+            print("FAIL:", _f)
+        if not FAILURES:
+            print("  (none — the crash is the whole finding)")
+        print()
+        traceback.print_exc()
+        sys.exit(1)

@@ -106,7 +106,7 @@ MUTATIONS = [
     ("the unmarked-up References label is not recognised",
      "        ref = _unmarked_reference_label(text)",
      "        ref = None",
-     "a plain-text References label with five ordered entries below it"),
+     "the plain-text label was found but the section below it did not"),
 
     ("the entry-count confirmation is removed",
      "        if len(surnames) < MIN_ENTRIES:",
@@ -421,8 +421,8 @@ MUTATIONS = [
      "CIT-ARCH-01: the candidate is preserved in the diagnostic"),
 
     ("rc2 §11.2: the identity partition double-counts",
-     '                          if c["identity_class"] == "identity_not_resolved"),',
-     '                          if c["identity_class"] != "unique_reference_match"),',
+     '                      sum(1 for c in cits\n                          if c["identity_class"] == "identity_not_resolved")),',
+     '                      sum(1 for c in cits\n                          if True)),',
      "§11.2: the identity classes must partition"),
 
     # ------------------------------- rc2 §9.4, candidate-level diagnostics
@@ -501,9 +501,76 @@ MUTATIONS = [
      "§8.3 row 4: F=no_match, S=unique is stop_reduced"),
 
     ("rc2 §8.4: two candidates no longer suppress the diagnostic",
-     '                       and not c.get("stop_reduced_phrase")]',
+     '        and not c.get("stop_reduced_phrase")]',
      "                       ]",
      "§8.4: two candidates suppress candidate-level diagnostics"),
+
+    # ------------------------------- rc2 §6.6, the surface grouping key
+
+    ("rc2 §6.6: the surface key is a quoted string, not an array",
+     '    return [normalized_author_phrase(phrase), surface_year_component(year)]',
+     '    return f"{normalized_author_phrase(phrase)}|{surface_year_component(year)}"',
+     "C-022: the key serializes as a JSON array with an integer year"),
+
+    ("rc2 §6.6: a bare year is emitted as a string",
+     "    return int(year) if year.isdigit() else year",
+     "    return year",
+     "C-022: the key serializes as a JSON array with an integer year"),
+
+    ("rc2 §6.6: surface normalization reaches for identity normalization",
+     '    return re.sub(r"\\s+", " ", phrase).strip().lower()\n\n\ndef surface_year_component',
+     '    return re.sub(r"[^a-z0-9 ]", "", re.sub(r"\\s+", " ", phrase).strip().lower())\n\n\ndef surface_year_component',
+     "C-023: `and` and `&` remain surface-distinct"),
+
+    # Counts OCCURRENCES rather than distinct groups, by making the set a
+    # list. The previous form was `len(cits) and len({...})`, which returns
+    # the same value whenever `cits` is non-empty and the same 0 when it is —
+    # a mutation that could never change anything, reported as caught for
+    # however long, off some other control. The probe surfaced it on
+    # 22 September once the controls around it stopped failing for other
+    # reasons.
+    ("rc2 §11: distinct_surface_groups counts occurrences, not groups",
+     '                  "distinct_surface_groups": len({\n                      json.dumps(c["citation_surface_group_key"],\n                                 separators=(",", ":"), ensure_ascii=False)\n                      for c in cits}),',
+     '                  "distinct_surface_groups": len([\n                      json.dumps(c["citation_surface_group_key"],\n                                 separators=(",", ":"), ensure_ascii=False)\n                      for c in cits]),',
+     "C-023: two occurrences of ONE surface is one group"),
+
+    # ------------------------------- rc2 §10 / §11.3, bibliography absent
+
+    ("rc2 §10: a missing bibliography aborts again, as v3.3 did",
+     '        return text, "", len(text), heads, "not_available"',
+     '        raise Abort(3, "references section not found")',
+     "§10: a manuscript with no bibliography is still READ"),
+
+    ("rc2 §10: identity is evaluated anyway, so absence reads as no-match",
+     '            c["author_resolution"] = "not_evaluated"',
+     '            c["author_resolution"] = "not_resolved"',
+     "C-066: author_resolution is not_evaluated, which is NOT not_resolved"),
+
+    # Aimed at `refs = []`, not at the enumerate guard. Un-guarding the
+    # enumerate alone changes nothing, because `refs` is already emptied
+    # upstream — so the first version of this mutation was a no-op that the
+    # probe reported as SURVIVED. Two dud mutations found in one run.
+    # No mutation for §10's nine-type suppression. Every guard in that path
+    # is REDUNDANT: with no bibliography there is no reference section, so
+    # `assemble_references` returns nothing, every lookup is no_match, and not
+    # one of the nine can be constructed whatever the guards say. Disabling
+    # any of them changes no output, so a probe would report "caught" off some
+    # other control and establish nothing.
+    #
+    # The guards are kept because they state the rule where a reader looks for
+    # it, and because they would matter the day the absent path returns
+    # something other than an empty section. But the control that passes is
+    # passing structurally, and this file will not pretend otherwise.
+
+    ("rc2 §11.3: not-evaluated quantities report 0 instead of null",
+     "        return None if absent else value",
+     "        return value",
+     "C-067: not-evaluated quantities are null, never 0"),
+
+    ("rc2 §10: the surface key is nulled along with the identity",
+     '            c["citation_key"] = None\n            # C-066:',
+     '            c["citation_key"] = None\n            c["citation_surface_group_key"] = None\n            # C-066:',
+     "C-025: citation_surface_group_key stays COMPUTED"),
 
     # ------------------------------- rc2 §8.3 rows 6-9, §8.5, §8.6
 

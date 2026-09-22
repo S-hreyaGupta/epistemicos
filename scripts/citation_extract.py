@@ -2152,11 +2152,26 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
         f_state, f_idx = _lookup(full_key)
         s_state, s_idx = _lookup(reduced_key)
 
-        # §8.3's table. Rows 6 to 9 need BOTH candidates to match, and reaching
-        # them requires `ambiguous_author_resolution` (C-048 to C-051) and exit
-        # 6 (C-046, C-047, C-077), neither of which exists here. They are left
-        # unwritten rather than guessed at; the assertion below says so out
-        # loud instead of letting a silent `else` stand in for them.
+        # §8.3's table. Rows 6 to 9 need BOTH candidates to match. rc2 splits
+        # them: different keys → `ambiguous_author_resolution`, same key →
+        # exit 6. Neither exists here (C-048 to C-051, and C-046/047/077).
+        #
+        # A KNOWING DEVIATION, recorded rather than left to be discovered.
+        # This aborts for BOTH branches, where rc2 aborts for one and
+        # processes the other. It is therefore stricter than the spec and
+        # would refuse a manuscript rc2 says to carry on with.
+        #
+        # Chosen because the alternative is worse in the direction this
+        # repository cares about: the different-key branch needs an emission
+        # that does not exist, so the only ways to "handle" it are to invent
+        # the record or to pick one of two candidate identities silently. The
+        # second is precisely the guess CIT-ARCH-01 forbids.
+        #
+        # Unreachable on the corpus: the full candidate keys `non_person` over
+        # the entire surface including the lead-in, so matching it needs a
+        # bibliography entry labelled `as podsakoff et al.`. Unreachable is
+        # not impossible, which is why this is an abort with a message and not
+        # an assert.
         if f_state != "no_match" and s_state != "no_match":
             raise Abort(6, "rc2 §8.3 rows 6-9: both candidates matched, which "
                            "needs ambiguous_author_resolution and exit 6")

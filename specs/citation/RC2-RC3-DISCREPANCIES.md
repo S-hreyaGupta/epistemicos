@@ -298,6 +298,41 @@ rather than leave standing.
 
 ---
 
+## A deviation, not a discrepancy: §8.3 rows 6-9 abort where rc2 processes
+
+Recorded here because it is the only place this implementation knowingly does
+something rc2 forbids, and a deviation nobody wrote down is indistinguishable
+from a bug.
+
+rc2 §8.3, for an occurrence where both candidates match:
+
+```text
+different keys  →  ambiguous_author_resolution, and carry on
+same key        →  exit 6
+```
+
+This implementation aborts with exit 6 for both. It is **stricter than rc2**
+and would refuse a manuscript rc2 says to process.
+
+```text
+why       the different-key branch needs `ambiguous_author_resolution`, which
+          is C-048 to C-051 and does not exist. The alternatives are to invent
+          the record, or to silently pick one of two candidate identities —
+          the guess CIT-ARCH-01 exists to forbid.
+reach     no corpus input reaches it. The full candidate keys `non_person`
+          over the whole surface including the lead-in, so matching it needs a
+          bibliography entry labelled `as podsakoff et al.`.
+undo      implementing C-048 to C-051 removes the deviation. Until then the
+          abort carries its own explanation in the error message.
+```
+
+Worth noting what this is not. It is not a case of rc2 and rc3 disagreeing,
+and it is not an unimplemented case quietly reported as met. It is a refusal
+chosen over a guess, which the conformance map records as `NOT` for all four
+rows rather than claiming partial credit for the abort.
+
+---
+
 ## A measurement note, not a discrepancy: "worth" counts occurrences
 
 rc3 B6 is "Worth 2". Implemented, it recovers **4 occurrences and 0 works**.

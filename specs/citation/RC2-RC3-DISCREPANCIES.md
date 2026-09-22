@@ -279,17 +279,24 @@ file was recovered the same evening and defines both from their cases:
 `$...$`, and `leading_gloss` is a split-off segment that glosses rather than
 cites. `A2-EXCLUSION-EVIDENCE.md` has both, with all fourteen cases.
 
-The decision itself still stands — deferred is deferred, and `conversion_artifact`
-still waits on X-08 whatever it means. But the *reason* recorded above, that
-they are unimplementable because undefined, is no longer the reason. Under the
-consolidation workflow's rule 5 an empty remainder may change dispositions, and
-this remainder is no longer empty.
+The decision itself still stands — deferred is deferred. But the *reason*
+recorded above, that they are unimplementable because undefined, is no longer
+the reason. Under the consolidation workflow's rule 5 an empty remainder may
+change dispositions, and this remainder is no longer empty.
+
+**And the X-08 link is gone.** This section said `conversion_artifact` "still
+waits on X-08 whatever it means", following a reading offered on 21 September
+and agreed to. The evidence refutes it: A2's three `conversion_artifact` cases
+are `MBSR`, `(ECP_150 03_08_2014_A2 OZL)` and `McMindfulness` — an acronym, an
+ethics approval code and a coined term. None needs conversion repair, which is
+what X-08 defers. The three math-wrapped `Baron $(2012,2016)$` spans that DO
+belong to X-08 sit in a different residual class and are not among A2's thirty.
 
 ```text
 to re-ask    now that both are definable, does CIT-EXCL-01 still choose (a)?
-             leading_gloss needs no upstream work and could be implemented;
-             conversion_artifact genuinely cannot until X-08.
-             The two may no longer belong in the same disposition.
+             Neither is blocked by X-08 any more, so the original ground for
+             deferring conversion_artifact has gone. Both could be implemented
+             from their cases; whether they SHOULD be is the normative call.
 ```
 
 Not re-decided here. Flagged because a decision resting on a premise that has

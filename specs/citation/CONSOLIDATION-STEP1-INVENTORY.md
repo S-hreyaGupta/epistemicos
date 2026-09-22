@@ -129,10 +129,13 @@ table, carrying a count and no rule. That is 14 of rc3's 30 exclusions, and it
 is now an `UNRESOLVED` row needing a normative decision rather than more
 evidence.
 
-`conversion_artifact` may be a forward reference: rc2 X-08 defers
-`ConversionArtifactAnnotations / conversion repair` entirely. If so the reason
-name was written against work that does not exist yet, which is worth Alex
-Zamurko confirming rather than my assuming.
+`conversion_artifact` was read here as a possible forward reference to rc2
+X-08, which defers `ConversionArtifactAnnotations / conversion repair`.
+**Refuted 22 September**, once the case-level residual was recovered: A2's
+three are `MBSR`, an ethics approval code and `McMindfulness`, none of which
+needs conversion repair. The math-wrapped spans that genuinely are X-08's
+business sit in a different residual class and are not among A2's thirty.
+`A2-EXCLUSION-EVIDENCE.md` has the correction.
 
 And one thing it confirms. rc2 X-07 defers "comma-containing organization
 authors" by name, and C-036 makes it a conformance case: "unsupported

@@ -11,32 +11,56 @@ arithmetic.
 
 ## `conversion_artifact` — defined by its three cases
 
-All three are one shape. The residual files them under a section headed
-**"UPSTREAM CONVERSION — fix before Citation sees the text"**.
+**CORRECTED 22 September. The first version of this section identified the
+wrong three cases, and the correction matters because the wrong version was
+sent to Alex Zamurko and used to confirm a guess of his.**
+
+The residual has TWO groups of three that both mention conversion, in
+different classes, and the first reading took the wrong one:
 
 ```text
-77.  4918fd7d [19437:19448]   (2012,2016)
-78.  4918fd7d [38239:38250]   (2012,2016)
-79.  50408397 [27081:27092]   (2012,2014)
+class 4   UPSTREAM CONVERSION — fix before Citation sees the text     3
+          Baron $(2012,2016)$ and two more like it. NOT part of the 30.
+class 5   conversion artifact                                         3
+          inside "NOT CITATIONS — come out of the denominator — 30"
 ```
 
-> Additional work by Baron `$(2012,2016)$`, which focused on the effects of
-> extensive leader action learning programs, showed that [...]
-
-The PDF-to-Markdown conversion wrapped the year parenthetical in LaTeX math
-delimiters. The span is a real citation that the converter damaged, not a
-grammar failure and not something the grammar should learn to read.
+A2's thirty is class 5. So `conversion_artifact` is class 5's three:
 
 ```text
-definition   a candidate span whose detected form exists only because of an
-             upstream conversion defect; here, a year parenthetical wrapped in
-             $...$ by the PDF converter
-disposition  repair upstream, before the extractor sees the text
+102.  4918fd7d [15211:15215]   MBSR
+103.  4918fd7d [50950:50977]   (ECP_150 03_08_2014_A2 OZL)
+104.  4918fd7d [80801:80814]   McMindfulness
 ```
 
-**This confirms the X-08 reading.** Alex Zamurko's guess on 21 September, that
-`conversion_artifact` forward-references rc2 X-08's deferred conversion repair,
-is right: the residual's own section header says the fix belongs upstream.
+> Research has shown that mindfulness programs, such as MindfulnessBased
+> Stress Reduction (**MBSR**; Kabat-Zinn, 1982), benefit mental and physical
+> health [...]
+>
+> The study was approved by the local ethical review board
+> **(ECP_150 03_08_2014_A2 OZL)**.
+
+An acronym, an ethics approval code, and a coined term. Two of the three are
+the gloss half of a `(GLOSS; Author, Year)` parenthetical — structurally the
+same shape as `leading_gloss`, and distinguished from it, as far as the
+evidence shows, by being a single opaque token rather than explanatory prose.
+
+```text
+candidate definition   a single opaque token inside a parenthetical that the
+                       detector proposed and that names no author — an
+                       acronym, an identifier code, a coinage
+```
+
+**The X-08 reading is NOT supported, and was confirmed here in error.** X-08
+defers `ConversionArtifactAnnotations / conversion repair`. `MBSR` and
+`McMindfulness` need no conversion repair; they are correctly converted words
+that happen to sit where a citation sits. Only the ethics code looks like
+conversion debris at all, and even that is a faithful rendering of what the
+manuscript says.
+
+Worth recording that the name is a poor fit for two of its three members,
+which may be why it was never given a rule. Whatever `conversion_artifact`
+was meant to mean, these three are what it counts.
 
 ---
 
@@ -92,7 +116,47 @@ citations to save eleven non-citations.
 
 ---
 
-## A2's thirty does not reconcile with the thirty it came from
+## A2's thirty, reconciled
+
+**Settled 22 September by running the extractor over exactly the nine papers
+behind the 109 residual** — `43338825`, `4918fd7d`, `50408397`, `5da73cf4`,
+`849f8fc6`, `ad1e3ff9`, `c1d56945`, `e1b418a4`, `ea07e5f5`, named in
+`CITATION_CORPUS_RUN_3.md`.
+
+```text
+A2 reason             A2   ours, same nine papers
+────────────────────────────────────────────────────────────────
+url_or_image           8   8   exact
+publisher_metadata     4   4   exact
+leading_gloss         11   0   no rule exists
+conversion_artifact    3   0   no rule exists
+math_expression        3   0   rule exists, never fires
+non_citation_year      1   0   rule exists, never fires
+                      30   12
+```
+
+**`publisher_metadata` 4 is real and independent**, not a relabelling of the
+four page locators it appears to displace. Both it and `url_or_image` reproduce
+to the number on the same corpus, which is as close to confirmation as this
+evidence gets.
+
+So the total holds at 30 for a reason neither reading guessed: **four went out
+and four came in.** The residual's four locators left the exclusion set — two
+to §C's diagnostic class by A2's own note, two because the colon-locator fix
+makes them parse — and four `publisher_metadata` spans came in. The counts
+happen to match.
+
+**Eighteen of the thirty do not reproduce here, in two distinct ways.**
+Fourteen have no rule anywhere in the specification set. The other four are
+different and more interesting: `math_expression` and `non_citation_year` ARE
+implemented, with rules, and fire zero times across all thirteen in-profile
+papers. For `non_citation_year` the extractor already records why — rc3 §F
+gives one instance and no rule, and the obvious rule matches nineteen spans of
+which one is right. One in nineteen is not a rule.
+
+---
+
+## What the two thirties are made of
 
 The residual's class 5, **"NOT CITATIONS — come out of the denominator — 30"**,
 has seven subsections. A2 has six members. Five map one-to-one with identical
@@ -130,15 +194,19 @@ of them:
 > class in §C, not to correct refusal. Including it would double-count those
 > two.
 
-So rc3 removes two cases from the set and the total stays at 30. Either:
+So rc3 removes two cases from the set and the total stays at 30. Two readings
+were offered when this was first written, and **both were wrong**:
 
 ```text
-a)  publisher_metadata is a genuinely separate class that happens to number 4,
-    the two bare locators were dropped as the note says, and the total should
-    read 28
-b)  publisher_metadata is a relabelling of the four locators, in which case it
-    contains the two the note excludes and the note contradicts the table
+a)  publisher_metadata is separate and the total should read 28
+b)  publisher_metadata is a relabelling of the four locators
 ```
+
+The measurement above settles it. `publisher_metadata` is separate — four real
+spans, reproduced exactly — so (b) is out. But the total is still 30 and
+correctly so, because four locators left and four `publisher_metadata` came in,
+which (a) did not consider. The arithmetic works; it is the composition that
+changed.
 
 Not resolvable from these files. Worth saying that `publisher_metadata` is a
 real class independent of this question — this repository's implementation
@@ -152,7 +220,9 @@ is still worth knowing before A2 is treated as arithmetic.
 ## What this changes
 
 ```text
-conversion_artifact   definable now. Confirms the X-08 forward reference.
+conversion_artifact   definable now, and NOT the X-08 forward reference. The
+                      first reading here took class 4's three cases instead of
+                      class 5's, and confirmed a guess it should have refuted.
 leading_gloss         definable now, and NOT by the marker rule this
                       repository had reconstructed.
 A2's total            needs re-deriving, or a note saying which scope each

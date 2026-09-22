@@ -2213,10 +2213,24 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     # excluding ... references already exactly matched by an authoritative
     # citation identity." Ambiguity-reserved indices would be excluded too;
     # nothing reserves any yet, so the set is empty rather than ignored.
+    #
+    # "UNIQUE-reference pool" is load-bearing and was missed when §9.4 first
+    # landed on 21 September. §9.1 builds `by_reference_key` and emits one
+    # `duplicate_reference_key` per key holding two or more entries; a
+    # reference inside such a group has no unambiguous identity, so it can be
+    # neither a repair target here nor an `uncited_reference` under §9.6.
+    #
+    # This corpus has five such groups across four papers, and every one is
+    # two genuinely different works by the same first author in the same year
+    # — `Felfe & Schyns (2006)` beside `Felfe, Schmook & Six (2006)`. APA
+    # disambiguates those with 2006a/2006b and these bibliographies do not, so
+    # `surname|year` really is ambiguous for them rather than defective.
     authoritative = {c["candidate_key"] for c in cits
                      if c["identity_class"] == "unique_reference_match"}
+    unique_keys = {k for k, idx in ref_index_by_key.items() if len(idx) == 1}
     pool = [i for i, r in enumerate(refs)
-            if r["reference_key"] and r["reference_key"] not in authoritative]
+            if r["reference_key"] in unique_keys
+            and r["reference_key"] not in authoritative]
 
     # §9.5's merge qualification needs the suspect entries.
     embedded = [r for r in refs
@@ -2258,6 +2272,32 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     for i, d in enumerate(diagnostics):
         d["index"] = i
         lines.append(d)
+
+    # ---------------------------------------------------------- rc2 §9.6
+    #
+    #     After exact authoritative matches, ambiguity reservation, and
+    #     candidate-level possible-mismatch pairing, emit `uncited_reference`
+    #     for every remaining unique keyed reference.
+    #
+    # `pool` is already that set. It was built unique-keyed and not
+    # authoritatively matched, and §9.4's loop popped every reference it
+    # paired, so what survives is the residual the section asks for. Nothing
+    # is recomputed here, deliberately: a second derivation of "remaining"
+    # could disagree with the first, and then one of them would be wrong
+    # without anything saying which.
+    #
+    # The section's second sentence needs no code. "`unresolved_reference`
+    # rows are never uncited-reference candidates because they have no
+    # authoritative reference identity" — those rows carry no
+    # `reference_key`, so they never entered `ref_index_by_key`, never
+    # appeared in `unique_keys`, and cannot reach the pool. Stated because a
+    # reader should not have to rediscover that the guard is structural.
+    for i, ri in enumerate(pool):
+        lines.append({
+            "type": "uncited_reference", "index": i,
+            "reference_index": ri,
+            "reference_key": refs[ri]["reference_key"],
+        })
 
     # Alex Zamurko, 20 September, amending rc2:
     #

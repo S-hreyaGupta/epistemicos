@@ -133,6 +133,19 @@ CHECKS = {
               "MET", "adjacent digit swap pinned"),
     "C-059": ((), ("§9.4: a person candidate never pairs with a non-person",),
               "MET", "cross-kind pairing refused"),
+    # rc2 §9.6, implemented 22 September. The anti-needle added the night
+    # before caught this entry going stale on its first real occasion: the
+    # NOT verdict was still standing while the behaviour was in the file.
+    #
+    # PARTIAL rather than MET, and for one reason only. The case names three
+    # exclusions; exact matches and mismatch-paired references are pinned,
+    # and so are two more the case implies (unique keys, keyless rows). The
+    # third, ambiguity-reserved references, cannot be exercised because
+    # nothing reserves any yet — C-049 and C-050 are NOT. Claiming MET would
+    # mean claiming a control for an exclusion with no input.
+    "C-061": ((), ("§9.6: a mismatch-paired reference does not reappear",),
+              "PARTIAL",
+              "exact and paired pinned; no reserved refs exist to exclude"),
     "C-060": ((), ("§9.5: merge_suspected is targeted at the candidate",),
               "MET", "both halves pinned: targeted, and it does fire"),
     "C-062": ((), ("exact fails on count",), "MET", "rc2 §9.3"),
@@ -181,7 +194,6 @@ NOT_IMPLEMENTED = {
     **{c: ("ambiguous_author_resolution not implemented",
            "ambiguous_author_resolution")
        for c in ("C-048", "C-049", "C-050", "C-051")},
-    "C-061": ("uncited_reference pool not implemented", "uncited_reference"),
     **{c: ("citation_surface_group_key not implemented",
            "citation_surface_group_key")
        for c in ("C-022", "C-023", "C-024", "C-025")},

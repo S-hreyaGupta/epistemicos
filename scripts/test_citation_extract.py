@@ -1615,6 +1615,87 @@ def main() -> int:
     else:
         ok("§9.4: a paired reference leaves the pool and pairs only once")
 
+    # ------------------- rc2 §9.6, uncited references
+    print("\nrc2 §9.6 — uncited references")
+
+    def unc(body_text, refs):
+        with _tf.TemporaryDirectory() as td:
+            p = Path(td) / "paper.md"
+            p.write_text(HEAD + body_text + refs, encoding="utf-8")
+            lines, _c = ce.run(p, {"ampersand", "segments"})
+        return [l for l in lines if l.get("type") == "uncited_reference"]
+
+    # The residual itself. Nothing in the body matches any entry, so every
+    # keyed entry is left over.
+    u = unc("As shown (Smith, 2020) here.", "\n\n## References\n\n" + PAD)
+    if len(u) != 4:
+        failures.append(f"§9.6: every remaining keyed reference is uncited — "
+                        f"got {len(u)} of 4")
+    elif [x["index"] for x in u] != [0, 1, 2, 3]:
+        failures.append("§9.6: uncited_reference rows are indexed in order")
+    elif [x["reference_index"] for x in u] != [0, 1, 2, 3]:
+        failures.append("§9.6: the pool is built in reference SOURCE order")
+    else:
+        ok("§9.6: every remaining keyed reference is emitted, in source order")
+
+    # "After exact authoritative matches". The cited one must drop out, and
+    # this control is what stops §9.6 being a list of the whole bibliography.
+    u = unc("As shown (Jones, 2019) here.", "\n\n## References\n\n" + PAD)
+    if len(u) != 3:
+        failures.append(f"§9.6: an exactly matched reference is not uncited — "
+                        f"got {len(u)}, expected 3")
+    elif any(x["reference_key"] == "jones|2019" for x in u):
+        failures.append("§9.6: the matched entry appeared in the residual")
+    else:
+        ok("§9.6: an exact authoritative match leaves the pool")
+
+    # "...and candidate-level possible-mismatch pairing". §9.4 popped it, so
+    # it must not reappear here. Without this the same entry is reported twice
+    # under two contradictory headings.
+    u = unc("As shown (Whiteman, 2000) here.",
+            "\n\n## References\n\nWhitman, R. (2000). A paper. J, 1, 1.\n"
+            + PAD)
+    if any(x["reference_key"] == "whitman|2000" for x in u):
+        failures.append("§9.6: a reference paired by §9.4 was ALSO reported "
+                        "uncited; one entry cannot be both")
+    elif len(u) != 4:
+        failures.append(f"§9.6: the four unpaired entries remain — got {len(u)}")
+    else:
+        ok("§9.6: a mismatch-paired reference does not reappear as uncited")
+
+    # "every remaining UNIQUE keyed reference". Two entries sharing a key have
+    # no unambiguous identity, so neither is a residual. Five such groups
+    # exist in the corpus and every one is two different works by the same
+    # first author in the same year.
+    u = unc("As shown (Nobody, 1999) here.",
+            "\n\n## References\n\nJones, K. (2019). First work. J, 1, 1.\n"
+            "Jones, K., and Roe, P. (2019). Second work. J, 2, 1.\n"
+            "Brown, L. (2018). B. J, 2, 1.\nDavis, M. (2017). C. J, 3, 1.\n"
+            "Evans, N. (2016). D. J, 4, 1.\n")
+    if any(x["reference_key"] == "jones|2019" for x in u):
+        failures.append("§9.6: a duplicated key is not a UNIQUE keyed "
+                        "reference and must not be reported uncited")
+    elif len(u) != 3:
+        failures.append(f"§9.6: the three uniquely keyed entries remain — "
+                        f"got {len(u)}")
+    else:
+        ok("§9.6: a duplicated reference key is not a uncited candidate")
+
+    # "unresolved_reference rows are never uncited-reference candidates
+    # because they have no authoritative reference identity." Structural here
+    # — no key, so never in the pool — and pinned anyway, because "it cannot
+    # happen" is what this suite keeps discovering was untrue.
+    u = unc("As shown (Nobody, 1999) here.",
+            "\n\n## References\n\nMalone, T. An untitled entry with no year.\n"
+            + PAD)
+    if any(x.get("reference_key") in (None, "") for x in u):
+        failures.append("§9.6: a keyless reference reached the residual")
+    elif len(u) != 4:
+        failures.append(f"§9.6: only the four keyed entries are uncited — "
+                        f"got {len(u)}")
+    else:
+        ok("§9.6: an unresolved_reference is never a uncited candidate")
+
     print()
     if failures:
         for f in failures:

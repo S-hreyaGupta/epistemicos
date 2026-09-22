@@ -457,6 +457,23 @@ MUTATIONS = [
      "            rule = None",
      "§9.4 surname_edit_distance_1: expected one possible_mismatch"),
 
+    # ------------------------------- rc2 §9.6, the residual
+
+    ("rc2 §9.6: nothing is ever reported uncited",
+     '            "type": "uncited_reference", "index": i,',
+     '            "type": "uncited_reference_DISABLED", "index": i,',
+     "§9.6: every remaining keyed reference is uncited"),
+
+    ("rc2 §9.6: the unique-key filter is removed, so duplicates qualify",
+     "    unique_keys = {k for k, idx in ref_index_by_key.items() if len(idx) == 1}",
+     "    unique_keys = {k for k, idx in ref_index_by_key.items() if len(idx) >= 1}",
+     "§9.6: a duplicated key is not a UNIQUE keyed reference"),
+
+    ("rc2 §9.6: exactly matched references stay in the residual",
+     "            and r[\"reference_key\"] not in authoritative]",
+     "            and r[\"reference_key\"] not in set()]",
+     "§9.6: an exactly matched reference is not uncited"),
+
     ("rc3 B1b: the parenthetical detection site is closed again",
      "        inner = body[c1s + 1:c1e - 1]\n        cut = YEAR_RE.search(inner)",
      "        inner = body[c1s + 1:c1e - 1]\n        cut = None",

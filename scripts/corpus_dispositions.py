@@ -41,6 +41,7 @@ figures on record is not evidence that the findings behind it were dispositioned
 
 from __future__ import annotations
 
+import hashlib
 import pathlib
 import sys
 from collections import Counter
@@ -97,11 +98,10 @@ DISPOSED = {
 # settle. Moving one into DISPOSED needs a document, not an edit here.
 UNDISPOSED_NOTE = {
     ("unresolved_reference", "orphan_line"):
-        "a bibliography line that attached to no entry. Three visibly "
-        "different kinds are mixed in here: continuation lines of a real "
-        "entry, journal boilerplate inside the bibliography span, and entries "
-        "whose year is not parenthesised. Only the second is obviously "
-        "non-blocking",
+        "a bibliography line that attached to no entry. Partitioned below: "
+        "every one traces to rc2 §7.1 rule 1, a blank line closing the open "
+        "entry, and 116 of the 196 are cascade rather than independent "
+        "events. The question for the review is 80 wide, not 196",
     ("unresolved_reference", "entry_start_grammar"):
         "an entry-shaped line rc2 §7.1's guard refused",
     ("unresolved_reference", "no_year"):
@@ -163,6 +163,73 @@ RECALL_DOC = "specs/citation/UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md"
 RECALL_PINNED = {"uncited": 56, "person_matched": 27, "non_person_matched": 3}
 
 
+def canonical_text(path: pathlib.Path, fixes: set, meta: dict) -> str | None:
+    """The exact string every coordinate in the output indexes, or None.
+
+    Reproduces `run`'s three lines — normalise, then rc3 D1's two
+    byte-changing transforms in rc3 §J's pinned order — and then CHECKS the
+    result against the run's own `canonical_sha256` rather than trusting it.
+    A first attempt skipped the transforms and read a string 106 characters
+    from the one the offsets belong to; every line lookup below was quietly
+    off, and 55 of 196 orphans failed to map at all. The hash is what turns
+    that from a silent wrong answer into a refusal.
+    """
+    text = ce.normalise(path.read_bytes())
+    if "ampersand" in fixes:
+        text = text.replace("\\&", "&")
+    if "mathyear" in fixes:
+        text = ce.unwrap_math_years(text)
+    if hashlib.sha256(text.encode("utf-8")).hexdigest() != meta.get(
+            "canonical_sha256"):
+        return None
+    return text
+
+
+def orphan_causes(lines: list, text: str) -> Counter:
+    """Why no entry was open, per rc2 §7.1's own five rules.
+
+    §7.1 emits `orphan_line` in exactly one situation: a non-blank,
+    non-heading line that is neither an ENTRY_START nor an entry candidate,
+    arriving when nothing is open. So the question is never what the text is.
+    It is which of rules 1, 2 and 3 last closed the entry, and that is
+    readable off the line above without re-implementing the walk.
+    """
+    out: Counter = Counter()
+    starts, off = [], 0
+    for ln in text.split("\n"):
+        starts.append(off)
+        off += len(ln.encode("utf-8")) + 1
+    src = text.split("\n")
+    idx = {}
+    for i, s in enumerate(starts):
+        idx[s] = i
+    orphan_rows = []
+    for r in lines:
+        if r.get("type") != "unresolved_reference" or \
+                r.get("reason") != "orphan_line":
+            continue
+        # The record's start is the first non-whitespace byte of its line, so
+        # walk back to the line start rather than assuming they coincide.
+        i = max((j for j, s in enumerate(starts) if s <= r["start"]),
+                default=None)
+        if i is None:
+            out["could not be located in the manuscript"] += 1
+            continue
+        orphan_rows.append(i)
+    seen = set(orphan_rows)
+    for i in orphan_rows:
+        prev = src[i - 1] if i else ""
+        if (i - 1) in seen:
+            out["continuing a run the line above started"] += 1
+        elif not prev.strip(" \t"):
+            out["after a BLANK line, rule 1 closed the entry"] += 1
+        elif ce.HEAD_MD.match(prev) or ce.HEAD_HTML.match(prev):
+            out["after a heading, rule 2 closed the entry"] += 1
+        else:
+            out["after a line that was consumed into an entry"] += 1
+    return out
+
+
 def main() -> int:
     if not CORPUS.is_dir():
         print(f"  corpus not found at {CORPUS}")
@@ -170,6 +237,8 @@ def main() -> int:
 
     groups: Counter = Counter()
     recall: Counter = Counter()
+    causes: Counter = Counter()
+    unreadable: list = []
     by_scope: dict[str, Counter] = {"eleven": Counter(), "extra": Counter()}
     orphan_by_source: dict[str, list[int]] = {}
     refused = []
@@ -199,6 +268,12 @@ def main() -> int:
                 else:
                     recall["person_matched"] += 1
             recall["uncited"] += 1
+
+        ctext = canonical_text(p, set(ce.FIXES), lines[0])
+        if ctext is None:
+            unreadable.append(stem)
+        else:
+            causes.update(orphan_causes(lines, ctext))
 
         source = lines[0].get("references_source")
         refs = orph = 0
@@ -265,18 +340,55 @@ def main() -> int:
     # Mathpix converted badly enough to lose the heading, so "the fallback
     # costs this" and "these papers are in worse shape" predict the same
     # numbers.
-    print("\n  where the orphan lines are, and why this is not yet a cause")
+    print("\n  where the orphan lines are")
     for src in sorted(orphan_by_source):
         r, o = orphan_by_source[src]
         if r + o:
             print(f"    {src:10s} {r:4d} references {o:4d} orphan   "
                   f"{o / (r + o):5.1%} of lines orphaned")
-    print("    The papers needing §4.3's inferred fallback are the same "
-          "papers whose")
-    print("    conversion lost the heading, so the fallback's cost and the "
-          "papers'")
-    print("    condition are confounded. Both readings fit; neither is "
-          "established here.")
+
+    print("\n  why no entry was open, per rc2 §7.1's own five rules")
+    runs = causes["after a BLANK line, rule 1 closed the entry"]
+    if unreadable:
+        # The conclusion below is drawn over whatever loaded. Printing it
+        # above the caveat is how a partial run reads as a whole one, so the
+        # caveat replaces it instead of following it. Found by removing one
+        # of rc3 D1's transforms from the reproduction: twelve of thirteen
+        # papers refused, and the paragraph still said "one rule accounts
+        # for all of them" over the seven that were left.
+        print(f"    NOT ANALYSED. The canonical bytes could not be "
+              f"reproduced for")
+        print(f"    {len(unreadable)} paper(s): {', '.join(unreadable)}.")
+        print(f"    Every line lookup indexes that string, so a partial "
+              f"answer here would")
+        print(f"    be a wrong one rather than a smaller one.")
+    else:
+        for k, n in causes.most_common():
+            print(f"    {n:5d}  {k}")
+    if runs and not unreadable:
+        print(f"\n    One rule accounts for all of them. Rule 1 — a blank "
+              f"line closes the")
+        print(f"    open entry — fires inside bibliographies whose conversion "
+              f"put a blank")
+        print(f"    line in the middle of an entry, and the entry's remaining "
+              f"lines have")
+        print(f"    nothing to attach to. Rule 2 causes none of these and no "
+              f"section opens")
+        print(f"    with one.")
+        print(f"\n    So the review has {runs} decisions, not "
+              f"{sum(causes.values())}. The rest are the")
+        print(f"    cascade: once a line fails to attach, every line after it "
+              f"fails too,")
+        print(f"    until the next ENTRY_START.")
+        print(f"\n    This also dissolves the inferred/detected gap above "
+              f"rather than")
+        print(f"    explaining it away. Both are downstream of the same "
+              f"conversion damage:")
+        print(f"    the papers that lost their heading are the papers with "
+              f"blank lines")
+        print(f"    inside entries. §4.3's fallback is what let them run at "
+              f"all, not what")
+        print(f"    costs them their tails.")
 
     # ---- the one figure the residue notes lean on, re-derived ------------
     pm, npm, unc = (recall["person_matched"], recall["non_person_matched"],
@@ -323,6 +435,18 @@ def main() -> int:
         if key not in groups and key not in DISPOSED:
             problems.append(f"{key} is listed as undispositioned and the "
                             f"corpus produces none of it")
+    if unreadable:
+        problems.append(
+            f"the canonical bytes could not be reproduced for "
+            f"{', '.join(unreadable)}, so the orphan analysis ran over part "
+            f"of the corpus and was suppressed rather than reported small")
+    if causes and sum(causes.values()) != groups.get(
+            ("unresolved_reference", "orphan_line"), 0):
+        problems.append(
+            f"the orphan analysis accounted for {sum(causes.values())} lines "
+            f"and the corpus emitted "
+            f"{groups.get(('unresolved_reference', 'orphan_line'), 0)}. A "
+            f"partition that does not add up is not a partition")
     drift = {k: (RECALL_PINNED[k], recall[k]) for k in RECALL_PINNED
              if RECALL_PINNED[k] != recall[k]}
     if drift:

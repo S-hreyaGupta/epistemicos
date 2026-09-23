@@ -53,6 +53,58 @@ The implementation is faithful to §9.6. That is the problem: the section is
 correctly implemented and the number it produces still does not mean what its
 name says.
 
+## The method has a second blind spot, and it is the quieter one
+
+23 September. This document's test asks whether the surname and year both
+appear inside a single span the extractor emitted as `unresolved_citation`.
+That can only find a citation the extractor **saw and refused**. A citation the
+C1/C2 envelope never opened on produces no span at all, so there is nothing for
+the test to look inside, and the reference lands in the residual looking
+genuinely uncited.
+
+So the residual is now probed a second way, against the body text itself:
+does the surname appear as a word with its year beside it, and does any
+emitted record cover that byte position?
+
+```text
+residual                                          26
+  the surname and year never sit together          19
+  the surname and year DO sit together              7
+    a record covers that position                     4
+    NO record covers it                               3
+```
+
+Word boundaries, not substrings. A first pass matched `le`, `ou` and `dai`
+inside ordinary English and reported 16 rather than 7. Positions are byte
+offsets, which is what every record coordinate is.
+
+**The three are the finding.** Each names a work referred to in the body at a
+position the extractor produced no record of any kind for, so nothing in the
+output says anything was missed there:
+
+```text
+17bef7c6  ajzen|1980        Ajzen and Fishbein (1980; see also Francis et al., 2004)
+4918fd7d  oppenheimer|2009  ... Checks (IMCs); Oppenheimer, Meyvis, & Davidenko, 2009)
+ad1e3ff9  de villiers|2016  | De Villiers and Marques, 2016 |
+```
+
+Three separate shapes, not a category: a year parenthesis carrying a second
+citation, a nested parenthesis inside the candidate, and a table cell. The
+table cell is not evidence that tables are invisible — 31 records come from
+table rows elsewhere in this corpus, so that one is specific to the cell.
+
+This is a quieter failure than the one the rest of this document is about.
+`no_grammar_match` is a wrong outcome that says so. These three say nothing,
+and a reviewer reading the output has no signal at the position. The number is
+pinned in `scripts/corpus_dispositions.py`, and so is the arithmetic: the
+residual is computed by subtraction and again by the probe's own loop, and the
+script refuses if the two disagree.
+
+The honest reading of the 56, then: 30 name a reference the paper cites, 3 more
+name one the paper refers to invisibly, 4 sit where the extractor did emit
+something, and **19 have no trace in the body at all**. Nineteen is the number
+that behaves like the name of the field.
+
 > **These figures replace an earlier version of this document that reported 72
 > and 39.** Those came from a corpus run with only two of the five canonical
 > fixes enabled. The correction is at the bottom, under "How this document was

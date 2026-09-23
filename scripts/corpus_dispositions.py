@@ -142,7 +142,11 @@ UNDISPOSED_NOTE = {
         "grammar could not read. A false reconciliation diagnostic is B3 on "
         "its face. The document states the number and stops short of "
         "classifying it. Re-derived below rather than quoted, because the "
-        "figure moved",
+        "figure moved. The residual is probed a second way below, because the "
+        "document's method can only find a citation the extractor SAW and "
+        "refused: three of the 26 sit at a body position where the surname "
+        "and year are together and NO record of any kind covers them, which "
+        "is a quieter failure than the one the document is about",
     ("missing_reference", None):
         "candidate-level, so it establishes no identity. Partitioned below: "
         "only 9 of the 32 are a plausible author omission. Two are in a "
@@ -224,6 +228,12 @@ RECALL_PINNED = {"uncited": 56, "person_matched": 27, "non_person_matched": 3}
 # one of them was a citation that agreed with its reference. Pinned so the
 # next move is noticed rather than absorbed into a paragraph.
 STRUCTURE_PINNED = {"order": 4, "count": 4}
+
+# The residual sites the extractor says nothing about. Pinned for the same
+# reason as the two above, and with one extra: this number can only be driven
+# down by the envelope opening where it does not today, so a fall is a real
+# improvement and a rise is a regression. Either way it has to be noticed.
+SILENT_SITES_PINNED = 3
 
 
 def canonical_text(path: pathlib.Path, fixes: set, meta: dict) -> str | None:
@@ -653,6 +663,62 @@ def small_group_shapes(lines: list, body: str, section: str) -> Counter:
     return out
 
 
+def residual_probe(lines: list, body: str) -> Counter:
+    """What is left of `uncited_reference` after the recall document's method.
+
+    That method asks whether the reference's surname and year both appear
+    inside a single span the extractor emitted as `unresolved_citation`. It
+    can only find a citation the extractor SAW and refused. A citation the
+    C1/C2 envelope never opened on produces no span, so the method cannot
+    reach it, and the reference falls into the residual looking genuinely
+    uncited.
+
+    So the residual is tested a second way, against the body itself: does the
+    surname appear as a WORD with its year beside it, and is there any record
+    at all over that position? Word boundaries matter — `le`, `ou` and `dai`
+    are substrings of ordinary English, and a substring test counted them.
+    Positions are byte offsets, which is what every record coordinate is.
+
+    Two answers, and they mean opposite things. A site a record already covers
+    is one the extractor saw; whatever it did there is visible in the output.
+    A site no record covers is one the extractor was silent about, and silence
+    is a worse result than `no_grammar_match` — that at least tells a reviewer
+    something was missed.
+    """
+    out: Counter = Counter()
+    covered = []
+    for r in lines:
+        t = r.get("type")
+        if t == "citation":
+            covered.append((r["group_start"], r["group_end"]))
+        elif t in ("unresolved_citation", "excluded_candidate"):
+            covered.append((r["start"], r["end"]))
+    failed = [r["text"].lower() for r in lines
+              if r.get("type") == "unresolved_citation"]
+    low = body.lower()
+    for r in lines:
+        if r.get("type") != "uncited_reference":
+            continue
+        _kind, phrase, year = ce._split_key(r["reference_key"])
+        if any(phrase in s and year in s for s in failed):
+            continue
+        out["residual"] += 1
+        pat = _re.compile(r"(?<![\w-])" + _re.escape(phrase) + r"(?![\w-])")
+        sites = [m for m in pat.finditer(low)
+                 if year in low[max(0, m.start() - 60):m.start() + 120]]
+        if not sites:
+            out["  the surname and year never sit together in the body"] += 1
+            continue
+        out["  the surname and year DO sit together in the body"] += 1
+        off = len(body[:sites[0].start()].encode("utf-8"))
+        if any(s <= off < e for s, e in covered):
+            out["    a record covers that position, so the extractor saw "
+                "it"] += 1
+        else:
+            out["    NO record covers it; the extractor said nothing"] += 1
+    return out
+
+
 def structure_failures(lines: list) -> Counter:
     """What rc2 §9.3's `failed=order` findings actually are.
 
@@ -722,6 +788,7 @@ def main() -> int:
     cover: Counter = Counter()
     orderf: Counter = Counter()
     small: Counter = Counter()
+    resid: Counter = Counter()
     unreadable: list = []
     by_scope: dict[str, Counter] = {"eleven": Counter(), "extra": Counter()}
     orphan_by_source: dict[str, list[int]] = {}
@@ -761,6 +828,7 @@ def main() -> int:
             _b, _sec, *_rest = ce.split_body_and_references(ctext)
             gaps.update(missing_gaps(lines, _sec))
             small.update(small_group_shapes(lines, _b, _sec))
+            resid.update(residual_probe(lines, _b))
         refusals.update(grammar_refusals(lines))
         _a, _d = ambiguity_sources(lines)
         amb.update(_a)
@@ -1080,6 +1148,33 @@ def main() -> int:
     print("    A reference the paper cites, reported as uncited, is a false")
     print("    reconciliation diagnostic. Classifying it is the review's.")
 
+    if resid:
+        print("\n  and the residual, probed against the body instead")
+        for k in ("residual",
+                  "  the surname and year never sit together in the body",
+                  "  the surname and year DO sit together in the body",
+                  "    a record covers that position, so the extractor saw it",
+                  "    NO record covers it; the extractor said nothing"):
+            if resid.get(k):
+                print(f"    {resid[k]:5d}  {k}")
+        silent = resid.get("    NO record covers it; the extractor said "
+                           "nothing", 0)
+        if silent:
+            print(f"    The document's method can only find a citation the "
+                  f"extractor SAW and")
+            print(f"    refused. These {silent} were never made candidates at "
+                  f"all, so no span exists")
+            print("    for it to test and no diagnostic exists for a reviewer "
+                  "to read. Three")
+            print("    separate shapes, not a category: a year parenthesis "
+                  "carrying a second")
+            print("    citation, a nested parenthesis inside the candidate, "
+                  "and a table cell.")
+            print("    Tables are not the cause — 31 records come from table "
+                  "rows elsewhere.")
+            print("    `no_grammar_match` at least says something was missed. "
+                  "This says nothing.")
+
     if refused:
         print("\n  refused by the extractor, deliberately")
         for stem, scope, why in refused:
@@ -1167,6 +1262,25 @@ def main() -> int:
             f"Both notes above quote these. A fall is as much a change as a "
             f"rise and needs the same explanation, because the cheapest way "
             f"to empty this group is to stop running the check")
+
+    # The residual is computed twice, once by subtraction from the recall
+    # figures and once by the probe's own loop. They must agree, or one of
+    # the two blocks is describing a different set of rows than it prints.
+    want_resid = recall["uncited"] - recall["person_matched"] \
+        - recall["non_person_matched"]
+    if resid and resid["residual"] != want_resid:
+        problems.append(
+            f"the residual is {want_resid} by subtraction and "
+            f"{resid['residual']} by the probe's own loop. One of the two "
+            f"blocks above is reporting on a different set of rows than the "
+            f"other, and neither can be trusted until they agree")
+    silent = resid.get("    NO record covers it; the extractor said nothing", 0)
+    if resid and silent != SILENT_SITES_PINNED:
+        problems.append(
+            f"the silent residual sites moved: {SILENT_SITES_PINNED} -> "
+            f"{silent}. A fall means the envelope now opens where it did not, "
+            f"which is worth saying out loud rather than absorbing; a rise "
+            f"means it stopped opening somewhere it used to")
 
     drift = {k: (RECALL_PINNED[k], recall[k]) for k in RECALL_PINNED
              if RECALL_PINNED[k] != recall[k]}

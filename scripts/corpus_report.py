@@ -107,8 +107,13 @@ def main() -> int:
           f"{parsed / denom:.4f}" if denom else "  candidate_parse_rate    n/a")
 
     print("\nreconciliation records")
+    # rc2 §12.2's block order, so the report reads the way the output does.
+    # `duplicate_reference_key` was absent from this list while §9.1 was
+    # unimplemented, which meant the report agreed with the extractor about a
+    # record neither of them produced.
     for t in ("reference", "unresolved_reference", "uncited_reference",
-              "missing_reference", "possible_mismatch", "ambiguous_citation",
+              "missing_reference", "possible_mismatch",
+              "duplicate_reference_key", "ambiguous_citation",
               "author_structure_mismatch"):
         print(f"  {t:26} {types[t]}")
 

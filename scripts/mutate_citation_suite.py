@@ -862,6 +862,43 @@ MUTATIONS = [
      '                  "total_citation_occurrences": n_parsed,',
      "total must equal extracted + unresolved"),
 
+    # rc2 §9.1, implemented 23 September. The groups were computed and never
+    # emitted — five across four papers, zero records.
+    ("rc2 §9.1: duplicate groups are computed and not emitted again",
+     '        for k, idx in ref_index_by_key.items() if len(idx) >= 2]',
+     "        for k, idx in ref_index_by_key.items() if len(idx) >= 3]",
+     "one record per key holding two or more entries"),
+
+    # `cited` hardcoded true passes on the whole corpus: all five real groups
+    # ARE cited. Only the fixture with an uncited duplicate can catch it.
+    ("rc2 §9.1: cited is always true",
+     '         "cited": k in cited_keys}',
+     '         "cited": True}',
+     "a duplicate key no occurrence cites is cited=false"),
+
+    # NO MUTATION for §9.1's `identity_class` restriction on `cited_keys`.
+    # Written, probed, and removed on 23 September because it SURVIVED — and
+    # survived for a reason worth keeping rather than a gap worth filling.
+    #
+    # §8.2 gives `identity_not_resolved` only to keys matching zero references;
+    # a duplicate key matches two or more; so the only class a duplicate key
+    # can reach is `bibliography_key_ambiguous`, which is inside the
+    # restriction. Narrow and wide `cited_keys` are equal for duplicate keys.
+    # Measured: all 17 corpus citations carrying a duplicate key are that
+    # class, and zero candidate-level keys are duplicate keys.
+    #
+    # The restriction stays in the implementation because rc2 states the rule
+    # rather than the coincidence. It gets no mutation here because a mutation
+    # nothing can catch would sit in this file reading as an untested rule,
+    # which is the exact failure this file exists to find.
+
+    # §12.4's order for the block.
+    ("rc2 §12.4: the duplicate block loses its deterministic order",
+     '    duplicates.sort(key=lambda d: (min(d["reference_indices"]),\n'
+     '                                   d["reference_key"].encode("utf-8")))',
+     "    duplicates.reverse()",
+     "orders by smallest member reference_index, not by key"),
+
     # rc2 §14, C-078. The three conditions that do not coincide with "not every
     # citation uniquely matched", each removed on its own. All three are facts
     # about the bibliography, and the old proxy could not see any of them.

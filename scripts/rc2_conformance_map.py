@@ -315,9 +315,18 @@ CHECKS = {
               "both candidates named; rc2 asks for a byte golden"),
     "C-049": ((), ("§8.5: ambiguity-reserved references leave the pool",),
               "MET", "reserved indices emit no uncited_reference"),
-    "C-050": ((), ("§9.6: a duplicated reference key is not a uncited",),
-              "PARTIAL",
-              "no false uncited; duplicate_reference_key not emitted"),
+    # §9.1's record, implemented 23 September. The groups were computed here
+    # from the start — `unique_keys` is their complement and §8.5, §9.4 and
+    # §9.6 all depend on it — and never emitted, so the one thing a reader
+    # needed in order to see why those references were held back was the one
+    # thing missing from the output. Five groups across four papers.
+    #
+    # `cited` gets both branches: every real corpus group is cited, so a field
+    # hardcoded `true` passes the entire corpus and only a fixture catches it.
+    "C-050": ((), ("§9.6: a duplicated reference key is not a uncited",
+                   "§9.1: one record for"),
+              "MET",
+              "the record is emitted, and cited has both branches"),
     # rc2 §9.4 / §9.5, implemented 21 September. These eight sat in
     # NOT_IMPLEMENTED for a full commit after the behaviour landed, which is
     # what the anti-needle guard below now exists to prevent.

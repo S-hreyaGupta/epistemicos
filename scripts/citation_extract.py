@@ -2740,6 +2740,58 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                      if c["identity_class"] == "unique_reference_match"}
     unique_keys = {k for k, idx in ref_index_by_key.items() if len(idx) == 1}
 
+    # rc2 §9.1, implemented 23 September. The duplicate groups were being
+    # COMPUTED here — `unique_keys` is their complement and §8.5, §9.4 and §9.6
+    # all depend on it — and never EMITTED. Five groups across four papers,
+    # zero records, so the one thing a reader needs in order to see why those
+    # references were held back was the one thing the output did not say.
+    #
+    #     For each key with at least two entries emit one
+    #     `duplicate_reference_key`, indices ascending. `cited=true` iff at
+    #     least one extracted occurrence has an authoritative non-null
+    #     `citation_key` equal to that duplicate key; candidate-level
+    #     missing/mismatch keys do not set `cited=true`.
+    #
+    # `cited` is CIT-ARCH-01 once more, and the second sentence is the whole
+    # of it: a candidate-level diagnostic naming this key must not make the
+    # duplicate look cited. So the test is `identity_class`, which only §8.3
+    # sets, and not membership in any candidate-keyed collection.
+    #
+    # The restriction is UNREACHABLE today, and is written anyway. §8.2 gives
+    # `identity_not_resolved` only to keys matching zero references, and a
+    # duplicate key matches two or more, so the only class a duplicate key can
+    # reach is `bibliography_key_ambiguous` — which is in the set. Measured:
+    # all 17 corpus citations carrying a duplicate key are that class, and
+    # zero candidate-level keys are duplicate keys.
+    #
+    # Dropping the restriction would therefore change nothing today. It stays
+    # because "it cannot happen" is what this suite keeps discovering was
+    # untrue, and because rc2 states the rule rather than the coincidence.
+    # The mutation probe has no mutation for it: a mutation that cannot be
+    # caught would sit in that file forever reading as an untested rule.
+    #
+    # §10 lists this among the nine types suppressed when the bibliography is
+    # absent. `refs_out` is empty there, so the loop yields nothing — but the
+    # guard is explicit rather than inherited, for the reason the other eight
+    # are: a later change to `refs_out` should not quietly re-enable a record
+    # §10 forbids.
+    cited_keys = {c["citation_key"] for c in cits
+                  if c["identity_class"] in ("unique_reference_match",
+                                             "bibliography_key_ambiguous")}
+    duplicates = [] if absent else [
+        {"type": "duplicate_reference_key", "index": 0,
+         "reference_key": k,
+         "reference_indices": sorted(idx),
+         "cited": k in cited_keys}
+        for k, idx in ref_index_by_key.items() if len(idx) >= 2]
+    # rc2 §12.4: "smallest member reference_index, then reference_key UTF-8
+    # bytes". Ascending indices are already sorted above, so the first element
+    # IS the smallest — but the sort key says `min()` anyway, because "the
+    # list happens to be sorted" is a property of the line above rather than
+    # of this one, and the two can drift apart.
+    duplicates.sort(key=lambda d: (min(d["reference_indices"]),
+                                   d["reference_key"].encode("utf-8")))
+
     # rc2 §8.5, ambiguity reservation. Two sources, and they behave
     # differently here:
     #
@@ -2875,6 +2927,8 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
         d["index"] = i
     for i, d in enumerate(possible_mismatches):
         d["index"] = i
+    for i, d in enumerate(duplicates):
+        d["index"] = i
 
     for block in (cits,                 # 2
                   unres,                # 3
@@ -2885,7 +2939,7 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                   ambiguous_authors,    # 7
                   missing_refs,         # 8
                   uncited,              # 9
-                  # 10 duplicate_reference_key — §9.1, not implemented
+                  duplicates,           # 10
                   ambiguous_citations,  # 11
                   possible_mismatches,  # 12
                   mismatches):          # 13

@@ -3328,6 +3328,124 @@ def main() -> int:
         ok(f"§11.2: {diag} diagnostic occurrences within {inr} "
            f"identity_not_resolved, counted once each")
 
+    # -------------------------------------------------------- §9.1, C-049/050
+    #
+    # rc2 §9.1's record. The duplicate groups were being COMPUTED — `unique_keys`
+    # is their complement, and §8.5, §9.4 and §9.6 all depend on it — and never
+    # EMITTED. Five groups across four papers, zero records, so the one thing a
+    # reader needs in order to see why those references were held back was the
+    # one thing the output did not say.
+    print("\nrc2 §9.1 — duplicate reference keys")
+
+    DUP = ("\n\n## References\n\n"
+           "Felfe, J. (2006). One work. Journal, 7(1), 1-10.\n\n"
+           "Felfe, J. (2006). A different work. Journal, 8(1), 1-10.\n\n"
+           "Smith, J. (2020). A paper. Journal, 1(1), 1-10.\n")
+
+    def dups_of(body, refs=DUP):
+        p = Path(_tf.mkdtemp()) / "p.md"
+        p.write_bytes((HEAD + body + refs).encode("utf-8"))
+        ls, _c = ce.run(p, {"ampersand"})
+        return ls, [r for r in ls if r.get("type") == "duplicate_reference_key"]
+
+    ls, d = dups_of("As shown (Felfe, 2006) and (Smith, 2020) here.")
+    if len(d) != 1:
+        failures.append(f"§9.1: one record per key holding two or more "
+                        f"entries — got {len(d)}")
+    elif d[0]["reference_indices"] != sorted(d[0]["reference_indices"]):
+        failures.append(f"§9.1: indices ascending — got "
+                        f"{d[0]['reference_indices']}")
+    elif len(d[0]["reference_indices"]) != 2:
+        failures.append(f"§9.1: both members must be named — got "
+                        f"{d[0]['reference_indices']}")
+    else:
+        ok(f"§9.1: one record for {d[0]['reference_key']!r}, indices "
+           f"{d[0]['reference_indices']} ascending")
+
+    # `cited` is CIT-ARCH-01 again. Both branches, because a field hardcoded
+    # to `true` passes on this whole corpus — all five real groups are cited,
+    # so nothing here would have noticed.
+    if d and d[0]["cited"] is not True:
+        failures.append("§9.1: an occurrence authoritatively matching the "
+                        "duplicate key sets cited=true")
+    else:
+        _ls2, d2 = dups_of("As shown (Smith, 2020) alone here.")
+        if len(d2) != 1:
+            failures.append(f"§9.1: the uncited-duplicate fixture produced "
+                            f"{len(d2)} record(s), not one")
+        elif d2[0]["cited"] is not False:
+            failures.append(f"§9.1: a duplicate key no occurrence cites is "
+                            f"cited=false — got {d2[0]['cited']!r}")
+        else:
+            ok("§9.1: cited is true when an occurrence matches the key and "
+               "false when none does, on the same bibliography")
+
+    # rc2's second sentence: "candidate-level missing/mismatch keys do not set
+    # `cited=true`". UNREACHABLE in this implementation, and stated rather than
+    # claimed as a control, because a control that cannot fire is worse than
+    # none — it reads as evidence.
+    #
+    #   missing_reference keys carry identity_class=identity_not_resolved,
+    #   which §8.2 gives only to keys matching ZERO references; a duplicate key
+    #   matches two or more, so the sets are disjoint.
+    #
+    #   possible_mismatch pairs against the unmatched pool, and §9.4 builds
+    #   that pool from unique keys only, so no duplicate-group reference can
+    #   enter it.
+    #
+    # Measured before being relied on: across the corpus, zero candidate-level
+    # keys are also duplicate keys. The structural argument and the count
+    # agree, which is the only reason the argument is recorded rather than
+    # chased.
+    dup_keys = {r["reference_key"] for r in ls
+                if r.get("type") == "duplicate_reference_key"}
+    cand_keys = {r["candidate_key"] for r in ls
+                 if r.get("type") in ("missing_reference", "possible_mismatch")}
+    if dup_keys & cand_keys:
+        failures.append(f"§9.1: a candidate-level key reached a duplicate key "
+                        f"— {dup_keys & cand_keys}. The clause about "
+                        f"cited=true is reachable after all and needs a real "
+                        f"control, not the disjointness argument")
+    else:
+        ok("§9.1: candidate-level keys and duplicate keys are disjoint, so "
+           "rc2's cited=true caveat cannot be violated here")
+
+    # §12.4: "smallest member reference_index, then reference_key UTF-8 bytes".
+    # TWO groups, because with one the block is trivially ordered and a
+    # mutation reversing it is a no-op — that mutation survived until this
+    # fixture existed. The bibliography puts `zeta` before `alpha` so source
+    # order and key order disagree, and only the index rule gives this answer.
+    TWO = ("\n\n## References\n\n"
+           "Zeta, Q. (2001). First group, first member. Journal, 1(1), 1-10.\n\n"
+           "Zeta, Q. (2001). First group, second member. Journal, 2(1), 1-10.\n\n"
+           "Alpha, R. (2002). Second group, first member. Journal, 3(1), 1-10.\n\n"
+           "Alpha, R. (2002). Second group, second member. Journal, 4(1), 1-10.\n")
+    _ls3, d3 = dups_of("As shown (Zeta, 2001) and (Alpha, 2002) here.", refs=TWO)
+    got = [x["reference_key"] for x in d3]
+    if len(d3) != 2:
+        failures.append(f"§12.4: the ordering fixture must produce two "
+                        f"duplicate groups — got {len(d3)}")
+    elif got != ["zeta|2001", "alpha|2002"]:
+        failures.append(f"§12.4: duplicate_reference_key orders by smallest "
+                        f"member reference_index, not by key — got {got}")
+    elif sorted(got) == got:
+        failures.append(f"§12.4: this fixture must distinguish index order "
+                        f"from key order, and {got} is in key order too")
+    else:
+        ok(f"§12.4: {got} — ordered by smallest member index, against "
+           f"alphabetical order of the keys")
+
+    # §10 lists this among the nine suppressed types.
+    p = Path(_tf.mkdtemp()) / "p.md"
+    p.write_bytes((HEAD + "As shown (Felfe, 2006) here.\n\nPlain close.\n")
+                  .encode("utf-8"))
+    ls_abs, _c = ce.run(p, {"ampersand"})
+    if any(r.get("type") == "duplicate_reference_key" for r in ls_abs):
+        failures.append("§10: duplicate_reference_key is suppressed when the "
+                        "bibliography is absent")
+    else:
+        ok("§10: no duplicate_reference_key without a bibliography")
+
     # ------------------------------------------------------------ §14, C-078
     #
     # rc2 §14 lists TWELVE finding conditions that force exit 1, and the list

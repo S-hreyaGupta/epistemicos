@@ -194,10 +194,12 @@ def main() -> int:
 
     # ---- parenthetical, §12 row 3 ----
     print("\nparenthetical")
-    case("one author", "Work follows (Smith, 2020).", ["smith|2020"])
+    case("one author, parenthetical", "Work follows (Smith, 2020).",
+         ["smith|2020"])
     case("two authors with &", "Work follows (Ahnert & Fink, 2008).",
          ["ahnert|2008"])
-    case("et al.", "Work follows (Smith et al., 2020).", ["smith|2020"])
+    case("et al., parenthetical", "Work follows (Smith et al., 2020).",
+         ["smith|2020"])
     case("multi-segment, one occurrence each",
          "Work follows (Ahnert & Fink, 2008; Bartko, 1976).",
          ["ahnert|2008", "bartko|1976"])
@@ -208,10 +210,12 @@ def main() -> int:
 
     # ---- narrative, §12 row 4 ----
     print("\nnarrative")
-    case("one author", "Smith (2020) argues this.", ["smith|2020"])
+    case("one author, narrative", "Smith (2020) argues this.",
+         ["smith|2020"])
     case("and-terminated serial list",
          "Smith, Jones, and Brown (2020) argue this.", ["smith|2020"])
-    case("et al.", "Smith et al. (2020) argue this.", ["smith|2020"])
+    case("et al., narrative", "Smith et al. (2020) argue this.",
+         ["smith|2020"])
     # §12 names this one explicitly, particles included in the key.
     case("particle surname", "van der Maas (2022) argues this.",
          ["van der maas|2022"])
@@ -710,12 +714,14 @@ def main() -> int:
     amp = "As shown (Ahnert \\& Fink, 2008)."
     case("escaped ampersand is invisible without the flag", amp, [],
          want_unres=["no_grammar_match"])
-    case("and parses with it", amp, ["ahnert|2008"], fixes={"ampersand"})
+    case("and the ampersand parses with its flag", amp, ["ahnert|2008"],
+         fixes={"ampersand"})
 
     colon = "As shown (Kunda, 1990: 480) in that work."
     case("colon locator is unresolved without the flag", colon, [],
          want_unres=["no_grammar_match"])
-    case("and parses with it", colon, ["kunda|1990"], fixes={"colon"})
+    case("and the colon parses with its flag", colon, ["kunda|1990"],
+         fixes={"colon"})
     # The digit requirement is what separates a locator from a following
     # author, and it is the whole reason the rule is safe.
     case("colon flag does not swallow a following author",
@@ -850,8 +856,19 @@ def main() -> int:
         ok("§E: a candidate under `## Citation information` is excluded")
 
     # The negative for the envelope: an ordinary section is still in it.
+    #
+    # The live-fixture guard is the whole control. "Nothing was excluded" is
+    # satisfied by a fixture that produced nothing at all, so the citation has
+    # to be shown present before its absence from the excluded list means
+    # anything. Found by a sweep that nulls each emitter in turn
+    # (`scripts/vacuity_sweep.py`); this control survived with the citation
+    # emitter disabled, which is the only way it can fail.
     body, cits, unres, x = doc("As shown (Smith, 2020) here.")
-    if x:
+    if keys(cits) != ["smith|2020"]:
+        failures.append(f"the exclusion negative needs a citation to not "
+                        f"exclude — got {keys(cits)}, so `nothing was "
+                        f"excluded` would hold either way")
+    elif x:
         failures.append(f"an ordinary in-text citation was excluded: "
                         f"{[r['excluded_reason'] for r in x]}")
     else:
@@ -942,6 +959,15 @@ def main() -> int:
     elif s["excluded"] == 0:
         failures.append("A5's denominator control ran on a document with "
                         "nothing excluded, so it would pass either way")
+    # The guard above covers one side of the arithmetic and not the other.
+    # Both identities hold trivially at 0 == 0 + 0, so a document that
+    # excluded something and parsed nothing satisfies the whole control. The
+    # sweep found it: this survived with the citation and unresolved emitters
+    # both disabled.
+    elif s["parsed"] + s["unresolved"] == 0:
+        failures.append("A5's denominator control ran on a document with "
+                        "nothing parsed and nothing unresolved, so both "
+                        "identities hold at zero and neither is tested")
     else:
         ok("A5: the denominator excludes excluded_candidate")
 

@@ -491,6 +491,33 @@ CHECKS = {
               "two-line stream byte-exact; exit 6's reason pinned via §15"),
     "C-079": ((), ("square brackets produce no record",), "MET",
               "out of envelope"),
+
+    # rc2 §4.2 declares four patterns, two in ```text blocks and two in prose.
+    # The impl needles are the two that were inline literals until today: a
+    # pattern nobody can reach is a pattern no control can compare against
+    # rc2's own text, and comparing behaviour alone would let the regex and
+    # the spec drift apart in any way the fixtures happen not to cover.
+    "C-005": (("CLOSING_HASHES = re.compile", "CLEAN_NUMBERING = re.compile"),
+              ("rc2 §4.2 — the standalone heading contract",
+               "clean() does not know about years"), "MET",
+              "all four declared patterns are rc2's, and every negative sits "
+              "beside its repaired positive"),
+
+    # §6.4 states the guarantee over the whole closed enum, not just C-015's
+    # prefix case, so the control is exhaustive over the three reasons.
+    "C-015": ((), ("byte offsets on every unresolved",), "MET",
+              "verbatim and byte-addressed on all three reasons rc2 declares"),
+
+    "C-029": ((), ("rc2 §7.2 — the reference source span",), "MET",
+              "the join is one space, the span is the region between the "
+              "trimmed ends, and rc2 says those two must differ"),
+
+    # The fixture keeps the brackets BELOW §10's dominance threshold on
+    # purpose. A numeric-dominant document aborts at exit 2 and emits no
+    # identity records for a reason that has nothing to do with this case.
+    "C-080": (("def c1_spans",),
+              ("numeric citations produce no identity record",), "MET",
+              "five brackets, no record of any kind, on a run that completed"),
 }
 
 # Not implemented: (reason, anti-needle). Grouped so the shape of what is
@@ -535,18 +562,24 @@ NOT_IMPLEMENTED = {
     # broken". The summary gained `uniquely_matched_works` that morning; a key
     # held by two references was still counted as a unique match. See CHECKS.
 
+    # C-005, C-015, C-029 and C-080 left here on 23 September. All four were
+    # the same NOT: "behaviour is right, nothing pins it", which is the
+    # weakest verdict this file can carry — it is a claim about the suite, and
+    # nobody notices when it stops being true. Each now has a control, and
+    # each control was written the way the rest of today's were: over the
+    # closed set rc2 declares, with a vacuity guard beside it, and with a
+    # mutation proving the named control is the one that bites. See CHECKS.
+    #
+    # C-029's old note read "determinism not byte-pinned; 'byte-identical'
+    # already appears in prose, so it cannot serve as a needle". The note was
+    # about the wrong case. C-029 is rc2 §7.2's reference source span, not
+    # C-083's determinism golden — a reason that names a different case is
+    # how a verdict survives being false.
+
     # No honest anti-needle. Each says why.
-    **{c: ("determinism not byte-pinned; 'byte-identical' already appears in "
-           "prose, so it cannot serve as a needle", None)
-       for c in ("C-029", )},
     **{c: ("outside the pilot scope — rc2 itself marks these OUTSIDE_PILOT, "
            "so no local change can make the verdict stale", None)
        for c in ("C-084", "C-085", "C-086")},
-    "C-005": ("heading contract only partially pinned; 'heading contract' "
-              "already names an existing exit-4 control", None),
-    "C-015": ("verbatim span is kept but not pinned by a control", None),
-    "C-080": ("true but unpinned: numeric citations never become identity",
-              None),
     "C-081": ("the corpus still carries unresolved findings", None),
 }
 

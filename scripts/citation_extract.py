@@ -334,9 +334,16 @@ GUARD = ("et al.", "e.g.", "i.e.", "cf.", "vs.", "Dr.", "Prof.", "Mr.",
          "Vol.", "vol.", "Eq.", "Fig.", "Figs.", "Tab.", "ca.", "ed.",
          "eds.", "approx.", "U.S.", "U.K.")
 
+# rc2 §4.2, the standalone heading contract. All four patterns are named so a
+# control can compare them against rc2's own declared text rather than against
+# a copy of them retyped in the suite. The last two were inline literals inside
+# `headings` and `clean_name` until 23 September, which made the two rc2
+# declares in a ```text block reachable and the two it declares in prose not.
 HEAD_MD = re.compile(r"^(#{1,6})[ \t]+(.*)$")
 HEAD_HTML = re.compile(r"^[ \t]*<h([1-6])(?:[ \t][^>]*)?>(.*?)</h\1>[ \t]*$",
                        re.I)
+CLOSING_HASHES = re.compile(r"(?:[ \t]+#+)?[ \t]*$")
+CLEAN_NUMBERING = re.compile(r"^\d+(\.\d+)*[.)]?[ \t]+")
 REF_NAMES = {"references", "bibliography", "works cited"}
 
 # §10 exit 2, the author-date style guard.
@@ -493,7 +500,7 @@ def normalise(raw: bytes) -> str:
 
 
 def clean_name(name: str) -> str:
-    return re.sub(r"^\d+(\.\d+)*[.)]?[ \t]+", "", name)
+    return CLEAN_NUMBERING.sub("", name, count=1)
 
 
 def headings(text: str) -> list[tuple[int, int, str, int, int]]:
@@ -504,7 +511,10 @@ def headings(text: str) -> list[tuple[int, int, str, int, int]]:
         pos = end + 1
         m = HEAD_MD.match(line)
         if m:
-            name = re.sub(r"(?:[ \t]+#+)?[ \t]*$", "", m.group(2))
+            # "Remove ONE trailing closing-hash match", so count=1. The
+            # pattern is `$`-anchored and a second pass can only match empty
+            # at the new end, so this is the same bytes and the right word.
+            name = CLOSING_HASHES.sub("", m.group(2), count=1)
             out.append((i, len(m.group(1)), clean_name(name), start, end))
             continue
         m = HEAD_HTML.match(line)

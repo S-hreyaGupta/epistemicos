@@ -4185,6 +4185,382 @@ def main() -> int:
         ok(f"§1.3/C-004: {len(long_ref.encode())} bytes of reference is not "
            f"overlong at {len(long_ref)} code points")
 
+    # ------------------------------------------------------------ §4.2, C-005
+    #
+    # "declared heading cases pass/fail deterministically." §4.2 is the whole
+    # standalone heading contract, and everything downstream stands on it:
+    # §4.3 finds the bibliography by walking headings, §4.4 builds section
+    # metadata from a heading stack, §5 makes a heading line a hard sentence
+    # boundary, and §4.2's own last sentence refuses the document outright.
+    # A heading rule one character wrong moves the bibliography boundary, and
+    # nothing errors — the same shape as every other defect found today.
+    #
+    # Two halves.
+    #
+    # rc2 declares four patterns, two in ```text blocks and two in prose. All
+    # four are read out of rc2 and compared to the compiled objects. A pattern
+    # retyped here would agree with the implementation whatever either said,
+    # which is the self-consistency `rc2_declared` exists to avoid.
+    #
+    # Then behaviour, in PAIRS. Every negative sits beside the minimally
+    # repaired positive, because a `headings()` that recognises nothing
+    # satisfies all seven negatives by itself. `#t` must fail AND `# t` must
+    # parse, or this block is green for the wrong reason.
+    print("\nrc2 §4.2 — the standalone heading contract")
+
+    _sp = rc2_spec_path()
+    _s42 = ""
+    if _sp is not None:
+        _full42 = _sp.read_text(encoding="utf-8")
+        if "### 4.2 " in _full42 and "### 4.3 " in _full42:
+            _s42 = _full42.split("### 4.2 ")[1].split("### 4.3 ")[0]
+    declared_re = dict(re.findall(r"^(HEAD_MD|HEAD_HTML) = (.+)$", _s42, re.M))
+    _mc = re.search(r"closing-hash match `([^`]+)`", _s42)
+    if _mc:
+        declared_re["CLOSING_HASHES"] = _mc.group(1)
+    _mn = re.search(r"^(\^\\d\+\(.+)$", _s42, re.M)
+    if _mn:
+        declared_re["CLEAN_NUMBERING"] = _mn.group(1)
+
+    live_re = {"HEAD_MD": ce.HEAD_MD.pattern,
+               "HEAD_HTML": ce.HEAD_HTML.pattern,
+               "CLOSING_HASHES": ce.CLOSING_HASHES.pattern,
+               "CLEAN_NUMBERING": ce.CLEAN_NUMBERING.pattern}
+
+    if len(declared_re) != 4:
+        failures.append(f"§4.2/C-005: only {sorted(declared_re)} could be read "
+                        f"out of rc2 §4.2; the section moved or the parse is "
+                        f"wrong, and either way the comparison below would be "
+                        f"this file against itself")
+    else:
+        drift = [f"{n}\n        rc2  {declared_re[n]}\n        live {live_re[n]}"
+                 for n in sorted(declared_re) if declared_re[n] != live_re[n]]
+        if drift:
+            failures.append("§4.2/C-005: a declared pattern does not match "
+                            "rc2's own text —\n      " + "\n      ".join(drift))
+        else:
+            ok(f"§4.2/C-005: all four patterns are rc2's, character for "
+               f"character")
+
+    def head1(line: str):
+        got = ce.headings(line)
+        return None if not got else (got[0][1], got[0][2])
+
+    for label, bad, good, lvl, name in (
+        ("a hash run needs a space or tab", "#t", "# t", 1, "t"),
+        ("at most six hashes", "####### t", "###### t", 6, "t"),
+        ("HEAD_MD is anchored at column 0", " # t", "# t", 1, "t"),
+        ("the HTML level must close itself", "<h1>t</h2>", "<h1>t</h1>", 1, "t"),
+        ("HTML stops at h6", "<h7>t</h7>", "<h6>t</h6>", 6, "t"),
+        ("HTML must be the whole line", "x <h1>t</h1>", "<h1>t</h1>", 1, "t"),
+        ('attributes need a separator', '<h1class="x">t</h1>',
+         '<h1 class="x">t</h1>', 1, "t"),
+        ("setext `=` is not a heading", "Title\n=====", "# Title", 1, "Title"),
+        ("setext `-` is not a heading", "Title\n-----", "## Title", 2, "Title"),
+    ):
+        if head1(bad) is not None:
+            failures.append(f"§4.2/C-005: {label} — {bad!r} was read as "
+                            f"{head1(bad)}")
+        elif head1(good) != (lvl, name):
+            failures.append(f"§4.2/C-005: {label} — the repaired {good!r} must "
+                            f"still parse, got {head1(good)} want "
+                            f"{(lvl, name)}. Without this the negative above "
+                            f"is satisfied by recognising nothing")
+        else:
+            ok(f"§4.2/C-005: {label} ({bad!r} no, {good!r} yes)")
+
+    for label, line, lvl, name in (
+        ("one trailing hash run comes off", "## Title ##", 2, "Title"),
+        ("hashes need whitespace before them", "## Title#", 2, "Title#"),
+        ("only ONE run comes off", "## Title ## ##", 2, "Title ##"),
+        ("trailing whitespace goes with it", "## Title   ", 2, "Title"),
+        ("residual tags leave the name", "<h2><em>Meth</em>ods</h2>", 2,
+         "Methods"),
+        ("inner whitespace collapses", "<h2>a   b\tc</h2>", 2, "a b c"),
+        ("leading numbering is cleaned", "## 3. Methods", 2, "Methods"),
+        ("nested numbering with a paren", "## 3.1.4) Results", 2, "Results"),
+        ("numbering needs a separator", "## 3.Methods", 2, "3.Methods"),
+        # Surprising and per-rc2: `^\d+(\.\d+)*[.)]?[ \t]+` does not know what
+        # a year is, so a section called `2024 Survey` is cleaned to `Survey`.
+        # Pinned deliberately, so that reading it as a bug has to argue with
+        # rc2 rather than with this file.
+        ("clean() does not know about years", "## 2024 Survey", 2, "Survey"),
+    ):
+        if head1(line) != (lvl, name):
+            failures.append(f"§4.2/C-005: {label} — {line!r} gave "
+                            f"{head1(line)}, want {(lvl, name)}")
+        else:
+            ok(f"§4.2/C-005: {label} ({line!r} -> {name!r})")
+
+    # §4.2's last sentence, both ways round. The refusal alone would be
+    # satisfied by refusing everything.
+    for label, doc, want in (
+        ("two h1 and no h2 is refused", "# A\n\n# B\n", 4),
+        ("two h1 WITH an h2 is allowed", "# A\n\n## S\n\n# B\n", None),
+        ("one h1 and no h2 is allowed", "# A\n\ntext\n", None),
+    ):
+        try:
+            ce.split_body_and_references(ce.normalise(doc.encode("utf-8")))
+            got = None
+        except ce.Abort as a:
+            got = a.args[0]
+        if got != want:
+            failures.append(f"§4.2/C-005: {label} — got "
+                            f"{'exit ' + str(got) if got else 'no abort'}, "
+                            f"want {'exit ' + str(want) if want else 'no abort'}")
+        else:
+            ok(f"§4.2/C-005: {label}")
+
+    # ------------------------------------------------------------ §6.4, C-015
+    #
+    # C-015 is "unsupported prefix uses no_grammar_match with verbatim span |
+    # span/offsets preserved", and §6.4 states the guarantee over the whole
+    # closed enum, not just the prefix case: "Every unresolved record preserves
+    # verbatim candidate text and byte offsets."
+    #
+    # So the control is exhaustive over the enum rather than one case of it,
+    # and every fixture carries multibyte text BEFORE the candidate. An
+    # all-ASCII fixture satisfies "byte offsets" whether the offsets are bytes
+    # or code points, which is the C-003/C-004 trap: a right answer produced
+    # by a wrong unit.
+    print("\nrc2 §6.4 — verbatim text and byte offsets on every unresolved "
+          "reason")
+
+    declared_reasons = [l.strip() for l in rc2_section("6.4") if l.strip()]
+    # A whole multibyte sentence AHEAD of every candidate, in its own
+    # paragraph so no candidate envelope can reach back over it. ü is 2 bytes,
+    # — ’ and ﬁ are 3, so the byte offset of everything after it is 7 past the
+    # code point index and the two can never be confused for each other.
+    #
+    # The first version put the multibyte inside the candidate instead, where
+    # the prefix is pure ASCII and the two offsets coincide — the control
+    # reported failures that were really its own fixture.
+    PRE = "Müller — Beta’s ﬁrst note.\n\n"
+    UNRES = (
+        ("no_grammar_match", PRE + "Their work (following Smith, 2020) here."),
+        ("all_caps_surname", PRE + "The report (OECD, 2024) follows."),
+        ("stopword_surname", PRE + "The Table (2020) shows this."),
+    )
+    # Through `run`, not `extract_citations`. The byte rewrite happens in
+    # `to_byte_coordinates` at the end of the pipeline, so a control that
+    # stops at `extract_citations` reads CODE POINT offsets and would have
+    # reported this case met against the wrong stage. The guard below caught
+    # exactly that on the first run of this block.
+    seen_reasons, drifted = [], False
+    for want_reason, body in UNRES:
+        doc = HEAD + body + REFS
+        text = ce.normalise(doc.encode("utf-8"))
+        pu = Path(_tf.mkdtemp()) / "p.md"
+        pu.write_bytes(doc.encode("utf-8"))
+        lsu, _cu = ce.run(pu, {"ampersand"})
+        unres = [r for r in lsu if r.get("type") == "unresolved_citation"]
+        if len(unres) != 1:
+            failures.append(f"§6.4/C-015: {want_reason} — the fixture emitted "
+                            f"{len(unres)} unresolved records, not one")
+            drifted = True
+            continue
+        u = unres[0]
+        seen_reasons.append(u["reason"])
+        raw = text.encode("utf-8")
+        slice_ = raw[u["start"]:u["end"]].decode("utf-8", "replace")
+        cp_at = text.find(u["text"])
+        byte_at = len(text[:cp_at].encode("utf-8"))
+        if u["reason"] != want_reason:
+            failures.append(f"§6.4/C-015: wanted {want_reason}, got "
+                            f"{u['reason']} for {body!r}")
+        elif byte_at == cp_at:
+            failures.append(f"§6.4/C-015: {want_reason} — the fixture has no "
+                            f"multibyte text before the candidate, so byte "
+                            f"and code point offsets coincide and this case "
+                            f"establishes nothing about the unit")
+        elif u["start"] != byte_at:
+            failures.append(f"§6.4/C-015: {want_reason} start={u['start']}, "
+                            f"and the candidate begins at byte {byte_at} "
+                            f"(code point {cp_at}); §2 says every manuscript "
+                            f"coordinate is a byte offset")
+        elif slice_ != u["text"]:
+            failures.append(f"§6.4/C-015: {want_reason} — the span does not "
+                            f"slice its own text.\n      text  {u['text']!r}\n"
+                            f"      bytes {slice_!r}")
+        else:
+            ok(f"§6.4/C-015: {want_reason} is verbatim and byte-addressed "
+               f"({u['end'] - u['start']} bytes over "
+               f"{len(u['text'])} code points)")
+
+    if not declared_reasons:
+        failures.append("§6.4/C-015: rc2 §6.4's closed enum could not be read; "
+                        "the exhaustiveness claim below would be vacuous")
+    elif drifted:
+        pass
+    elif sorted(seen_reasons) != sorted(declared_reasons):
+        failures.append(f"§6.4/C-015: rc2 closes this enum at "
+                        f"{sorted(declared_reasons)} and the fixtures reach "
+                        f"{sorted(seen_reasons)}. A reason with no fixture is "
+                        f"a reason nothing here pins")
+    else:
+        ok(f"§6.4/C-015: all {len(declared_reasons)} reasons rc2 declares are "
+           f"reached, and no fixture produced one outside the set")
+
+    # ------------------------------------------------------------ §7.2, C-029
+    #
+    # "reference assembly deterministic | line join/source spans exact". §7.2
+    # says two things that pull in opposite directions, and a control that
+    # checks only one of them would be happy with an implementation that got
+    # the other backwards:
+    #
+    #   `assembled` = joined entry text and IS NOT VERBATIM because joins
+    #   insert one space.
+    #
+    #   start/end cover the canonical-byte region from first
+    #   non-horizontal-whitespace byte of the first source line through one
+    #   past the last non-horizontal-whitespace byte of the final source line.
+    #
+    # So `assembled` must NOT equal its own source region, and the region must
+    # still begin and end on non-whitespace. Both are asserted.
+    print("\nrc2 §7.2 — the reference source span")
+
+    wrapped = ("   Smith, J. (2020). A very long title that\n"
+               "\t wraps onto a second line and then\n"
+               "  a third one.  \n")
+    mb = "Müller, K. (2019). Beta — gamma. Journal, 2(2), 2-20.\n"
+    doc29 = (HEAD + "Work by Smith (2020) and Müller (2019) here.\n\n"
+             "## References\n\n" + wrapped + "\n" + mb)
+    p29 = Path(_tf.mkdtemp()) / "p.md"
+    p29.write_bytes(doc29.encode("utf-8"))
+    ls29, _c29 = ce.run(p29, {"ampersand"})
+    refs29 = [r for r in ls29 if r.get("type") == "reference"]
+    raw29 = ce.normalise(doc29.encode("utf-8")).encode("utf-8")
+
+    if len(refs29) != 2:
+        failures.append(f"§7.2/C-029: the fixture must assemble exactly two "
+                        f"references, got {len(refs29)}")
+    else:
+        multi, single = refs29[0], refs29[1]
+        region = raw29[multi["start"]:multi["end"]].decode("utf-8")
+        want_join = " ".join(l.strip(" \t") for l in wrapped.strip("\n").split("\n"))
+        # §7.2 describes a REGION, so the expected value is the raw slab
+        # between the two trimmed ends — inner newlines and the continuation
+        # lines' own indentation included, and the leading three spaces and
+        # trailing two spaces excluded.
+        expect29 = doc29[doc29.index("Smith, J. (2020). A very"):
+                         doc29.index("a third one.") + len("a third one.")]
+        if region[:1] in (" ", "\t") or region[-1:] in (" ", "\t"):
+            failures.append(f"§7.2/C-029: the source region starts or ends on "
+                            f"horizontal whitespace — {region[:1]!r} .. "
+                            f"{region[-1:]!r}")
+        elif region != expect29:
+            failures.append(f"§7.2/C-029: the region is not the slab between "
+                            f"the two trimmed ends.\n      got  {region!r}\n"
+                            f"      want {expect29!r}")
+        else:
+            ok("§7.2/C-029: the span is the byte region between the first and "
+               "last non-whitespace bytes, inner newlines and indentation "
+               "included")
+
+        if multi["assembled"] != want_join:
+            failures.append(f"§7.2/C-029: the join is not one ASCII space per "
+                            f"line.\n      got  {multi['assembled']!r}\n"
+                            f"      want {want_join!r}")
+        elif multi["assembled"] == region:
+            failures.append("§7.2/C-029: `assembled` equals its own source "
+                            "region, and rc2 says it is NOT verbatim because "
+                            "the joins insert a space. A three-line entry that "
+                            "round-trips has not been joined")
+        else:
+            ok("§7.2/C-029: three lines join on one ASCII space, and the "
+               "result is deliberately not its own source text")
+
+        # The single-line multibyte entry: here `assembled` and the region DO
+        # coincide, so the span length is the only thing that separates bytes
+        # from code points.
+        span = single["end"] - single["start"]
+        cps = len(single["assembled"])
+        if span == cps:
+            failures.append(f"§7.2/C-029: the multibyte entry spans {span} "
+                            f"units for {cps} code points; a byte region over "
+                            f"`Müller ... —` cannot be the same number")
+        elif span != len(single["assembled"].encode("utf-8")):
+            failures.append(f"§7.2/C-029: span {span} is neither the code "
+                            f"point count {cps} nor the byte count "
+                            f"{len(single['assembled'].encode('utf-8'))}")
+        else:
+            ok(f"§7.2/C-029: the multibyte entry spans {span} bytes over "
+               f"{cps} code points")
+
+    # ------------------------------------------------------------ C-080
+    #
+    # "numeric citations never become identity records | only style detector
+    # behavior."
+    #
+    # The trap here is the obvious fixture. A document written entirely in
+    # numeric style trips §10's style detector and aborts with exit 2 — so it
+    # emits no identity records for a reason that has nothing to do with C-080,
+    # and the case would read green on an implementation that happily turned
+    # `[1]` into `one|1`. The fixture below keeps the numeric brackets BELOW
+    # the dominance threshold, so the run completes normally and the claim is
+    # about the envelope rather than about the abort.
+    print("\nrc2 C-080 — numeric citations produce no identity record")
+
+    body80 = ("Prior work [1] and later work [2, 3] are relevant.\n\n"
+              "A study (Smith, 2020) confirms it, and Jones (2019) agrees.\n\n"
+              "Others [4]–[6] report the same, see also [7].\n")
+    refs80 = ("\n\n## References\n\n"
+              "Smith, J. (2020). A paper. Journal, 1(1), 1-10.\n\n"
+              "Jones, A. (2019). Another. Journal, 2(2), 2-20.\n")
+    p80 = Path(_tf.mkdtemp()) / "p.md"
+    p80.write_bytes((HEAD + body80 + refs80).encode("utf-8"))
+    try:
+        ls80, _c80 = ce.run(p80, {"ampersand"})
+        aborted = None
+    except ce.Abort as a:
+        ls80, aborted = [], a.args[0]
+
+    raw80 = ce.normalise((HEAD + body80 + refs80).encode("utf-8")).encode("utf-8")
+    bracket_spans = [(m.start(), m.end()) for m in
+                     re.finditer(rb"\[[0-9,\s]+\]", raw80)]
+    occ80 = [r for r in ls80 if r.get("type") in ("citation",
+                                                  "unresolved_citation")]
+    id80 = [r for r in ls80 if r.get("type") == "citation"]
+
+    if aborted is not None:
+        failures.append(f"§10/C-080: the fixture aborted with exit {aborted}. "
+                        f"A numeric-dominant document proves nothing about "
+                        f"C-080 — the style detector stopped the run before "
+                        f"any identity record could exist")
+    elif len(bracket_spans) != 5:
+        # [1] [2, 3] [4] [6] [7]. A fixed count, so a fixture edited later
+        # cannot quietly shrink what this block is asserting over.
+        failures.append(f"§10/C-080: expected five numeric brackets in the "
+                        f"fixture, found {len(bracket_spans)}")
+    elif not id80:
+        failures.append("§10/C-080: the fixture produced no citation at all, "
+                        "so 'no numeric citation became one' is free")
+    else:
+        # The two record types carry different span fields: an occurrence has
+        # `group_start`/`group_end`, an unresolved candidate has `start`/`end`.
+        # Reading only one of them would leave the other type free to overlap
+        # a bracket unobserved.
+        def span80(r):
+            if "group_start" in r:
+                return r["group_start"], r["group_end"]
+            return r["start"], r["end"]
+
+        touching = [(r["type"], r.get("text") or r.get("author_phrase"),
+                     span80(r))
+                    for r in occ80
+                    for (bs, be) in bracket_spans
+                    if span80(r)[0] < be and bs < span80(r)[1]]
+        if touching:
+            failures.append(f"§10/C-080: a record overlaps a numeric bracket "
+                            f"span — {touching[0]}")
+        elif keys(id80) != ["smith|2020"]:
+            failures.append(f"§10/C-080: the author-date citation beside the "
+                            f"brackets must still parse, got {keys(id80)}")
+        else:
+            ok(f"§10/C-080: {len(bracket_spans)} numeric brackets produced no "
+               f"record of any kind, and the author-date citation beside them "
+               f"still resolves")
+
     print()
     if failures:
         for f in failures:

@@ -1139,6 +1139,76 @@ MUTATIONS = [
      "            if not isinstance(v, int) or not 0 <= v < len(table):\n"
      "                continue\n            if False:",
      "an out-of-range coordinate was accepted"),
+
+    # ---------------------------------------------------------------- C-005.
+    # §4.2 is the contract every later section stands on, and all four of
+    # these are silent: the document still parses, the bibliography boundary
+    # just moves.
+    ("rc2 §4.2/C-005: a hash run no longer needs whitespace after it",
+     'HEAD_MD = re.compile(r"^(#{1,6})[ \\t]+(.*)$")',
+     'HEAD_MD = re.compile(r"^(#{1,6})[ \\t]*(.*)$")',
+     "a hash run needs a space or tab"),
+
+    ("rc2 §4.2/C-005: the HTML heading no longer has to close its own level",
+     'r"^[ \\t]*<h([1-6])(?:[ \\t][^>]*)?>(.*?)</h\\1>[ \\t]*$"',
+     'r"^[ \\t]*<h([1-6])(?:[ \\t][^>]*)?>(.*?)</h[1-6]>[ \\t]*$"',
+     "the HTML level must close itself"),
+
+    ("rc2 §4.2/C-005: the h1 refusal needs three h1 headings, not two",
+     "    if sum(1 for h in heads if h[1] == 1) >= 2 and \\",
+     "    if sum(1 for h in heads if h[1] == 1) >= 3 and \\",
+     "two h1 and no h2 is refused"),
+
+    ("rc2 §4.2/C-005: closing hashes stay in the heading name",
+     '            name = CLOSING_HASHES.sub("", m.group(2), count=1)',
+     "            name = m.group(2)",
+     "one trailing hash run comes off"),
+
+    # ---------------------------------------------------------------- C-015.
+    # Surgical on purpose. Removing `start`/`end` from OFFSET_FIELDS would take
+    # a dozen controls red and prove nothing about which one was watching the
+    # unresolved records; skipping exactly that record type leaves C-015 as the
+    # only thing standing between this and a silent unit change.
+    ("rc2 §6.4/C-015: unresolved candidates keep code point offsets",
+     "    table = byte_offsets(text)\n    for rec in records:",
+     "    table = byte_offsets(text)\n    for rec in records:\n"
+     '        if rec.get("type") == "unresolved_citation":\n            continue',
+     "the candidate begins at byte"),
+
+    # `"reason": reason` on the end is what makes this the unresolved builder
+    # rather than the excluded-candidate one four lines below it, which opens
+    # with the same six keys.
+    ("rc2 §6.4/C-015: the unresolved span stops one short of its own text",
+     '        "text": body[start:end], "start": start, "end": end, '
+     '"reason": reason,',
+     '        "text": body[start:end - 1], "start": start, "end": end, '
+     '"reason": reason,',
+     "does not slice its own text"),
+
+    # ---------------------------------------------------------------- C-029.
+    ("rc2 §7.2/C-029: wrapped lines join on two spaces",
+     '        assembled = " ".join(parts)',
+     '        assembled = "  ".join(parts)',
+     "the join is not one ASCII space per line"),
+
+    ("rc2 §7.2/C-029: the entry span keeps the line's own indentation",
+     "        span = (base + off, base + off + len(stripped))",
+     "        span = (base + lstart, base + lend)",
+     "starts or ends on horizontal whitespace"),
+
+    # ---------------------------------------------------------------- C-080.
+    # One conceptual change — numeric brackets enter the C1 envelope — and it
+    # takes both halves of `c1_spans`, because square brackets carry a
+    # reference NUMBER where the envelope asks for a year. An implementation
+    # that widened only the delimiter would still find nothing, which is the
+    # reason this mutation is a single substitution over both lines.
+    ("rc2 C-080: numeric brackets enter the C1 envelope",
+     '    for m in re.finditer(r"\\([^()]*\\)", body):\n'
+     "        if YEAR_RE.search(m.group(0)):",
+     '    for m in re.finditer(r"[(\\[][^()\\[\\]]*[)\\]]", body):\n'
+     "        if YEAR_RE.search(m.group(0)) or "
+     'm.group(0).startswith("["):',
+     "overlaps a numeric bracket span"),
 ]
 
 # The STOP mutation needs to empty the set rather than edit its opening line.

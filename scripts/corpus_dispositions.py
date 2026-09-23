@@ -126,8 +126,11 @@ UNDISPOSED_NOTE = {
         "classifying it. Re-derived below rather than quoted, because the "
         "figure moved",
     ("missing_reference", None):
-        "candidate-level, so it establishes no identity. Whether the "
-        "occurrences behind it are real gaps is unexamined",
+        "candidate-level, so it establishes no identity. Partitioned below: "
+        "only 9 of the 32 are a plausible author omission. Two are in a "
+        "bibliography line the reference grammar refused, three are a "
+        "surname the manuscript itself spells two ways, and 18 name a "
+        "surname the references section does carry under a different year",
     ("possible_mismatch", "surname_edit_distance_1"):
         "rc2 §9.4's first repair rule",
     ("possible_mismatch", "year_adjacent"):
@@ -287,6 +290,60 @@ def grammar_refusals(lines: list) -> Counter:
     return out
 
 
+def _flat(s: str) -> str:
+    return _re.sub(r"[^0-9a-zà-ÿ]", "", s.lower())
+
+
+def missing_gaps(lines: list, section: str) -> Counter:
+    """Is the work a `missing_reference` names actually absent?
+
+    `missing_reference` says a citation's candidate key matched no reference.
+    It does not say the paper failed to list the work, and the difference is
+    the whole question for the review: an author's omission is the paper's
+    problem, a reference the extractor could not read is ours.
+
+    Mirrors UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md's method in the other
+    direction, and orders the tests so the narrowest explanation wins.
+
+    THE THIRD GROUP IS NOT A DEFECT, AND IT LOOKS EXACTLY LIKE ONE
+    -------------------------------------------------------------
+    Three keys differ from a real reference key only by punctuation:
+    `kabatzinn|2003` against `kabat-zinn|2003`, and the same for
+    `donaldson-feilder`. That reads as the two sides normalising hyphens
+    differently, which would be a reconciliation defect on both sides at
+    once.
+
+    It is not. The manuscript itself carries both spellings — `Kabat-Zinn,
+    2003` in four places and `KabatZinn, 2003` in one — so the conversion
+    dropped the hyphen in a single occurrence and the extractor is reporting
+    that occurrence accurately. Checked in the canonical bytes before the
+    conclusion was written, because every field in the output agrees with the
+    defect reading and only the manuscript disagrees.
+    """
+    out: Counter = Counter()
+    secflat = _flat(section)
+    refkeys = {r["reference_key"] for r in lines
+               if r.get("type") == "reference" and r.get("reference_key")}
+    flatrefs = {_flat(k) for k in refkeys}
+    refused = [r["text"].lower() for r in lines
+               if r.get("type") == "unresolved_reference"]
+    for r in lines:
+        if r.get("type") != "missing_reference":
+            continue
+        ck = r["candidate_key"]
+        _kind, phrase, year = ce._split_key(ck)
+        if _flat(ck) in flatrefs:
+            k = "same work, the two sides spell the surname differently"
+        elif any(phrase in t and year in t for t in refused):
+            k = "in a bibliography line the reference grammar refused"
+        elif _flat(phrase) in secflat:
+            k = "surname IS in the references section, this year is not"
+        else:
+            k = "surname appears nowhere in the references section"
+        out[k] += 1
+    return out
+
+
 def main() -> int:
     if not CORPUS.is_dir():
         print(f"  corpus not found at {CORPUS}")
@@ -296,6 +353,7 @@ def main() -> int:
     recall: Counter = Counter()
     causes: Counter = Counter()
     refusals: Counter = Counter()
+    gaps: Counter = Counter()
     unreadable: list = []
     by_scope: dict[str, Counter] = {"eleven": Counter(), "extra": Counter()}
     orphan_by_source: dict[str, list[int]] = {}
@@ -332,6 +390,8 @@ def main() -> int:
             unreadable.append(stem)
         else:
             causes.update(orphan_causes(lines, ctext))
+            _b, _sec, *_rest = ce.split_body_and_references(ctext)
+            gaps.update(missing_gaps(lines, _sec))
         refusals.update(grammar_refusals(lines))
 
         source = lines[0].get("references_source")
@@ -459,6 +519,16 @@ def main() -> int:
           "envelope catching")
     print("    prose, which C-010 and C-011 make the correct outcome rather "
           "than a drop.")
+
+    if gaps:
+        print("\n  missing_reference, is the work really absent?")
+        for k, n in gaps.most_common():
+            print(f"    {n:5d}  {k}")
+        print("    Only the last group is a plausible author omission. The "
+              "other three are")
+        print("    the extractor or the conversion, and each is a narrower "
+              "question than")
+        print("    \"are these 32 real\".")
 
     # ---- the one figure the residue notes lean on, re-derived ------------
     pm, npm, unc = (recall["person_matched"], recall["non_person_matched"],

@@ -598,7 +598,21 @@ NOT_IMPLEMENTED = {
     **{c: ("outside the pilot scope — rc2 itself marks these OUTSIDE_PILOT, "
            "so no local change can make the verdict stale", None)
        for c in ("C-084", "C-085", "C-086")},
-    "C-081": ("the corpus still carries unresolved findings", None),
+    # Still NOT, and the reason is now a number instead of an impression.
+    # `corpus_dispositions.py` asks the one mechanical question C-081 rests
+    # on: does a document state a disposition for this finding group, and
+    # does it cite a rule. 461 of 480 findings carry none, across 14 groups.
+    #
+    # rc2's classification rule is explicit that an undocumented expectation
+    # is not a waiver, so the residue cannot be read as non-blocking by
+    # default. Whether each group is blocking is a freeze-review judgement
+    # and stays there; what changed today is that the review can see what it
+    # is being asked to rule on.
+    #
+    # No anti-needle. The verdict turns on documents that do not exist yet,
+    # and a needle cannot watch for an absence.
+    "C-081": ("461 of 480 corpus findings carry no disposition; run "
+              "scripts/corpus_dispositions.py", None),
 }
 
 

@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import hashlib
 import pathlib
+import re as _re
 import sys
 from collections import Counter
 
@@ -109,8 +110,10 @@ UNDISPOSED_NOTE = {
         "but no document says so over this corpus",
     ("unresolved_citation", "no_grammar_match"):
         "the largest citation-side class. C-010 and C-011 make it the correct "
-        "outcome rather than a silent drop; whether 121 of them is an "
-        "accepted limitation is the open question",
+        "outcome rather than a silent drop. Partitioned below by the first "
+        "declared production that refuses each span: 25 of the 121 are the "
+        "envelope catching prose with no author in it, and the rest are "
+        "grammar questions rc3 already names",
     ("unresolved_citation", "stopword_surname"):
         "rc2 §6.3's named outcome",
     ("unresolved_citation", "all_caps_surname"):
@@ -230,6 +233,60 @@ def orphan_causes(lines: list, text: str) -> Counter:
     return out
 
 
+def grammar_refusals(lines: list) -> Counter:
+    """Which declared production refuses each `no_grammar_match` span.
+
+    Same method as the orphan partition: ask rc2's own machinery why, rather
+    than sorting the text by eye into categories this file invented. Every
+    test below is a production the specification declares — YEAR, INITIALS,
+    CORE, the closed STOP set, §7.4's non-person head — and the order is
+    first-failure, so a span is reported against the earliest thing that
+    refuses it.
+
+    ONE GROUP IS NAMED FOR AN ASYMMETRY, NOT A CAUSE
+    ------------------------------------------------
+    `non_person_head` accepts `BIS` and `Citizenship report P&G India
+    subcontinent`, which are organisations. It also accepts
+    `Ulker Demirel & Ciftci` and `Saeed & Binti Abdul Ghani Azmi`, which are
+    people with multi-token surnames. Both land in one group because §7.4's
+    reference-side path is what admits both, and that asymmetry — the
+    reference side accepts the head, the citation side refuses it — is the
+    true statement available here.
+
+    Calling the group "non-person" would have been the day's recurring
+    defect in miniature: a label that is accurate about the test and wrong
+    about the finding. Separating the organisations from the multi-token
+    surnames needs rc3 B1a's surname production, which this file does not
+    implement and must not invent.
+    """
+    init_re = _re.compile(rf"^{ce.INITIALS}")
+    year_only = _re.compile(rf"^[\(\s]*{ce.YEAR}[\)\s,.]*$")
+    out: Counter = Counter()
+    for r in lines:
+        if r.get("type") != "unresolved_citation" or \
+                r.get("reason") != "no_grammar_match":
+            continue
+        t = r["text"]
+        inner = t[1:-1] if t.startswith("(") and t.endswith(")") else t
+        head = _re.split(rf"[,(]?\s*{ce.YEAR}", inner)[0].strip(" ,;(")
+        first = _re.split(r"[\s,;:]+", head)[0].lower().rstrip(",;:") if head \
+            else ""
+        if year_only.match(t.strip()) or not head:
+            k = "a year with no author region at all"
+        elif init_re.match(head):
+            k = "opens with INITIALS — rc3 §C3's forename-first limitation"
+        elif not _re.search(ce.CORE, head):
+            k = "no CORE anywhere in the author region"
+        elif first in ce.STOP:
+            k = "opens with a STOP token — §6.3 reduced and the rest refused"
+        elif ce.non_person_head(head):
+            k = "§7.4 accepts this head, §6 refuses it (see the docstring)"
+        else:
+            k = "CORE-opening, not STOP, not §7.4-acceptable, still refused"
+        out[k] += 1
+    return out
+
+
 def main() -> int:
     if not CORPUS.is_dir():
         print(f"  corpus not found at {CORPUS}")
@@ -238,6 +295,7 @@ def main() -> int:
     groups: Counter = Counter()
     recall: Counter = Counter()
     causes: Counter = Counter()
+    refusals: Counter = Counter()
     unreadable: list = []
     by_scope: dict[str, Counter] = {"eleven": Counter(), "extra": Counter()}
     orphan_by_source: dict[str, list[int]] = {}
@@ -274,6 +332,7 @@ def main() -> int:
             unreadable.append(stem)
         else:
             causes.update(orphan_causes(lines, ctext))
+        refusals.update(grammar_refusals(lines))
 
         source = lines[0].get("references_source")
         refs = orph = 0
@@ -389,6 +448,17 @@ def main() -> int:
         print(f"    inside entries. §4.3's fallback is what let them run at "
               f"all, not what")
         print(f"    costs them their tails.")
+
+    print("\n  no_grammar_match, by the first declared production that "
+          "refuses the span")
+    for k, n in refusals.most_common():
+        print(f"    {n:5d}  {k}")
+    print("    Six groups, and only the last two are open questions about "
+          "the grammar.")
+    print("    A year with no author and a span with no CORE are the "
+          "envelope catching")
+    print("    prose, which C-010 and C-011 make the correct outcome rather "
+          "than a drop.")
 
     # ---- the one figure the residue notes lean on, re-derived ------------
     pm, npm, unc = (recall["person_matched"], recall["non_person_matched"],

@@ -63,6 +63,24 @@ serialized field, an emitted record type, a constant it must define — and it
 must be read off the implementation rather than guessed. A word that could
 appear in a sentence about the feature is not an anti-needle, and neither is
 a name nobody has written yet.
+
+A THIRD RULE, and it cost three verdicts on 23 September alone
+--------------------------------------------------------------
+A needle is searched for in SOURCE. So it must be a substring of the source,
+not of what the source prints. Two ways that goes wrong, both hit today:
+
+    f-strings     the control prints "all 109 tokens" and the file reads
+                  `all {len(declared_stop)} tokens`. The needle matched
+                  nothing. Same for `\\&`, which prints as `\&`.
+    line breaks   a message wrapped across two string literals is two
+                  substrings in the file and one in the output. A needle
+                  spanning the break matches nothing.
+
+Each time, the guard did its job and reported NOT ASSESSED rather than
+passing — which is the guard working, not failing. But three in one day is a
+habit rather than an accident, so the rule is written here: before adding a
+needle, grep the source for it. `grep -c -- "<needle>" scripts/<file>.py`
+must print 1.
 """
 
 from __future__ import annotations
@@ -141,14 +159,18 @@ CHECKS = {
     #      candidate keys. rc3 requires them, so a byte golden against rc2
     #      differs on the tail by design and this will not close while both
     #      documents are in force.
-    #   2. `meta` is v3.3's. rc2 §1.1 pins `spec_version = "3.4"` plus
-    #      `citation_rule_version`, `citation_profile` and `mode`; v3.3's meta
-    #      is the whole of `{"type":"meta","spec_version":"3.3"}`. Emitting
-    #      any of them is the output declaring which specification governs it,
-    #      which is a decision for the consolidation and not a formatting fix.
-    "C-068": ((), ("record types lead with the key ",),
+    #   2. `meta` CLOSED on 23 September. rc2 §1.1's four rule-identity
+    #      fields are emitted and the question that held them back turned out
+    #      not to need asking: every rule the extractor runs is rc2's or
+    #      rc3's, so `3.3` was a wrong label rather than an undecided one.
+    #
+    # So C-068 is PARTIAL on (1) alone now, and (1) will not close while both
+    # rc2 and rc3 are in force — rc3 REQUIRES the extra fields.
+    "C-068": (("CITATION_RULE_VERSION = ",),
+              ("record types lead with the key ",
+               "rule version and ET_AL_MIN_AUTHORS"),
               "PARTIAL",
-              "summary closed; meta still declares v3.3, and rc3 adds fields"),
+              "meta and summary closed; rc3's extra fields keep it open"),
     # rc2 §11.1's extraction invariant, executable for the first time on
     # 23 September — `total_citation_occurrences` was among the twelve fields
     # this file did not emit, so the equation had no left-hand side.
@@ -202,8 +224,17 @@ CHECKS = {
     "C-014": ((), ("OECD (2024) is all_caps_surname",), "MET", ""),
     "C-016": (("PREFIX_CUES_CP",), ("the §4 prefix cues still work",), "MET",
               "closed PREFIX set"),
-    "C-018": (("STOP = {",), (), "PARTIAL",
-              "STOP exists; rc2 wants one case per token"),
+    # "one case per token", and rc2 §3.2 calls the list "closed and versioned"
+    # — which is the one situation where testing a sample proves nothing about
+    # the rest. The exhaustive control found five tokens missing from this
+    # file: rc2's last line, panel / column / row / appendix / exhibit, with
+    # zero occurrences anywhere in the corpus. `Panel (2020)` was keying
+    # `panel|2020`, and `As Panel Smith (2020)` was losing a real citation.
+    "C-018": (('"panel", "column", "row", "appendix", "exhibit",',),
+              ("tokens, and no others — this file's",
+               "STOP token leading a candidate must never"),
+              "MET",
+              "one case per token, over rc2's list rather than this file's"),
     "C-021": ((), ("a possessive surname keys to the bare name",), "MET",
               "person candidate only, surface unchanged"),
     # These four were implemented and controlled BEFORE the anti-needle guard

@@ -63,7 +63,37 @@ import tempfile
 import unicodedata
 from pathlib import Path
 
-SPEC_VERSION = "3.3"
+# rc2 §1.1's rule-identity block, adopted 23 September.
+#
+#     spec_version          = "3.4"
+#     citation_profile      = "apa7_like_v1"
+#     citation_rule_version = "citation_v3.4_apa7_like_v1"
+#
+# This said `3.3` until today, and that was not a neutral "undecided" state.
+# The implementation is built from rc2 and rc3 clause by clause — §8.3's
+# table, §9.4, §9.6, §10, §11, §12, §13, §15, and rc3's amendments — so the
+# output was describing a run produced entirely by v3.4's rules under v3.3's
+# name. The label was wrong, and waiting to correct it meant continuing to
+# emit a wrong one.
+#
+# `spec_version` here is rule IDENTITY, not a conformance certificate. rc2
+# §1.1 puts it in the same block as `citation_rule_version`, which is half of
+# the fingerprint tuple `(canonical_manuscript_bytes, citation_rule_version)`
+# that decides whether two runs are comparable at all. What passes and what
+# does not is the conformance map's claim, and it says 71 of 86 plainly.
+#
+# §1.1 also settles that these are not runtime inputs: "citation_profile and
+# ET_AL_MIN_AUTHORS are properties of citation_rule_version; they are not
+# independently selectable." Hence module constants and no CLI flag.
+SPEC_VERSION = "3.4"
+CITATION_PROFILE = "apa7_like_v1"
+CITATION_RULE_VERSION = "citation_v3.4_apa7_like_v1"
+
+# rc2 §12.2: `mode ∈ {standalone_nomap, standalone_map, orchestrated}`, and
+# §2.1 makes the no-map scope the GSD pilot target. rc2 §2.1 also forbids a
+# supplied map in this scope rather than making it optional as rc1 did, which
+# this implementation satisfies by accepting no map argument at all.
+MODE = "standalone_nomap"
 
 # ------------------------------------------------- rc3 §A, the output contract
 #
@@ -250,6 +280,25 @@ STOP = {
     "following", "like", "first", "second", "third", "next", "then", "also",
     "yet", "still", "both", "when", "where", "because", "if", "unless",
     "until", "once",
+    # rc2 §3.2's last line, missing here until 23 September. Five tokens, and
+    # the set is "closed and versioned" — so a divergence is a divergence
+    # whether or not this corpus happens to contain one. It does not: zero
+    # occurrences across the thirteen papers, which is exactly why nothing
+    # caught it and exactly why it would have been found by the first paper
+    # that says "Panel A (Smith, 2020)".
+    #
+    # The behaviour it changes, measured before the fix, and wrong in BOTH
+    # directions:
+    #
+    #     Panel (2020) reports       keyed `panel|2020` — a citation to a work
+    #                                by an author named Panel. `Table (2020)`
+    #                                correctly gives `stopword_surname`.
+    #     As Panel Smith (2020)      no_grammar_match, the real citation LOST.
+    #                                `As Table Smith (2020)` resolves smith|2020
+    #                                because STOP reduction can remove `Table`.
+    #
+    # One invents a citation, the other drops one.
+    "panel", "column", "row", "appendix", "exhibit",
 }
 
 GUARD = ("et al.", "e.g.", "i.e.", "cf.", "vs.", "Dr.", "Prof.", "Mr.",
@@ -2294,6 +2343,14 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                        f"APA")
 
     lines = [{"type": "meta", "spec_version": SPEC_VERSION,
+              "citation_rule_version": CITATION_RULE_VERSION,
+              "citation_profile": CITATION_PROFILE,
+              "mode": MODE,
+              # rc2 declares it in `meta` as well as `summary`, and it is
+              # `null` in the pilot scope, which is the only scope this
+              # implementation runs. §2.1 forbids a supplied map here rather
+              # than making it optional, so there is nothing else it could be.
+              "section_map_sha256": None,
               "implementation": "scripts/citation_extract.py",
               "fixes_applied": sorted(fixes),
               # rc2 §2: "canonical_sha256 is lowercase hexadecimal SHA-256
@@ -3241,13 +3298,14 @@ def to_byte_coordinates(records: list[dict], text: str) -> None:
 #      rc2's keys come first in rc2's order; ours follow. A byte golden
 #      against rc2 would still differ on the tail, which is why C-068 is not
 #      claimed as fully met.
-#   2. It does not settle `meta`'s rule identity. rc2 §1.1 pins
-#      `spec_version = "3.4"`, `citation_profile`, `citation_rule_version` and
-#      `mode`, none of which exists in v3.3, whose `meta` is the whole of
-#      `{"type":"meta","spec_version":"3.3"}`. Emitting any of them is the
-#      output declaring which specification governs it, and that is not a
-#      formatting decision. Raised 23 September; `meta` keeps v3.3's identity
-#      until it is answered, so C-068 stays PARTIAL on `meta` alone.
+#   2. `meta`'s rule identity is SETTLED, 23 September. rc2 §1.1's four
+#      fields are emitted. It was held back on the ground that declaring
+#      which specification governs the output is a decision rather than a
+#      formatting fix — which was true, and led to the wrong conclusion. The
+#      rules this file runs are rc2's and rc3's throughout, so `3.3` was not
+#      an undecided label, it was an inaccurate one, and holding it meant
+#      continuing to emit something wrong while waiting for permission to
+#      make it right.
 #
 # The summary's counts WERE renamed, on 23 September. rc2 calls them
 # `uniquely_matched_occurrences` and `uniquely_matched_works`, and Alex
@@ -3436,7 +3494,12 @@ def main() -> int:
         # go to stdout, so the two destinations never disagree.
         code = ab.code
         payload = serialize([
-            {"type": "meta", "spec_version": SPEC_VERSION},
+            # rc2 §14 gives the error stream its own two-field meta, and the
+            # second field is `citation_rule_version`. Not the full §12.2 meta
+            # — §14 shows exactly these two, so an error artifact identifies
+            # the ruleset that refused the document and nothing else.
+            {"type": "meta", "spec_version": SPEC_VERSION,
+             "citation_rule_version": CITATION_RULE_VERSION},
             {"type": "error", "code": ab.code, "reason": ab.reason}])
 
     # §12.1: UTF-8, LF only. Written through the binary buffer so the

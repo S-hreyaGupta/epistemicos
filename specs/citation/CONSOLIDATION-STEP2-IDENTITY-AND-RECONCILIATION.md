@@ -360,7 +360,7 @@ Two `UNRESOLVED` rows now stand across the whole of Step 2, and neither is a
 conflict between rc1 and rc2:
 
 ```text
-meta's rule identity     which specification the output declares governs it
+meta's rule identity     CLOSED 23 September: the output declares v3.4
                          (CONSOLIDATION-STEP2-SUMMARY-AND-OUTPUT.md)
 identity_class spelling  rc2 §9.2 against rc2 §11
 ```

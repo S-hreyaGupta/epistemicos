@@ -862,6 +862,50 @@ MUTATIONS = [
      '                  "total_citation_occurrences": n_parsed,',
      "total must equal extracted + unresolved"),
 
+    # rc2 §1.1, adopted 23 September. `meta` said v3.3 while every rule the
+    # extractor runs is rc2's or rc3's, so the label was wrong rather than
+    # undecided.
+    ("rc2 §1.1: meta declares v3.3 again",
+     'SPEC_VERSION = "3.4"',
+     'SPEC_VERSION = "3.3"',
+     "rule identity must match rc2's pinned constants"),
+
+    ("rc2 §1.1: the profile drifts from the rule version it belongs to",
+     'CITATION_PROFILE = "apa7_like_v1"',
+     'CITATION_PROFILE = "apa7"',
+     "rule identity must match rc2's pinned constants"),
+
+    # §12.3's declared meta. Dropping `mode` leaves the other seven in order,
+    # so only the declared-FIELDS half of the §12.3 control can see it.
+    ("rc2 §12.3: meta stops naming its execution mode",
+     '              "mode": MODE,\n',
+     "",
+     "rc2 declares fields this file does not emit"),
+
+    # §14's error stream has its own two-field meta, and the second field is
+    # the ruleset that refused the document.
+    ("rc2 §14: the error stream's meta loses its rule version",
+     '            {"type": "meta", "spec_version": SPEC_VERSION,\n'
+     '             "citation_rule_version": CITATION_RULE_VERSION},',
+     '            {"type": "meta", "spec_version": SPEC_VERSION},',
+     "the error stream's meta is exactly type, spec_version"),
+
+    # rc2 §3.2, C-018. The state this file was in until 23 September: five of
+    # rc2's 109 STOP tokens missing, zero corpus occurrences of any of them, so
+    # nothing but an exhaustive check over the closed set could see it.
+    ("rc2 §3.2: rc2's last STOP line goes missing again",
+     '    "panel", "column", "row", "appendix", "exhibit",',
+     "",
+     "the STOP set must equal rc2's closed list"),
+
+    # The two behaviours a STOP token has, each broken on its own. Removing a
+    # token from the middle of the set is the same defect as the five, and the
+    # set-equality control catches it — so these aim at the RULES instead.
+    ("rc2 §6: a STOP first CORE is no longer rejected",
+     '    if core.lower() in STOP:',
+     "    if False:",
+     "STOP token leading a candidate must never become a citation"),
+
     # rc2 §9.1, implemented 23 September. The groups were computed and never
     # emitted — five across four papers, zero records.
     ("rc2 §9.1: duplicate groups are computed and not emitted again",

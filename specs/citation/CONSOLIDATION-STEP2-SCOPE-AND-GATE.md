@@ -257,7 +257,7 @@ Across the whole of Step 2: **no `DROP`**. Two `MOVE`s, both keeping their rule
 normative. Two `UNRESOLVED` rows, neither a conflict between rc1 and rc2:
 
 ```text
-meta's rule identity     which specification the output declares governs it
+meta's rule identity     CLOSED 23 September: the output declares v3.4
 identity_class spelling  rc2 §9.2 against rc2 §11
 ```
 

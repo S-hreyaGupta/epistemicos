@@ -389,24 +389,36 @@ No `DROP`, and no rule lost. Both `MOVE`s keep their rule normative — one
 narrowed from a general statement to two per-field ones, the other relocated
 from §11 to §8.5 beside the mechanism it constrains.
 
-One `UNRESOLVED`, and it is not a conflict between rc1 and rc2:
+One row was UNRESOLVED here and was CLOSED on 23 September:
 
 ```text
-UNRESOLVED   meta's rule identity
+CLOSED   meta's rule identity — the output declares v3.4
 ```
 
 rc2 §1.1 pins `spec_version = "3.4"`, `citation_rule_version =
 "citation_v3.4_apa7_like_v1"`, `citation_profile = "apa7_like_v1"` and `mode`.
 None of the four exists in v3.3, whose `meta` is the whole of
 `{"type":"meta","spec_version":"3.3"}` — which is what this implementation
-emits. So emitting any of them is the output declaring which specification
-governs it, and `citation_rule_version` is half of rc2's own fingerprint tuple
-`(canonical_manuscript_bytes, citation_rule_version)`, which is what decides
-whether two runs are comparable at all.
+emitted until 23 September. `citation_rule_version` is half of rc2's own
+fingerprint tuple `(canonical_manuscript_bytes, citation_rule_version)`, which
+is what decides whether two runs are comparable at all.
 
-That is a normative decision about what the artifact claims, not a formatting
-fix, so it is left for the consolidation rather than taken here. It is the only
-thing keeping C-068 open apart from rc3's additional fields, which rc3 requires
+This was first recorded here as UNRESOLVED, on the ground that declaring which
+specification governs the output is a normative decision rather than a
+formatting fix. That ground was correct and the conclusion drawn from it was
+not. The rules this implementation runs are rc2's and rc3's throughout —
+§8.3's table, §9.4, §9.6, §10, §11, §12, §13, §15, and rc3's amendments — so
+`3.3` was not an undecided label held open pending a decision. It was an
+inaccurate one, and holding it meant continuing to emit something wrong while
+waiting for permission to make it right.
+
+One thing worth separating, because it is the objection that caused the delay:
+`spec_version` is not a conformance certificate. rc2 §1.1 puts it in the
+rule-IDENTITY block, beside `citation_rule_version`. It names the ruleset that
+produced the output. What passes and what does not is the conformance map's
+claim, made separately, and it says 71 of 86 plainly.
+
+So C-068 is now PARTIAL on rc3's additional fields alone, which rc3 requires
 and which will not close while both documents are in force.
 
 The summary's field names were taken, and the ground is on record: Alex

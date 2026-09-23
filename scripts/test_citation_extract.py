@@ -2205,16 +2205,17 @@ def main() -> int:
             # fields this file did not emit. All twenty-one landed on
             # 23 September, so the summary is checked like any other record.
             #
-            # `meta` stays out, and that is a real divergence rather than an
-            # inconvenience. rc2 §1.1 pins `spec_version = "3.4"` plus
-            # `citation_rule_version`, `citation_profile` and `mode`, none of
-            # which exists in v3.3, whose meta is the whole of
-            # `{"type":"meta","spec_version":"3.3"}`. Emitting them is the
-            # output declaring which specification governs it. Ordering a set
-            # that does not match is not the check §12.3 asks for, and
-            # pretending otherwise would make this control pass on a document
-            # nobody could byte-compare.
-            declared_by_type.pop("meta", None)
+            # `meta` came in on 23 September and is no longer excluded. It was
+            # v3.3's one-field form while the question "which specification
+            # does this output declare governs it" was open. The answer turned
+            # out not to need asking: the rules implemented ARE rc2's and
+            # rc3's, so `3.3` was not an undecided label, it was a wrong one.
+            #
+            # rc2's `meta` example carries two forms, the full §12.2 envelope
+            # and §14's two-field error-stream version. Both are keyed `meta`,
+            # so `rc2_declared` keeps the FIRST it meets, which is the full
+            # one. The error stream's shape is checked by §13's own controls.
+            pass
 
         rec_by_type = {}
         for ln in ce.serialize(ls).rstrip(b"\n").split(b"\n"):
@@ -3327,6 +3328,203 @@ def main() -> int:
     else:
         ok(f"§11.2: {diag} diagnostic occurrences within {inr} "
            f"identity_not_resolved, counted once each")
+
+    # ------------------------------------------------------------ §1.1, C-068
+    #
+    # rc2 §1.1's rule-identity constants, read out of §1.1's own block rather
+    # than retyped. `meta` carried v3.3's single field until 23 September, and
+    # that was not a neutral undecided state: every rule the extractor runs is
+    # rc2's or rc3's, so the output was describing a v3.4 run under v3.3's
+    # name. Waiting to correct it meant continuing to emit a wrong label.
+    print("\nrc2 §1.1 — rule identity")
+
+    pinned = {}
+    for ln in rc2_section("1.1"):
+        if "=" in ln:
+            k, _, v = ln.partition("=")
+            pinned[k.strip()] = v.strip().strip('"')
+    want = {"spec_version": ce.SPEC_VERSION,
+            "citation_profile": ce.CITATION_PROFILE,
+            "citation_rule_version": ce.CITATION_RULE_VERSION}
+    if not pinned:
+        failures.append("§1.1: rc2's pinned-constant block was not found, so "
+                        "this control establishes nothing")
+    else:
+        wrong = {k: (pinned.get(k), v) for k, v in want.items()
+                 if pinned.get(k) != v}
+        if wrong:
+            failures.append(f"§1.1: rule identity must match rc2's pinned "
+                            f"constants — (rc2, ours) {wrong}")
+        elif pinned.get("ET_AL_MIN_AUTHORS") != str(ce.ET_AL_MIN_AUTHORS):
+            failures.append(f"§1.1: ET_AL_MIN_AUTHORS is "
+                            f"{pinned.get('ET_AL_MIN_AUTHORS')} in rc2, "
+                            f"{ce.ET_AL_MIN_AUTHORS} here")
+        else:
+            ok(f"§1.1: spec_version {ce.SPEC_VERSION}, profile "
+               f"{ce.CITATION_PROFILE}, rule version and ET_AL_MIN_AUTHORS "
+               f"all match rc2's pinned block")
+
+    # §1.1: "citation_profile and ET_AL_MIN_AUTHORS are properties of
+    # citation_rule_version; they are NOT independently selectable runtime
+    # inputs." So no CLI flag may set any of them.
+    # The ARGPARSE options only. A first version searched the whole of `main`
+    # for the quoted names and went red on the error-stream meta dict, which
+    # names `citation_rule_version` because §14 requires it to. The claim is
+    # "not selectable", so the evidence is the option list, not the file.
+    import inspect as _inspect
+    _cli_src = _inspect.getsource(ce.main) if hasattr(ce, "main") else ""
+    declared_opts = re.findall(r"add_argument\(\s*[\"']([^\"']+)[\"']",
+                               _cli_src)
+    leaked = [o for o in declared_opts
+              if o.strip("-").replace("-", "_") in
+              ("citation_profile", "citation_rule_version", "spec_version",
+               "et_al_min_authors", "profile", "rule_version")]
+    if not declared_opts:
+        failures.append("§1.1: no CLI options were found to inspect, so this "
+                        "control did not run")
+    elif leaked:
+        failures.append(f"§1.1: these are properties of citation_rule_version, "
+                        f"not selectable runtime inputs — the CLI declares "
+                        f"{leaked}")
+    else:
+        ok(f"§1.1: none of the {len(declared_opts)} CLI options selects the "
+           f"profile, rule version or et-al threshold")
+
+    # rc2 §14's error stream has its OWN meta: two fields, not §12.2's eight.
+    #
+    # Through the CLI, reading the BYTES it writes. A first version built the
+    # record itself and handed it to `ce.serialize`, which checks that this
+    # control can construct rc2's shape and says nothing about whether `main`
+    # emits it.
+    _bad = Path(_tf.mkdtemp()) / "bad.md"
+    _bad.write_bytes(b"\xff\xfe not utf-8 at all")
+    _cap, _out, _argv = _BinStdout(), sys.stdout, sys.argv
+    sys.stdout, sys.argv = _cap, [str(Path(ce.__file__)), str(_bad)]
+    try:
+        _code = ce.main()
+    finally:
+        sys.stdout, sys.argv = _out, _argv
+    _stream = _cap.buffer.getvalue().decode("utf-8").splitlines()
+    if _code != 5 or len(_stream) != 2:
+        failures.append(f"§14: invalid UTF-8 is exit 5 and exactly two lines "
+                        f"— got exit {_code}, {len(_stream)} line(s)")
+    else:
+        err_meta = _json.loads(_stream[0])
+        if list(err_meta) != ["type", "spec_version", "citation_rule_version"]:
+            failures.append(f"§14: the error stream's meta is exactly type, "
+                            f"spec_version, citation_rule_version — got "
+                            f"{list(err_meta)}")
+        elif err_meta["citation_rule_version"] != ce.CITATION_RULE_VERSION:
+            failures.append("§14: the error stream must name the ruleset that "
+                            "refused the document")
+        else:
+            ok("§14: invalid UTF-8 writes two lines, and the meta names the "
+               "ruleset that refused the document")
+
+    # ------------------------------------------------------------ §3.2, C-018
+    #
+    # C-018: "every STOP token has deterministic behavior | synthetic suite |
+    # ONE CASE PER TOKEN". Exhaustive, because rc2 §3.2 says the list "is
+    # closed and versioned" and a closed set is the one place where testing a
+    # sample proves nothing about the rest.
+    #
+    # It found five. rc2's last line — panel, column, row, appendix, exhibit —
+    # was never copied into this file, and the corpus contains zero of them,
+    # so nothing else could have noticed. What it costs, measured:
+    #
+    #     Panel (2020) reports     keyed `panel|2020`, a citation to a work by
+    #                              an author named Panel
+    #     As Panel Smith (2020)    no_grammar_match — the real citation lost,
+    #                              where `As Table Smith (2020)` resolves
+    #
+    # One invents a citation and the other drops one.
+    print("\nrc2 §3.2 — every STOP token, one case each")
+
+    _spec_txt = (rc2_spec_path().read_text(encoding="utf-8")
+                 if rc2_spec_path() else "")
+    _m = re.search(r"### 3\.2 Closed STOP set.*?```text\n(.*?)```",
+                   _spec_txt, re.S)
+    declared_stop = set(_m.group(1).split()) if _m else set()
+
+    if not declared_stop:
+        failures.append("§3.2: rc2's STOP block was not found, so the closed "
+                        "set could not be read and this block proves nothing")
+    elif declared_stop != ce.STOP:
+        failures.append(
+            f"§3.2: the STOP set must equal rc2's closed list — "
+            f"in rc2 not ours {sorted(declared_stop - ce.STOP)}, "
+            f"in ours not rc2 {sorted(ce.STOP - declared_stop)}")
+    else:
+        ok(f"§3.2: all {len(declared_stop)} tokens, and no others — this file's "
+           f"set equals rc2's closed list exactly")
+
+        # One case per token, both behaviours rc2 gives a STOP word.
+        #
+        #   §6   a parsed first CORE whose lowercase value is STOP
+        #        -> stopword_surname, never a citation
+        #   §6.3 a leading STOP token is removable, so the phrase behind it
+        #        still resolves
+        #
+        # Tokens ending in `.` are excluded from the second shape only: `Jan.
+        # Smith (2020)` is an initialled forename in APA, not a reduction, and
+        # rc2's own §3.2 normalisation strips a trailing comma/semicolon/colon
+        # but not a period. Stated rather than silently skipped.
+        # rc2 §6 says "a PARSED first CORE whose lowercase value is STOP".
+        # Thirteen of the 109 can never be a parsed CORE at all — the single
+        # letter `a`, and the twelve period-final month abbreviations — so
+        # they reach `no_grammar_match` instead, which is the correct outcome
+        # rather than a defect.
+        #
+        # The partition is by a property of rc2's OWN tokens: one character,
+        # or ending in a period. Not by `ce.CORE`, which would move the buckets
+        # with the implementation and leave the control passing either way.
+        #
+        # What holds for all 109 without exception is the thing that matters:
+        # a STOP token leading a candidate NEVER becomes a citation.
+        bad_cite, bad_reason, bad_reduce, skipped = [], [], [], []
+        for tok in sorted(declared_stop):
+            word = tok[:1].upper() + tok[1:]
+            core_shaped = len(tok) > 1 and not tok.endswith(".")
+            cits, unres, _e = extract(f"{word} (2020) reports this.")
+            if cits:
+                bad_cite.append((tok, keys(cits)))
+            else:
+                want = "stopword_surname" if core_shaped else "no_grammar_match"
+                if not any(u["reason"] == want for u in unres):
+                    bad_reason.append((tok, want,
+                                       [u["reason"] for u in unres]))
+            if not core_shaped:
+                skipped.append(tok)
+                continue
+            cits, _u, _e = extract(f"As {word} Smith (2020) reports this.")
+            if keys(cits) != ["smith|2020"]:
+                bad_reduce.append((tok, keys(cits)))
+
+        if bad_cite:
+            failures.append(f"§6: a STOP token leading a candidate must never "
+                            f"become a citation — {len(bad_cite)} did, "
+                            f"e.g. {bad_cite[:4]}")
+        elif bad_reason:
+            failures.append(f"§6: {len(bad_reason)} STOP token(s) rejected "
+                            f"for the wrong reason, e.g. {bad_reason[:4]}")
+        elif len(skipped) != 13:
+            failures.append(f"§6: expected exactly 13 tokens that cannot be a "
+                            f"parsed CORE — got {len(skipped)}. rc2's list "
+                            f"moved, and the partition needs re-deriving "
+                            f"rather than the count adjusting")
+        else:
+            ok(f"§6: none of the {len(declared_stop)} STOP tokens becomes a "
+               f"citation — {len(declared_stop) - 13} as stopword_surname, "
+               f"13 as no_grammar_match because they cannot be a CORE")
+
+        if bad_reduce:
+            failures.append(f"§6.3: a leading STOP token must be removable so "
+                            f"the phrase behind it still resolves — "
+                            f"{len(bad_reduce)} failed, e.g. {bad_reduce[:4]}")
+        else:
+            ok(f"§6.3: all {len(declared_stop) - len(skipped)} non-abbreviated "
+               f"tokens reduce away, leaving smith|2020 "
+               f"({len(skipped)} tokens that cannot be a CORE, excluded)")
 
     # -------------------------------------------------------- §9.1, C-049/050
     #

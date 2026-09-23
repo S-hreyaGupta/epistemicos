@@ -45,6 +45,7 @@ import hashlib
 import pathlib
 import re as _re
 import sys
+import unicodedata as _ud
 from collections import Counter
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -104,10 +105,13 @@ UNDISPOSED_NOTE = {
         "entry, and 116 of the 196 are cascade rather than independent "
         "events. The question for the review is 80 wide, not 196",
     ("unresolved_reference", "entry_start_grammar"):
-        "an entry-shaped line rc2 §7.1's guard refused",
+        "an entry-shaped line rc2 §7.1's guard refused. Two named shapes, not "
+        "a miscellany: three are a multi-token surname, which is rc3 B1a, and "
+        "two are an initial written without its period",
     ("unresolved_reference", "no_year"):
-        "rc2 §7.3 says emit this and no reference row. Expected by the rule, "
-        "but no document says so over this corpus",
+        "rc2 §7.3 says emit this and no reference row. The one finding is an "
+        "entry carrying a publication state where the year goes, which is a "
+        "bibliographic convention rather than a missing year",
     ("unresolved_citation", "no_grammar_match"):
         "the largest citation-side class. C-010 and C-011 make it the correct "
         "outcome rather than a silent drop. Partitioned below by the first "
@@ -115,9 +119,23 @@ UNDISPOSED_NOTE = {
         "envelope catching prose with no author in it, and the rest are "
         "grammar questions rc3 already names",
     ("unresolved_citation", "stopword_surname"):
-        "rc2 §6.3's named outcome",
+        "rc2 §6.3's named outcome, and not one of them is an author named by "
+        "a stop word. Every one is a correctly written citation behind a "
+        "lead-in adverb, and every one parses once the lead-in comes off. "
+        "§6.3 attempts STOP reduction only when the full phrase FAILS the "
+        "grammar, and one word decides whether it does. Paper e1b418a4 "
+        "carries both halves: `Indeed, Lind` is a comma pair with no joiner, "
+        "which the narrative grammar rejects, so it reduces and resolves, "
+        "while `Indeed, Lind and van den Bos` is a valid three-name serial "
+        "list that has swallowed the lead-in as name one, so it parses, "
+        "never reduces, and §6.3's last line refuses it. Same word, same "
+        "comma, same paper, and the `and` is the whole difference",
     ("unresolved_citation", "all_caps_surname"):
-        "rc2 §6.2's named outcome, and C-014 pins it",
+        "rc2 §6.2's named outcome, and C-014 pins it. Reached only after rc3 "
+        "B1b's non-person path declines, and it declined for all three "
+        "because the organisation appears in no reference row. So these are "
+        "the non-person shape of a missing reference, not a grammar refusal, "
+        "and CIT-ARCH-01 is what makes that the right outcome",
     ("uncited_reference", None):
         "UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md identifies a large share of "
         "these as naming a reference the paper DOES cite, in a span the "
@@ -132,11 +150,22 @@ UNDISPOSED_NOTE = {
         "surname the manuscript itself spells two ways, and 18 name a "
         "surname the references section does carry under a different year",
     ("possible_mismatch", "surname_edit_distance_1"):
-        "rc2 §9.4's first repair rule",
+        "rc2 §9.4's first repair rule, and all four pairings are the same "
+        "author under two spellings: a diacritic, a hyphen, and two dropped "
+        "letters. The rule is working. The open question is the one rc2 "
+        "leaves open in terms, that the pairing establishes no identity, so "
+        "four citations stay unresolved against references that are present",
     ("possible_mismatch", "year_adjacent"):
-        "rc2 §9.4's second repair rule",
+        "rc2 §9.4's second repair rule. Both are a one-year disagreement "
+        "between the body and the bibliography, which is a manuscript fact "
+        "rather than an extractor one",
     ("duplicate_reference_key", None):
-        "rc2 §9.1's record. Implemented 23 September, never dispositioned",
+        "rc2 §9.1's record, and not one of the five is a duplicate. Each is "
+        "two different works sharing a first surname and a year, and no row "
+        "carries the letter suffix that would separate them. All five keys "
+        "are the same five already counted under ambiguous_citation, so "
+        "those two groups are one bibliography fact reported twice: 5 keys "
+        "behind 22 findings",
     ("ambiguous_citation", None):
         "rc2 §8.3 rows 3 and 5, and 15 of the 17 come from the three papers "
         "outside C-081's eleven. Reduced below to the 5 keys behind them: "
@@ -471,6 +500,159 @@ def structure_coverage(lines: list) -> Counter:
     return out
 
 
+_JOINER = _re.compile(r"\s(?:and|&)\s", _re.I)
+
+
+def _fold(s: str) -> str:
+    """Diacritics removed, for asking whether two spellings differ only by one."""
+    return "".join(c for c in _ud.normalize("NFD", s.lower())
+                   if not _ud.combining(c))
+
+
+def small_group_shapes(lines: list, body: str, section: str) -> Counter:
+    """The six groups whose disposition note was written from the reason name.
+
+    `failed=order` was the first of these to be checked against its own
+    findings, and the note turned out to be wrong: none of the seven was about
+    order. That note had been written from the field label, which is a way of
+    describing findings without reading them, and six more notes in
+    UNDISPOSED_NOTE were written the same way. This function reads them.
+
+    Nothing here is a defect claim. Each group is checked for the one thing
+    its note asserts or implies, and the answer is whatever the records say.
+    """
+    out: Counter = Counter()
+    refs = {r["index"]: r for r in lines if r.get("type") == "reference"}
+    # `ambiguous_citation` carries `citation_key`, not `reference_key`. Read
+    # from the wrong field this set came out empty and the paragraph below
+    # still claimed the overlap, which is why the claim is now printed only
+    # when its own counter supports it.
+    ambig = {r.get("citation_key") for r in lines
+             if r.get("type") == "ambiguous_citation"}
+
+    for r in lines:
+        t, reason = r.get("type"), r.get("reason")
+
+        # rc2 §6.3's last line: "A parsed first CORE whose lowercase value is
+        # STOP -> stopword_surname". The note called it "§6.3's named
+        # outcome", which is true of the label and silent on whether the
+        # surname is a stop word or the author is standing behind one.
+        if (t, reason) == ("unresolved_citation", "stopword_surname"):
+            out["stopword_surname"] += 1
+            head = r["text"]
+            head = head[:head.rindex("(")] if "(" in head else head
+            head = head.rstrip()
+            first = (head.split(",")[0] if "," in head
+                     else head.split(" ")[0]).strip().lower()
+            if first.rstrip(",;:") not in ce.STOP:
+                out["  the first surname really is a STOP word"] += 1
+                continue
+            rest = head[len(first):].lstrip(" ,").strip()
+            if not ce.person_form(rest)[1]:
+                out["  a STOP lead-in over something that still will not "
+                    "parse"] += 1
+                continue
+            out["  a STOP lead-in, and the rest is a clean author list"] += 1
+            # §6.3 attempts reduction only "if [the full phrase] does not"
+            # satisfy AUTHORS_NARR. `However, Dahlander and Gann` satisfies
+            # it — as a THREE-name serial list that has swallowed the lead-in
+            # — so reduction never runs and §6.3's last line refuses it.
+            # `Indeed, Lind` is a comma pair with no joiner, which the
+            # narrative grammar rejects, so that one reduces and resolves.
+            if _JOINER.search(rest):
+                out["    the remainder is a joined list, so the lead-in "
+                    "became name one"] += 1
+            else:
+                out["    the remainder has no joiner"] += 1
+
+        # The other side of that comparison, measured in the same run rather
+        # than asserted. Without it the claim about which lead-ins survive
+        # rests on a branch above that never fires.
+        elif t == "citation" and r.get("stop_reduced_phrase"):
+            ph = r["author_phrase"]
+            tok = ph.split(" ")[0].strip()
+            if tok.lower().rstrip(",;:") not in ce.STOP or not tok.endswith(","):
+                continue
+            out["  the same lead-in where the citation DID reduce and "
+                "resolve"] += 1
+            if _JOINER.search(ph[len(tok):]):
+                out["    ...and there the remainder IS a joined list"] += 1
+            else:
+                out["    ...and there the remainder has no joiner"] += 1
+
+        # rc2 §6.2's outcome, reached only AFTER rc3 B1b's non-person path
+        # declines. CIT-ARCH-01 and rc2 §8: "the bibliography, not the
+        # syntax, is what makes this a citation". So the question the note
+        # does not ask is whether the organisation is listed at all.
+        elif (t, reason) == ("unresolved_citation", "all_caps_surname"):
+            out["all_caps_surname"] += 1
+            label = (ce.non_person_head(r["text"]) or "").lower()
+            listed = any(label and label in (x.get("assembled") or "")[:80].lower()
+                         for x in refs.values())
+            if listed:
+                out["  the organisation IS in the bibliography"] += 1
+            else:
+                out["  cited but in no reference row at all"] += 1
+
+        elif (t, reason) == ("unresolved_reference", "entry_start_grammar"):
+            out["entry_start_grammar"] += 1
+            head = r["text"].split("(")[0].split(",")[0].strip()
+            if " " in head:
+                out["  a multi-token surname, which is rc3 B1a"] += 1
+            elif _re.search(r"[,&]\s*[A-Z](?![\w.])", r["text"][:90]):
+                out["  an initial written without its period"] += 1
+            else:
+                out["  neither shape"] += 1
+
+        elif (t, reason) == ("unresolved_reference", "no_year"):
+            out["no_year"] += 1
+            if _re.search(r"\b(in press|forthcoming|n\.?d\.?|submitted)\b",
+                          r["text"][:160], _re.I):
+                out["  a publication state where the year goes"] += 1
+            else:
+                out["  no year and no publication state either"] += 1
+
+        elif t == "possible_mismatch":
+            out["possible_mismatch"] += 1
+            cand = ce._split_key(r["candidate_key"])[1]
+            ref = (ce._split_key(refs[r["reference_index"]]["reference_key"])[1]
+                   if r["reference_index"] in refs else "")
+            if r.get("evidence") == "year_adjacent":
+                out["  year_adjacent: the two sides disagree by one year"] += 1
+                continue
+            out["  surname_edit_distance_1"] += 1
+            # Which side carries the odd spelling. The same question the
+            # order group turned on, and the only thing that separates "the
+            # source is damaged" from "the two sides normalise differently".
+            if cand in _fold(section) and ref in section.lower():
+                out["    both spellings appear in the bibliography"] += 1
+            elif ref.lower() in body.lower():
+                out["    the reference spelling also appears in the body"] += 1
+            else:
+                out["    each spelling stays on its own side"] += 1
+
+        elif t == "duplicate_reference_key":
+            out["duplicate_reference_key"] += 1
+            rows = [refs[i]["assembled"] for i in r["reference_indices"]
+                    if i in refs]
+            # Two rows under one key are a real duplicate only if they are
+            # the same work. Different works under one key is a fact about
+            # the KEY, which is a surname and a year and nothing else.
+            heads = {x.split("(")[0][:60].strip().lower() for x in rows}
+            if len(heads) == 1:
+                out["  the rows are the same work listed twice"] += 1
+            else:
+                out["  two different works under one surname and year"] += 1
+            if any(_re.search(r"\b(?:1[5-9]|20)\d{2}[a-z]\b", x) for x in rows):
+                out["    the bibliography distinguishes them with a "
+                    "year suffix"] += 1
+            else:
+                out["    neither row carries a year letter suffix"] += 1
+            if r.get("reference_key") in ambig:
+                out["    the same key is also an ambiguous_citation"] += 1
+    return out
+
+
 def structure_failures(lines: list) -> Counter:
     """What rc2 §9.3's `failed=order` findings actually are.
 
@@ -539,6 +721,7 @@ def main() -> int:
     amb: Counter = Counter()
     cover: Counter = Counter()
     orderf: Counter = Counter()
+    small: Counter = Counter()
     unreadable: list = []
     by_scope: dict[str, Counter] = {"eleven": Counter(), "extra": Counter()}
     orphan_by_source: dict[str, list[int]] = {}
@@ -577,6 +760,7 @@ def main() -> int:
             causes.update(orphan_causes(lines, ctext))
             _b, _sec, *_rest = ce.split_body_and_references(ctext)
             gaps.update(missing_gaps(lines, _sec))
+            small.update(small_group_shapes(lines, _b, _sec))
         refusals.update(grammar_refusals(lines))
         _a, _d = ambiguity_sources(lines)
         amb.update(_a)
@@ -756,6 +940,100 @@ def main() -> int:
               "counterpart, so")
         print("    the pair is reported with no repair rule behind it.")
 
+    if small:
+        print("\n  the six small groups, read rather than labelled")
+        for head, kids in (
+                ("stopword_surname", (
+                    "  the first surname really is a STOP word",
+                    "  a STOP lead-in, and the rest is a clean author list",
+                    "    the remainder is a joined list, so the lead-in "
+                    "became name one",
+                    "    the remainder has no joiner",
+                    "  a STOP lead-in over something that still will not "
+                    "parse",
+                    "  the same lead-in where the citation DID reduce and "
+                    "resolve",
+                    "    ...and there the remainder IS a joined list",
+                    "    ...and there the remainder has no joiner")),
+                ("all_caps_surname", (
+                    "  the organisation IS in the bibliography",
+                    "  cited but in no reference row at all")),
+                ("entry_start_grammar", (
+                    "  a multi-token surname, which is rc3 B1a",
+                    "  an initial written without its period",
+                    "  neither shape")),
+                ("no_year", (
+                    "  a publication state where the year goes",
+                    "  no year and no publication state either")),
+                ("possible_mismatch", (
+                    "  year_adjacent: the two sides disagree by one year",
+                    "  surname_edit_distance_1",
+                    "    both spellings appear in the bibliography",
+                    "    the reference spelling also appears in the body",
+                    "    each spelling stays on its own side")),
+                ("duplicate_reference_key", (
+                    "  the rows are the same work listed twice",
+                    "  two different works under one surname and year",
+                    "    the bibliography distinguishes them with a "
+                    "year suffix",
+                    "    neither row carries a year letter suffix",
+                    "    the same key is also an ambiguous_citation"))):
+            if not small.get(head):
+                continue
+            print(f"    {small[head]:5d}  {head}")
+            for k in kids:
+                if small.get(k):
+                    print(f"    {small[k]:5d}  {k}")
+        # Each conclusion is printed only if its own counter carries it.
+        # The overlap claim below was written before the counter measuring it
+        # was correct, and it printed anyway over a count of zero — the same
+        # defect the whole block exists to catch, one level up. Prose that
+        # cannot be silenced by the data is not a finding.
+        # The claim below is a clean split, so it prints only on a clean
+        # split: every dropped one joined, every survivor not, and both sides
+        # non-empty so the comparison has two halves to compare.
+        if (small["  a STOP lead-in, and the rest is a clean author list"]
+                == small["stopword_surname"]
+                == small["    the remainder is a joined list, so the "
+                         "lead-in became name one"]
+                and small["  the same lead-in where the citation DID reduce "
+                          "and resolve"]
+                == small["    ...and there the remainder has no joiner"] > 0):
+            print("    Every stopword_surname is an author standing behind a "
+                  "lead-in, not an")
+            print("    author named by a stop word, and one word decides "
+                  "which ones survive.")
+            print("    §6.3 reduces only when the full phrase FAILS the "
+                  "grammar. `Indeed, Lind`")
+            print("    is a comma pair with no joiner, which the narrative "
+                  "grammar rejects, so")
+            print("    it reduces and resolves. `Indeed, Lind and van den "
+                  "Bos` is a valid")
+            print("    three-name serial list that has swallowed the lead-in "
+                  "as name one, so")
+            print("    it parses, never reduces, and §6.3's last line "
+                  "refuses it. Same word,")
+            print("    same comma, and the `and` is the whole difference.")
+        if small["  cited but in no reference row at all"] \
+                == small["all_caps_surname"]:
+            print("    The all-caps rows are CIT-ARCH-01 working: rc3 B1b "
+                  "declined because the")
+            print("    organisation is in no reference row, which makes them "
+                  "the non-person")
+            print("    shape of a missing reference rather than a grammar "
+                  "refusal.")
+        if not small["  the rows are the same work listed twice"]:
+            print("    No duplicate_reference_key is a duplicate. Each is "
+                  "two works under one")
+            print("    surname and year.")
+        if small["    the same key is also an ambiguous_citation"] \
+                == small["duplicate_reference_key"]:
+            print("    Every one of those keys is already counted above as "
+                  "an ambiguous_citation,")
+            print("    so the two groups are one bibliography fact reported "
+                  "twice: 5 keys, 22")
+            print("    findings.")
+
     if amb:
         print("\n  ambiguous_citation, what is really ambiguous")
         for k in ("records", "distinct keys behind them",
@@ -833,6 +1111,40 @@ def main() -> int:
         if key not in groups and key not in DISPOSED:
             problems.append(f"{key} is listed as undispositioned and the "
                             f"corpus produces none of it")
+
+    # Every undispositioned group must be PARTITIONED by something that ran,
+    # not merely described. Seven notes here were written from the reason
+    # label alone — "rc2 §6.3's named outcome" and the like — and the first
+    # one checked against its own findings turned out to say the opposite of
+    # what they showed. A note written from the label is a restatement of the
+    # field name, and nothing in this file used to tell the two apart.
+    #
+    # So each group names the block that reads it, and a group added without
+    # one is a failure rather than a paragraph.
+    PARTITIONED = {
+        ("unresolved_reference", "orphan_line"): causes,
+        ("unresolved_citation", "no_grammar_match"): refusals,
+        ("uncited_reference", None): recall,
+        ("missing_reference", None): gaps,
+        ("ambiguous_citation", None): amb,
+        ("author_structure_mismatch", "count"): cover,
+        ("author_structure_mismatch", "order"): orderf,
+        ("unresolved_citation", "stopword_surname"): small,
+        ("unresolved_citation", "all_caps_surname"): small,
+        ("unresolved_reference", "entry_start_grammar"): small,
+        ("unresolved_reference", "no_year"): small,
+        ("possible_mismatch", "surname_edit_distance_1"): small,
+        ("possible_mismatch", "year_adjacent"): small,
+        ("duplicate_reference_key", None): small,
+    }
+    for key in UNDISPOSED_NOTE:
+        if key not in PARTITIONED:
+            problems.append(f"{key} carries a note and no partition, so the "
+                            f"note is describing a field name rather than "
+                            f"its findings")
+        elif not PARTITIONED[key]:
+            problems.append(f"{key} names a partition that produced nothing, "
+                            f"so the note stands on a block that did not run")
     if unreadable:
         problems.append(
             f"the canonical bytes could not be reproduced for "

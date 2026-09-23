@@ -222,8 +222,26 @@ CHECKS = {
     "C-013": ((), ("never bank|2024",), "MET",
               "longest-suffix recovery forbidden"),
     "C-014": ((), ("OECD (2024) is all_caps_surname",), "MET", ""),
-    "C-016": (("PREFIX_CUES_CP",), ("the §4 prefix cues still work",), "MET",
-              "closed PREFIX set"),
+    # "one case per prefix", over rc2's closed list rather than this file's.
+    # The same exhaustiveness that found five missing STOP tokens found five
+    # missing PREFIX cues an hour later — rc2's own "five newly added
+    # multiword forms", which arrived with rc2 and were never picked up here.
+    # Unlike the STOP gap this one was NOT latent: two corpus groups parsed
+    # while silently dropping the citation sitting behind the prefix.
+    "C-016": (('"for a similar approach, see", "for discussion, see",',),
+              ("the PREFIX set must equal rc2's closed list",
+               "every closed PREFIX form must parse"),
+              "MET",
+              "all eleven parse, and no cue leaks into author_phrase"),
+    # STRUCTURAL, and the note says so. On every input that can be built the
+    # two orders agree — a short match leaves a lowercase remainder, CORE
+    # needs a capital, the branch fails and the alternation backtracks. What
+    # is checkable is that the compiled alternation offers the long form
+    # first, which is what rc2's "before considering a shorter member" asks.
+    "C-017": (("key=lambda c: (-len(c), c)",),
+              ("a longer form must be offered before",),
+              "MET",
+              "longest-first in the compiled alternation; structural"),
     # "one case per token", and rc2 §3.2 calls the list "closed and versioned"
     # — which is the one situation where testing a sample proves nothing about
     # the rest. The exhaustive control found five tokens missing from this
@@ -467,7 +485,6 @@ NOT_IMPLEMENTED = {
               "is unpinned is the two-line error stream's exact bytes, which "
               "needs a byte golden this repository does not have",
               '"code": 6, "reason"'),
-    "C-017": ("PREFIX longest-match precedence not pinned", "longest-match"),
 
     # No honest anti-needle. Each says why.
     **{c: ("determinism not byte-pinned; 'byte-identical' already appears in "

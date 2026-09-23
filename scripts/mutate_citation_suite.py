@@ -890,6 +890,34 @@ MUTATIONS = [
      '            {"type": "meta", "spec_version": SPEC_VERSION},',
      "the error stream's meta is exactly type, spec_version"),
 
+    # rc2 §3.1, C-016/017. Six of eleven members until 23 September, and
+    # unlike §3.2's gap this one was NOT latent: two corpus groups parsed while
+    # silently dropping the citation behind the prefix.
+    ("rc2 §3.1: the five multiword PREFIX forms go missing again",
+     '               "for example, see", "for instance, see",\n'
+     '               "for a similar approach, see", "for discussion, see",\n'
+     '               "for a review, see")',
+     "               )",
+     "the PREFIX set must equal rc2's closed list"),
+
+    # C-016 asks for one case per prefix, and the cue must not leak into
+    # author_phrase. Dropping the cue group entirely leaves every member
+    # unparseable, which the per-cue control catches and the set-equality one
+    # does not.
+    ("rc2 §3.1/C-016: the cue is no longer stripped before the authors",
+     '    prefix = "(?:" + "|".join(re.escape(c) for c in all_cues) + r")[,]?[ \\t\\n]+"',
+     '    prefix = "(?:zzz-not-a-cue)[,]?[ \\t\\n]+"',
+     "every closed PREFIX form must parse with the cue excluded"),
+
+    # C-017's longest-first ordering. Sorting the cues shortest-first puts
+    # `see` ahead of `see also` and every multiword form ending in `see`.
+    ("rc2 §3.1/C-017: cues are offered shortest first",
+     "    all_cues = tuple(sorted(set(cues) | set(LEAD_IN_CUES),\n"
+     "                            key=lambda c: (-len(c), c)))",
+     "    all_cues = tuple(sorted(set(cues) | set(LEAD_IN_CUES),\n"
+     "                            key=lambda c: (len(c), c)))",
+     "a longer form must be offered before the shorter one it contains"),
+
     # rc2 §3.2, C-018. The state this file was in until 23 September: five of
     # rc2's 109 STOP tokens missing, zero corpus occurrences of any of them, so
     # nothing but an exhaustive check over the closed set could see it.

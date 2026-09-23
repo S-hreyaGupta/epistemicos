@@ -3421,6 +3421,104 @@ def main() -> int:
             ok("§14: invalid UTF-8 writes two lines, and the meta names the "
                "ruleset that refused the document")
 
+    _spec_txt = (rc2_spec_path().read_text(encoding="utf-8")
+                 if rc2_spec_path() else "")
+
+    # ------------------------------------------------------- §3.1, C-016/017
+    #
+    # The other closed set, and it had the same defect as §3.2's: six of rc2's
+    # eleven members. rc2 calls the missing five "the five newly added
+    # multiword forms", so they arrived with rc2 and were never picked up.
+    #
+    # Unlike the STOP gap this one was NOT latent. Two corpus groups used one
+    # each, and in both the group parsed while silently dropping the single
+    # citation sitting behind the prefix — `Osadchiy et al., 2015` out of a
+    # three-citation group in gold paper 1, and `Sonnentag & Frese, 2003`.
+    print("\nrc2 §3.1 — every parenthetical PREFIX, one case each")
+
+    _m31 = re.search(r"### 3\.1 Closed parenthetical PREFIX set.*?```text\n(.*?)```",
+                     _spec_txt, re.S)
+    declared_prefix = ([l.strip() for l in _m31.group(1).strip().splitlines()
+                        if l.strip()] if _m31 else [])
+
+    if not declared_prefix:
+        failures.append("§3.1: rc2's PREFIX block was not found, so the closed "
+                        "set could not be read and this block proves nothing")
+    elif set(declared_prefix) != set(ce.PREFIX_CUES):
+        failures.append(
+            f"§3.1: the PREFIX set must equal rc2's closed list — "
+            f"in rc2 not ours {[c for c in declared_prefix if c not in ce.PREFIX_CUES]}, "
+            f"in ours not rc2 {[c for c in ce.PREFIX_CUES if c not in declared_prefix]}")
+    else:
+        ok(f"§3.1: all {len(declared_prefix)} cues, and no others — this "
+           f"file's set equals rc2's closed list exactly")
+
+        # C-016, one case per prefix. Every member must carry a citation
+        # through, and `author_phrase` must be the author rather than any part
+        # of the cue — rc2 §6: "author_phrase EXCLUDES a supported
+        # parenthetical PREFIX".
+        bad = []
+        for cue in declared_prefix:
+            cits, _u, _e = extract(f"It holds ({cue} Smith, 2020) here.")
+            if keys(cits) != ["smith|2020"]:
+                bad.append((cue, keys(cits)))
+            elif cits[0]["author_phrase"] != "Smith":
+                bad.append((cue, f"author_phrase={cits[0]['author_phrase']!r}"))
+        if bad:
+            failures.append(f"§3.1/C-016: every closed PREFIX form must parse "
+                            f"with the cue excluded from author_phrase — "
+                            f"{len(bad)} failed, e.g. {bad[:3]}")
+        else:
+            ok(f"§3.1/C-016: all {len(declared_prefix)} cues parse, and none "
+               f"leaks into author_phrase")
+
+        # C-017, longest-match precedence. "The matcher MUST choose the longest
+        # matching member before considering a shorter member. Therefore
+        # `see also` cannot decompose to `see`, and a multiword form ending in
+        # `see` cannot decompose to the standalone `see` prefix."
+        #
+        # STRUCTURAL, and stated as such rather than dressed up. On every input
+        # that could be built here the two orders agree: a short match leaves a
+        # lowercase remainder (`also Smith`, `see Smith`), CORE requires a
+        # capital, so the short branch fails and the alternation backtracks to
+        # the long one. Output cannot tell them apart. What CAN be checked is
+        # that the compiled alternation offers the long form first, which is
+        # what rc2's "before considering" asks for.
+        pats = ce.build_patterns({"ampersand"})
+        src = pats["seg"].pattern
+        # The cue alternation, split into MEMBERS. A substring search is wrong
+        # here and said so loudly: `src.find("see")` lands inside
+        # `for\ a\ similar\ approach,\ see`, so every long form looked as
+        # though it came after the short one it contains.
+        #
+        # `re.escape` both sides, because the pattern was built with it and
+        # whether it escapes a space is version-dependent — this Python emits
+        # `see\ also`.
+        inner = src[src.index("(?:(?:") + len("(?:(?:"):]
+        inner = inner[:inner.index(")")]
+        members = inner.split("|")
+        pos = {c: (members.index(re.escape(c))
+                   if re.escape(c) in members else -1)
+               for c in declared_prefix}
+        missing = [c for c, i in pos.items() if i < 0]
+        if missing:
+            failures.append(f"§3.1/C-017: these cues are not in the compiled "
+                            f"segment pattern at all — {missing}")
+        else:
+            out_of_order = [
+                (a, b) for a in declared_prefix for b in declared_prefix
+                if a != b and b.endswith(a) and pos[b] > pos[a]]
+            if out_of_order:
+                failures.append(
+                    f"§3.1/C-017: a longer form must be offered before the "
+                    f"shorter one it contains — {out_of_order[:3]} are the "
+                    f"wrong way round")
+            else:
+                pairs = [(a, b) for a in declared_prefix for b in declared_prefix
+                         if a != b and b.endswith(a)]
+                ok(f"§3.1/C-017: {len(pairs)} shorter-inside-longer pair(s), "
+                   f"every long form offered first (structural, see comment)")
+
     # ------------------------------------------------------------ §3.2, C-018
     #
     # C-018: "every STOP token has deterministic behavior | synthetic suite |
@@ -3440,8 +3538,6 @@ def main() -> int:
     # One invents a citation and the other drops one.
     print("\nrc2 §3.2 — every STOP token, one case each")
 
-    _spec_txt = (rc2_spec_path().read_text(encoding="utf-8")
-                 if rc2_spec_path() else "")
     _m = re.search(r"### 3\.2 Closed STOP set.*?```text\n(.*?)```",
                    _spec_txt, re.S)
     declared_stop = set(_m.group(1).split()) if _m else set()

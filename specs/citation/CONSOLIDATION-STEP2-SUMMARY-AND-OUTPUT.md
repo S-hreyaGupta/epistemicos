@@ -69,17 +69,18 @@ paper           total  extracted  unres_extr   rc1 gap
 43338825          126        117           9         9
 4918fd7d          283        264          19        19
 50408397          241        236           5         5
+5da73cf4          125        125           0         0
 849f8fc6           69         68           1         1
-ad1e3ff9          190        185           5         5
+ad1e3ff9          190        186           4         4
 bf2fdc4a          169        160           9         9
 c1d56945          243        219          24        24
-e1b418a4          213        200          13        13
+e1b418a4          213        201          12        12
 ea07e5f5          110        107           3         3
 ed6a890a          196        186          10        10
-CORPUS           2235       2102         133       133
+CORPUS           2235       2104         131       131
 ```
 
-rc1's §11.2 would be off by 133 on thirteen papers. rc2's holds exactly on all
+rc1's §11.2 would be off by 131 on thirteen papers. rc2's holds exactly on all
 thirteen. So this is not a preference between two formulations; rc2 corrects a
 defect, and the correction is undocumented anywhere outside the section text.
 
@@ -97,8 +98,11 @@ carries the old spelling forward.
 ```text
 disposition   REPLACE — rc2's §11.2 replaces rc1's
 evidence      rc1's arithmetic fails by exactly unresolved_extraction_
-              occurrences, measured at 133 over the corpus. rc2's holds on all
-              thirteen papers.
+              occurrences, measured at 131 over the corpus. rc2's holds on all
+              thirteen papers. (Was 133 when written; rc2 §3.1's five missing
+              PREFIX cues landed the same day and moved two candidates from
+              unresolved to parsed. The gap is still exactly the unresolved
+              count, which is the claim.)
 control       §11.2/C-052, and §11.2's second equation, each computed from a
               different field so neither side is derived from the other
 ```

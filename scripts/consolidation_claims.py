@@ -122,8 +122,8 @@ def main() -> int:
          "duplicate_reference_key records emitted      0       5",
          counts.get("duplicate_reference_key", 0), 5),
         ("CONSOLIDATION-STEP2-SUMMARY-AND-OUTPUT.md",
-         "CORPUS           2235       2102",
-         counts.get("citation", 0), 2102),
+         "CORPUS           2235       2104",
+         counts.get("citation", 0), 2104),
     ]
     for name, literal, live, expected in FIGURES:
         text = docs.get(name, "")

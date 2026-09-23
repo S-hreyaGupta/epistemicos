@@ -239,7 +239,35 @@ AUTHORS_NARR = (rf"(?:{SURNAME}{WS}{ET_AL}"
 # flag adds the second form rather than replacing the first.
 LOCATOR = r",[ \t\n]?(?:p\.|pp\.|para\.|chap\.)[ \t\n]?[^();]+"
 LOCATOR_COLON = r"(?::[ \t]*\d[^();]*)"
-PREFIX_CUES = ("e.g.", "i.e.", "cf.", "see also", "see", "but see")
+# rc2 §3.1's closed parenthetical PREFIX set, completed 23 September. This
+# file had six of rc2's eleven; rc2 itself calls the other five "the five
+# newly added multiword forms", so they arrived with rc2 and were never
+# picked up here.
+#
+# Why they needed to be PREFIX members rather than LEAD_IN cues, which is what
+# made the gap survive: `build_patterns` allows exactly ONE cue before the
+# authors. rc3 B5's LEAD_IN_CUES already holds `for a similar approach` and
+# `for a review`, so those matched — and then the pattern wanted a surname and
+# found `see`, which is a STOP word and fails CORE. Two cues in sequence, one
+# cue's worth of pattern.
+#
+# rc2's answer is exactly right: each of the five is a single member carrying
+# its own internal comma, so `for a similar approach, see` is one cue. §3.1
+# says so in as many words — "the five newly added multiword forms contain
+# their internal comma exactly as listed and do not require an additional
+# comma after `see`".
+#
+# Two real corpus occurrences were being lost as `no_grammar_match`:
+#
+#     ad1e3ff9  (for a similar approach, see Osadchiy et al., 2015;
+#                Kim and Davis, 2016; Sharma et al., 2019a)
+#     e1b418a4  (for a review, see Sonnentag & Frese, 2003)
+#
+# The first is gold paper 1 and carries three citations.
+PREFIX_CUES = ("e.g.", "i.e.", "cf.", "see also", "see", "but see",
+               "for example, see", "for instance, see",
+               "for a similar approach, see", "for discussion, see",
+               "for a review, see")
 
 # rc3 B5, "Bounded lead-in cue. Worth 17". The cue set is CLOSED and is listed
 # in rc3 verbatim; it is not a pattern over "for a <noun>", because an open

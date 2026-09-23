@@ -52,7 +52,30 @@ CORPUS = REPO / "data/md_full"
 # The candidate-state figures this corpus is known to produce under ce.FIXES.
 # Not a target and not an assertion about quality — a tripwire, so a change in
 # the numbers has to be noticed and explained rather than absorbed.
-PINNED = {"parsed": 2102, "unresolved_citation": 133, "excluded_candidate": 19}
+#
+# MOVED 23 September, 2102/133 -> 2104/131, and the tripwire did its job: it
+# fired, and the two citations were identified before the pin was touched.
+#
+# rc2 §3.1's closed PREFIX set had six of its eleven members here. The five
+# missing are the multiword forms that carry their own internal comma, which
+# rc2 itself calls "the five newly added multiword forms". Two corpus groups
+# used one each, and in both the group PARSED while silently dropping the one
+# citation that sat behind the prefix:
+#
+#     ad1e3ff9  offset 31396   (for a similar approach, see Osadchiy et al.,
+#                               2015; Kim and Davis, 2016; Sharma et al., 2019a)
+#               before  kim|2016, sharma|2019a           2 of 3
+#               after   osadchiy|2015, kim|2016, sharma|2019a
+#
+#     e1b418a4  offset 16917   (for a review, see Sonnentag & Frese, 2003)
+#               before  nothing
+#               after   sonnentag|2003
+#
+# Diffed occurrence by occurrence at (paper, group_start, citation_key):
+# exactly two gained, ZERO lost. `unresolved_citation` falls by the two
+# records those groups were also producing, and `uncited_reference` falls
+# from 57 to 56 because Sonnentag & Frese is now cited rather than residual.
+PINNED = {"parsed": 2104, "unresolved_citation": 131, "excluded_candidate": 19}
 
 
 def main() -> int:

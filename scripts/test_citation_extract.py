@@ -3328,6 +3328,89 @@ def main() -> int:
         ok(f"§11.2: {diag} diagnostic occurrences within {inr} "
            f"identity_not_resolved, counted once each")
 
+    # ------------------------------------------------------------ §14, C-078
+    #
+    # rc2 §14 lists TWELVE finding conditions that force exit 1, and the list
+    # is closed. The conformance map read "the exit-1 finding set is not
+    # closed" until 23 September, which was wrong about rc2 and right about
+    # this file: three proxies were tested, and eight of the twelve happened to
+    # coincide with "not every citation uniquely matched".
+    #
+    # Three did not coincide, and each exited 0 where rc2 requires 1. All three
+    # share a shape: they are findings about the BIBLIOGRAPHY, and no fact
+    # about the bibliography alone can make a citation fail to match.
+    print("\nrc2 §14 — the closed exit-1 finding set")
+
+    # rc2's twelve, parsed from rc2 rather than retyped. A list typed here
+    # would be a copy of FINDINGS_FORCING_EXIT1 and would agree with it
+    # whatever either said.
+    spec14 = [l.strip("- ").strip() for l in
+              (rc2_spec_path().read_text(encoding="utf-8")
+               .split("Exit 1 is forced by any of:")[1]
+               .split("An `et_al`")[0].splitlines())
+              if l.strip().startswith("-")]
+    if len(spec14) != 12:
+        failures.append(f"§14: expected twelve conditions in rc2's list, "
+                        f"parsed {len(spec14)}; the section moved or the parse "
+                        f"is wrong, and either way this block establishes "
+                        f"nothing")
+    elif len(ce.FINDINGS_FORCING_EXIT1) != len(spec14):
+        failures.append(f"§14/C-078: rc2 lists {len(spec14)} finding "
+                        f"conditions, this file evaluates "
+                        f"{len(ce.FINDINGS_FORCING_EXIT1)}")
+    else:
+        ok(f"§14/C-078: all {len(spec14)} of rc2's finding conditions are "
+           f"evaluated, and the set is closed")
+
+    def exit_of(body, refs):
+        p = Path(_tf.mkdtemp()) / "p.md"
+        p.write_bytes((HEAD + body + refs).encode("utf-8"))
+        ls, code = ce.run(p, {"ampersand"})
+        return ls, code, ls[-1].get("exit_findings", [])
+
+    CITED = "As shown (Smith, 2020) here."
+    ONE = "\n\n## References\n\nSmith, J. (2020). A paper. Journal, 1(1), 1-10.\n"
+
+    # Exit 0 has to be REACHABLE, or every case below passes for free.
+    _ls, code, found = exit_of(CITED, ONE)
+    if code != 0 or found:
+        failures.append(f"§14: a clean document must exit 0 — got {code} "
+                        f"with {found}. Every case below would then pass "
+                        f"whatever the rule said")
+    else:
+        ok("§14: a clean document exits 0, so exit 1 below means something")
+
+    # The three that do NOT coincide with "not uniquely matched". Each is a
+    # fact about the bibliography, and the citation still matches perfectly.
+    PAD = ("\n\nJones, K. (2019). B. Journal, 2(1), 1-10."
+           "\n\nBrown, L. (2018). C. Journal, 3(1), 1-10."
+           "\n\nDavis, M. (2017). D. Journal, 4(1), 1-10.\n")
+    for label, refs, want in (
+        ("residual uncited_reference",
+         ONE.rstrip("\n") + PAD, "residual uncited_reference"),
+        ("unresolved_reference",
+         ONE.rstrip("\n") + "\n\na stray orphan line with no entry grammar"
+         + PAD, "unresolved_reference"),
+        ("any suspect reference",
+         ONE.rstrip("\n") + "\n\nWilson, R. (2015). " + ("x" * 1600)
+         + ". Journal, 9(1), 1-10." + PAD, "any suspect reference"),
+    ):
+        ls, code, found = exit_of(CITED, refs)
+        um = [l for l in ls if l.get("type") == "summary"][0]
+        if code != 1:
+            failures.append(f"§14: {label} forces exit 1 — got {code}")
+        elif want not in found:
+            failures.append(f"§14: exit 1 came from {found}, not from the "
+                            f"named condition {want!r}. Right answer, wrong "
+                            f"reason")
+        elif um["uniquely_matched_occurrences"] != um["extracted_citation_occurrences"]:
+            failures.append(f"§14: this fixture must have EVERY citation "
+                            f"uniquely matched, or the old proxy would have "
+                            f"caught it and {label} proves nothing")
+        else:
+            ok(f"§14: {label} forces exit 1 with every citation still "
+               f"uniquely matched")
+
     # C-002: "CRLF/lone CR→LF then NFC", canonical bytes exactly pinned.
     # Both directions matter. NFC composition SHORTENS the text — `e` + U+0301
     # is two code points and three bytes, `é` is one and two — so a document

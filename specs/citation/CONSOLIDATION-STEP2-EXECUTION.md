@@ -180,13 +180,14 @@ which is also new. Scope work, not behaviour.
 
 ## What is NOT covered here
 
+**All ten are now dispositioned, 23 September.**
+
 ```text
-§8  Pass 2 identity            93 lines   the 3x3 table and its outcomes
-§9  reconciliation            109 lines   candidate-level correction lands here
-§11 summary invariants        100 lines   DONE 23 September
-§12 canonical JSONL            58 lines   DONE 23 September
-§2, §10, §19                             scope, absence, gate
-§0, §14, §17                   16 total   small
+§8  Pass 2 identity            93 lines   CONSOLIDATION-STEP2-IDENTITY-AND-
+§9  reconciliation            109 lines   RECONCILIATION.md
+§11 summary invariants        100 lines   CONSOLIDATION-STEP2-SUMMARY-AND-
+§12 canonical JSONL            58 lines   OUTPUT.md
+§0, §2, §10, §14, §17, §19               CONSOLIDATION-STEP2-SCOPE-AND-GATE.md
 ```
 
 §11 and §12 are dispositioned clause by clause in
@@ -201,8 +202,17 @@ Two findings from that pair are worth carrying here:
 - rc1 uses six summary terms in its invariants and defines none of them. rc2
   §11.4 defines all six plus `identity_resolution_performed`, which rc1 lacks.
 
-§8 and §9 remain, at 202 changed lines, and they are where CIT-ARCH-01 is
-decided rather than surfaced.
+Three findings from the other two pairs worth carrying here:
+
+- **rc1 §8's opening clause permits a syntax-derived `citation_key`** and rc2
+  forbids it. That one sentence is what CIT-ARCH-01 decides; rc1 was not silent
+  on the question, it answered it the other way.
+- **rc2 §19 removes Section Map and Orchestrator as freeze dependencies for the
+  pilot scope.** The single most consequential change in the pair for whether
+  work can proceed, and invisible unless §0, §2 and §19 are read together.
+- **rc2 §14's exit-1 set is closed** at twelve conditions. Three of them were
+  being missed entirely — all three facts about the bibliography, which no
+  proxy over citation matching can see.
 
 What no longer needs covering: §3 and §6 were flagged as the dangerous
 undiffed sections, on the reasoning that a silent wording change in the grammar
@@ -215,10 +225,9 @@ rather than outstanding.
 
 ```text
 architecture            rc1 → rc2   COMPLETE
-execution conformance   rc1 → rc2   10 sections IDENTICAL and closed.
-                                    §11 and §12 dispositioned 23 September.
-                                    8 CHANGED remain: §8 and §9 are 202 lines
-                                    of it, the other six are small.
+execution conformance   rc1 → rc2   COMPLETE, 23 September.
+                                    10 sections byte-identical, 10 CHANGED
+                                    dispositioned clause by clause.
 conformance matrix      rc1 → rc2   COMPLETE
 deferred-work register  rc1 → rc2   COMPLETE
 rc2 → rc3                           seven discrepancies recorded

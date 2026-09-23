@@ -320,6 +320,65 @@ class Abort(Exception):
         self.code, self.reason = code, reason
 
 
+def _has(lines, t):
+    return any(r.get("type") == t for r in lines)
+
+
+# rc2 §14's exit-1 conditions, and the set IS closed — twelve of them, listed
+# in the section. Module-level so a control can count them against rc2's own
+# list; a tuple built inside `run` cannot be compared to anything.
+#
+# C-078 read "the exit-1 finding set is not closed" in the conformance map
+# until 23 September. Wrong about rc2, right about this file, which tested
+# three proxies:
+#
+#     every citation uniquely matched, no unresolved_citation,
+#     no `exact` author_structure_mismatch
+#
+# Eight of the twelve coincide with "not every citation uniquely matched" and
+# were satisfied without ever being consulted. Three do not coincide at all,
+# because they are facts about the BIBLIOGRAPHY and no fact about the
+# bibliography alone can stop a citation matching. Each exited 0 where rc2
+# requires 1:
+#
+#     residual uncited_reference    a reference nobody cited
+#     unresolved_reference          a malformed bibliography entry
+#     any suspect reference         an overlong or embedded entry
+#
+# Every predicate reads the EMITTED records rather than the locals the blocks
+# were built from. A condition read off the stream is the same thing rc2's
+# reader sees; one read off a local agrees with the code that produced it
+# whether or not the record reached the output.
+FINDINGS_FORCING_EXIT1 = (
+    ("bibliography_absent", lambda ls: _has(ls, "bibliography_absent")),
+    ("citation with author_resolution=not_resolved",
+     lambda ls: any(r.get("type") == "citation"
+                    and r.get("author_resolution") == "not_resolved"
+                    for r in ls)),
+    ("unresolved_citation", lambda ls: _has(ls, "unresolved_citation")),
+    ("unresolved_reference", lambda ls: _has(ls, "unresolved_reference")),
+    ("candidate-level missing_reference",
+     lambda ls: _has(ls, "missing_reference")),
+    ("residual uncited_reference", lambda ls: _has(ls, "uncited_reference")),
+    ("candidate-level possible_mismatch",
+     lambda ls: _has(ls, "possible_mismatch")),
+    ("duplicate_reference_key", lambda ls: _has(ls, "duplicate_reference_key")),
+    ("ambiguous_citation", lambda ls: _has(ls, "ambiguous_citation")),
+    ("ambiguous_author_resolution",
+     lambda ls: _has(ls, "ambiguous_author_resolution")),
+    ("any suspect reference",
+     lambda ls: any(r.get("type") == "reference" and r.get("suspect_reasons")
+                    for r in ls)),
+    # §9.3's split, and it is deliberate: an `exact` mismatch is wrong in every
+    # style, while `et_al` depends on ET_AL_MIN_AUTHORS and is style-dependent.
+    # "An `et_al` mismatch is reported but does not by itself force exit 1."
+    ("exact author_structure_mismatch",
+     lambda ls: any(r.get("type") == "author_structure_mismatch"
+                    and r.get("citation_author_form") == "exact"
+                    for r in ls)),
+)
+
+
 # ---------------------------------------------------------------- §2, §3
 
 def normalise(raw: bytes) -> str:
@@ -3013,30 +3072,19 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                   # C-084 to C-086 are the map modes and rc2 itself marks them
                   # OUTSIDE_PILOT.
                   "section_map_sha256": None,
-                  # rc2 §9.3: "An `exact` mismatch forces exit 1. An `et_al`
-                  # mismatch is reported but does not by itself force exit 1
-                  # in v3.4." The split is deliberate — an exact mismatch is
-                  # wrong in every style, while et_al depends on
-                  # ET_AL_MIN_AUTHORS and is style-dependent.
-                  #
-                  # Bibliography-absent mode is stated rather than inherited.
-                  # The test below asks whether every citation was uniquely
-                  # matched; under §10 none can be, because identity was never
-                  # evaluated. So absent mode would reach exit 1 through a
-                  # condition that is vacuous there — the right answer for a
-                  # reason that does not survive reading.
-                  #
-                  # It is exit 1 because a manuscript with no reference list
-                  # is a reportable condition about the document, and exit 0
-                  # would assert there is nothing to report. Recorded as this
-                  # implementation's reading, not as rc2's: §14 gives exit 1
-                  # to "one or more defined finding conditions" and never
-                  # closes that set, which is C-078 and unimplemented.
-                  "exit": 1 if absent else
-                          (0 if (len(uniquely_matched) == len(cits)
-                                 and not unres
-                                 and not any(m["citation_author_form"] == "exact"
-                                             for m in mismatches)) else 1)})
+                  # Placeholder. §14's finding conditions are evaluated below,
+                  # over the records this run actually emitted, and the real
+                  # value is written in before the stream leaves.
+                  "exit": None})
+
+    # rc2 §14. The conditions and the reasoning are at FINDINGS_FORCING_EXIT1.
+    findings = [name for name, hit in FINDINGS_FORCING_EXIT1 if hit(lines)]
+    lines[-1]["exit"] = 1 if findings else 0
+    # Not one of rc2's summary fields, and not a count — the NAMES of the
+    # conditions that fired. §14 says exit 1 means "one or more defined finding
+    # conditions" and then lists them; a bare `1` tells a reader that some
+    # member of a twelve-item set is true and leaves them to find which.
+    lines[-1]["exit_findings"] = findings
     # rc2 §2. Last thing before the records leave: every coordinate becomes a
     # UTF-8 byte offset into the canonical manuscript. `text` is exactly
     # `canonical_manuscript_bytes` decoded, which is what the offsets have

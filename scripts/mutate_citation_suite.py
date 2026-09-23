@@ -862,6 +862,46 @@ MUTATIONS = [
      '                  "total_citation_occurrences": n_parsed,',
      "total must equal extracted + unresolved"),
 
+    # rc2 §14, C-078. The three conditions that do not coincide with "not every
+    # citation uniquely matched", each removed on its own. All three are facts
+    # about the bibliography, and the old proxy could not see any of them.
+    ("rc2 §14: a reference nobody cited stops forcing exit 1",
+     '    ("residual uncited_reference", lambda ls: _has(ls, "uncited_reference")),',
+     "",
+     "residual uncited_reference forces exit 1"),
+
+    ("rc2 §14: a malformed bibliography entry stops forcing exit 1",
+     '    ("unresolved_reference", lambda ls: _has(ls, "unresolved_reference")),',
+     "",
+     "named condition 'unresolved_reference'"),
+
+    ("rc2 §14: a suspect reference stops forcing exit 1",
+     '    ("any suspect reference",\n'
+     '     lambda ls: any(r.get("type") == "reference" and r.get("suspect_reasons")\n'
+     '                    for r in ls)),',
+     "",
+     "named condition 'any suspect reference'"),
+
+    # §9.3's split. An `et_al` mismatch must NOT force exit 1 on its own, so
+    # widening the predicate to every mismatch breaks the rule in the other
+    # direction — and the control that catches it is the clean-document one,
+    # because a widened condition makes exit 0 unreachable.
+    ("rc2 §9.3: an et_al mismatch forces exit 1 too",
+     '    ("exact author_structure_mismatch",\n'
+     '     lambda ls: any(r.get("type") == "author_structure_mismatch"\n'
+     '                    and r.get("citation_author_form") == "exact"\n'
+     '                    for r in ls)),',
+     '    ("exact author_structure_mismatch",\n'
+     '     lambda ls: _has(ls, "author_structure_mismatch") or len(ls) > 0),',
+     "a clean document must exit 0"),
+
+    # The count itself. If rc2's twelve and this file's tuple drift apart, the
+    # first control in the block says so — it reads rc2's list, not this one.
+    ("rc2 §14: one finding condition is dropped from the closed set",
+     '    ("ambiguous_citation", lambda ls: _has(ls, "ambiguous_citation")),',
+     "",
+     "finding conditions, this file evaluates"),
+
     # C-051 and rc2 §11.4. The state this file was in until 23 September: a key
     # held by two references counted as a unique match, so an occurrence that
     # was `bibliography_key_ambiguous` by every other field in the output was

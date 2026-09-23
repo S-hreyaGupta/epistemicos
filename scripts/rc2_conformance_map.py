@@ -256,6 +256,25 @@ CHECKS = {
     # "unless independently matched by another unambiguous occurrence". The
     # control asserts both halves, because excluding everything would satisfy
     # the first alone.
+    # rc2 §14's twelve finding conditions, implemented 23 September. C-078's
+    # NOT reason was "the exit-1 finding set is not closed" — wrong about rc2,
+    # which closes it in as many words, and right about this file, which tested
+    # three proxies. Eight of the twelve coincided with "not every citation
+    # uniquely matched" and so were never consulted; three did not coincide at
+    # all and each exited 0 where rc2 requires 1.
+    #
+    # The suite needle is the COUNT control, which reads rc2's list rather
+    # than this file's tuple, so the verdict goes stale if either moves.
+    "C-078": (("FINDINGS_FORCING_EXIT1 = (",),
+              # NOT the printed line: the control builds the count with an
+              # f-string, so its SOURCE reads `all {len(spec14)} of rc2's`.
+              # A needle copied from the output would never match the file it
+              # is searched in — the third time that shape has appeared.
+              # A needle must also fit on ONE source line. The first attempt
+              # here spanned the control's line break and matched nothing,
+              # which is the same mistake in a third guise.
+              ("of rc2's finding conditions are",),
+              "MET", "twelve conditions, counted against rc2's own list"),
     "C-051": (("keyed_once = {k for k, n in counts.items() if n == 1}",),
               ("C-051: reserved indices",), "MET",
               "a duplicated key counts +0; the unambiguous match still counts"),
@@ -409,7 +428,6 @@ NOT_IMPLEMENTED = {
               "needs a byte golden this repository does not have",
               '"code": 6, "reason"'),
     "C-017": ("PREFIX longest-match precedence not pinned", "longest-match"),
-    "C-078": ("the exit-1 finding set is not closed", "FINDINGS_FORCING_EXIT1"),
 
     # No honest anti-needle. Each says why.
     **{c: ("determinism not byte-pinned; 'byte-identical' already appears in "

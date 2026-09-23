@@ -90,6 +90,15 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+# rc2 §19's gate has eight items and only one is mechanically checkable:
+# "Unicode 15.0.0 behavior required by this contract is demonstrated in the
+# execution environment". It is NOT one of the 86 conformance cases, so it does
+# not appear below. `scripts/unicode_gate.py` is the demonstration and
+# `specs/citation/UNICODE-GATE-EVIDENCE.md` records what it found — the
+# environment carries 13.0.0, the difference is observable on §7 and §1.4, and
+# no character it concerns appears anywhere in the corpus.
+
+
 REPO = Path(__file__).resolve().parent.parent
 MATRIX = REPO / "specs/citation/citation-v3.4-rc2-conformance-matrix.md"
 IMPL = REPO / "scripts/citation_extract.py"

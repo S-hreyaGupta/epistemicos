@@ -3,14 +3,51 @@
 22 September 2026, found while implementing rc2 §9.6.
 
 ```text
-uncited_reference emitted            57
-of those, the reference IS cited     28
-                                     ──
-plausible residual                   29
+                                  22 Sep    23 Sep
+uncited_reference emitted            57        56
+of those, the reference IS cited     28        27
+                                     ──        ──
+plausible residual                   29        29
 ```
 
-Just under half the rows are wrong. Each of the 28 names a reference the paper
-does cite, in a span the grammar could not read.
+**Both headline figures moved on 23 September and the residual did not.** rc2
+§3.1's closed PREFIX set turned out to be five cues short, and the five missing
+are the multiword forms — `for a review, see` among them, which this document
+lists below as one of its own examples. Restoring them let one of those spans
+parse, which resolved its reference and removed the row from both columns at
+once. Measured rather than reasoned: the extractor at `f6280de` produces 57 and
+28 over this corpus, the one at `e788440` produces 56 and 27.
+
+The figures are re-derived by `scripts/corpus_dispositions.py`, by this
+document's own method, so the next move is noticed rather than absorbed.
+
+```text
+by the failed span's own reason      22 Sep    23 Sep
+no_grammar_match                        24        23
+stopword_surname                         4         4
+```
+
+## The method does not reach non-person references
+
+"Its surname and year" is person-shaped, and three `non_person|` reference
+keys satisfy the same test:
+
+```text
+17bef7c6   non_person|citizenship report p&g india subcontinent|2022
+ad1e3ff9   non_person|bloomberg|2011
+ad1e3ff9   non_person|bloomberg|2013
+```
+
+All three were present on 22 September too, so this is a gap in the method
+rather than drift. Counting them takes the residual from 29 to 26. They are
+reported separately rather than folded in, because this document's breakdown
+below is over the person-shaped population and mixing the two would make the
+28 and the 27 stop being comparable.
+
+Just under half the rows are wrong. Each of the 27 names a reference the paper
+does cite, in a span the grammar could not read. The breakdown that follows was
+written over the 28 and one of its lead-in-cue cases has since parsed, so it
+describes the shapes rather than the current count.
 
 The implementation is faithful to §9.6. That is the problem: the section is
 correctly implemented and the number it produces still does not mean what its

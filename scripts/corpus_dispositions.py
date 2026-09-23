@@ -116,10 +116,12 @@ UNDISPOSED_NOTE = {
     ("unresolved_citation", "all_caps_surname"):
         "rc2 §6.2's named outcome, and C-014 pins it",
     ("uncited_reference", None):
-        "UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md identifies 28 of these as "
-        "naming a reference the paper DOES cite, in a span the grammar could "
-        "not read. A false reconciliation diagnostic is B3 on its face. The "
-        "document states the number and stops short of classifying it",
+        "UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md identifies a large share of "
+        "these as naming a reference the paper DOES cite, in a span the "
+        "grammar could not read. A false reconciliation diagnostic is B3 on "
+        "its face. The document states the number and stops short of "
+        "classifying it. Re-derived below rather than quoted, because the "
+        "figure moved",
     ("missing_reference", None):
         "candidate-level, so it establishes no identity. Whether the "
         "occurrences behind it are real gaps is unexamined",
@@ -146,6 +148,20 @@ UNDISPOSED_NOTE = {
         "count half",
 }
 
+# UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md, 22 September, as written.
+#
+# Its method, verbatim: "For each `uncited_reference`, check whether its
+# surname and year both appear inside a single span the extractor emitted as
+# `unresolved_citation`. Same span, not the same document."
+#
+# Pinned so the note above cannot go on quoting a figure the corpus stopped
+# producing. It already had: 57 and 28 were both correct for the extractor at
+# f6280de and both moved when §3.1's five missing PREFIX cues landed in
+# e788440 the next day. Confirmed by re-running that extractor over this
+# corpus rather than inferred — 57/28 before, 56/27 after.
+RECALL_DOC = "specs/citation/UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md"
+RECALL_PINNED = {"uncited": 56, "person_matched": 27, "non_person_matched": 3}
+
 
 def main() -> int:
     if not CORPUS.is_dir():
@@ -153,6 +169,7 @@ def main() -> int:
         return 2
 
     groups: Counter = Counter()
+    recall: Counter = Counter()
     by_scope: dict[str, Counter] = {"eleven": Counter(), "extra": Counter()}
     orphan_by_source: dict[str, list[int]] = {}
     refused = []
@@ -166,6 +183,23 @@ def main() -> int:
         except ce.Abort as e:
             refused.append((stem, scope, f"exit {e.args[0]}"))
             continue
+        # The recall re-derivation, per paper. "Same span, not the same
+        # document" is the whole method: an earlier attempt matched surname
+        # and year independently across all failed spans and counted
+        # coincidence, so the containment test stays inside one span.
+        failed = [r["text"].lower() for r in lines
+                  if r.get("type") == "unresolved_citation"]
+        for r in lines:
+            if r.get("type") != "uncited_reference":
+                continue
+            _kind, phrase, year = ce._split_key(r["reference_key"])
+            if any(phrase in span and year in span for span in failed):
+                if r["reference_key"].startswith("non_person|"):
+                    recall["non_person_matched"] += 1
+                else:
+                    recall["person_matched"] += 1
+            recall["uncited"] += 1
+
         source = lines[0].get("references_source")
         refs = orph = 0
         for r in lines:
@@ -244,6 +278,20 @@ def main() -> int:
     print("    condition are confounded. Both readings fit; neither is "
           "established here.")
 
+    # ---- the one figure the residue notes lean on, re-derived ------------
+    pm, npm, unc = (recall["person_matched"], recall["non_person_matched"],
+                    recall["uncited"])
+    print(f"\n  uncited_reference, re-derived by {RECALL_DOC}'s own method")
+    print(f"    emitted                              {unc:4d}")
+    print(f"    the reference IS cited, person key   {pm:4d}   "
+          f"the document's population")
+    print(f"    the reference IS cited, non_person   {npm:4d}   "
+          f"its method does not reach these")
+    print(f"    plausible residual, person only      {unc - pm:4d}")
+    print(f"    plausible residual, both shapes      {unc - pm - npm:4d}")
+    print("    A reference the paper cites, reported as uncited, is a false")
+    print("    reconciliation diagnostic. Classifying it is the review's.")
+
     if refused:
         print("\n  refused by the extractor, deliberately")
         for stem, scope, why in refused:
@@ -275,6 +323,14 @@ def main() -> int:
         if key not in groups and key not in DISPOSED:
             problems.append(f"{key} is listed as undispositioned and the "
                             f"corpus produces none of it")
+    drift = {k: (RECALL_PINNED[k], recall[k]) for k in RECALL_PINNED
+             if RECALL_PINNED[k] != recall[k]}
+    if drift:
+        problems.append(
+            f"the recall figures moved: "
+            f"{', '.join(f'{k} {a} -> {b}' for k, (a, b) in drift.items())}. "
+            f"{RECALL_DOC} quotes these, so the document is now wrong and the "
+            f"move has to be explained before the pin is touched")
 
     print()
     if problems:

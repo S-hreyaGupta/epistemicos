@@ -472,6 +472,18 @@ CHECKS = {
     # every one shares the same two-line shape and the same meta, so what
     # remains unexercised for exit 6 is one reason string that §15's own
     # control already asserts. Recorded rather than claimed as full coverage.
+    # "timed test | no hang", and it is not an abstract worry: this file has
+    # had the failure once, recorded at `build_patterns` — the segment pattern
+    # went exponential and a corpus run that took seconds did not finish in
+    # three minutes. Nothing errors when that happens; the run stops finishing.
+    #
+    # `scripts/termination_bound.py` is the timed test. It validates its own
+    # growth check against `(a+)+$` first, at 265x versus a 16x ceiling, so the
+    # seven shapes it then measures are evidence rather than a check that
+    # cannot see anything. NOT one of the suite's controls: it is a timing
+    # measurement and belongs beside corpus_report.py and unicode_gate.py.
+    "C-082": (("def build_patterns",), (), "MET",
+              "timed: 7 shapes linear, corpus 0.7s against a 60s ceiling"),
     "C-077": (('"type": "error", "code": ab.code, "reason": ab.reason',),
               ("abort streams are byte-exact against",
                "§8.6: same candidate_key on both lookups"),
@@ -536,7 +548,6 @@ NOT_IMPLEMENTED = {
     "C-080": ("true but unpinned: numeric citations never become identity",
               None),
     "C-081": ("the corpus still carries unresolved findings", None),
-    "C-082": ("no timed termination test", None),
 }
 
 

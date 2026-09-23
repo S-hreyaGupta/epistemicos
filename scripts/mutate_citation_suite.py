@@ -416,8 +416,10 @@ MUTATIONS = [
     # and a crash is not a control going red — the same distinction this file
     # had to learn about extraction_accuracy earlier tonight.
     ("CIT-ARCH-01: the diagnostic drops the candidate it must preserve",
-     '                "candidate_key": cand_key, "occurrences": len(occs),',
-     '                "candidate_key": None, "occurrences": len(occs),',
+     '                "candidate_key": cand_key,\n'
+     '                "identity_authority": "candidate",',
+     '                "candidate_key": None,\n'
+     '                "identity_authority": "candidate",',
      "CIT-ARCH-01: the candidate is preserved in the diagnostic"),
 
     ("rc2 §11.2: the identity partition double-counts",
@@ -443,14 +445,18 @@ MUTATIONS = [
      "§9.4: a paired reference is removed from the pool"),
 
     ("CIT-ARCH-01: missing_reference establishes identity",
-     '                "merge_suspected": merge,\n                "citation_key": None, "author_kind": None,',
-     '                "merge_suspected": merge,\n                "citation_key": cand_key, "author_kind": kind,',
-     "§9.4: neither diagnostic establishes citation_key"),
+     '                "identity_authority": "candidate",\n'
+     '                "example": occs[0].get("citation_group"),',
+     '                "identity_authority": "authoritative",\n'
+     '                "example": occs[0].get("citation_group"),',
+     "identity_authority is the literal 'candidate'"),
 
     ("CIT-ARCH-01: possible_mismatch establishes identity",
-     '                "rule": rule, "occurrences": len(occs),\n                # rc2, twice over and in CIT-ARCH-01: this establishes nothing.\n                "citation_key": None, "author_kind": None,',
-     '                "rule": rule, "occurrences": len(occs),\n                # rc2, twice over and in CIT-ARCH-01: this establishes nothing.\n                "citation_key": cand_key, "author_kind": kind,',
-     "§9.4: a possible_mismatch establishes no citation_key"),
+     '                "identity_authority": "candidate",\n'
+     '                "reference_index": ri,',
+     '                "identity_authority": "authoritative",\n'
+     '                "reference_index": ri,',
+     "identity_authority is the literal 'candidate' on possible_mismatch"),
 
     ("rc2 §9.5: merge_suspected is set globally",
      "            merge = any(",
@@ -855,6 +861,47 @@ MUTATIONS = [
      '                  "total_citation_occurrences": denom,',
      '                  "total_citation_occurrences": n_parsed,',
      "total must equal extracted + unresolved"),
+
+    # rc2 §12.3's declared FIELDS, as against their order. Twelve were absent
+    # across five record types until 23 September and §12.3's control passed on
+    # all of it: it filtered rc2's declared keys down to the ones the record
+    # had, then checked those were in order. A field that was never emitted was
+    # never compared.
+    ("rc2 §12.3: identity_authority goes away again",
+     '                "identity_authority": "candidate",\n'
+     '                "example": occs[0].get("citation_group"),',
+     '                "example": occs[0].get("citation_group"),',
+     "rc2 declares fields this file does not emit"),
+
+    ("rc2 §12.3: possible_mismatch calls its evidence `rule` again",
+     '                "evidence": rule,',
+     '                "rule": rule,',
+     "rc2 declares fields this file does not emit"),
+
+    ("rc2 §12.3: ambiguous_citation reverts to rc1's candidate_key",
+     '                "citation_key": cand,\n'
+     '                # rc2\'s declared shape:',
+     '                "candidate_key": cand,\n'
+     '                # rc2\'s declared shape:',
+     "rc2 declares fields this file does not emit"),
+
+    # §12.4 needs this one, not just §12.3: without `reference_index` two
+    # mismatches on one citation can stay tied on every key the block is
+    # ordered by, which §12.4 forbids in as many words.
+    ("rc2 §12.3: the mismatch stops naming its reference",
+     '            "reference_index": ri,\n'
+     '            "citation_author_form": c["author_form"],',
+     '            "citation_author_form": c["author_form"],',
+     "rc2 declares fields this file does not emit"),
+
+    # The rule those two records carry. rc2 replaces `citation_key: null,
+    # author_kind: null` with the literal, so re-adding the nulls is the
+    # regression to catch.
+    ("rc2 §12.3: the candidate diagnostics carry null identity fields again",
+     '                "merge_suspected": merge,\n            })',
+     '                "merge_suspected": merge,\n'
+     '                "citation_key": None, "author_kind": None,\n            })',
+     "must not carry citation_key or author_kind at all"),
 
     # C-002. Dropping NFC leaves a decomposed `e` + U+0301 in the manuscript:
     # two code points where one is meant, so every coordinate after it is

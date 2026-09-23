@@ -2496,7 +2496,18 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
             ambiguous_citations.append({
                 "type": "ambiguous_citation", "index": 0,
                 "citation_index": c["index"],
-                "candidate_key": cand,
+                # rc2 §12.3 names this `citation_key`, not `candidate_key`,
+                # and §12.4 sorts the block on "first occurrence position of
+                # citation_key". The VALUE was always right — a nonunique
+                # match does establish a key, it just does not establish
+                # which work — but the field carried rc1's name.
+                "citation_key": cand,
+                # rc2's declared shape: `"example":"Smith (2020)"`. Never
+                # defined in prose, in any of the three records that carry it.
+                # Read off the examples as the citation surface of the first
+                # corresponding occurrence, and recorded as this file's reading
+                # rather than as rc2's.
+                "example": c.get("citation_group"),
                 "reference_indices": idx,
             })
 
@@ -2511,14 +2522,20 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     #
     # The et_al rule compares every visible author, not only the first, so
     # `Smith, Jones, et al. (2020)` is checked on both.
+    # Carries the reference's INDEX alongside the record, because §12.3
+    # declares `reference_index` on the mismatch and §12.4 orders the block by
+    # it. `enumerate(refs)` is the serialized `reference.index`: `refs_out` is
+    # `refs` and its indices are assigned by the same enumeration above, which
+    # is what rc2 §12.4 means by "All reference_index values refer to the
+    # serialized reference.index".
     by_key = {}
-    for r in refs:
+    for i, r in enumerate(refs):
         if r["reference_key"] and r.get("authors"):
-            by_key.setdefault(r["reference_key"], r)
+            by_key.setdefault(r["reference_key"], (i, r))
 
     mismatches = []
     for c in (cits if not absent else []):
-        ref = by_key.get(c["citation_key"])
+        ri, ref = by_key.get(c["citation_key"], (None, None))
         vis = c.get("visible_authors")
         # "For person citations with NON-NULL person-form data and a matched
         # reference with NON-NULL authors/author_count." A null on either side
@@ -2542,11 +2559,18 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
             "type": "author_structure_mismatch", "index": 0,
             "citation_index": c["index"] if "index" in c else None,
             "citation_key": c["citation_key"],
+            # rc2 §12.3 declares both of these and this file emitted neither.
+            # `reference_index` is load-bearing: §12.4 sorts the block on
+            # `(citation index, reference_index, failed)`, so without it two
+            # mismatches on one citation could stay tied on every key the
+            # block is ordered by — which is exactly what §12.4 forbids.
+            "reference_index": ri,
             "citation_author_form": c["author_form"],
             "visible_authors": vis,
             "author_count_constraint": c["author_count_constraint"],
             "reference_authors": ra, "reference_author_count": rn,
             "failed": "count" if not count_ok else "order",
+            "example": c.get("citation_group"),
         })
 
     # rc3 A5, normative:
@@ -2678,11 +2702,21 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
             pool.pop(pi)                          # "remove from the pool"
             diagnostics.append({
                 "type": "possible_mismatch", "index": 0,
-                "candidate_key": cand_key, "reference_index": ri,
+                "candidate_key": cand_key,
+                # rc2 §12.3: `identity_authority` is the literal "candidate".
+                # It replaces the two explicit nulls this record used to carry
+                # — `citation_key: None, author_kind: None` — which said the
+                # same thing less precisely. A null field can mean "not
+                # established" or "not applicable"; the literal says which.
+                "identity_authority": "candidate",
+                "reference_index": ri,
                 "reference_key": refs[ri]["reference_key"],
-                "rule": rule, "occurrences": len(occs),
-                # rc2, twice over and in CIT-ARCH-01: this establishes nothing.
-                "citation_key": None, "author_kind": None,
+                # rc2 calls this `evidence`. It was `rule`, which is rc1's
+                # name and also the local variable's, so the drift was easy to
+                # keep. `evidence` is the better word: the rule is what the
+                # repair pass applied, the evidence is what it found.
+                "evidence": rule,
+                "occurrences": len(occs),
             })
         else:
             merge = any(
@@ -2690,9 +2724,11 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                 and year in r["assembled"] for r in embedded)
             diagnostics.append({
                 "type": "missing_reference", "index": 0,
-                "candidate_key": cand_key, "occurrences": len(occs),
+                "candidate_key": cand_key,
+                "identity_authority": "candidate",
+                "example": occs[0].get("citation_group"),
+                "occurrences": len(occs),
                 "merge_suspected": merge,
-                "citation_key": None, "author_kind": None,
             })
 
     # §12.2: "Blocks never interleave." `diagnostics` holds both kinds in

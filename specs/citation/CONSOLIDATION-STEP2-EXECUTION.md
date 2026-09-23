@@ -159,9 +159,16 @@ load-bearing for the section above it.
 
 ### §11.3 Bibliography absence — NEW
 
-Eight summary fields go `null` rather than `0` when identity resolution did not
-run. `0` would mean "ran and found none"; `null` means "not evaluated". rc1
-carried the distinction in prose; rc2 makes it a field list.
+Summary fields go `null` rather than `0` when identity resolution did not run.
+`0` would mean "ran and found none"; `null` means "not evaluated". rc1 carried
+the distinction in prose; rc2 makes it a field list.
+
+**"Eight" was wrong, corrected 23 September.** rc2 §11.3 has ten entries: nine
+null and one zero, the zero being `resolved_citation_occurrences`, which is a
+real measurement rather than an absent one. The count is now generated from
+rc2's bytes in `CONSOLIDATION-STEP2-SUMMARY-AND-OUTPUT.md` and in C-067's
+control, because it was miscounted twice by eye — once as eight here, once as
+ten in the correction.
 
 ### §2.2 Standalone with supplied map — NEW
 
@@ -173,19 +180,29 @@ which is also new. Scope work, not behaviour.
 
 ## What is NOT covered here
 
-The ten CHANGED sections are identified but not yet dispositioned clause by
-clause. §9 and §11 are the largest at 109 and 100 changed lines, and §11's
-summary-field work is what rc3 A5 later amends, so those two should be taken
-together rather than in order.
-
 ```text
 §8  Pass 2 identity            93 lines   the 3x3 table and its outcomes
 §9  reconciliation            109 lines   candidate-level correction lands here
-§11 summary invariants        100 lines   the field set rc3 A5 then amends
-§12 canonical JSONL            58 lines   output contract
+§11 summary invariants        100 lines   DONE 23 September
+§12 canonical JSONL            58 lines   DONE 23 September
 §2, §10, §19                             scope, absence, gate
 §0, §14, §17                   16 total   small
 ```
+
+§11 and §12 are dispositioned clause by clause in
+`CONSOLIDATION-STEP2-SUMMARY-AND-OUTPUT.md`. Taken together rather than in
+order, because §12's record shapes are what §11's invariants are computed over.
+Two findings from that pair are worth carrying here:
+
+- rc1 §11.2's partition is **arithmetically unsatisfiable** — it partitions
+  `total_citation_occurrences` over identity outcomes that `unresolved_citation`
+  rows never receive. Off by 133 on this corpus. rc2 corrects it silently by
+  moving the left-hand side to `extracted_citation_occurrences`.
+- rc1 uses six summary terms in its invariants and defines none of them. rc2
+  §11.4 defines all six plus `identity_resolution_performed`, which rc1 lacks.
+
+§8 and §9 remain, at 202 changed lines, and they are where CIT-ARCH-01 is
+decided rather than surfaced.
 
 What no longer needs covering: §3 and §6 were flagged as the dangerous
 undiffed sections, on the reasoning that a silent wording change in the grammar
@@ -199,10 +216,11 @@ rather than outstanding.
 ```text
 architecture            rc1 → rc2   COMPLETE
 execution conformance   rc1 → rc2   10 sections IDENTICAL and closed.
-                                    10 CHANGED, identified but not yet
-                                    dispositioned clause by clause.
-conformance matrix      rc1 → rc2   not started
-deferred-work register  rc1 → rc2   not started
+                                    §11 and §12 dispositioned 23 September.
+                                    8 CHANGED remain: §8 and §9 are 202 lines
+                                    of it, the other six are small.
+conformance matrix      rc1 → rc2   COMPLETE
+deferred-work register  rc1 → rc2   COMPLETE
 rc2 → rc3                           seven discrepancies recorded
 ```
 

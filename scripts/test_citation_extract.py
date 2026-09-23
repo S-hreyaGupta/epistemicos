@@ -79,6 +79,50 @@ def keys(cits):
 FAILURES: list[str] = []
 
 
+def rc2_spec_path() -> Path | None:
+    """rc2's execution-conformance document, located from the working directory.
+
+    Not from `__file__`: the mutation probe copies the suite into a temp
+    directory and runs it there, so a path relative to this file resolves into
+    the temp directory and the read fails. Six mutations crashed that way rather
+    than taking a control red, and the probe reported them as WRONG CONTROL.
+    """
+    probe = Path.cwd()
+    for _ in range(4):
+        cand = probe / "specs/citation/citation-v3.4-rc2-execution-conformance.md"
+        if cand.exists():
+            return cand
+        probe = probe.parent
+    return None
+
+
+def rc2_section(number: str) -> list[str]:
+    """The lines of rc2's first ```text block under `### <number>`.
+
+    So a control can assert against rc2's own list instead of a tuple somebody
+    typed from memory. §11.3's field list was miscounted twice by eye — once as
+    eight, once as ten — before it was read this way.
+    """
+    p = rc2_spec_path()
+    if p is None:
+        return []
+    out, in_sec, in_block = [], False, False
+    for ln in p.read_text(encoding="utf-8").splitlines():
+        if ln.startswith("### "):
+            if in_sec and out:
+                break
+            in_sec = ln.startswith(f"### {number} ")
+            continue
+        if in_sec and ln.strip().startswith("```"):
+            if in_block:
+                break
+            in_block = True
+            continue
+        if in_sec and in_block:
+            out.append(ln)
+    return out
+
+
 def rc2_declared() -> dict[str, list[str]]:
     """rc2's declared key order per record type, read from rc2's own bytes.
 
@@ -95,21 +139,18 @@ def rc2_declared() -> dict[str, list[str]]:
     is wrong. The probe demonstrated exactly that — swapping two keys inside
     KEY_ORDER survived, because the control moved with it.
     """
-    probe = Path.cwd()
-    for _ in range(4):
-        cand = probe / "specs/citation/citation-v3.4-rc2-execution-conformance.md"
-        if cand.exists():
-            out: dict[str, list[str]] = {}
-            for ln in cand.read_text(encoding="utf-8").splitlines():
-                if ln.startswith('{"type":'):
-                    try:
-                        parsed = _json.loads(ln)
-                    except ValueError:
-                        continue
-                    out.setdefault(parsed["type"], list(parsed))
-            return out
-        probe = probe.parent
-    return {}
+    p = rc2_spec_path()
+    if p is None:
+        return {}
+    out: dict[str, list[str]] = {}
+    for ln in p.read_text(encoding="utf-8").splitlines():
+        if ln.startswith('{"type":'):
+            try:
+                parsed = _json.loads(ln)
+            except ValueError:
+                continue
+            out.setdefault(parsed["type"], list(parsed))
+    return out
 
 
 def main() -> int:
@@ -1874,18 +1915,26 @@ def main() -> int:
 
     # C-067. `0` is a measurement; `null` is the absence of one. A reader
     # averaging match rates across a corpus has to be able to tell them apart.
-    # rc2 §11.3 names exactly ten. Read off the section rather than retyped
-    # from memory, and the four rc2 fields added on 23 September
-    # (`distinct_works_cited`, the two diagnostics counts, and the pair
-    # renamed from `matched_*`) are on its list too.
-    nulled = ("uniquely_matched_occurrences", "uniquely_matched_works",
-              "unique_reference_match_occurrences",
-              "bibliography_key_ambiguous_occurrences",
-              "identity_not_resolved_occurrences",
-              "author_resolution_ambiguous_occurrences",
-              "reference_missing_occurrences", "possible_mismatch_occurrences",
-              "distinct_works_cited",
-              "author_structure_mismatches")
+    # rc2 §11.3's list, PARSED out of rc2 rather than retyped. The hand-typed
+    # version of this tuple was wrong twice in one day: the consolidation
+    # document counted the section's fields as eight, a correction counted them
+    # as ten-null, and the truth is nine null and one zero. Two people counting
+    # by eye got two different wrong answers, so the list is generated.
+    #
+    # `resolved_citation_occurrences` is deliberately excluded: §11.3 sets it to
+    # `0`, not null, because zero citations WERE resolved and that is a
+    # measurement. Asserting it null would contradict the section.
+    spec113 = rc2_section("11.3")
+    nulled = tuple(l.split("=")[0].strip() for l in spec113
+                   if l.strip().endswith("null"))
+    if len(nulled) != 9:
+        failures.append(f"C-067: expected nine null fields in rc2 §11.3, "
+                        f"parsed {len(nulled)} — the section moved or the "
+                        f"parse is wrong, and either way this control is not "
+                        f"checking what it says")
+    # `author_structure_mismatches` is not rc2's; it is this file's extra, and
+    # §11.3's reasoning applies to it for the same reason.
+    nulled = nulled + ("author_structure_mismatches",)
     wrong = [k for k in nulled if summ.get(k, "missing") is not None]
     if wrong:
         failures.append(f"C-067: not-evaluated quantities are null, never 0 — "
@@ -2093,12 +2142,22 @@ def main() -> int:
         # ce.__file__, which resolves to a temp directory once the mutation
         # probe copies the module, so the control failed for a reason that had
         # nothing to do with block order.
+        # `(Felfe, 2006)` against two 2006 Felfe entries is here for §12.3's
+        # sake rather than §12.2's: it is the only way to get an
+        # `ambiguous_citation` record into the fixture, and without one that
+        # record type is absent from `rec_by_type` and skipped entirely. The
+        # mutation renaming its `citation_key` back to rc1's `candidate_key`
+        # SURVIVED until this line was added — the control could not see a
+        # record the document never produced.
         mixed = d / "mixed.md"
         mixed.write_text(
             HEAD + "As shown (Whiteman, 2000) and (Smith, 2020) and "
-            "(Adams and Boyle, 2015) here.\n\n## References\n\n"
+            "(Adams and Boyle, 2015) and (Felfe, 2006) here.\n\n"
+            "## References\n\n"
             "Whitman, R. (2000). Pairs by edit distance. J, 1, 1.\n"
             "Adams, J. (2015). One author, cited as two. J, 2, 1.\n"
+            "Felfe, J. (2006). One work. J, 7, 1.\n"
+            "Felfe, J. (2006). A different work, same key. J, 8, 1.\n"
             "Jones, K. (2019). A. J, 3, 1.\nBrown, L. (2018). B. J, 4, 1.\n"
             "Davis, M. (2017). C. J, 5, 1.\nEvans, N. (2016). D. J, 6, 1.\n",
             encoding="utf-8")
@@ -2167,16 +2226,34 @@ def main() -> int:
                             "not found, so the declared order could not be "
                             "read. Not passing on a check that did not run")
         else:
-            bad = []
+            # `want` filters rc2's declared keys down to the ones the record
+            # actually has, and then checks their ORDER. That was the whole
+            # check until 23 September, and it meant a declared field this
+            # file never emitted passed silently: filtered out of `want`,
+            # never compared, never reported.
+            #
+            # Twelve fields were absent that way across five record types —
+            # `identity_authority` and `example` on both candidate-level
+            # diagnostics, `evidence`, `citation_key` on `ambiguous_citation`,
+            # `reference_index` on `author_structure_mismatch`, and meta's
+            # four. The control was green, named §12.3, and tested order only.
+            # So `absent` is now reported separately from `bad`.
+            bad, absent = [], []
             for t, declared in declared_by_type.items():
                 r = rec_by_type.get(t)
                 if r is None:
                     continue
+                gone = [k for k in declared if k not in r]
+                if gone:
+                    absent.append(f"{t}: {gone}")
                 want = [k for k in declared if k in r]
                 if list(r)[:len(want)] != want:
                     bad.append(f"{t}: got {list(r)[:len(want)]}, want {want}")
             checked = [t for t in declared_by_type if t in rec_by_type]
-            if bad:
+            if absent:
+                failures.append("§12.3: rc2 declares fields this file does not "
+                                "emit — " + "; ".join(absent))
+            elif bad:
                 failures.append("§12.3: declared key order — " + "; ".join(bad))
             elif "citation" not in rec_by_type or "reference" not in rec_by_type:
                 failures.append("§12.3: the fixture must carry both a citation "
@@ -2517,7 +2594,7 @@ def main() -> int:
              "year_transposition")]:
         mr, pm = diag(f"As shown {cite} here.",
                       "\n\n## References\n\n" + entry + "\n" + PAD)
-        if len(pm) != 1 or pm[0]["rule"] != rule:
+        if len(pm) != 1 or pm[0]["evidence"] != rule:
             failures.append(f"§9.4 {label}: expected one possible_mismatch "
                             f"with rule {rule} — got "
                             f"{[(x['rule']) for x in pm]}, {len(mr)} missing")
@@ -2557,7 +2634,7 @@ def main() -> int:
     if len(pm) != 1:
         failures.append(f"§9.4: one candidate pairs at most once — got "
                         f"{len(pm)}")
-    elif pm[0]["rule"] != "year_adjacent":
+    elif pm[0]["evidence"] != "year_adjacent":
         failures.append(f"§9.4: references are scanned in SOURCE order, so "
                         f"the 1999 entry pairs first — got {pm[0]['rule']}")
     else:
@@ -2617,9 +2694,18 @@ def main() -> int:
     if len(mr) != 1:
         failures.append(f"§9.4: an unpairable candidate emits one "
                         f"missing_reference — got {len(mr)}")
-    elif mr[0]["citation_key"] is not None or mr[0]["author_kind"] is not None:
-        failures.append("§9.4: neither diagnostic establishes citation_key "
-                        "or author_kind")
+    # Was `citation_key is None and author_kind is None`. rc2 §12.3 removes
+    # both fields from this record and puts `identity_authority: "candidate"`
+    # in their place, which is a stronger statement of the same rule: an absent
+    # field cannot be read as an unestablished one, and the literal says
+    # positively what authority the record has rather than leaving a reader to
+    # infer it from two nulls.
+    elif "citation_key" in mr[0] or "author_kind" in mr[0]:
+        failures.append(f"§9.4/§12.3: this record must not carry citation_key "
+                        f"or author_kind at all — got {sorted(mr[0])}")
+    elif mr[0].get("identity_authority") != "candidate":
+        failures.append(f"§12.3: identity_authority is the literal "
+                        f"'candidate' — got {mr[0].get('identity_authority')!r}")
     elif mr[0]["candidate_key"] != "smith|2020":
         failures.append("CIT-ARCH-01: the candidate is preserved in the "
                         "diagnostic")
@@ -2635,9 +2721,14 @@ def main() -> int:
                   "\n" + PAD)
     if len(pm) != 1:
         failures.append(f"§9.4: the repair pairs — got {len(pm)}")
-    elif pm[0]["citation_key"] is not None or pm[0]["author_kind"] is not None:
-        failures.append("§9.4: a possible_mismatch establishes no citation_key "
-                        "or author_kind either")
+    elif "citation_key" in pm[0] or "author_kind" in pm[0]:
+        failures.append(f"§9.4/§12.3: a possible_mismatch must not carry "
+                        f"citation_key or author_kind either — "
+                        f"got {sorted(pm[0])}")
+    elif pm[0].get("identity_authority") != "candidate":
+        failures.append(f"§12.3: identity_authority is the literal "
+                        f"'candidate' on possible_mismatch too — got "
+                        f"{pm[0].get('identity_authority')!r}")
     elif pm[0]["candidate_key"] != "whiteman|2000":
         failures.append("§9.4: possible_mismatch preserves the CANDIDATE, not "
                         "the reference it paired with")

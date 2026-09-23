@@ -3424,6 +3424,154 @@ def main() -> int:
     _spec_txt = (rc2_spec_path().read_text(encoding="utf-8")
                  if rc2_spec_path() else "")
 
+    # ------------------------------------------------------------ C-031, and
+    # every other closed set rc2 declares
+    #
+    # C-031 asks for "schema rejection" on `unresolved_reference.reason`: only
+    # `entry_start_grammar | orphan_line | no_year`. The same requirement
+    # applies to every closed enum in rc2, so this checks them together rather
+    # than one at a time.
+    #
+    # Written after two closed sets turned out to have drifted in one day —
+    # §3.2's STOP list was five tokens short and §3.1's PREFIX list was five
+    # cues short. Neither was findable by testing a sample, which is the whole
+    # property of a closed set. So the rule here is: for every value field rc2
+    # closes, no emitted value may fall outside it.
+    #
+    # The sweep across the thirteen corpus papers found ZERO violations in
+    # these eight, so this is a guard rather than a fix. What it guards against
+    # is the direction the other two drifted in — a set gaining a member here
+    # that rc2 does not have, or losing one it does.
+    print("\nrc2's closed value enums — nothing outside any of them")
+
+    def _inline_enum(pat):
+        m = re.search(pat, _spec_txt)
+        return {x.strip().strip("`") for x in m.group(1).split(",")} if m else set()
+
+    ENUMS = {
+        "author_resolution": _inline_enum(r"author_resolution ∈ \{([^}]+)\}"),
+        "author_kind": _inline_enum(r"author_kind ∈ \{([^}]+)\}"),
+        "style": _inline_enum(r"style ∈ \{([^}]+)\}"),
+        "section_level": _inline_enum(r"section_level ∈ \{([^}]+)\}"),
+        "evidence": _inline_enum(r"`evidence ∈ \{([^}]+)\}`"),
+        "failed": _inline_enum(r"`failed ∈ \{([^}]+)\}`"),
+    }
+    # `reason` is TWO closed enums under one field name — §6.4's for
+    # `unresolved_citation` and §7's for `unresolved_reference` — so the sweep
+    # keys on (record type, field). Keyed on the field alone it reported
+    # `no_grammar_match` as a violation of the reference enum, which is a flaw
+    # in the check rather than a defect in the run: right value, wrong record.
+    _rr = re.search(r"Closed `unresolved_reference\.reason` enum:.*?```text\n(.*?)```",
+                    _spec_txt, re.S)
+    _rc = re.search(r"### 6\.4 Unresolved-citation reasons.*?```text\n(.*?)```",
+                    _spec_txt, re.S)
+    ENUMS[("unresolved_reference", "reason")] = (
+        set(_rr.group(1).split()) if _rr else set())
+    ENUMS[("unresolved_citation", "reason")] = (
+        set(_rc.group(1).split()) if _rc else set())
+
+    empty = [k for k, v in ENUMS.items() if not v]
+    if empty:
+        failures.append(f"C-031: these closed sets could not be read out of "
+                        f"rc2, so the sweep proves nothing for them — {empty}")
+    else:
+        # One fixture per branch, chosen so that EVERY declared value in
+        # every closed enum is reached. That is the real bar, and the first
+        # version of this control did not clear it: it ran six fixtures,
+        # reached 12 of the 21 values, and guarded the rest with a floor of
+        # "at least 14" that was a number picked rather than derived.
+        #
+        # A subset check is only evidence over the values it reaches. Testing
+        # a sample is exactly what a closed set defeats, which is how §3.1 and
+        # §3.2 both drifted unnoticed.
+        R1 = ("\n\n## References\n\n"
+              "Smith, J. (2020). A. Journal, 1(1), 1-10.\n")
+        FIXTURES = [
+            ("two resolved, one non-ASCII",
+             "As shown (Smith, 2020) and Müller (2019) here.",
+             R1.rstrip("\n") + "\n\nMüller, K. (2019). B. Journal, 2(1), 1-10.\n"),
+            # §10: not_evaluated / undetermined
+            ("bibliography absent", "As shown (Smith, 2020) here.",
+             "\n\nPlain closing text with no reference list.\n"),
+            # §8.3 row 3: a key held by two entries
+            ("duplicate key", "As shown (Felfe, 2006) here.",
+             "\n\n## References\n\nFelfe, J. (2006). One. Journal, 7(1), 1-10."
+             "\n\nFelfe, J. (2006). Two. Journal, 8(1), 1-10.\n"),
+            # §9.4's three repair rules, one fixture each
+            ("repair: surname_edit_distance_1", "As shown (Whiteman, 2000) here.",
+             "\n\n## References\n\nWhitman, R. (2000). A. Journal, 1(1), 1-10.\n"),
+            ("repair: year_adjacent", "As shown (Whitman, 2001) here.",
+             "\n\n## References\n\nWhitman, R. (2000). A. Journal, 1(1), 1-10.\n"),
+            ("repair: year_transposition", "As shown (Whitman, 2001) here.",
+             "\n\n## References\n\nWhitman, R. (2010). A. Journal, 1(1), 1-10.\n"),
+            # §9.3's two failure modes
+            ("mismatch: order", "As shown (Smith & Brown, 2020) here.",
+             "\n\n## References\n\nSmith, J., & Jones, K. (2020). A. J, 1, 1.\n"),
+            ("mismatch: count", "As shown (Smith & Brown, 2020) here.", R1),
+            # §7's three unresolved_reference reasons
+            ("bad entries", "As shown (Smith, 2020) here.",
+             R1.rstrip("\n") + "\n\na stray orphan line with no entry grammar"
+             "\n\nMalone, T. An entry with no year at all."
+             "\n\nUlker Demirel, E., & Ciftci, G. (2020). A review. J, 3, 1.\n"),
+            # §6.4's three unresolved_citation reasons
+            ("bad candidates",
+             "As shown (OECD, 2020) here. Table (2020) reports it. "
+             "See (Table 2020) also.", R1),
+            # §6.3 stop reduction, and the narrative style
+            ("narrative, stop-reduced", "As Table Smith (2020) reports this.", R1),
+            # non_person identity
+            ("non-person", "The report (World Bank, 2020) says so.",
+             "\n\n## References\n\nWorld Bank (2020). A report. WB.\n"),
+        ]
+        # `section_level` needs its own document: `none` is text before any
+        # heading, and h3/h4 need nesting, neither of which fits above.
+        LEVELS = ("Opening text with (Smith, 2020) before any heading.\n\n"
+                  "# Paper\n\n## Introduction\n\nMore (Smith, 2020).\n\n"
+                  "### Sub\n\nMore (Smith, 2020).\n\n"
+                  "#### Deep\n\nYet more (Smith, 2020)." + R1)
+
+        emitted = {k: set() for k in ENUMS}
+        docs = [HEAD + b + r for _l, b, r in FIXTURES] + [LEVELS]
+        for doc in docs:
+            p = Path(_tf.mkdtemp()) / "p.md"
+            p.write_bytes(doc.encode("utf-8"))
+            try:
+                ls, _c = ce.run(p, {"ampersand"})
+            except ce.Abort:
+                continue
+            for r in ls:
+                for key in ENUMS:
+                    if isinstance(key, tuple):
+                        rtype, field = key
+                        if r.get("type") == rtype and r.get(field) is not None:
+                            emitted[key].add(r[field])
+                    elif key in r and r[key] is not None:
+                        emitted[key].add(r[key])
+
+        # `ambiguous` is reachable only through §15's test-only injection seam
+        # — §8.3 rows 6 to 9 need both candidates to match on different keys,
+        # which no document can produce. Named rather than silently tolerated,
+        # and C-042 to C-045 are what cover it.
+        UNREACHABLE = {("author_resolution", "ambiguous")}
+
+        violations = {str(k): sorted(emitted[k] - ENUMS[k])
+                      for k in ENUMS if emitted[k] - ENUMS[k]}
+        unreached = {str(k): sorted(v) for k in ENUMS
+                     if (v := {x for x in ENUMS[k] - emitted[k]
+                               if (k, x) not in UNREACHABLE})}
+        total = sum(len(v) for v in ENUMS.values())
+        if violations:
+            failures.append(f"C-031: values emitted outside a set rc2 closes — "
+                            f"{violations}")
+        elif unreached:
+            failures.append(f"C-031: these declared values were never reached, "
+                            f"so the subset check says nothing about them — "
+                            f"{unreached}")
+        else:
+            ok(f"C-031: every one of the {total} values across "
+               f"{len(ENUMS)} closed enums is reached, and nothing outside "
+               f"them is emitted")
+
     # ------------------------------------------------------- §3.1, C-016/017
     #
     # The other closed set, and it had the same defect as §3.2's: six of rc2's

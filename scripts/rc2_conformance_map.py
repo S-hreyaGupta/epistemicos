@@ -277,8 +277,20 @@ CHECKS = {
               "the closed three, in §7.3's order"),
     "C-070": ((), ("C-070: multi-year citations order by year",), "MET",
               "§12.4's year key breaks the position tie"),
-    "C-031": (('"entry_start_grammar"', '"orphan_line"', '"no_year"'), (),
-              "PARTIAL", "three reasons emitted, set not schema-enforced"),
+    # "schema rejection" on the reason enum, done for EVERY closed value set
+    # rc2 declares rather than that one. Written after §3.1 and §3.2 both
+    # turned out to have drifted in a single day — neither findable by testing
+    # a sample, which is the whole property of a closed set.
+    #
+    # Two directions, and the control checks both: nothing emitted outside a
+    # declared set, and every declared value reached. The second is what makes
+    # the first evidence; a subset check only says something about the values
+    # it exercises. 25 values across 8 enums, one fixture per branch.
+    "C-031": (('"entry_start_grammar"', '"orphan_line"', '"no_year"'),
+              ("every one of the",
+               "values emitted outside a set rc2 closes"),
+              "MET",
+              "all 25 values across 8 closed enums reached, none outside"),
     "C-033": ((), ("a list that parses partway",), "MET",
               "ordered authors, or nothing"),
     "C-034": ((), ("a full-forename reference takes no part",), "MET",

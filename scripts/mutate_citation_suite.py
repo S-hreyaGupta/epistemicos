@@ -890,6 +890,26 @@ MUTATIONS = [
      '            {"type": "meta", "spec_version": SPEC_VERSION},',
      "the error stream's meta is exactly type, spec_version"),
 
+    # C-031, generalised: every closed value enum rc2 declares. The sweep found
+    # zero violations, so these mutations check the guard rather than a defect —
+    # each puts a value outside the set rc2 closes.
+    ("rc2 §7: an unresolved_reference gains a fourth reason",
+     '                          "reason": "orphan_line"})',
+     '                          "reason": "orphan_line_v2"})',
+     "values emitted outside a set rc2 closes"),
+
+    ("rc2 §9.3: `failed` gains a third value",
+     '            "failed": "count" if not count_ok else "order",',
+     '            "failed": "count" if not count_ok else "order_or_count",',
+     "values emitted outside a set rc2 closes"),
+
+    # The other direction, and the one that matters more: a declared value
+    # stops being reachable. That is the shape §3.1 and §3.2 both had.
+    ("rc2 §9.4: year_transposition can no longer fire",
+     "        if _year_transposed(cand_year, ref_year):",
+     "        if False:",
+     "declared values were never reached"),
+
     # rc2 §3.1, C-016/017. Six of eleven members until 23 September, and
     # unlike §3.2's gap this one was NOT latent: two corpus groups parsed while
     # silently dropping the citation behind the prefix.

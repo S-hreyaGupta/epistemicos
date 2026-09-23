@@ -39,10 +39,24 @@ why the citation work never went through that protocol.
 
 How it works
 ------------
-Each of the three citation-side record emitters is disabled in turn, by
-replacing the `append` that publishes the record with a discard. The suite is
-then run and its `[ok]` lines collected. A control that still passes with an
-emitter disabled is not testing anything that emitter produces.
+Two record emitters, `citation` and `unresolved_citation`, are disabled
+TOGETHER by replacing the `append` that publishes the record with a discard.
+The suite is then run and its `[ok]` lines collected. A control that still
+passes with both disabled is not testing anything either one produces.
+
+What it does NOT disable, and what that costs
+---------------------------------------------
+`excluded_candidate` is the third citation-side emitter and this sweep leaves
+it running. Six of the pinned survivors below are pinned for that reason
+alone: they consume excluded records, so of course they survive. Those six are
+unmeasured rather than cleared, and extending the sweep to a third pass would
+move them out of the pin and into the result.
+
+Stated because the first version of this docstring said "each of the three
+citation-side record emitters is disabled in turn", which was wrong twice over
+in a file whose entire purpose is catching claims that overstate what was
+checked. Two, not three, and together, not in turn. Nothing in the file was
+wrong; only its account of itself.
 
 Most survivors are legitimate: a heading-detection control does not care that
 citations stopped being emitted, and a reference-side control does not either.
@@ -84,10 +98,12 @@ EMITTERS = [
      '    _ = ({\n        "type": "unresolved_citation", "index": 0,'),
 ]
 
-# Controls that legitimately survive with BOTH citation-side emitters off.
+# Controls that legitimately survive with both disabled emitters off.
 #
 # Every one was read before it was listed. They fall into five groups, none of
-# which consumes a citation record:
+# which consumes a citation record — though the excluded_candidate group is
+# only here because this sweep does not disable that emitter, so those six are
+# untested rather than cleared:
 #
 #   heading and section detection      the `References` line rules, h1/h2
 #   the style guard                    §10, which runs on raw text pre-extraction

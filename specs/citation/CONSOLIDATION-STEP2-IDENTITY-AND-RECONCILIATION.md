@@ -184,7 +184,7 @@ it.
 
 ## §9 — the dispositions
 
-### 9.1 Bibliography identity and duplicate index — REPLACE, and it is NOT IMPLEMENTED
+### 9.1 Bibliography identity and duplicate index — REPLACE, and it WAS NOT IMPLEMENTED
 
 ```text
 rc1   Build `by_reference_key` over non-null `reference_key` values.
@@ -199,20 +199,26 @@ rc2   Build `by_reference_key` over ALL EMITTED `reference` rows.
 rc2 adds the `cited` rule, and it is CIT-ARCH-01 once more: a candidate-level
 diagnostic must not make a duplicate look cited.
 
-The implementation emits none of these records:
+The implementation emitted none of these records when this was written:
 
 ```text
-reference keys held by two or more entries   5 groups across 4 papers
-duplicate_reference_key records emitted      0
+                                             was     now
+reference keys held by two or more entries   5       5
+duplicate_reference_key records emitted      0       5
 ```
 
-Not a regression — it has never been implemented, and the extractor says so in
-a comment. But §8.5's reservation and §9.6's pool both depend on duplicate keys
-being identified, and both currently compute that inline instead. The record
-that would let a reader see it is absent.
+Not a regression — it had never been implemented. The groups were being
+COMPUTED from the start, because §8.5's reservation and §9.6's pool are both
+defined against them, so the extractor knew about all five and said nothing.
+The one thing a reader needs in order to see why those references were held
+back was the one thing missing from the output.
+
+**Implemented 23 September**, with `cited` exercised on both branches: every
+real corpus group is cited, so a field hardcoded `true` passes the whole corpus
+and only a fixture with an uncited duplicate catches it.
 
 ```text
-disposition   REPLACE, and OPEN as implementation work
+disposition   REPLACE, implemented 23 September
 evidence      C-050 is PARTIAL in the conformance map for exactly this
 ```
 
@@ -241,10 +247,12 @@ why it survived. This implementation does serialize it, as an extra field, using
 
 ```text
 disposition   REPLACE with rc2's §9.2 classification
-UNRESOLVED    which spelling the consolidated document uses. §11's is
-              recommended: it is the one the counts are named after, and a
-              class whose name differs from the count over it is a rename
-              waiting to be missed
+spelling      §11's, CLOSED 23 September. It is the one the counts are named
+              after, and a class whose name differs from the count over it is
+              a rename waiting to be missed. Recorded as a finding about rc2
+              rather than a question, because rc2 disagreeing with itself is
+              something to report and the answer had an obvious default that
+              the implementation was already using.
 ```
 
 ### 9.3 Unique EXACT matches and author structure — REPLACE
@@ -327,16 +335,17 @@ Implemented 22 September, and the reason the ordering matters is on record in
 §8.4   unmatched candidate set        NEW       renumbers §8.4-8.5 to §8.5-8.6
 §8.5   ambiguity reservation          REPLACE   rule was unimplemented; fixed
 §8.6   internal invariant failure     REPLACE
-§9.1   bibliography identity          REPLACE   and NOT IMPLEMENTED, 5 groups
-§9.2   identity classification        REPLACE   + UNRESOLVED: rc2's two names
+§9.1   bibliography identity          REPLACE   implemented 23 Sep, 5 groups
+§9.2   identity classification        REPLACE   rc2 names them twice; §11's kept
 §9.3   unique exact matches           REPLACE
 §9.4   candidate-level diagnostics    REPLACE   the 28 August correction
 §9.5   merge qualification            REPLACE   two sentences MOVE by absorption
 §9.6   uncited references             REPLACE   ordering becomes normative
 ```
 
-No `DROP`. One `UNRESOLVED`, which is rc2 disagreeing with itself rather than
-with rc1, and one open implementation item.
+No `DROP`. The one row opened here as `UNRESOLVED` was rc2 disagreeing with
+itself rather than with rc1, and it closed the same day on §11's spelling. The
+open implementation item, §9.1's record, closed too.
 
 ---
 
@@ -346,24 +355,27 @@ with rc1, and one open implementation item.
 architecture            rc1 -> rc2   COMPLETE
 conformance matrix      rc1 -> rc2   COMPLETE
 deferred-work register  rc1 -> rc2   COMPLETE
-execution conformance   rc1 -> rc2   10 sections IDENTICAL and closed
-                                     §8, §9, §11, §12 dispositioned
-                                     §0, §2, §10, §14, §17, §19 remain — 6
-                                     sections, small, mostly scope and gate
+execution conformance   rc1 -> rc2   COMPLETE. 10 sections byte-identical,
+                                     10 dispositioned clause by clause.
+                                     §0, §2, §10, §14, §17, §19 are in
+                                     CONSOLIDATION-STEP2-SCOPE-AND-GATE.md
 rc2 -> rc3                           seven discrepancies recorded
 ```
 
-The four large sections are done. What remains in this pair is six small
-sections totalling well under a hundred changed lines.
-
-Two `UNRESOLVED` rows now stand across the whole of Step 2, and neither is a
-conflict between rc1 and rc2:
+Two rows were opened as `UNRESOLVED` across the whole of Step 2 and both
+closed on 23 September. Neither was a conflict between rc1 and rc2:
 
 ```text
-meta's rule identity     CLOSED 23 September: the output declares v3.4
+meta's rule identity     CLOSED: the output declares v3.4
                          (CONSOLIDATION-STEP2-SUMMARY-AND-OUTPUT.md)
-identity_class spelling  rc2 §9.2 against rc2 §11
+identity_class spelling  CLOSED: §11's, above
 ```
+
+Both were first recorded as questions for the consolidation. Neither needed
+to be. One was a wrong label rather than an undecided one; the other was a
+defect in rc2 with an obvious default the implementation already used. Worth
+noting the pattern, since the cost of asking is a round trip and the cost of
+deciding wrongly here was one constant and one word.
 
 Both are decisions about naming that bind an artifact other people read, and
 both are cheap to take and expensive to take twice.

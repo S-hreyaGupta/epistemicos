@@ -256,9 +256,9 @@ rc1  mode ∈ {standalone, orchestrated}
 rc2  mode ∈ {standalone_nomap, standalone_map, orchestrated}
 ```
 
-Follows rc2 §2.2 being new. Scope, not behaviour — except that `mode` is a
-`meta` field, and `meta` is the one record this implementation still does not
-emit in rc2's shape. See the open question at the end.
+Follows rc2 §2.2 being new. Scope, not behaviour. `mode` is a `meta` field,
+and `meta` was the one record this implementation did not emit in rc2's shape;
+it does now, carrying `standalone_nomap`. See the end of this document.
 
 ### 12.3 Two enum sets — REPLACE
 

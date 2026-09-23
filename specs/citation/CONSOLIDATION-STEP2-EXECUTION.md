@@ -233,5 +233,8 @@ deferred-work register  rc1 → rc2   COMPLETE
 rc2 → rc3                           seven discrepancies recorded
 ```
 
-No `DROP` and no `UNRESOLVED` found in what has been compared so far, in either
-pair.
+Across the whole of Step 2, all four pairs: **no `DROP`**. Two rows were opened
+as `UNRESOLVED` and both closed on 23 September, `meta`'s rule identity and the
+`identity_class` spelling. Neither turned out to be a conflict between rc1 and
+rc2 — one was a wrong label rather than an undecided one, the other a defect
+inside rc2 with an obvious default.

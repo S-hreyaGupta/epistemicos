@@ -254,15 +254,20 @@ v3.3 -> v3.4                         DECIDED, CIT-ARCH-01
 ```
 
 Across the whole of Step 2: **no `DROP`**. Two `MOVE`s, both keeping their rule
-normative. Two `UNRESOLVED` rows, neither a conflict between rc1 and rc2:
+normative. Two rows were opened as `UNRESOLVED` and both closed the same day,
+neither having been a conflict between rc1 and rc2:
 
 ```text
-meta's rule identity     CLOSED 23 September: the output declares v3.4
-identity_class spelling  rc2 §9.2 against rc2 §11
+meta's rule identity     CLOSED — the output declares v3.4, because the rules
+                         it runs are rc2's and rc3's throughout and `3.3` was
+                         a wrong label rather than an undecided one
+identity_class spelling  CLOSED — §11's, because the counts are named after
+                         it. rc2 disagreeing with itself is a finding for the
+                         consolidation, not a decision it had to wait on
 ```
 
-And one open implementation item, §9.1's `duplicate_reference_key` — five
-duplicate-key groups across four papers, no records emitted.
+The one open implementation item, §9.1's `duplicate_reference_key`, was also
+closed: five groups across four papers, five records now emitted.
 
 What Step 3 needs that this does not supply: the workflow v6 text is still not
 in the repository, so every gate these documents cite is one a reader cannot

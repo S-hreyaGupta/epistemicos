@@ -805,6 +805,57 @@ MUTATIONS = [
     # unconvertible coordinate leaves a code-point value in a byte field with
     # nothing to distinguish it — the exact silent-wrongness this change
     # exists to remove.
+    # rc2 §11. The state this file was in until 23 September: nine of rc2's
+    # twenty-one summary fields. Every one of §11.1 and §11.2's invariants was
+    # unevaluable, and the conformance map could only say PARTIAL.
+    ("rc2 §11: the twelve added summary fields go away again",
+     '                  "bibliography_reconciliation_performed": not absent,',
+     "",
+     "rc2 declares summary fields this file does not emit"),
+
+    # §12.3 for the summary. Removing its KEY_ORDER row leaves insertion
+    # order, which is v3.3's order and passes every arithmetic check above.
+    ("rc2 §12.3: the summary's declared key order is dropped",
+     '    "summary": [\n        "type", "identity_resolution_performed",',
+     '    "_summary_disabled": [\n        "type", "identity_resolution_performed",',
+     "§12.3: declared key order"),
+
+    # §11.4's authority distinction, and the defect this actually was. Counting
+    # every non-null key instead of every authoritative one is silent: the
+    # number is plausible, it is larger than the truth by exactly the citations
+    # with no reference behind them, and only §11.2's partition catches it.
+    ("rc2 §11.4: resolved counts any key, not an authoritative one",
+     '    resolved_occ = sum(1 for c in cits if c["citation_key"] in ref_index_by_key)',
+     '    resolved_occ = sum(1 for c in cits if c["citation_key"] is not None)',
+     "a key with no bibliography entry behind it is not resolved"),
+
+    # The same error one field over. `distinct_works_cited` has no invariant
+    # over it in rc2, so nothing but its own control can catch this.
+    ("rc2 §11.4: works cited counts syntax-derived keys",
+     '                      c["citation_key"] for c in cits\n'
+     '                      if c["citation_key"] in ref_index_by_key})),',
+     '                      c["citation_key"] for c in cits\n'
+     '                      if c["citation_key"] is not None})),',
+     "a key with no reference is not a work cited"),
+
+    # §11.2's subset bound. Counting diagnostic RECORDS rather than the
+    # occurrences they represent undercounts whenever one candidate key covers
+    # several occurrences — the opposite direction from double-counting, and
+    # equally invisible.
+    ("rc2 §11.4: the diagnostics count records, not occurrences",
+     '    ref_missing_occ = sum(d["occurrences"] for d in missing_refs)\n'
+     '    mismatch_occ = sum(d["occurrences"] for d in possible_mismatches)',
+     "    ref_missing_occ = len(missing_refs) * 9\n"
+     "    mismatch_occ = len(possible_mismatches)",
+     "the diagnostics count occurrences twice"),
+
+    # §11.1. The extraction invariant is the one rc2 marks "always", so it has
+    # to hold in bibliography-absent mode too.
+    ("rc2 §11.1: total stops counting the unresolved occurrences",
+     '                  "total_citation_occurrences": denom,',
+     '                  "total_citation_occurrences": n_parsed,',
+     "total must equal extracted + unresolved"),
+
     # C-002. Dropping NFC leaves a decomposed `e` + U+0301 in the manuscript:
     # two code points where one is meant, so every coordinate after it is
     # one out and the canonical hash names a different document.

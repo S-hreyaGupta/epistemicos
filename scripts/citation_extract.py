@@ -2804,15 +2804,94 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
         """§11.3: null in bibliography-absent mode, the count otherwise."""
         return None if absent else value
 
+    # rc2 §11.4, "resolved_citation_occurrences": *extracted occurrences with a
+    # non-null AUTHORITATIVE citation_key.*
+    #
+    # `authoritative` is the load-bearing word and the first version of this
+    # line dropped it, counting every non-null key instead. §11.2's partition
+    # then failed on 7 of the 13 papers, which is how the mistake was caught:
+    #
+    #     resolved_citation_occurrences
+    #     = unique_reference_match_occurrences
+    #     + bibliography_key_ambiguous_occurrences
+    #
+    # 55 citations across the corpus carry a `citation_key` with no
+    # bibliography behind it — `Chesbrough (2003)` keys `chesbrough|2003` while
+    # its `author_resolution` is `not_resolved`. That is CIT-ARCH-01 in the
+    # output: this file derives `citation_key` from syntax the way v3.3 does,
+    # and rc2 §8 says "syntax does not confer authoritative author_kind or
+    # citation_key. Authority is acquired only through exact bibliography
+    # resolution." Both models are live here, so "has a key" and "has an
+    # authoritative key" are different questions with different answers.
+    #
+    # Measured as membership in the reference index rather than by reading
+    # `identity_class`, so that the partition control below compares two
+    # expressions and not one against itself. Checked over the corpus before
+    # being relied on: the two agree on all 2102 citations and disagree on
+    # none, which is the evidence for the equality, not the definition of it.
+    resolved_occ = sum(1 for c in cits if c["citation_key"] in ref_index_by_key)
+
+    # §11.4, "reference_missing_occurrences" / "possible_mismatch_occurrences":
+    # *occurrences represented by* candidate-level diagnostics. Occurrences,
+    # not records — one record covers however many occurrences share its
+    # candidate key, which is what the records' own `occurrences` field holds.
+    #
+    # Summing is only safe because each unresolved citation lands in exactly
+    # one `grouped` bucket, so no occurrence is counted twice. §11.2 gives the
+    # check that would catch it if that stopped holding: both are "diagnostics
+    # over a SUBSET of identity_not_resolved_occurrences", so their sum can
+    # never exceed it. Controlled below rather than trusted.
+    ref_missing_occ = sum(d["occurrences"] for d in missing_refs)
+    mismatch_occ = sum(d["occurrences"] for d in possible_mismatches)
+
     lines.append({"type": "summary",
                   "identity_resolution_performed": not absent,
+                  # §11.4: "true iff bibliography reconciliation was
+                  # evaluated; in v3.4 this equals identity_resolution_
+                  # performed." Emitted as its own field anyway, because rc2
+                  # declares it and "equals" is a statement about v3.4 that a
+                  # later revision can withdraw without renaming anything.
+                  "bibliography_reconciliation_performed": not absent,
                   "references_source": ref_source,
-                  # v3.3's fields keep v3.3's meaning. rc2 renames them
-                  # `uniquely_matched_*`, which is the consolidation's change
-                  # to make, not this one's.
-                  "matched_occurrences": _n(len(uniquely_matched)),
-                  "matched_works": _n(len({c["citation_key"]
-                                           for c in uniquely_matched})),
+                  # rc2 §11.1's extraction invariant, which holds in absent
+                  # mode too — extraction does not need a bibliography:
+                  #
+                  #     total = extracted + unresolved_extraction
+                  "total_citation_occurrences": denom,
+                  "extracted_citation_occurrences": n_parsed,
+                  "unresolved_extraction_occurrences": n_unres,
+                  # §11.3's one explicit exception to the null rule: this is
+                  # `0` and not `null` when identity resolution did not run.
+                  # Zero citations were resolved, and that IS a measurement.
+                  "resolved_citation_occurrences": 0 if absent else resolved_occ,
+                  # rc2's names for the two counts this file has carried as
+                  # v3.3's `matched_occurrences` / `matched_works` since before
+                  # the consolidation. Renamed on Alex Zamurko's instruction of
+                  # 20 September, which is written in rc2's vocabulary:
+                  #
+                  #     `author_structure_mismatch` occurrences MUST NOT
+                  #     contribute to `uniquely_matched_occurrences` or
+                  #     `uniquely_matched_works`.
+                  #
+                  # An instruction about a field is a decision about its name.
+                  "uniquely_matched_occurrences": _n(len(uniquely_matched)),
+                  "uniquely_matched_works": _n(len({c["citation_key"]
+                                                    for c in uniquely_matched})),
+                  # §11.4: "unique non-null authoritative citation_key values
+                  # when identity resolution ran; null when it did not."
+                  # Distinct KEYS, where `resolved_citation_occurrences`
+                  # counts occurrences — and `authoritative` again, so the
+                  # 55 syntax-only keys are not works this paper cited.
+                  "distinct_works_cited": _n(len({
+                      c["citation_key"] for c in cits
+                      if c["citation_key"] in ref_index_by_key})),
+                  "reference_missing_occurrences": _n(ref_missing_occ),
+                  "possible_mismatch_occurrences": _n(mismatch_occ),
+                  # Not one of rc2's summary fields. Kept because Alex
+                  # Zamurko's amendment above makes it the quantity that
+                  # explains a gap between `resolved_citation_occurrences` and
+                  # `uniquely_matched_occurrences`, and a reader who can see
+                  # both counts but not the reason they differ has to guess.
                   "author_structure_mismatches": _n(len(mismatches)),
                   # rc3 §C partitions CASES, not defects: one record per
                   # group, however many defects that group carries.
@@ -2862,6 +2941,15 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                       r: sum(1 for x in excl if x["excluded_reason"] == r)
                       for r in EXCLUDED_REASONS
                       if any(x["excluded_reason"] == r for x in excl)},
+                  # rc2 puts the digest in BOTH `meta` and `summary`, and this
+                  # file emitted it only in `meta`. Same value, computed once.
+                  "canonical_sha256": lines[0]["canonical_sha256"],
+                  # `null` in standalone no-map mode, which is the only mode
+                  # this implementation runs. rc2 §13 names the field so that a
+                  # map-consuming run has somewhere to put the map's digest;
+                  # C-084 to C-086 are the map modes and rc2 itself marks them
+                  # OUTSIDE_PILOT.
+                  "section_map_sha256": None,
                   # rc2 §9.3: "An `exact` mismatch forces exit 1. An `et_al`
                   # mismatch is reported but does not by itself force exit 1
                   # in v3.4." The split is deliberate — an exact mismatch is
@@ -2988,12 +3076,38 @@ def to_byte_coordinates(records: list[dict], text: str) -> None:
 #      rc2's keys come first in rc2's order; ours follow. A byte golden
 #      against rc2 would still differ on the tail, which is why C-068 is not
 #      claimed as fully met.
-#   2. It does not rename the summary's counts. rc2 calls them
-#      `uniquely_matched_occurrences` and `uniquely_matched_works`; this file
-#      keeps v3.3's `matched_occurrences` and `matched_works`, as it has
-#      since before the consolidation, and that rename is the consolidation's
-#      to make.
+#   2. It does not settle `meta`'s rule identity. rc2 §1.1 pins
+#      `spec_version = "3.4"`, `citation_profile`, `citation_rule_version` and
+#      `mode`, none of which exists in v3.3, whose `meta` is the whole of
+#      `{"type":"meta","spec_version":"3.3"}`. Emitting any of them is the
+#      output declaring which specification governs it, and that is not a
+#      formatting decision. Raised 23 September; `meta` keeps v3.3's identity
+#      until it is answered, so C-068 stays PARTIAL on `meta` alone.
+#
+# The summary's counts WERE renamed, on 23 September. rc2 calls them
+# `uniquely_matched_occurrences` and `uniquely_matched_works`, and Alex
+# Zamurko's amendment of 20 September is written in those names, which makes it
+# a decision already taken rather than one this file would be taking.
 KEY_ORDER = {
+    # rc2 §12.3's declared order for the two envelope records. `meta` is
+    # rc2's four-field form with this file's two extras appended;
+    # `canonical_order` puts the declared keys first and lets the rest follow,
+    # so the extras cannot displace rc2's order.
+    "meta": [
+        "type", "spec_version", "citation_rule_version", "citation_profile",
+        "mode", "canonical_sha256", "section_map_sha256", "references_source"],
+    "summary": [
+        "type", "identity_resolution_performed",
+        "bibliography_reconciliation_performed", "total_citation_occurrences",
+        "extracted_citation_occurrences", "unresolved_extraction_occurrences",
+        "resolved_citation_occurrences", "distinct_surface_groups",
+        "distinct_works_cited", "uniquely_matched_occurrences",
+        "uniquely_matched_works", "unique_reference_match_occurrences",
+        "bibliography_key_ambiguous_occurrences",
+        "reference_missing_occurrences", "possible_mismatch_occurrences",
+        "author_resolution_ambiguous_occurrences",
+        "identity_not_resolved_occurrences", "canonical_sha256",
+        "section_map_sha256", "references_source", "exit"],
     "citation": [
         "type", "index", "citation_group", "citation_segment",
         "author_phrase", "resolved_author_phrase", "author_resolution",

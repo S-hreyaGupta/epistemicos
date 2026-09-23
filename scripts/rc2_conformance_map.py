@@ -131,13 +131,31 @@ CHECKS = {
     # table — comparing output to the table it was built from can only show
     # the table was not applied, never that it is wrong.
     #
+    # `summary` closed on 23 September: all twenty-one of rc2's fields, in
+    # rc2's order, checked against rc2's own bytes.
+    #
     # Still PARTIAL, for two divergences that are named rather than hidden:
-    # records carry fields beyond rc2's declared set (rc3's candidate_state,
-    # §6.3's stop_reduced_phrase, §8.1's two candidate keys), and `meta` and
-    # `summary` differ in field NAMES, not just order.
+    #
+    #   1. records carry fields beyond rc2's declared set — rc3's
+    #      `candidate_state`, §6.3's `stop_reduced_phrase`, §8.1's two
+    #      candidate keys. rc3 requires them, so a byte golden against rc2
+    #      differs on the tail by design and this will not close while both
+    #      documents are in force.
+    #   2. `meta` is v3.3's. rc2 §1.1 pins `spec_version = "3.4"` plus
+    #      `citation_rule_version`, `citation_profile` and `mode`; v3.3's meta
+    #      is the whole of `{"type":"meta","spec_version":"3.3"}`. Emitting
+    #      any of them is the output declaring which specification governs it,
+    #      which is a decision for the consolidation and not a formatting fix.
     "C-068": ((), ("record types lead with the key ",),
               "PARTIAL",
-              "bytes and key order pinned; meta and summary names differ"),
+              "summary closed; meta still declares v3.3, and rc3 adds fields"),
+    # rc2 §11.1's extraction invariant, executable for the first time on
+    # 23 September — `total_citation_occurrences` was among the twelve fields
+    # this file did not emit, so the equation had no left-hand side.
+    #
+    # Not one of rc2's 86 cases. Recorded here anyway, with C-052's entry
+    # extended below to the second control, because the map's job is to say
+    # what is pinned and §11.1 now is.
     "C-083": ((), ("C-083: the same input produces byte-identical output",),
               "MET", "two runs, same bytes"),
     # §12.2's two halves. "Blocks never interleave" was being broken: the two
@@ -229,8 +247,14 @@ CHECKS = {
               "F=unique, S=no_match"),
     "C-039": ((), ("§8.3: nonunique/no_match → ambiguous_citation",), "MET",
               "F=nonunique, S=no_match"),
-    "C-052": ((), ("§11.2: the identity classes partition",), "MET",
-              "identity partition is exact"),
+    # Two controls, and the second is the one that earned its place. §11.2's
+    # partition was pinned in the extractor's own vocabulary; the new control
+    # checks rc2's equation over rc2's field names, with a resolved and an
+    # unresolved occurrence both present so neither side can be empty.
+    "C-052": ((), ("§11.2: the identity classes partition",
+                   "§11.2/C-052: resolved + ambiguous + not_resolved"),
+              "MET",
+              "identity partition exact, in rc2's names, both sides non-empty"),
     # rc2 §6.3 / §8.1 / §8.4, implemented 22 September. The guard did NOT
     # flag these, because their anti-needle was `stop_reduced_candidate` —
     # a name guessed when the case was written, and the implementation calls

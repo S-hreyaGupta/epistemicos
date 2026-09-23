@@ -79,6 +79,39 @@ def keys(cits):
 FAILURES: list[str] = []
 
 
+def rc2_declared() -> dict[str, list[str]]:
+    """rc2's declared key order per record type, read from rc2's own bytes.
+
+    Walks up from the working directory rather than from this file, because the
+    mutation probe copies the suite into a temp directory and runs it there.
+    An earlier version resolved the path relative to `__file__`, which made
+    six mutations crash on a missing spec file instead of taking a control red
+    — reported as WRONG CONTROL, which is the probe working correctly on a
+    broken probe.
+
+    Reading rc2 rather than `ce.KEY_ORDER` is the point. Comparing the output
+    against the table the output was built from is self-consistent by
+    construction: it can show the table was not applied, never that the table
+    is wrong. The probe demonstrated exactly that — swapping two keys inside
+    KEY_ORDER survived, because the control moved with it.
+    """
+    probe = Path.cwd()
+    for _ in range(4):
+        cand = probe / "specs/citation/citation-v3.4-rc2-execution-conformance.md"
+        if cand.exists():
+            out: dict[str, list[str]] = {}
+            for ln in cand.read_text(encoding="utf-8").splitlines():
+                if ln.startswith('{"type":'):
+                    try:
+                        parsed = _json.loads(ln)
+                    except ValueError:
+                        continue
+                    out.setdefault(parsed["type"], list(parsed))
+            return out
+        probe = probe.parent
+    return {}
+
+
 def main() -> int:
     failures: list[str] = FAILURES
 
@@ -1195,10 +1228,10 @@ def main() -> int:
     cit = next(l for l in lines if l.get("type") == "citation")
     if cit["citation_key"] != "smith|2020":
         failures.append("a mismatch must not erase the established identity")
-    elif s["matched_occurrences"] != 0:
+    elif s["uniquely_matched_occurrences"] != 0:
         failures.append(f"an author_structure_mismatch occurrence must not "
                         f"count as matched — got "
-                        f"{s['matched_occurrences']}")
+                        f"{s['uniquely_matched_occurrences']}")
     elif code != 1:
         failures.append(f"an exact mismatch forces exit 1 — got {code}")
     else:
@@ -1211,7 +1244,7 @@ def main() -> int:
     elif code != 1:
         # This document also has an unresolved-free, fully matched profile,
         # so exit 1 here comes from the mismatch alone being subtracted from
-        # matched_occurrences — not from the et_al rule forcing it.
+        # uniquely_matched_occurrences — not from the et_al rule forcing it.
         ok("an et_al mismatch does not itself force exit 1")
     else:
         ok("an et_al mismatch is reported without forcing exit 1 on its own")
@@ -1841,11 +1874,17 @@ def main() -> int:
 
     # C-067. `0` is a measurement; `null` is the absence of one. A reader
     # averaging match rates across a corpus has to be able to tell them apart.
-    nulled = ("matched_occurrences", "matched_works",
+    # rc2 §11.3 names exactly ten. Read off the section rather than retyped
+    # from memory, and the four rc2 fields added on 23 September
+    # (`distinct_works_cited`, the two diagnostics counts, and the pair
+    # renamed from `matched_*`) are on its list too.
+    nulled = ("uniquely_matched_occurrences", "uniquely_matched_works",
               "unique_reference_match_occurrences",
               "bibliography_key_ambiguous_occurrences",
               "identity_not_resolved_occurrences",
               "author_resolution_ambiguous_occurrences",
+              "reference_missing_occurrences", "possible_mismatch_occurrences",
+              "distinct_works_cited",
               "author_structure_mismatches")
     wrong = [k for k in nulled if summ.get(k, "missing") is not None]
     if wrong:
@@ -2099,40 +2138,24 @@ def main() -> int:
         # `candidate_state`, `stop_reduced_phrase` and the two candidate keys
         # beyond what rc2 declares, so a byte golden against rc2 would still
         # differ on the tail. That is why C-068 stays PARTIAL.
-        # The declared order is read from rc2's OWN BYTES, not from
-        # ce.KEY_ORDER. Comparing the output against the table the output was
-        # built from is self-consistent by construction: it can show the table
-        # was not applied, never that the table is wrong. The mutation probe
-        # demonstrated exactly that — swapping two keys inside KEY_ORDER
-        # survived, because the control moved with it.
-        spec = None
-        probe = Path.cwd()
-        for _ in range(4):
-            cand = probe / "specs/citation/citation-v3.4-rc2-execution-conformance.md"
-            if cand.exists():
-                spec = cand
-                break
-            probe = probe.parent
-        declared_by_type = {}
-        if spec is not None:
-            for ln in spec.read_text(encoding="utf-8").splitlines():
-                if ln.startswith('{"type":'):
-                    try:
-                        parsed = _json.loads(ln)
-                    except ValueError:
-                        continue
-                    declared_by_type.setdefault(parsed["type"], list(parsed))
-            # `meta` and `summary` are excluded, and the reason is a real
-            # divergence rather than an inconvenience: for those two the
-            # field SET differs, not just its order. rc2's summary calls the
-            # counts `uniquely_matched_occurrences` and `uniquely_matched_works`
-            # where this file keeps v3.3's `matched_*`, and rc2's meta carries
-            # `citation_rule_version`, `citation_profile` and `mode` which this
-            # file does not emit. Ordering a set that does not match is not the
-            # check §12.3 asks for, and pretending otherwise would make this
-            # control pass on a document nobody could byte-compare.
+        declared_by_type = rc2_declared()
+        if declared_by_type:
+            # `summary` used to be excluded here alongside `meta`, because its
+            # field SET differed and not just its order — rc2's
+            # `uniquely_matched_*` against v3.3's `matched_*`, and twelve rc2
+            # fields this file did not emit. All twenty-one landed on
+            # 23 September, so the summary is checked like any other record.
+            #
+            # `meta` stays out, and that is a real divergence rather than an
+            # inconvenience. rc2 §1.1 pins `spec_version = "3.4"` plus
+            # `citation_rule_version`, `citation_profile` and `mode`, none of
+            # which exists in v3.3, whose meta is the whole of
+            # `{"type":"meta","spec_version":"3.3"}`. Emitting them is the
+            # output declaring which specification governs it. Ordering a set
+            # that does not match is not the check §12.3 asks for, and
+            # pretending otherwise would make this control pass on a document
+            # nobody could byte-compare.
             declared_by_type.pop("meta", None)
-            declared_by_type.pop("summary", None)
 
         rec_by_type = {}
         for ln in ce.serialize(ls).rstrip(b"\n").split(b"\n"):
@@ -2995,6 +3018,160 @@ def main() -> int:
     except ce.Abort as a:
         failures.append(f"§2: a legitimate null coordinate aborted "
                         f"{a.code} {a.reason}")
+
+    # ------------------------------------------------------ §11, §11.4, C-052
+    #
+    # rc2 declares 21 summary fields and this file emitted 9 of them until
+    # 23 September. The twelve added are not decoration: §11.1 and §11.2 are
+    # arithmetic invariants over them, and an invariant you cannot evaluate is
+    # not an invariant.
+    print("\nrc2 §11 — summary fields and the invariants over them")
+
+    def summ_of(body, refs=REFS, fixes=frozenset({"ampersand"})):
+        p = Path(_tf.mkdtemp()) / "p.md"
+        p.write_bytes((HEAD + body + refs).encode("utf-8"))
+        ls, _c = ce.run(p, set(fixes))
+        return [l for l in ls if l.get("type") == "summary"][0]
+
+    # Which fields rc2 declares, read out of rc2's own example line. A list
+    # typed into this control would be a copy of the implementation's list, and
+    # two copies of the same table agree with each other whatever either says.
+    #
+    # Field SET only. Their ORDER is §12.3's business and is checked there,
+    # against the same bytes — duplicating it here would mean two controls to
+    # keep in step and one of them eventually lying.
+    declared = rc2_declared().get("summary")
+    if not declared:
+        failures.append("§11: rc2's summary example line was not found, so "
+                        "this block establishes nothing")
+    else:
+        got = list(ce.canonical_order(summ_of("A claim (Smith, 2020) holds.")))
+        missing = [k for k in declared if k not in got]
+        if missing:
+            failures.append(f"§11: rc2 declares summary fields this file does "
+                            f"not emit — {missing}")
+        else:
+            ok(f"§11: all {len(declared)} of rc2's summary fields are emitted, "
+               f"with this file's {len(got) - len(declared)} extras alongside")
+
+    # §11.1, the extraction invariant, and rc2 says "always" — so it is checked
+    # in bibliography-absent mode too, where every identity count goes null.
+    # Extraction does not need a bibliography, and §11.3 leaves these three out
+    # of its null list precisely because they were still measured.
+    # `(OECD, 2020)` is in the fixture on purpose: it fails §6's all-caps
+    # surname rule and becomes an `unresolved_citation`, so the right-hand side
+    # has two non-zero terms.
+    #
+    # The first version used two ordinary citations, both of which parsed. That
+    # made `unresolved_extraction_occurrences` zero, so `total = extracted`
+    # held with the unresolved term absent — and the mutation that drops the
+    # term entirely SURVIVED. Caught by the probe, which is the only thing that
+    # could have caught it: the control was green, named the right rule, and
+    # tested half of it.
+    for label, refs in (("with a bibliography", REFS),
+                        ("with none at all", "\n\nPlain closing text.\n")):
+        s = summ_of("A claim (Smith, 2020) holds. Also (OECD, 2020) says so.",
+                    refs=refs)
+        lhs = s["total_citation_occurrences"]
+        extracted = s["extracted_citation_occurrences"]
+        unres_occ = s["unresolved_extraction_occurrences"]
+        if lhs != extracted + unres_occ:
+            failures.append(f"§11.1: total must equal extracted + unresolved "
+                            f"{label} — {lhs} != {extracted} + {unres_occ}")
+        elif not extracted or not unres_occ:
+            failures.append(f"§11.1: the invariant was checked {label} with "
+                            f"extracted={extracted} and unresolved={unres_occ}; "
+                            f"a zero term makes it hold without being tested")
+        else:
+            ok(f"§11.1: total {lhs} = extracted {extracted} + unresolved "
+               f"{unres_occ}, {label}")
+
+    # §11.2's identity partition, which is C-052: "resolved + author_ambiguous
+    # + not_resolved = extracted". Every extracted occurrence gets exactly one
+    # of rc2 §9.2's identity states, so a citation that fell through every
+    # branch would show up here as arithmetic rather than as a missing field.
+    s = summ_of("A claim (Smith, 2020) holds. Nobody (Ghost, 1999) agrees.")
+    lhs = s["extracted_citation_occurrences"]
+    rhs = (s["resolved_citation_occurrences"]
+           + s["author_resolution_ambiguous_occurrences"]
+           + s["identity_not_resolved_occurrences"])
+    if lhs != rhs:
+        failures.append(f"§11.2/C-052: the identity partition must be exact — "
+                        f"extracted {lhs} != {rhs}")
+    elif s["resolved_citation_occurrences"] == 0 or \
+            s["identity_not_resolved_occurrences"] == 0:
+        failures.append("§11.2/C-052: the partition was checked on a document "
+                        "where one side is empty, so it would balance without "
+                        "the states being assigned")
+    else:
+        ok("§11.2/C-052: resolved + ambiguous + not_resolved = extracted, "
+           "with both a resolved and an unresolved occurrence present")
+
+    # §11.2's second equation, and the one that caught a real defect. It is
+    # only evidence because the two sides come from different places:
+    # `resolved_citation_occurrences` from whether a key is in the reference
+    # index, the right-hand side from `identity_class`.
+    #
+    # Computed as the sum, this would have been true on all thirteen papers
+    # and said nothing. Computed independently, it was FALSE on seven of them,
+    # because `resolved` had been written as "has a non-null citation_key" and
+    # rc2 §11.4 says "non-null AUTHORITATIVE citation_key" — 55 corpus
+    # citations have the first and not the second.
+    lhs = s["resolved_citation_occurrences"]
+    rhs = (s["unique_reference_match_occurrences"]
+           + s["bibliography_key_ambiguous_occurrences"])
+    if lhs != rhs:
+        failures.append(f"§11.2: resolved must equal unique_reference_match + "
+                        f"bibliography_key_ambiguous — {lhs} != {rhs}")
+    else:
+        ok("§11.2: resolved = unique_reference_match + key_ambiguous, each "
+           "side computed from a different field")
+
+    # §11.4's authority distinction, stated as its own control because the
+    # arithmetic above can be satisfied by two wrong numbers that happen to
+    # agree. A citation with no reference behind it keeps its syntax-derived
+    # key — rc2 §8: "syntax does not confer authoritative citation_key" — and
+    # must NOT be counted as resolved or as a work cited.
+    p = Path(_tf.mkdtemp()) / "p.md"
+    p.write_bytes((HEAD + "Nobody (Ghost, 1999) agrees." + REFS).encode("utf-8"))
+    ls, _c = ce.run(p, {"ampersand"})
+    ghost = next((c for c in ls if c.get("type") == "citation"
+                  and c.get("year") == "1999"), None)
+    s = [l for l in ls if l.get("type") == "summary"][0]
+    if ghost is None:
+        failures.append("§11.4: the authority control's citation did not parse")
+    elif ghost["citation_key"] is None:
+        failures.append("§11.4: this control needs a citation that HAS a key "
+                        "without authority; this one has no key, so it would "
+                        "pass under either model")
+    elif s["resolved_citation_occurrences"] != 0:
+        failures.append(f"§11.4: a key with no bibliography entry behind it is "
+                        f"not resolved — got "
+                        f"{s['resolved_citation_occurrences']}")
+    elif s["distinct_works_cited"] != 0:
+        failures.append(f"§11.4: a key with no reference is not a work cited — "
+                        f"got {s['distinct_works_cited']}")
+    else:
+        ok(f"§11.4: {ghost['citation_key']!r} has a key and no authority, so "
+           f"it counts toward neither resolved nor works cited")
+
+    # §11.2: the two candidate-level diagnostics are "over a SUBSET of
+    # identity_not_resolved_occurrences", not additional partition states.
+    # Their sum can therefore never exceed it — the check that would catch an
+    # occurrence being counted under two candidate keys.
+    s = summ_of("Nobody (Ghost, 1999) agrees. Neither (Phantom, 1998) does.")
+    diag = (s["reference_missing_occurrences"]
+            + s["possible_mismatch_occurrences"])
+    inr = s["identity_not_resolved_occurrences"]
+    if diag > inr:
+        failures.append(f"§11.2: the diagnostics count occurrences twice — "
+                        f"{diag} diagnostic occurrences over {inr} unresolved")
+    elif diag == 0:
+        failures.append("§11.2: the subset bound was checked with no "
+                        "diagnostics emitted, so it holds vacuously")
+    else:
+        ok(f"§11.2: {diag} diagnostic occurrences within {inr} "
+           f"identity_not_resolved, counted once each")
 
     # C-002: "CRLF/lone CR→LF then NFC", canonical bytes exactly pinned.
     # Both directions matter. NFC composition SHORTENS the text — `e` + U+0301

@@ -720,9 +720,14 @@ MUTATIONS = [
      '            [].append({',
      "§8.3: EXACTLY ONE ambiguous_author_resolution per occurrence"),
 
+    # Retargeted 23 September: the record went flat, into rc2 §12.3's declared
+    # key order, so the nested `candidates` array this probe reached into is
+    # gone. Reported as "probe did not apply", which is the right answer and
+    # the reason that state exists — a probe that silently mutated nothing
+    # would have read as a pass.
     ("rc2 §8.5: ambiguity reserves nothing",
-     "    for a in ambiguous_authors:\n        for cand in a[\"candidates\"]:\n            reserved.update(cand[\"reference_indices\"])",
-     "    for a in []:\n        for cand in a[\"candidates\"]:\n            reserved.update(cand[\"reference_indices\"])",
+     "    for a in ambiguous_authors:",
+     "    for a in []:",
      "§8.5: reserved indices must not emit uncited_reference"),
 
     ("rc2 §8.5: reserved indices stay in the pool",
@@ -1202,6 +1207,68 @@ MUTATIONS = [
     # reference NUMBER where the envelope asks for a year. An implementation
     # that widened only the delimiter would still find nothing, which is the
     # reason this mutation is a single substitution over both lines.
+    # ---------------------------------------------------------------- C-048.
+    # The two index arrays are swapped. §12.3's control sees key NAMES and
+    # ORDER, so it stays green; only a byte golden notices that `full` names
+    # the reduced candidate's reference and the reduced candidate names
+    # `full`'s. That difference is the reason rc2 asks for a byte golden here
+    # and the reason the old control, which asked only whether both candidates
+    # were named, could not have caught the nested shape it was written
+    # against.
+    ("rc2 §12.3/C-048: the two reference-index arrays are swapped",
+     '                "full_match_state": f_state,\n'
+     '                "full_candidate_key": full_key,\n'
+     '                "full_reference_indices": f_idx,\n'
+     '                "stop_reduced_phrase": c.get("stop_reduced_phrase"),\n'
+     '                "stop_reduced_match_state": s_state,\n'
+     '                "stop_reduced_candidate_key": reduced_key,\n'
+     '                "stop_reduced_reference_indices": s_idx,\n',
+     '                "full_match_state": f_state,\n'
+     '                "full_candidate_key": full_key,\n'
+     '                "full_reference_indices": s_idx,\n'
+     '                "stop_reduced_phrase": c.get("stop_reduced_phrase"),\n'
+     '                "stop_reduced_match_state": s_state,\n'
+     '                "stop_reduced_candidate_key": reduced_key,\n'
+     '                "stop_reduced_reference_indices": f_idx,\n',
+     "byte for byte"),
+
+    # The §12.3 control read ONE fixture's output and skipped every declared
+    # type that fixture did not emit — ten of fifteen. This mutation drops a
+    # declared field from a record type that was in the missing five, so it
+    # survives against the old control by construction.
+    ("rc2 §12.3: ambiguous_author_resolution drops a declared field",
+     '                "stop_reduced_phrase": c.get("stop_reduced_phrase"),\n',
+     "",
+     "rc2 declares fields this file does not emit"),
+
+    # ------------------------------------------------------- §8.5, C-051's twin.
+    # Restores the ordering defect exactly: the ambiguous occurrence's own
+    # `citation_key` is null by §8.3, and falling back to the candidate key it
+    # held BEFORE resolution is what building `matched` too early did.
+    ("rc2 §8.5: an ambiguous occurrence is matched on its pre-resolution key",
+     '    matched = [c for c in cits if c["citation_key"] in keyed_once]',
+     '    matched = [c for c in cits\n'
+     '               if (c["citation_key"] or c.get("candidate_key_stop_reduced"))\n'
+     "               in keyed_once]",
+     "counts +0 — got"),
+
+    # ---------------------------------------------------------------- C-061.
+    # Aimed at 2a, not 2b. A duplicate key is excluded from the pool
+    # structurally — it is not in `unique_keys` — so removing the reservation
+    # of `ambiguous_citations` changes nothing observable and a control built
+    # on that fixture alone survives it. Author-resolution ambiguity is where
+    # reservation is the only thing holding the rows out.
+    ("rc2 §9.6: author-resolution ambiguity reserves only its full candidate",
+     '        reserved.update(a["full_reference_indices"])\n'
+     '        reserved.update(a["stop_reduced_reference_indices"])',
+     '        reserved.update(a["full_reference_indices"])',
+     "both reserved rows must leave the pool"),
+
+    ("rc2 §9.6: a mismatch-paired reference stays in the pool",
+     '            pool.pop(pi)                          # "remove from the pool"',
+     '            pool.count(pi)                        # "remove from the pool"',
+     "must leave the pool and nothing else with it"),
+
     ("rc2 C-080: numeric brackets enter the C1 envelope",
      '    for m in re.finditer(r"\\([^()]*\\)", body):\n'
      "        if YEAR_RE.search(m.group(0)):",

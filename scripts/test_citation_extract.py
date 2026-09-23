@@ -1685,13 +1685,57 @@ def main() -> int:
     elif len(aar) != 1:
         failures.append(f"§8.3: EXACTLY ONE ambiguous_author_resolution per "
                         f"occurrence, never one per candidate — got {len(aar)}")
-    elif [x["candidate"] for x in aar[0]["candidates"]] != ["full",
-                                                            "stop_reduced"]:
-        failures.append("C-048: the record carries both candidates, named")
     elif summ["author_resolution_ambiguous_occurrences"] != 1:
         failures.append("§11.2: the fourth identity class is counted")
     else:
         ok("§8.3 row 6: different keys → ambiguous, nothing established")
+
+    # ---- C-048, and rc2 asks for a BYTE golden ----
+    #
+    # "ambiguous_author_resolution schema exact | byte golden | candidate
+    # states/keys/index arrays". Byte golden, because the previous control
+    # asserted the record "carries both candidates, named" and was satisfied
+    # by a shape of the implementation's own invention:
+    #
+    #     "candidates":[{"candidate":"full",...},{"candidate":"stop_reduced",...}]
+    #
+    # That is one record carrying both candidates, and it matched NONE of the
+    # eight field names rc2 §12.3 declares. `candidate`/`candidate_key`/
+    # `match_state`/`reference_indices` nested under a `candidates` array,
+    # where rc2 declares `full_match_state`, `full_candidate_key`,
+    # `full_reference_indices` and their four stop_reduced counterparts flat
+    # on the record. A control written from the implementation cannot see
+    # that; a control written from rc2's bytes cannot miss it.
+    #
+    # The expected line is rc2's key order with this fixture's values, so the
+    # states, keys and index arrays C-048 names are all pinned at once.
+    want48 = (
+        b'{"type":"ambiguous_author_resolution","citation_index":0,'
+        b'"author_phrase":"From Tether","full_match_state":"unique",'
+        b'"full_candidate_key":"non_person|from tether|2018",'
+        b'"full_reference_indices":[0],"stop_reduced_phrase":"Tether",'
+        b'"stop_reduced_match_state":"unique",'
+        b'"stop_reduced_candidate_key":"tether|2018",'
+        b'"stop_reduced_reference_indices":[1],"index":0}')
+    with _tf.TemporaryDirectory() as _td48:
+        _p48 = Path(_td48) / "paper.md"
+        _p48.write_text(HEAD + "From Tether (2018) we take this."
+                        + "\n\n## References\n\n" + R_BOTH, encoding="utf-8")
+        _ls48, _c48 = ce.run(_p48, {"ampersand", "segments"})
+    # Anchored at the start of the line: the summary's `exit_findings` array
+    # also contains the string `ambiguous_author_resolution`, and a substring
+    # match picked up two records where there is one.
+    got48 = [l for l in ce.serialize(_ls48).split(b"\n")
+             if l.startswith(b'{"type":"ambiguous_author_resolution"')]
+    if len(got48) != 1:
+        failures.append(f"C-048: exactly one record expected, got {len(got48)}")
+    elif got48[0] != want48:
+        failures.append(f"C-048: the record is not rc2 §12.3's declared shape, "
+                        f"byte for byte.\n      got  {got48[0].decode()}\n"
+                        f"      want {want48.decode()}")
+    else:
+        ok("C-048: the record is byte-exact against rc2's declared key order, "
+           "both states, both keys, both index arrays")
 
     # §8.5. Both reserved indices must leave the pool, or ambiguity turns into
     # two false uncited references — which is the one outcome the section
@@ -1706,6 +1750,47 @@ def main() -> int:
                         f"uncited — got {[u['reference_key'] for u in unc]}")
     else:
         ok("§8.5: ambiguity-reserved references leave the pool")
+
+    # §8.5's FOURTH bullet, on the clause-1 reservation this time. C-051
+    # closed the duplicate-key half on 23 September; the author-resolution
+    # half was broken by an ordering the source explicitly claimed it was not:
+    #
+    #     "so it is already absent from this list"
+    #
+    # `matched` was built where `keyed_once` is, and §8.3 nulls the ambiguous
+    # occurrence's `citation_key` two hundred lines later. Same dicts, so the
+    # field went null and the list membership did not. This fixture reported
+    # `uniquely_matched_occurrences: 1` for an occurrence whose own key is
+    # null and whose identity_class is `author_resolution_ambiguous`.
+    #
+    # Both halves of the bullet, because "+0" alone is satisfied by counting
+    # nothing: the second document adds an independent unambiguous occurrence
+    # of the same work, which §8.5 says MUST then count.
+    if summ["uniquely_matched_occurrences"] != 0 or \
+            summ["uniquely_matched_works"] != 0:
+        failures.append(
+            f"§8.5: an author-resolution-ambiguous occurrence counts +0 — got "
+            f"{summ['uniquely_matched_occurrences']} occurrence(s) and "
+            f"{summ['uniquely_matched_works']} work(s) from one occurrence "
+            f"whose citation_key is {cit['citation_key']!r}")
+    else:
+        _cit2, _aar2, _unc2, summ2 = amb(
+            "From Tether (2018) we take this.\n\nTether (2018) agrees.",
+            R_BOTH)
+        if summ2["extracted_citation_occurrences"] != 2:
+            failures.append(f"§8.5: the second fixture must carry TWO "
+                            f"occurrences or the 'unless independently "
+                            f"matched' half is untested — got "
+                            f"{summ2['extracted_citation_occurrences']}")
+        elif summ2["uniquely_matched_occurrences"] != 1:
+            failures.append(f"§8.5: an independent unambiguous occurrence of "
+                            f"the same work MUST count — got "
+                            f"{summ2['uniquely_matched_occurrences']}. "
+                            f"Excluding everything satisfies the rule above "
+                            f"and fails its purpose")
+        else:
+            ok("§8.5: author-resolution ambiguity counts +0, and an "
+               "independent unambiguous occurrence beside it still counts")
 
     # §8.6, and the finding that goes with it. The abort is implemented and
     # CANNOT FIRE, by rc2's own construction rather than by ours: §6.3 creates
@@ -2253,6 +2338,57 @@ def main() -> int:
             # `reference_index` on `author_structure_mismatch`, and meta's
             # four. The control was green, named §12.3, and tested order only.
             # So `absent` is now reported separately from `bad`.
+            # `rec_by_type` is widened by the fixtures below before anything
+            # is compared. Until 23 September this loop read ONE fixture's
+            # output and skipped every declared type that fixture did not
+            # emit — ten of rc2's fifteen were reached, five were not, and the
+            # [ok] line said "10 record types" without saying that ten was not
+            # all of them.
+            #
+            # `ambiguous_author_resolution` was one of the five. It was
+            # emitting a nested `candidates` array of the implementation's own
+            # invention and matched NONE of the eight field names rc2 declares
+            # for it. Eight declared keys, absent for as long as the record has
+            # existed, under a control named for exactly that.
+            for _body, _refs in (
+                # ambiguous_author_resolution: both candidates match, on
+                # different keys.
+                ("From Tether (2018) we take this.",
+                 "From Tether (2018). A report. Publisher.\n"
+                 "Tether, B. (2018). A paper. Journal, 1(1), 1-10.\n"),
+                # duplicate_reference_key and ambiguous_citation.
+                ("As shown (Felfe, 2006) here.",
+                 "Felfe, J. (2006). One. J, 1(1), 1-10.\n\n"
+                 "Felfe, J. (2006). Two. J, 2(2), 2-20.\n"),
+                # possible_mismatch, one edit from the reference.
+                ("As shown (Smth, 2020) here.",
+                 "Smith, J. (2020). A paper. J, 1(1), 1-10.\n"),
+                # missing_reference.
+                ("As shown (Nobody, 1999) here.",
+                 "Smith, J. (2020). A paper. J, 1(1), 1-10.\n"),
+                # author_structure_mismatch.
+                ("As shown (Smith & Jones, 2020) here.",
+                 "Smith, J., Brown, K., & Lee, T. (2020). A paper. "
+                 "J, 1(1), 1-10.\n"),
+                # unresolved_reference, beside a normal entry.
+                ("As shown (Smith, 2020) here.",
+                 "Smith, J. (2020). A paper. J, 1(1), 1-10.\n\n"
+                 "an orphan line here\n"),
+                # unresolved_citation.
+                ("Work (following Smith, 2020) here.",
+                 "Smith, J. (2020). A paper. J, 1(1), 1-10.\n"),
+                # bibliography_absent: no references section at all.
+                ("As shown (Smith, 2020) here.", None),
+            ):
+                _p = Path(_tf.mkdtemp()) / "p.md"
+                _p.write_text(HEAD + _body + ("\n" if _refs is None else
+                                              "\n\n## References\n\n" + _refs),
+                              encoding="utf-8")
+                _ls, _cc = ce.run(_p, {"ampersand", "segments"})
+                for _ln in ce.serialize(_ls).rstrip(b"\n").split(b"\n"):
+                    _r = _json.loads(_ln.decode("utf-8"))
+                    rec_by_type.setdefault(_r["type"], _r)
+
             bad, absent = [], []
             for t, declared in declared_by_type.items():
                 r = rec_by_type.get(t)
@@ -2265,17 +2401,26 @@ def main() -> int:
                 if list(r)[:len(want)] != want:
                     bad.append(f"{t}: got {list(r)[:len(want)]}, want {want}")
             checked = [t for t in declared_by_type if t in rec_by_type]
+            # `error` only exists in an abort stream, where the whole two-line
+            # output is pinned byte for byte by §13's goldens. Named here
+            # rather than skipped, so the arithmetic below still closes.
+            unreached = [t for t in declared_by_type if t not in rec_by_type]
             if absent:
                 failures.append("§12.3: rc2 declares fields this file does not "
                                 "emit — " + "; ".join(absent))
             elif bad:
                 failures.append("§12.3: declared key order — " + "; ".join(bad))
-            elif "citation" not in rec_by_type or "reference" not in rec_by_type:
-                failures.append("§12.3: the fixture must carry both a citation "
-                                "and a reference for this to check anything")
+            elif unreached != ["error"]:
+                failures.append(f"§12.3: these declared record types were "
+                                f"never produced, so their key order was "
+                                f"never compared — {unreached}. Only `error` "
+                                f"may be unreached, and only because §13 pins "
+                                f"the whole abort stream byte for byte")
             else:
-                ok(f"§12.3: {len(checked)} record types lead with the key "
-                   f"order rc2's own document declares")
+                ok(f"§12.3: {len(checked)} of rc2's "
+                   f"{len(declared_by_type)} record types lead with the key "
+                   f"order rc2's own document declares; `error` is pinned by "
+                   f"§13's byte goldens instead")
 
         # The two fields rc2 declares and this file did not emit until
         # 22 September. `surname` held the right value under a name that
@@ -4560,6 +4705,187 @@ def main() -> int:
             ok(f"§10/C-080: {len(bracket_spans)} numeric brackets produced no "
                f"record of any kind, and the author-date citation beside them "
                f"still resolves")
+
+    # ------------------------------------------------------------ §9.6, C-061
+    #
+    # C-061 was PARTIAL, and the reason it gave had gone stale in the worse of
+    # the two directions — not "implemented and still reading NOT", but "the
+    # stated obstacle was removed and nobody went back". It read:
+    #
+    #     the third, ambiguity-reserved references, cannot be exercised
+    #     because nothing reserves any yet — C-049 and C-050 are NOT.
+    #
+    # C-049 and C-050 both closed on 23 September, so the obstacle has been
+    # gone for hours. This is C-051's shape again, and the map's own docstring
+    # is about exactly this failure.
+    #
+    # Flipping the verdict on the strength of C-049's control would be the
+    # other defect the mutation probe exists to find: a case resting on a
+    # control named for a different rule. So §9.6 gets its own block, over
+    # rc2's own three-item list.
+    #
+    # The hard part is not producing the three exclusions. It is producing
+    # each one where NO OTHER exclusion could be responsible — exclusion 1
+    # covers any reference a citation matched, so a fixture whose citation
+    # resolved proves nothing about 2 or 3. Each fixture below asserts the
+    # citation's identity state first, and only then that the reference
+    # stayed out of the uncited pool.
+    print("\nrc2 §9.6 — what uncited_reference excludes")
+
+    _s96 = ""
+    if _sp is not None:
+        _f96 = _sp.read_text(encoding="utf-8")
+        if "### 9.6 " in _f96 and "## 10. " in _f96:
+            _s96 = _f96.split("### 9.6 ")[1].split("## 10. ")[0]
+    excl96 = [l.strip()[2:].strip() for l in _s96.splitlines()
+              if l.strip().startswith("- ")]
+    # Not string equality — rc2 rewords, and a control that breaks on a
+    # semicolon is noise. The count is the staleness guard: a fourth
+    # exclusion, or one of these three replaced, takes this red.
+    want96 = ("exact", "ambiguity", "mismatch")
+    if len(excl96) != 3:
+        failures.append(f"§9.6/C-061: rc2 lists three exclusions and "
+                        f"{len(excl96)} were parsed — {excl96}. The fixtures "
+                        f"below would then be covering an unknown fraction "
+                        f"of the rule")
+    elif not all(any(w in e for e in excl96) for w in want96):
+        failures.append(f"§9.6/C-061: rc2's three exclusions no longer name "
+                        f"{want96} — got {excl96}")
+    else:
+        ok("§9.6/C-061: rc2 still closes the list at three exclusions")
+
+    R_BROWN = "\nBrown, L. (2017). C. Journal, 3(1), 1-10.\n"
+
+    def unc96(body, refs):
+        p = Path(_tf.mkdtemp()) / "p.md"
+        p.write_bytes((HEAD + body + "\n\n## References\n\n"
+                       + refs).encode("utf-8"))
+        ls, _c = ce.run(p, {"ampersand"})
+        return ls, [r["reference_key"] for r in ls
+                    if r.get("type") == "uncited_reference"]
+
+    # 1. Exact authoritative match. The baseline, and also the VACUITY GUARD
+    #    for everything below: `brown|2017` is cited by nobody in any of these
+    #    fixtures and must appear every time. An implementation that excluded
+    #    every reference would satisfy all three exclusions and be useless.
+    ls96, u96 = unc96("As shown (Smith, 2020) here.",
+                      "Smith, J. (2020). A paper. Journal, 1(1), 1-10.\n"
+                      + R_BROWN)
+    if u96 != ["brown|2017"]:
+        failures.append(f"§9.6/C-061: an exactly matched reference must leave "
+                        f"the pool and an uncited one must stay in it — got "
+                        f"{u96}")
+    else:
+        ok("§9.6/C-061: exclusion 1, the exact match goes and brown|2017 "
+           "stays")
+
+    # 2. Ambiguity reservation, the exclusion the old note called
+    #    unexercisable. rc2 §8.5 reserves for TWO different ambiguities, and
+    #    they are kept out of the pool by two different mechanisms. That is
+    #    the trap here:
+    #
+    #    2a author-resolution ambiguity — the two candidates match two
+    #       DIFFERENT keys. Both keys are unique, so both rows reach the pool
+    #       and only `reserved` takes them out. Reservation is load-bearing.
+    #
+    #    2b duplicate-key ambiguity — one key held by two rows. Those rows are
+    #       excluded STRUCTURALLY: a non-unique key is not in `unique_keys`,
+    #       so they never reach the pool and reservation is not what keeps
+    #       them out.
+    #
+    #    This block was written with 2b alone. It read as "reservation works",
+    #    and the mutation that removes the reservation SURVIVED it — the probe
+    #    doing its job on a control doing none. Both are here now, each saying
+    #    which mechanism it observes.
+    ls96, u96 = unc96("From Tether (2018) we take this.",
+                      "From Tether (2018). A report. Publisher.\n"
+                      "Tether, B. (2018). A paper. Journal, 1(1), 1-10.\n"
+                      + R_BROWN)
+    c96 = [r for r in ls96 if r.get("type") == "citation"]
+    if not c96:
+        failures.append("§9.6/C-061: the 2a fixture did not parse")
+    elif c96[0]["identity_class"] != "author_resolution_ambiguous":
+        failures.append(f"§9.6/C-061: 2a must be AMBIGUOUS, not matched — "
+                        f"identity_class is {c96[0]['identity_class']!r}, so "
+                        f"exclusion 1 would be doing the work")
+    elif u96 != ["brown|2017"]:
+        failures.append(f"§9.6/C-061: 2a — both reserved rows must leave the "
+                        f"pool and brown|2017 must stay in it, got {u96}")
+    else:
+        ok("§9.6/C-061: exclusion 2a, two distinct unique keys reserved by "
+           "one ambiguous occurrence, neither surfacing as uncited")
+
+    ls96, u96 = unc96("As shown (Felfe, 2006) here.",
+                      "Felfe, J. (2006). One. Journal, 1(1), 1-10.\n\n"
+                      "Felfe, J. (2006). Two. Journal, 2(2), 2-20.\n"
+                      + R_BROWN)
+    c96 = [r for r in ls96 if r.get("type") == "citation"]
+    dup96 = [r for r in ls96 if r.get("type") == "duplicate_reference_key"]
+    if not c96 or not dup96:
+        failures.append(f"§9.6/C-061: 2b needs a citation and a "
+                        f"duplicate_reference_key — got {len(c96)} and "
+                        f"{len(dup96)}")
+    elif c96[0]["identity_class"] != "bibliography_key_ambiguous":
+        failures.append(f"§9.6/C-061: 2b — identity_class is "
+                        f"{c96[0]['identity_class']!r}, not ambiguous")
+    elif len(dup96[0]["reference_indices"]) != 2:
+        failures.append(f"§9.6/C-061: 2b needs ONE key over TWO rows, or the "
+                        f"structural exclusion is not what is observed — got "
+                        f"{dup96[0]['reference_indices']}")
+    elif u96 != ["brown|2017"]:
+        failures.append(f"§9.6/C-061: 2b — a duplicate-keyed row reached the "
+                        f"uncited pool, got {u96}")
+    else:
+        ok("§9.6/C-061: exclusion 2b, duplicate-keyed rows stay out because "
+           "the key is not unique, not because anything reserved them")
+
+    # 3. Candidate-level possible-mismatch pairing. `Smth` is one edit from
+    #    `Smith`, and the occurrence resolves to NOTHING — identity_not_resolved
+    #    with an empty reference_indices. So `smith|2020` is kept out of the
+    #    pool by the pairing alone, which is CIT-ARCH-01's point restated in
+    #    §9.6: a candidate-level diagnostic reserves without establishing.
+    ls96, u96 = unc96("As shown (Smth, 2020) here.",
+                      "Smith, J. (2020). A paper. Journal, 1(1), 1-10.\n"
+                      + R_BROWN)
+    c96 = [r for r in ls96 if r.get("type") == "citation"]
+    pm96 = [r for r in ls96 if r.get("type") == "possible_mismatch"]
+    if not c96 or not pm96:
+        failures.append(f"§9.6/C-061: the mismatch fixture needs both a "
+                        f"citation and a possible_mismatch — got "
+                        f"{len(c96)} and {len(pm96)}")
+    elif c96[0]["reference_indices"]:
+        failures.append(f"§9.6/C-061: this occurrence must match NOTHING or "
+                        f"exclusion 1 covers the reference — "
+                        f"reference_indices is {c96[0]['reference_indices']}")
+    elif pm96[0].get("identity_authority") != "candidate":
+        failures.append(f"§9.6/C-061: the pairing must be candidate-level — "
+                        f"identity_authority is "
+                        f"{pm96[0].get('identity_authority')!r}")
+    elif u96 != ["brown|2017"]:
+        failures.append(f"§9.6/C-061: a mismatch-paired reference must leave "
+                        f"the pool and nothing else with it — got {u96}")
+    else:
+        ok("§9.6/C-061: exclusion 3, the paired reference leaves the pool "
+           "without the occurrence resolving to it")
+
+    # §9.6's closing sentence: `unresolved_reference` rows "are never
+    # uncited-reference candidates because they have no authoritative
+    # reference identity". Not one of the three exclusions — a row that never
+    # entered the pool cannot be excluded from it — and it fails the same way.
+    ls96, u96 = unc96("As shown (Smith, 2020) here.",
+                      "Smith, J. (2020). A paper. Journal, 1(1), 1-10.\n"
+                      "\na stray orphan line with no entry grammar\n"
+                      + R_BROWN)
+    ur96 = [r for r in ls96 if r.get("type") == "unresolved_reference"]
+    if not ur96:
+        failures.append("§9.6/C-061: the fixture emitted no "
+                        "unresolved_reference, so the clause is untested")
+    elif u96 != ["brown|2017"]:
+        failures.append(f"§9.6/C-061: an unresolved_reference row reached the "
+                        f"uncited pool — got {u96}")
+    else:
+        ok("§9.6/C-061: an unresolved_reference row is never an "
+           "uncited-reference candidate")
 
     print()
     if failures:

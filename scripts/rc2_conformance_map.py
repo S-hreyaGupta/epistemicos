@@ -381,8 +381,19 @@ CHECKS = {
               "§15's mandatory case: exit 6, reason named"),
     "C-047": ((), ("C-047: a shared reference index is ambiguity",), "MET",
               "guards on equal keys, not overlapping indices"),
-    "C-048": ((), ("C-048: the record carries both candidates",), "PARTIAL",
-              "both candidates named; rc2 asks for a byte golden"),
+    # PARTIAL until 23 September, with the note "both candidates named; rc2
+    # asks for a byte golden". Both halves of that note turned out to be
+    # understatements. The record was a nested `candidates` array of the
+    # implementation's own invention and matched NONE of the eight field names
+    # rc2 §12.3 declares for it — and the §12.3 control could not see that,
+    # because it skipped every record type its one fixture did not emit, and
+    # this was one of five it never reached. The byte golden rc2 asks for is
+    # what closes it: a control that compares only names and order would
+    # still pass with the two index arrays swapped.
+    "C-048": (('"full_reference_indices": f_idx,',),
+              ("C-048: the record is byte-exact against rc2",), "MET",
+              "byte golden over rc2's ten declared keys, both states, both "
+              "keys, both index arrays"),
     "C-049": ((), ("§8.5: ambiguity-reserved references leave the pool",),
               "MET", "reserved indices emit no uncited_reference"),
     # §9.1's record, implemented 23 September. The groups were computed here
@@ -435,15 +446,22 @@ CHECKS = {
     # before caught this entry going stale on its first real occasion: the
     # NOT verdict was still standing while the behaviour was in the file.
     #
-    # PARTIAL rather than MET, and for one reason only. The case names three
-    # exclusions; exact matches and mismatch-paired references are pinned,
-    # and so are two more the case implies (unique keys, keyless rows). The
-    # third, ambiguity-reserved references, cannot be exercised because
-    # nothing reserves any yet — C-049 and C-050 are NOT. Claiming MET would
-    # mean claiming a control for an exclusion with no input.
-    "C-061": ((), ("§9.6: a mismatch-paired reference does not reappear",),
-              "PARTIAL",
-              "exact and paired pinned; no reserved refs exist to exclude"),
+    # PARTIAL until 23 September, on the reason "the third,
+    # ambiguity-reserved references, cannot be exercised because nothing
+    # reserves any yet — C-049 and C-050 are NOT". Both closed the same day,
+    # so the stated obstacle had been gone for hours. C-051's shape exactly:
+    # not a verdict that went stale in the harmless direction, but one whose
+    # reason stopped being true and kept being read.
+    #
+    # §9.6's three exclusions are now covered one fixture each, and the second
+    # is covered TWICE, because rc2 §8.5 reserves for two different
+    # ambiguities that leave the pool by two different mechanisms. Written
+    # first with the duplicate-key fixture alone, where the rows are excluded
+    # structurally rather than by reservation — the mutation that removes the
+    # reservation survived that control, which is what the probe is for.
+    "C-061": ((), ("rc2 §9.6 — what uncited_reference excludes",), "MET",
+              "three exclusions, one fixture each, and each says which "
+              "mechanism it observes"),
     "C-060": ((), ("§9.5: merge_suspected is targeted at the candidate",),
               "MET", "both halves pinned: targeted, and it does fire"),
     "C-062": ((), ("exact fails on count",), "MET", "rc2 §9.3"),

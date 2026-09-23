@@ -2527,22 +2527,36 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     # "the summary has no uniquely-matched-works count to assert +0 against".
     # The count landed this morning; the rule was still broken underneath it.
     #
-    # The other reservation source, §8.5 clause 1, needs nothing here. An
-    # occurrence whose two candidates disagree gets `author_resolution=
-    # ambiguous` and a null `citation_key` under §8.3 rows 6-9, so it is
-    # already absent from this list, and §8.5 explicitly permits the
-    # references it named to be counted when some OTHER unambiguous occurrence
-    # matches them.
+    # The other reservation source, §8.5 clause 1, is author-resolution
+    # ambiguity. An occurrence whose two candidates disagree gets
+    # `author_resolution=ambiguous` and a NULL `citation_key` under §8.3
+    # rows 6-9, so a list keyed on `citation_key` should not contain it.
+    #
+    # It did. This paragraph read "so it is already absent from this list" and
+    # that was an ordering claim the code did not satisfy: the list was built
+    # HERE, and §8.3 nulls the key two hundred lines BELOW. The list holds the
+    # same dicts, so the field went null and the membership did not.
+    # `(From Tether, 2018)` against both `From Tether (2018).` and
+    # `Tether, B. (2018).` reported `uniquely_matched_occurrences: 1` for an
+    # occurrence whose own `citation_key` is null and whose `identity_class`
+    # is `author_resolution_ambiguous`.
+    #
+    # So `matched` is built after resolution instead, beside the one thing
+    # that reads it. `keyed_once` stays here because it is computed from
+    # `refs`, which §8.3 does not touch.
+    #
+    # §8.5 explicitly permits the references such an occurrence named to be
+    # counted when some OTHER unambiguous occurrence matches them, and that
+    # still holds: those occurrences carry their own non-null keys.
     counts: dict[str, int] = {}
     for r in refs:
         if r["reference_key"]:
             counts[r["reference_key"]] = counts.get(r["reference_key"], 0) + 1
     keyed_once = {k for k, n in counts.items() if n == 1}
-    cite_keys = []
-    for c in cits:
-        if c["citation_key"] not in cite_keys:
-            cite_keys.append(c["citation_key"])
-    matched = [c for c in cits if c["citation_key"] in keyed_once]
+    # `cite_keys`, a deduplicated list of `citation_key` values, was built
+    # here too and read by nothing. Removed with `matched`: it is the same
+    # early read of the same unsettled field, and a reader who found it would
+    # reasonably assume something downstream depended on it.
 
     # ------------------------------------------- rc2 §8.2 and §8.3, identity
     #
@@ -2657,15 +2671,33 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
             # "Emit exactly one `ambiguous_author_resolution`." One per
             # occurrence, carrying both candidates — never one per candidate,
             # which is the shape rc3 §C1 calls the naive mistake elsewhere.
+            #
+            # FLAT, in rc2 §12.3's declared key order. Until 23 September this
+            # was a nested `candidates` array of the implementation's own
+            # invention, which satisfied "one record carrying both" and
+            # matched none of the eight field names rc2 declares for it:
+            #
+            #     author_phrase  full_match_state  full_candidate_key
+            #     full_reference_indices  stop_reduced_phrase
+            #     stop_reduced_match_state  stop_reduced_candidate_key
+            #     stop_reduced_reference_indices
+            #
+            # §12.3's own control did not see it. It compares each record
+            # against rc2's declared keys, skipping any type its fixture did
+            # not emit, and no fixture emitted this one — so ten declared keys
+            # went unchecked while the control reported the ten types it HAD
+            # reached. The count is now asserted against rc2's own total.
             ambiguous_authors.append({
                 "type": "ambiguous_author_resolution", "index": 0,
                 "citation_index": c["index"],
-                "candidates": [
-                    {"candidate": "full", "candidate_key": full_key,
-                     "match_state": f_state, "reference_indices": f_idx},
-                    {"candidate": "stop_reduced", "candidate_key": reduced_key,
-                     "match_state": s_state, "reference_indices": s_idx},
-                ],
+                "author_phrase": c["author_phrase"],
+                "full_match_state": f_state,
+                "full_candidate_key": full_key,
+                "full_reference_indices": f_idx,
+                "stop_reduced_phrase": c.get("stop_reduced_phrase"),
+                "stop_reduced_match_state": s_state,
+                "stop_reduced_candidate_key": reduced_key,
+                "stop_reduced_reference_indices": s_idx,
             })
             continue
 
@@ -2926,8 +2958,13 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     # file has already watched a structural guarantee stop holding quietly.
     reserved: set[int] = set()
     for a in ambiguous_authors:
-        for cand in a["candidates"]:
-            reserved.update(cand["reference_indices"])
+        # Both of rc2 §12.3's index arrays, since the record went flat on
+        # 23 September. "all reference indices named by
+        # `ambiguous_author_resolution`" — reading one of the two would
+        # reserve half of them and leave the other half to surface as a false
+        # uncited_reference, which is the outcome §8.5 names twice.
+        reserved.update(a["full_reference_indices"])
+        reserved.update(a["stop_reduced_reference_indices"])
     for a in ambiguous_citations:
         reserved.update(a["reference_indices"])
 
@@ -3078,6 +3115,9 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     # emits a mismatch" — and the two are compatible. The identity stands; the
     # match does not count as unique. So the key is kept and the occurrence is
     # subtracted from the matched counts rather than erased.
+    # Built here, not where `keyed_once` is, because `citation_key` is not
+    # settled until §8.3 has run. See the note beside `keyed_once`.
+    matched = [c for c in cits if c["citation_key"] in keyed_once]
     mismatched_keys = {m["citation_key"] for m in mismatches}
     uniquely_matched = [c for c in matched
                         if c["citation_key"] not in mismatched_keys]

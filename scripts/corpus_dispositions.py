@@ -138,8 +138,11 @@ UNDISPOSED_NOTE = {
     ("duplicate_reference_key", None):
         "rc2 §9.1's record. Implemented 23 September, never dispositioned",
     ("ambiguous_citation", None):
-        "rc2 §8.3 rows 3 and 5. 15 of the 17 come from the three papers "
-        "outside C-081's eleven",
+        "rc2 §8.3 rows 3 and 5, and 15 of the 17 come from the three papers "
+        "outside C-081's eleven. Reduced below to the 5 keys behind them: "
+        "every pair is two genuinely different works, no manuscript uses a "
+        "letter suffix, and the author list that does tell them apart is "
+        "carried in the output but not in the key",
     # Two groups, not one. `author_structure_mismatch` carries a `failed`
     # field and rc2 §9.3 gives it two exact checks, so a single disposition
     # over the type would be covering two different findings with one
@@ -344,6 +347,62 @@ def missing_gaps(lines: list, section: str) -> Counter:
     return out
 
 
+def ambiguity_sources(lines: list) -> tuple[Counter, list]:
+    """How many keys are behind the `ambiguous_citation` records, and can the
+    source tell the works apart when the key cannot?
+
+    §8.3 rows 3 and 5 emit this when a candidate key maps to more than one
+    reference row. Seventeen records is not seventeen questions: several
+    occurrences can hit the same duplicated key, and the review's unit is the
+    key.
+
+    The second question is the interesting one. rc2 builds identity from the
+    FIRST surname and the year, and checks author structure separately in
+    §9.3. So a paper citing two 2015 works by the same first author produces
+    a nonunique key even when its own text distinguishes them, and on this
+    corpus that is what happens in every case: not one of the five pairs is a
+    duplicated reference, and not one manuscript uses a letter suffix. They
+    disambiguate by author list, which `visible_authors` already carries.
+
+    Reported, not judged. rc2 separating identity from author structure looks
+    deliberate rather than overlooked, so whether identity should read the
+    author list is a specification question and not this file's.
+    """
+    out: Counter = Counter()
+    detail: list = []
+    refs = {r["index"]: r for r in lines if r.get("type") == "reference"}
+    dup = {r["reference_key"] for r in lines
+           if r.get("type") == "duplicate_reference_key"}
+    seen_keys = set()
+    for r in lines:
+        if r.get("type") != "ambiguous_citation":
+            continue
+        out["records"] += 1
+        k = r["citation_key"]
+        if k not in seen_keys:
+            seen_keys.add(k)
+            out["distinct keys behind them"] += 1
+            out["...also a duplicate_reference_key" if k in dup
+                else "...NOT a duplicate_reference_key"] += 1
+            rows = [refs[i]["assembled"] for i in r.get("reference_indices", [])
+                    if i in refs]
+            # Same work twice would be a reference-side defect. Different
+            # works is the paper citing two things the key cannot separate.
+            same = len(rows) == 2 and rows[0][:40] == rows[1][:40]
+            out["...the rows are the same work" if same
+                else "...the rows are different works"] += 1
+            detail.append((k, rows))
+    for r in lines:
+        if r.get("type") != "citation":
+            continue
+        if r.get("citation_key") in seen_keys:
+            va = r.get("visible_authors") or []
+            out["occurrences on an ambiguous key, one visible author"
+                if len(va) < 2 else
+                "occurrences on an ambiguous key, author list visible"] += 1
+    return out, detail
+
+
 def main() -> int:
     if not CORPUS.is_dir():
         print(f"  corpus not found at {CORPUS}")
@@ -354,6 +413,7 @@ def main() -> int:
     causes: Counter = Counter()
     refusals: Counter = Counter()
     gaps: Counter = Counter()
+    amb: Counter = Counter()
     unreadable: list = []
     by_scope: dict[str, Counter] = {"eleven": Counter(), "extra": Counter()}
     orphan_by_source: dict[str, list[int]] = {}
@@ -393,6 +453,8 @@ def main() -> int:
             _b, _sec, *_rest = ce.split_body_and_references(ctext)
             gaps.update(missing_gaps(lines, _sec))
         refusals.update(grammar_refusals(lines))
+        _a, _d = ambiguity_sources(lines)
+        amb.update(_a)
 
         source = lines[0].get("references_source")
         refs = orph = 0
@@ -519,6 +581,28 @@ def main() -> int:
           "envelope catching")
     print("    prose, which C-010 and C-011 make the correct outcome rather "
           "than a drop.")
+
+    if amb:
+        print("\n  ambiguous_citation, what is really ambiguous")
+        for k in ("records", "distinct keys behind them",
+                  "...also a duplicate_reference_key",
+                  "...NOT a duplicate_reference_key",
+                  "...the rows are different works",
+                  "...the rows are the same work",
+                  "occurrences on an ambiguous key, author list visible",
+                  "occurrences on an ambiguous key, one visible author"):
+            if amb.get(k):
+                print(f"    {amb[k]:5d}  {k}")
+        print("    Not one pair is a duplicated reference and not one "
+              "manuscript uses a")
+        print("    letter suffix. They tell the works apart by author list, "
+              "which the")
+        print("    output already carries in visible_authors and the key does "
+              "not use.")
+        print("    rc2 checks author structure separately in §9.3, so that "
+              "reads as a")
+        print("    deliberate split rather than an oversight. A specification "
+              "question.")
 
     if gaps:
         print("\n  missing_reference, is the work really absent?")

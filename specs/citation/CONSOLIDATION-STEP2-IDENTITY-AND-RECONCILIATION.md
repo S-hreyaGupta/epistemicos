@@ -168,6 +168,29 @@ uniquely_matched_works             958     955
 11 newly excluded                      2011 - 11 = 2000
 ```
 
+**The delta above is still what §11.4 did; the level is not where the corpus
+sits now.** A later fix the same day moved both totals again, and this block
+was outside the only script that checks these documents against the run, so
+nothing would have said so:
+
+```text
+                                  §11.4    now
+uniquely_matched_occurrences       2000    2020
+uniquely_matched_works              955     960
+```
+
+rc2 §6.7 derives `visible_authors` "when the source citation author syntax
+fully matches the person grammar", and §6.3 makes `stop_reduced_phrase` the
+phrase that matched whenever reduction happened. Reading `author_phrase`
+instead put the discarded lead-in into the author list, so `Similarly, Tether
+(2002)` was compared as two authors against a correct one-author reference.
+Four keys carried a false `author_structure_mismatch`, and §9.3 excludes every
+occurrence of such a key from the matched count; removing them returns 18
+occurrences and 4 works. The 17 and the 6 above are unchanged.
+
+Both figures are now checked by `scripts/consolidation_claims.py`, which is
+what should have caught this.
+
 ```text
 disposition   REPLACE (wording), and the rule is normative in rc2
 fixed         23 September. C-051 MET, with a control that also asserts the

@@ -52,7 +52,15 @@ CORPUS = REPO / "data" / "md_full"
 
 
 def corpus_records() -> dict:
-    """Every record type the corpus produces, and how many of each."""
+    """Every record type the corpus produces, and how many of each.
+
+    Plus the two summary totals, under their own field names. They are here
+    rather than in a second pass because a document quoting a corpus LEVEL
+    rather than a record count is exactly what slipped past this script once:
+    the §11.4 before/after block in
+    CONSOLIDATION-STEP2-IDENTITY-AND-RECONCILIATION.md was outside FIGURES,
+    so when a later fix moved both totals nothing said so.
+    """
     counts: dict[str, int] = {}
     for f in sorted(CORPUS.glob("*.md")):
         try:
@@ -61,6 +69,8 @@ def corpus_records() -> dict:
             continue
         for r in lines:
             counts[r["type"]] = counts.get(r["type"], 0) + 1
+        for k in ("uniquely_matched_occurrences", "uniquely_matched_works"):
+            counts[k] = counts.get(k, 0) + (lines[-1].get(k) or 0)
     return counts
 
 
@@ -124,6 +134,15 @@ def main() -> int:
         ("CONSOLIDATION-STEP2-SUMMARY-AND-OUTPUT.md",
          "CORPUS           2235       2104",
          counts.get("citation", 0), 2104),
+        # The level, not the delta. The §11.4 before/after pair above it
+        # records what that one change did and stays as written; these two
+        # say where the corpus is now, and the document has to move with them.
+        ("CONSOLIDATION-STEP2-IDENTITY-AND-RECONCILIATION.md",
+         "uniquely_matched_occurrences       2000    2020",
+         counts.get("uniquely_matched_occurrences", 0), 2020),
+        ("CONSOLIDATION-STEP2-IDENTITY-AND-RECONCILIATION.md",
+         "uniquely_matched_works              955     960",
+         counts.get("uniquely_matched_works", 0), 960),
     ]
     for name, literal, live, expected in FIGURES:
         text = docs.get(name, "")

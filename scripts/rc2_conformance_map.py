@@ -464,8 +464,23 @@ CHECKS = {
               "mechanism it observes"),
     "C-060": ((), ("§9.5: merge_suspected is targeted at the candidate",),
               "MET", "both halves pinned: targeted, and it does fire"),
-    "C-062": ((), ("exact fails on count",), "MET", "rc2 §9.3"),
-    "C-063": ((), ("exact fails on order",), "MET", "rc2 §9.3"),
+    # Both were MET before the check could see these inputs at all. rc2 §6.7
+    # supplies the left-hand side of §9.3's comparison, and it was being built
+    # from `author_phrase` — which §6.3 guarantees is the phrase that did NOT
+    # match the grammar whenever STOP reduction happened. Ten of the twenty
+    # reduced corpus occurrences carried the discarded lead-in as author
+    # number one; ten more yielded three nulls and were skipped silently.
+    #
+    # So C-062 and C-063 held on their own fixtures and the field they
+    # consume was wrong on a whole class of input. Each now carries the
+    # lead-in case on both sides: the correct pair must pass, and a genuinely
+    # wrong pair behind the same lead-in must still be caught.
+    "C-062": ((), ("exact fails on count",
+                   "a real count mismatch behind a lead-in is still caught"),
+              "MET", "rc2 §9.3, and the reduced phrase reaches it"),
+    "C-063": ((), ("exact fails on order",
+                   "a real order mismatch behind a lead-in is still caught"),
+              "MET", "rc2 §9.3, and the reduced phrase reaches it"),
     "C-064": (("ET_AL_MIN_AUTHORS = 3",),
               ("et_al fails below ET_AL_MIN_AUTHORS",), "MET",
               "threshold pinned in the profile, not chosen"),

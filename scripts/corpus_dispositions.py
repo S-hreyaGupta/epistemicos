@@ -156,10 +156,23 @@ UNDISPOSED_NOTE = {
         "One of the remaining four that document already identified as its "
         "own measuring error, two sit on ambiguous keys where no identity "
         "was established, and the last cannot be checked at all. See the "
-        "coverage block below for why",
+        "coverage block below for why. One finding left this group on 23 "
+        "September and was not dispositioned away: `Similarly, Tether "
+        "(2002)` counted its own lead-in as author number one, against a "
+        "correct one-author reference, and §9.3 says an `exact` mismatch "
+        "forces exit 1",
+    # This note read "Same open question as the count half" until it was
+    # checked. It cannot be. The count half's question is coverage — the
+    # references §9.3 never reaches — and every order finding is a reference
+    # §9.3 reached and read. Written from the field name, not the findings.
     ("author_structure_mismatch", "order"):
-        "rc2 §9.3's order check, pinned by C-063. Same open question as the "
-        "count half",
+        "rc2 §9.3's order check, pinned by C-063. Not one of them is about "
+        "order: rc2 names the check `order` and writes it as elementwise "
+        "equality, so it is the label every disagreement inherits once the "
+        "count check has passed. Partitioned below — each is one surname the "
+        "source spells two ways, one character apart, which is the shape "
+        "rc2 §9.4 declares a repair rule for at the candidate level and "
+        "§9.3 has no counterpart for",
 }
 
 # UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md, 22 September, as written.
@@ -175,6 +188,13 @@ UNDISPOSED_NOTE = {
 # corpus rather than inferred — 57/28 before, 56/27 after.
 RECALL_DOC = "specs/citation/UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md"
 RECALL_PINNED = {"uncited": 56, "person_matched": 27, "non_person_matched": 3}
+
+# The same discipline for §9.3, after the §6.7 fix on 23 September moved both
+# halves: order 7 -> 4, count 5 -> 4. Four findings were the lead-in token
+# `visible_authors` had been reading out of the unreduced phrase, and every
+# one of them was a citation that agreed with its reference. Pinned so the
+# next move is noticed rather than absorbed into a paragraph.
+STRUCTURE_PINNED = {"order": 4, "count": 4}
 
 
 def canonical_text(path: pathlib.Path, fixes: set, meta: dict) -> str | None:
@@ -451,6 +471,61 @@ def structure_coverage(lines: list) -> Counter:
     return out
 
 
+def structure_failures(lines: list) -> Counter:
+    """What rc2 §9.3's `failed=order` findings actually are.
+
+    rc2 names the second half of the check `order`, and the rule it writes is
+    elementwise equality:
+
+        reference.authors[i] == visible_authors[i] for every i
+
+    Those are not the same property. Elementwise equality fails for ANY
+    disagreement in any position, and `order` is the only name available for
+    whatever is left once the count check has passed. So the label says
+    "these authors are in the wrong sequence" and the rule measures "these two
+    lists are not identical".
+
+    The test for a genuine ordering problem is whether the two sides hold the
+    same names at all, which sorting settles. If `sorted(visible)` equals
+    `sorted(reference[:len(visible)])`, the same people are listed and only
+    the sequence differs; that is order. If the sorted lists differ, the sides
+    disagree about WHO, and calling it order misdirects whoever reads it.
+
+    This block exists because a disposition note here asserted that the order
+    half was the same open question as the count half. It cannot be: the count
+    half's question is coverage, references the check never reaches, and every
+    order finding is a reference the check reached and read. That note was
+    written from the field name rather than from the findings.
+    """
+    out: Counter = Counter()
+    for r in lines:
+        if r.get("type") != "author_structure_mismatch":
+            continue
+        if r.get("failed") != "order":
+            continue
+        vis = r["visible_authors"] or []
+        ref = r["reference_authors"] or []
+        out["order findings"] += 1
+        if sorted(vis) == sorted(ref[:len(vis)]):
+            out["  the same names in a different sequence"] += 1
+            continue
+        out["  the two sides name different people"] += 1
+        diff = [i for i in range(min(len(vis), len(ref))) if vis[i] != ref[i]]
+        if len(diff) != 1:
+            out["    more than one position disagrees"] += 1
+            continue
+        out["    exactly one position disagrees"] += 1
+        # The same test rc2 §9.4 already declares for the candidate level.
+        # §9.3 has no counterpart, so a pair one character apart is reported
+        # as an ordering failure with no repair rule behind it.
+        i = diff[0]
+        if ce._osa(vis[i], ref[i]) <= 1:
+            out["      and that pair is one edit apart"] += 1
+        else:
+            out["      and that pair is a different surname"] += 1
+    return out
+
+
 def main() -> int:
     if not CORPUS.is_dir():
         print(f"  corpus not found at {CORPUS}")
@@ -463,6 +538,7 @@ def main() -> int:
     gaps: Counter = Counter()
     amb: Counter = Counter()
     cover: Counter = Counter()
+    orderf: Counter = Counter()
     unreadable: list = []
     by_scope: dict[str, Counter] = {"eleven": Counter(), "extra": Counter()}
     orphan_by_source: dict[str, list[int]] = {}
@@ -505,6 +581,7 @@ def main() -> int:
         _a, _d = ambiguity_sources(lines)
         amb.update(_a)
         cover.update(structure_coverage(lines))
+        orderf.update(structure_failures(lines))
 
         source = lines[0].get("references_source")
         refs = orph = 0
@@ -652,6 +729,33 @@ def main() -> int:
               "that it runs")
         print("    everywhere. Nothing before today stated the coverage.")
 
+    if orderf:
+        print("\n  what §9.3's `failed=order` findings are")
+        for k in ("order findings",
+                  "  the same names in a different sequence",
+                  "  the two sides name different people",
+                  "    exactly one position disagrees",
+                  "    more than one position disagrees",
+                  "      and that pair is one edit apart",
+                  "      and that pair is a different surname"):
+            if orderf.get(k):
+                print(f"    {orderf[k]:5d}  {k}")
+        if not orderf.get("  the same names in a different sequence"):
+            print("    Not one of them is about order. rc2 names the check "
+                  "`order` and writes")
+            print("    it as elementwise equality, so it is the label every "
+                  "disagreement")
+            print("    gets once the count check has passed.")
+        print("    The one-edit pairs are a surname the source spells two "
+              "ways, and it")
+        print("    goes both directions: one has the damaged spelling in the "
+              "bibliography,")
+        print("    the other in the body. rc2 §9.4 declares "
+              "`surname_edit_distance_1` for")
+        print("    exactly this shape at the candidate level. §9.3 has no "
+              "counterpart, so")
+        print("    the pair is reported with no repair rule behind it.")
+
     if amb:
         print("\n  ambiguous_citation, what is really ambiguous")
         for k in ("records", "distinct keys behind them",
@@ -741,6 +845,17 @@ def main() -> int:
             f"and the corpus emitted "
             f"{groups.get(('unresolved_reference', 'orphan_line'), 0)}. A "
             f"partition that does not add up is not a partition")
+    sdrift = {k: (v, groups.get(("author_structure_mismatch", k), 0))
+              for k, v in STRUCTURE_PINNED.items()
+              if v != groups.get(("author_structure_mismatch", k), 0)}
+    if sdrift:
+        problems.append(
+            f"the author-structure figures moved: "
+            f"{', '.join(f'{k} {a} -> {b}' for k, (a, b) in sdrift.items())}. "
+            f"Both notes above quote these. A fall is as much a change as a "
+            f"rise and needs the same explanation, because the cheapest way "
+            f"to empty this group is to stop running the check")
+
     drift = {k: (RECALL_PINNED[k], recall[k]) for k in RECALL_PINNED
              if RECALL_PINNED[k] != recall[k]}
     if drift:

@@ -1844,8 +1844,28 @@ def _record(body, gs, ge, ss, se, seg_text, core, year, style, sent, heads,
         "citation_surface_group_key": surface_group_key(author_phrase, y),
         # rc2 §6.7. Null for a non-person candidate, per the section's own
         # last line.
+        #
+        # Read from the phrase that PARSED, not from `author_phrase`. §6.7
+        # opens "when the source citation author syntax fully matches the
+        # person grammar", and §6.3 is what decides which phrase that is: the
+        # full phrase is the candidate, and a `stop_reduced_phrase` "exists
+        # only if the remaining phrase fully matches AUTHORS_NARR" — created
+        # only after the full phrase failed to. So whenever reduction happened,
+        # `author_phrase` is by construction the phrase that did NOT match, and
+        # §6.7's precondition selects the reduced one.
+        #
+        # Reading the full phrase put the discarded lead-in token into
+        # `visible_authors` as author number one. `Similarly, Tether (2002)`
+        # produced `['similarly', 'tether']` against a correct one-author
+        # reference, and §9.3 called it a count mismatch on `exact` form, which
+        # §9.3 says "forces exit 1". Ten of the twenty reduced occurrences on
+        # this corpus carried the extra token, three of them `exact`.
+        #
+        # Nothing else reads the reduced phrase here: `author_phrase`,
+        # `citation_surface_group_key` and `citation_group` are all still the
+        # full source run, which is what §6.6 requires of them.
         **dict(zip(("author_form", "visible_authors", "author_count_constraint"),
-                   person_form(author_phrase)
+                   person_form(stop_reduced_phrase or author_phrase)
                    if author_kind == "person" else (None, None, None))),
         # rc2's citation schema declares this and never says what it holds
         # when identity IS resolved — §8.3 only ever sets it to null, for

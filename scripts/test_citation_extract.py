@@ -1131,6 +1131,106 @@ def main() -> int:
     else:
         ok("§6.7: particles are retained in visible_authors")
 
+    # ---- §6.7's precondition: WHICH phrase fully matches the grammar ----
+    #
+    # §6.7 opens "when the source citation author syntax fully matches the
+    # person grammar", and §6.3 decides which phrase that is. A
+    # `stop_reduced_phrase` "exists only if the remaining phrase fully matches
+    # AUTHORS_NARR", and it is created only after the full phrase failed to.
+    # So whenever reduction happened, `author_phrase` is the phrase that did
+    # NOT match and the reduced one is the phrase that did.
+    #
+    # Reading `author_phrase` put the discarded lead-in into `visible_authors`
+    # as author number one, and §9.3 then compared it to a reference that
+    # never had it. Four corpus mismatches, one of them `exact`, which §9.3
+    # says forces exit 1. Found from the other end: a disposition note claimed
+    # the `order` findings were the same question as the `count` ones, and
+    # none of the seven turned out to be about order at all.
+    def redu(body_text, refs=R1):
+        lines, _code = run_doc(body_text, refs)
+        c = next((l for l in lines if l.get("type") == "citation"), None)
+        m = [l for l in lines if l.get("type") == "author_structure_mismatch"]
+        return c, m
+
+    # Both branches of `author_form`, each against a reference it agrees with.
+    for label, body_text, refs, want in (
+            ("exact", "Similarly, Smith (2020) showed this.", R1, ["smith"]),
+            ("et_al", "Additionally, Smith et al. (2020) showed this.", R3,
+             ["smith"])):
+        c, m = redu(body_text, refs)
+        if c is None:
+            failures.append(f"§6.7 {label}: the reduced lead-in case has to "
+                            f"parse at all")
+        # The vacuity guard on the fixture itself. If reduction did not
+        # happen, `author_phrase` IS the matching phrase and this control is
+        # asserting nothing — it would pass on an implementation that reads
+        # either field.
+        elif not c["stop_reduced_phrase"]:
+            failures.append(f"§6.7 {label}: this fixture only means something "
+                            f"if reduction happened — author_phrase is "
+                            f"{c['author_phrase']!r} and nothing reduced")
+        elif c["visible_authors"] != want:
+            failures.append(f"§6.7 {label}: visible_authors comes from the "
+                            f"phrase that matched the grammar, not from "
+                            f"{c['author_phrase']!r} — got "
+                            f"{c['visible_authors']}")
+        elif m:
+            failures.append(f"§9.3 {label}: a correct pair behind a lead-in "
+                            f"emitted a mismatch on {m[0]['failed']} — "
+                            f"visible {m[0]['visible_authors']} against "
+                            f"reference {m[0]['reference_authors']}")
+        else:
+            ok(f"§6.7 {label}: the lead-in is not author number one")
+
+    # The other half, and the one no mismatch could reveal: a lead-in with no
+    # comma leaves a two-word run that fullmatches no single surname, so the
+    # full phrase yielded three nulls and §9.3 was skipped entirely. Silence,
+    # not a wrong answer. Ten of the twenty reduced corpus occurrences were
+    # this, and enabling the check on them raised nothing — which is the
+    # result, not the absence of one.
+    c, m = redu("As Smith et al. (2020) showed this.", R3)
+    if c is None or not c["stop_reduced_phrase"]:
+        failures.append("§6.7: the no-comma lead-in fixture must still reduce")
+    elif c["visible_authors"] != ["smith"]:
+        failures.append(f"§6.7: a lead-in with no comma must not suppress the "
+                        f"structure fields — got {c['visible_authors']}")
+    else:
+        ok("§6.7: a lead-in with no comma no longer silences the check")
+
+    # The negatives, each beside its own positive above. Reading the reduced
+    # phrase must not become a way of passing: a pair that genuinely disagrees
+    # is still caught behind the same lead-ins, on both of §9.3's halves.
+    c, m = redu("Similarly, Smith (2020) showed this.", R2)
+    if not m or m[0]["failed"] != "count":
+        failures.append(f"§9.3: a real count mismatch behind a lead-in must "
+                        f"still be caught — got {[x['failed'] for x in m]}")
+    elif m[0]["visible_authors"] != ["smith"]:
+        failures.append(f"§9.3: and it must be reported against the reduced "
+                        f"list — got {m[0]['visible_authors']}")
+    else:
+        ok("§9.3: a real count mismatch behind a lead-in is still caught")
+
+    c, m = redu("As Smith and Jones (2020) showed this.", R2)
+    if not m or m[0]["failed"] != "order":
+        failures.append(f"§9.3: a real order mismatch behind a lead-in must "
+                        f"still be caught — got {[x['failed'] for x in m]}")
+    else:
+        ok("§9.3: a real order mismatch behind a lead-in is still caught")
+
+    # §6.6 is emphatic that reduction "never rewrites" the surface fields, so
+    # the fix must be visible in ONE field only. Pinned here because the
+    # cheapest wrong way to make the controls above pass is to reduce
+    # `author_phrase` itself, which is exactly what C-020 forbids.
+    c, _m = redu("Similarly, Smith (2020) showed this.", R1)
+    if c["author_phrase"] != "Similarly, Smith":
+        failures.append(f"C-020: author_phrase is still the complete run — "
+                        f"got {c['author_phrase']!r}")
+    elif c["citation_surface_group_key"][0] != "similarly, smith":
+        failures.append(f"§6.6: the surface group key is built from the full "
+                        f"phrase — got {c['citation_surface_group_key']}")
+    else:
+        ok("§6.6: only visible_authors moved; the surface fields did not")
+
     # §9.3's two rules, each way round.
     if mism("As shown (Smith & Brown, 2020) here.", R2):
         failures.append("§9.3: exact passes when count and order agree — a "

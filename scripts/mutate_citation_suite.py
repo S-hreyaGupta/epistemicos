@@ -276,6 +276,25 @@ MUTATIONS = [
      "        if True:\n            continue",
      "§9.3: exact fails on count"),
 
+    # The defect this modelled was real until 23 September: `visible_authors`
+    # read `author_phrase`, which §6.3 guarantees is the phrase that did NOT
+    # match the grammar whenever reduction happened. Four corpus mismatches,
+    # one `exact` and so exit-1 forcing, every one of them against a reference
+    # the citation agreed with.
+    ("rc2 §6.7: visible_authors is read from the phrase that did not parse",
+     "person_form(stop_reduced_phrase or author_phrase)",
+     "person_form(author_phrase)",
+     "§6.7 exact: visible_authors comes from the phrase that matched"),
+
+    # Paired with it, the opposite error: always reducing would drop a leading
+    # surname that never was a lead-in. Nothing in the corpus distinguishes
+    # these two, so the negative is here rather than left to a measurement.
+    ("rc2 §6.6: reduction rewrites the surface phrase as well",
+     '        "author_phrase": re.sub(r"\\s+", " ", author_phrase).strip(),',
+     '        "author_phrase": re.sub(r"\\s+", " ", '
+     'stop_reduced_phrase or author_phrase).strip(),',
+     "C-020: author_phrase is still the complete run"),
+
     ("rc2 §9.3: et al. is compared as a count, not a minimum",
      "            count_ok = rn >= ET_AL_MIN_AUTHORS",
      "            count_ok = rn == len(vis)",

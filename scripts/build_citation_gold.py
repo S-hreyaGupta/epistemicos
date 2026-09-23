@@ -328,8 +328,19 @@ def main() -> int:
             },
             "source": {
                 "sha256": CORPUS_MARKDOWN[paper],
-                "what": "papers.markdown for this row — the bytes the "
-                        "extractor reads",
+                # Was "the bytes the extractor reads", which stopped being
+                # exact on 22 September. rc3 D1 puts the two byte-changing
+                # fixes ahead of canonicalisation, so under `--fix all` the
+                # extractor measures against a transformed copy of these
+                # bytes and `canonical_sha256` is a different value. The
+                # binding still holds and is still the right one — gold and
+                # candidate have to come from the same FILE, and the
+                # transforms are deterministic and named — but the field
+                # should say which of the two hashes it is.
+                "what": "papers.markdown for this row — the file the "
+                        "extractor is given, before ingest transforms. NOT "
+                        "the run's canonical_sha256, which covers the bytes "
+                        "after ampersand_unescape_v1 and mathyear.",
                 "corpus_paper": CORPUS_ID[paper],
                 "annotated_from_pdf_sha256": MANUSCRIPT_PDF[paper],
                 "note": "the annotation was made from a different copy of this "

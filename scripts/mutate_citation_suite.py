@@ -745,6 +745,93 @@ MUTATIONS = [
      "        inner = body[c1s + 1:c1e - 1]\n        cut = YEAR_RE.search(inner)",
      "        inner = body[c1s + 1:c1e - 1]\n        cut = None",
      "§G: (International Monetary Fund, 2022) keys the complete label"),
+
+    # rc2 §2. The state this file was in until 22 September: coordinates
+    # emitted as code-point indices. It passed every control in the suite,
+    # and on the corpus 95.3% of offsets pointed at unrelated text.
+    ("rc2 §2: coordinates go back to being code-point indices",
+     "    to_byte_coordinates(lines, text)\n",
+     "    pass  # to_byte_coordinates(lines, text)\n",
+     "spans do not slice their own text out of the manuscript bytes"),
+
+    # The subtler shape, and the one worth probing separately: an
+    # implementation that converts only SOME fields. `group_start` and
+    # `group_end` are the obvious pair; `segment_start` is the one a partial
+    # patch forgets, and every count and sort still comes out identical.
+    ("rc2 §2: segment coordinates are left unconverted",
+     'OFFSET_FIELDS = frozenset({\n'
+     '    "group_start", "group_end", "segment_start", "segment_end",',
+     'OFFSET_FIELDS = frozenset({\n'
+     '    "group_start", "group_end",',
+     "spans do not slice their own text out of the manuscript bytes"),
+
+    # rc3 D1. The transforms go back after canonicalisation, which is where
+    # they were. Under `--fix all` every offset past the first substitution
+    # shifts, and nothing errors.
+    ("rc3 D1: the ampersand substitution moves back after canonicalisation",
+     '    if "ampersand" in fixes:\n        text = text.replace("\\\\&", "&")\n',
+     "",
+     "The substitution is running after canonicalisation"),
+
+    # And the half-move: `ampersand` ahead of the hash but `mathyear` left
+    # behind. Passes the D1 control above and must fail the §J one.
+    ("rc3 §J: mathyear alone is left after canonicalisation",
+     '    if "mathyear" in fixes:\n        # rc3 §J pins the order',
+     '    if False:\n        # rc3 §J pins the order',
+     "with both byte-changing fixes on"),
+
+    # rc2 §2 binds canonical_sha256 to the bytes the offsets index. Hashing
+    # before the transform breaks that binding and nothing downstream notices,
+    # because the digest is only ever compared to itself.
+    ("rc2 §2: canonical_sha256 is taken before the ingest transform",
+     '              "canonical_sha256": hashlib.sha256(\n'
+     '                  text.encode("utf-8")).hexdigest(),',
+     '              "canonical_sha256": hashlib.sha256(\n'
+     '                  normalise(path.read_bytes()).encode("utf-8")).hexdigest(),',
+     "canonical_sha256 is unchanged by a byte-changing fix"),
+
+    # The other half of the same control, and it needs its own mutation or the
+    # binding branch is unreachable. Hashing the BODY moves with the fixes, so
+    # it passes the movement test above, and is still not the manuscript the
+    # coordinates index — the reference section is missing from it.
+    ("rc2 §2: canonical_sha256 covers the body instead of the manuscript",
+     '              "canonical_sha256": hashlib.sha256(\n'
+     '                  text.encode("utf-8")).hexdigest(),',
+     '              "canonical_sha256": hashlib.sha256(\n'
+     '                  body.encode("utf-8")).hexdigest(),',
+     "canonical_sha256 is not the digest of the bytes the offsets index"),
+
+    # The strictness of the guard, not the conversion. Skipping an
+    # unconvertible coordinate leaves a code-point value in a byte field with
+    # nothing to distinguish it — the exact silent-wrongness this change
+    # exists to remove.
+    # C-002. Dropping NFC leaves a decomposed `e` + U+0301 in the manuscript:
+    # two code points where one is meant, so every coordinate after it is
+    # one out and the canonical hash names a different document.
+    ("rc2 §2/C-002: NFC normalisation is dropped",
+     '    return unicodedata.normalize("NFC", s)',
+     "    return s",
+     "normalisation is not CRLF/CR→LF then NFC"),
+
+    # C-004, the converse. Each of rc2 §1.3's three code-point counts is
+    # switched to bytes; all three are silent, and each has its own control.
+    ("rc2 §1.3/C-004: osa measures bytes instead of code points",
+     "def _osa(a: str, b: str) -> int:",
+     "def _osa(a: str, b: str) -> int:\n"
+     "    a, b = a.encode('utf-8').decode('latin-1'), "
+     "b.encode('utf-8').decode('latin-1')",
+     "osa counts code points, not bytes"),
+
+    ("rc2 §1.3/C-004: the overlong threshold counts bytes",
+     "        if len(assembled) > 1500:",
+     '        if len(assembled.encode("utf-8")) > 1500:',
+     "the 1500 threshold is counting bytes"),
+
+    ("rc2 §2: an out-of-range coordinate is skipped instead of aborting",
+     "            if not isinstance(v, int) or not 0 <= v < len(table):",
+     "            if not isinstance(v, int) or not 0 <= v < len(table):\n"
+     "                continue\n            if False:",
+     "an out-of-range coordinate was accepted"),
 ]
 
 # The STOP mutation needs to empty the set rather than edit its opening line.

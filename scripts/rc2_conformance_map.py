@@ -85,6 +85,38 @@ SUITE = REPO / "scripts/test_citation_extract.py"
 # PARTIAL at best.
 CHECKS = {
     "C-001": ((), ("exit 5: invalid utf-8",), "MET", "abort before processing"),
+    # rc2 §2 and §1.3, implemented 22 September. These three were NOT for as
+    # long as this file has existed, and carried `None` for an anti-needle on
+    # the stated ground that "a byte-offset contract leaves no distinctive
+    # identifier behind". That was true of the implementation and false of the
+    # controls: what a byte contract leaves behind is a control that slices
+    # the manuscript by a record's own coordinates, and those name themselves.
+    #
+    # The implementation needle is `to_byte_coordinates` rather than anything
+    # in §2's prose, and the suite needles are the three controls' own
+    # sentences. C-003's characters are rc2's — β, —, ’, ﬁ — not chosen here.
+    "C-002": (("unicodedata.normalize(\"NFC\"",),
+              ("§2/C-002: CRLF and lone CR become LF",), "MET",
+              "CRLF and lone CR to LF, then NFC, canonical bytes pinned"),
+    "C-003": (("def to_byte_coordinates",),
+              # Not the whole sentence: the suite writes the ampersand inside
+              # an f-string, so its SOURCE carries `\\&` where its output
+              # carries `\&`. A needle copied from the printed line would
+              # never match the file it is searched in — the same shape as the
+              # `stop_reduced_candidate` false negative recorded above.
+              ("spans still slice their own text",
+               "substitutions precede canonicalisation"),
+              "MET",
+              "every span slices its own text, with the fixes on and off"),
+    # C-004 is the converse case and needs its own evidence: three counts
+    # rc2 §1.3 keeps in code points. Converting THOSE to bytes would be just
+    # as silent as leaving the coordinates unconverted, so each is exercised
+    # on input where the two units disagree.
+    "C-004": (("if len(assembled) > 1500:",),
+              ("§1.3/C-004: osa is one substitution apart",
+               "§1.3/C-004: CORE's floor is 2 code points"),
+              "MET",
+              "osa, CORE's floor and the overlong threshold stay code points"),
     # rc2 §13 and §12.1, implemented 22 September. Every control here compares
     # BYTES: §12.1's clauses are byte properties, and a test that parses the
     # lines back cannot see a single one of them.
@@ -336,9 +368,6 @@ NOT_IMPLEMENTED = {
     "C-078": ("the exit-1 finding set is not closed", "FINDINGS_FORCING_EXIT1"),
 
     # No honest anti-needle. Each says why.
-    **{c: ("byte-coordinate contract: offsets here are code points; an "
-           "implementation leaves no distinctive identifier", None)
-       for c in ("C-002", "C-003", "C-004")},
     **{c: ("determinism not byte-pinned; 'byte-identical' already appears in "
            "prose, so it cannot serve as a needle", None)
        for c in ("C-029", )},

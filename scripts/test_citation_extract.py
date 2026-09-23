@@ -2771,6 +2771,310 @@ def main() -> int:
     else:
         ok("§9.6: an unresolved_reference is never a uncited candidate")
 
+    # ---------------------------------------------------------------- §2
+    #
+    #     Every manuscript coordinate is a half-open, zero-based UTF-8 byte
+    #     offset into `canonical_manuscript_bytes`.
+    #
+    # The whole class of defect here is silent: a code-point index is a
+    # perfectly plausible integer, it stays in range, it sorts in the right
+    # order, and every count built on it comes out the same. Nothing errors.
+    # Measured 22 September before the fix, across the thirteen in-profile
+    # papers: 14,834 of 15,570 emitted offsets — 95.3% — named a position
+    # holding unrelated text.
+    #
+    # So these controls do not check the offsets against an expected number.
+    # They take each record's own text and ask whether slicing the manuscript
+    # BYTES by that record's own coordinates returns it. That is the only
+    # form of the check that cannot pass for the wrong reason: a wrong offset
+    # yields a wrong slice, and there is no third possibility.
+    print("\nrc2 §2 — coordinates are UTF-8 byte offsets")
+
+    def sliced(body: str, fixes=frozenset({"ampersand"}), refs=REFS):
+        """Every (record, field-pair) span, and what the bytes hold there."""
+        doc = HEAD + body + refs
+        p = Path(_tf.mkdtemp()) / "p.md"
+        p.write_bytes(doc.encode("utf-8"))
+        lines, _c = ce.run(p, set(fixes))
+        # Rebuild canonical bytes the way §2 defines them, from the file —
+        # NOT from anything `run` returns. A control that asked the extractor
+        # for the text it measured against would agree with itself.
+        text = ce.normalise(p.read_bytes())
+        if "ampersand" in fixes:
+            text = text.replace("\\&", "&")
+        if "mathyear" in fixes:
+            text = ce.unwrap_math_years(text)
+        raw = text.encode("utf-8")
+        out = []
+        for rec in lines:
+            for val, s, e in (("citation_group", "group_start", "group_end"),
+                              ("citation_segment", "segment_start",
+                               "segment_end"),
+                              ("text", "start", "end")):
+                if (rec.get(val) is not None
+                        and isinstance(rec.get(s), int)
+                        and isinstance(rec.get(e), int)):
+                    out.append((rec.get("type"), val, rec[val],
+                                raw[rec[s]:rec[e]].decode("utf-8", "replace")))
+        return out
+
+    # An all-ASCII document. Byte offsets and code-point indices are IDENTICAL
+    # here, so this control passes either way — which is exactly why it is not
+    # the evidence. It is here to show the slicing harness itself works, so
+    # that a failure in the next control means the offsets and not the check.
+    spans = sliced("Growth is documented (Smith, 2020) widely.")
+    wrong = [s for s in spans if s[2] != s[3]]
+    if not spans:
+        failures.append("§2: the ASCII control produced no spans to check")
+    elif wrong:
+        failures.append(f"§2: the slicing harness disagrees on pure ASCII, "
+                        f"where bytes and code points cannot differ — {wrong[0]}")
+    else:
+        ok(f"§2: on ASCII every one of {len(spans)} spans slices its own text")
+
+    # The real one. Every character before the citation is multi-byte, so a
+    # code-point index is guaranteed to land short — 2 bytes per character in
+    # the accented run, 3 per em-dash and curly quote.
+    #
+    # This is not a contrived document. Mathpix output carries accented
+    # surnames, en-dashes and curly quotes within the first few hundred
+    # characters of every paper in this corpus, which is why the pre-fix
+    # figure was 95% and not 5%.
+    #
+    # Interleaved rather than front-loaded, so the displacement grows across
+    # the document. A single citation after a single accented run would fail
+    # by a fixed amount, which an off-by-N patch could absorb; here the error
+    # is different at every site and only a real conversion holds.
+    # The four characters are rc2's own, not chosen here. C-003's evidence
+    # column reads "β, —, ’, ﬁ spans slice exact bytes", and they are four
+    # different widths — 2, 3, 3 and 3 bytes — so a patch that assumed one
+    # multiplier passes on some and fails on others.
+    LEAD = ("Schön, Müller und Björk — β decay, don’t say ﬁnal — "
+            "établissent qu'il s'agit d'une étude préliminaire. ")
+    spans = sliced(LEAD
+                   + "Growth is documented (Smith, 2020) widely. "
+                   + "Le résumé — très détaillé — précède (Jones, 2019) ici. "
+                   + "Weiterführende Überlegungen zeigen (Brown, 2018) dies. "
+                   + "Une dernière remarque (Davis, 2017) là.",
+                   refs=("\n\n## References\n\n"
+                         "Smith, J. (2020). A paper. Journal, 1(1), 1-10.\n\n"
+                         "Jones, R. (2019). Another. Journal, 2(1), 1-10.\n\n"
+                         "Brown, K. (2018). A third. Journal, 3(1), 1-10.\n\n"
+                         "Davis, L. (2017). A fourth. Journal, 4(1), 1-10.\n"))
+    wrong = [s for s in spans if s[2] != s[3]]
+    if not spans:
+        failures.append("§2: the multi-byte control produced no spans")
+    elif wrong:
+        t, field, want, got = wrong[0]
+        failures.append(f"§2: {len(wrong)} of {len(spans)} spans do not slice "
+                        f"their own text out of the manuscript bytes — "
+                        f"{t}.{field} is {want!r}, bytes hold {got!r}")
+    else:
+        ok(f"§2: after {len(LEAD.encode()) - len(LEAD)} bytes of multi-byte "
+           f"lead-in, all {len(spans)} spans still slice their own text")
+
+    # rc3 D1, and the reason the two byte-changing fixes moved ahead of
+    # canonicalisation:
+    #
+    #     exclusion     does not change bytes   safe at any stage
+    #     substitution  changes bytes           every downstream offset shifts
+    #
+    # Applied after the canonical bytes are fixed, `\& -> &` shortens the body
+    # under every citation that follows it and NOTHING ERRORS. Measured on
+    # paper 4918fd7d before the move: 0 of 264 citations could slice their own
+    # group; with the fixes off, 123 of 123 could. A control that only ran
+    # with fixes off would have reported the extractor healthy.
+    body = ("Early work (Alpha \\& Beta, 2001) and (Gamma \\& Delta, 2002) "
+            "and (Epsilon \\& Zeta, 2003) set this out. "
+            "Growth is documented (Smith, 2020) widely.")
+    spans = sliced(body, fixes=frozenset({"ampersand"}))
+    wrong = [s for s in spans if s[2] != s[3]]
+    if len(spans) < 4:
+        failures.append(f"§2/D1: expected at least four spans, got {len(spans)}")
+    elif wrong:
+        t, field, want, got = wrong[0]
+        failures.append(f"§2/D1: with `ampersand` on, {len(wrong)} of "
+                        f"{len(spans)} spans are displaced — {t}.{field} is "
+                        f"{want!r}, bytes hold {got!r}. The substitution is "
+                        f"running after canonicalisation.")
+    else:
+        ok(f"rc3 D1: three `\\&` substitutions precede canonicalisation, so "
+           f"all {len(spans)} spans still slice their own text")
+
+    # Both byte-changing fixes together, in the order rc3 §J pins. `mathyear`
+    # rewrites `$(2012)$` to `(2012)`, which shortens the text again and by a
+    # different amount, so an implementation that moved only `ampersand`
+    # ahead of the hash passes the control above and fails this one.
+    body = ("Early work (Alpha \\& Beta, 2001) set this out. "
+            "Later $(2012)$ and $(2016)$ work followed. "
+            "Growth is documented (Smith, 2020) widely.")
+    spans = sliced(body, fixes=frozenset({"ampersand", "mathyear"}))
+    wrong = [s for s in spans if s[2] != s[3]]
+    if len(spans) < 3:
+        failures.append(f"§2/§J: expected at least three spans, got {len(spans)}")
+    elif wrong:
+        t, field, want, got = wrong[0]
+        failures.append(f"§2/§J: with both byte-changing fixes on, "
+                        f"{len(wrong)} of {len(spans)} spans are displaced — "
+                        f"{t}.{field} is {want!r}, bytes hold {got!r}")
+    else:
+        ok(f"rc3 §J: ampersand then mathyear, both before canonicalisation — "
+           f"all {len(spans)} spans hold")
+
+    # rc2 §2 binds `canonical_sha256` to "exactly canonical_manuscript_bytes",
+    # and D1 puts the ingest transforms before it. Those two together mean the
+    # digest has to cover the SAME bytes the offsets index — otherwise a
+    # reader who fetches the manuscript by its recorded hash gets a document
+    # the coordinates do not fit.
+    #
+    # Recomputed here from the file rather than read back from the output,
+    # for the same reason as above.
+    import hashlib as _hl
+    doc = (HEAD + "Early work (Alpha \\& Beta, 2001) set this out. "
+           + "Growth is documented (Smith, 2020) widely." + REFS)
+    p = Path(_tf.mkdtemp()) / "p.md"
+    p.write_bytes(doc.encode("utf-8"))
+    digests = {}
+    for fx in (frozenset(), frozenset({"ampersand"})):
+        ls, _c = ce.run(p, set(fx))
+        t = ce.normalise(p.read_bytes())
+        if "ampersand" in fx:
+            t = t.replace("\\&", "&")
+        digests[bool(fx)] = (ls[0]["canonical_sha256"],
+                             _hl.sha256(t.encode("utf-8")).hexdigest())
+    # Order matters between these two, and the first version had it backwards.
+    # Checking the binding first made the second branch unreachable: a digest
+    # taken before the transform fails the binding check too, so "unchanged by
+    # a byte-changing fix" could never be the reported reason. A branch that
+    # cannot fire is the same defect as a check that passes for the wrong
+    # reason. The movement test goes first because it is the narrower claim.
+    if digests[False][0] == digests[True][0]:
+        failures.append("rc3 D1: canonical_sha256 is unchanged by a "
+                        "byte-changing fix, so it is being computed before "
+                        "the ingest transform rather than after it")
+    elif any(a != b for a, b in digests.values()):
+        failures.append(f"§2: canonical_sha256 is not the digest of the bytes "
+                        f"the offsets index — {digests}")
+    else:
+        ok("§2/D1: canonical_sha256 covers the post-transform bytes, and "
+           "moves when the transform does")
+
+    # The guard, not the conversion. `to_byte_coordinates` used to skip any
+    # coordinate outside the table instead of raising, which left code-point
+    # values sitting in the same field as byte values with nothing to tell
+    # them apart. An offset that cannot be converted means the record was
+    # built against a different string, and rc2 §14 exit 6 is "internal
+    # invariant violation".
+    try:
+        ce.to_byte_coordinates([{"type": "citation", "start": 10 ** 6}],
+                               "short text")
+        failures.append("§2: an out-of-range coordinate was accepted; a wrong "
+                        "offset must not survive the conversion silently")
+    except ce.Abort as a:
+        if a.code != 6:
+            failures.append(f"§2: out-of-range coordinate aborted {a.code}, "
+                            f"not §14's exit 6 for an invariant violation")
+        else:
+            ok("§2: an unconvertible coordinate aborts, exit 6, rather than "
+               "staying in the record as a code-point index")
+
+    # And the null case it must NOT abort on: `previous_sentence_end` is None
+    # for the first sentence, and §11.3 nulls ten fields outright. Making the
+    # guard strict is only correct if it stays quiet on a legitimate null.
+    rec = {"type": "citation", "previous_sentence_end": None, "start": 3}
+    try:
+        ce.to_byte_coordinates([rec], "a é c")
+        if rec["previous_sentence_end"] is not None:
+            failures.append("§2: a null coordinate was converted to a number")
+        elif rec["start"] != 4:
+            failures.append(f"§2: start 3 in 'a é c' is byte 4, got "
+                            f"{rec['start']}")
+        else:
+            ok("§2: a null coordinate passes through as null, and the "
+               "sibling offset still converts")
+    except ce.Abort as a:
+        failures.append(f"§2: a legitimate null coordinate aborted "
+                        f"{a.code} {a.reason}")
+
+    # C-002: "CRLF/lone CR→LF then NFC", canonical bytes exactly pinned.
+    # Both directions matter. NFC composition SHORTENS the text — `e` + U+0301
+    # is two code points and three bytes, `é` is one and two — so a document
+    # that is not normalised produces coordinates against a longer string than
+    # the one `canonical_sha256` names.
+    raw = b"# P\r\n\r\nCafe\xcc\x81 said\r(Smith, 2020).\r\nNext.\n"
+    got = ce.normalise(raw)
+    want = "# P\n\nCafé said\n(Smith, 2020).\nNext.\n"
+    if got != want:
+        failures.append(f"§2/C-002: normalisation is not CRLF/CR→LF then NFC "
+                        f"— got {got!r}, want {want!r}")
+    elif len(got.encode("utf-8")) != len(want.encode("utf-8")):
+        failures.append("§2/C-002: canonical byte length disagrees")
+    else:
+        ok("§2/C-002: CRLF and lone CR become LF, then NFC composes — "
+           "canonical bytes are exactly pinned")
+
+    # C-004, the converse of everything above: three counts legitimately stay
+    # in CODE POINTS, and rc2 §1.3 lists them by name.
+    #
+    #     OSA edit distance unit         code point after NFC
+    #     CORE minimum length            >= 2 code points
+    #     reference overlong threshold   > 1500 code points
+    #
+    # The trap is symmetrical with the offsets one. Converting these to bytes
+    # would also be silent: an accented surname would fail a CORE check it
+    # passes, and a 1200-character reference with accents would be flagged
+    # overlong. So each is exercised on input where bytes and code points
+    # disagree, and the expected answer is the code-point one.
+
+    # OSA over code points. `Müller` vs `Miller` is one substitution in code
+    # points and two bytes apart in UTF-8 — ü is two bytes, i is one — so a
+    # byte-based distance returns 2 and the rule's `<= 1` never fires.
+    if ce._osa("müller", "miller") != 1:
+        failures.append(f"§1.3/C-004: osa counts code points, not bytes — "
+                        f"müller/miller is {ce._osa('müller', 'miller')}, "
+                        f"want 1")
+    elif ce._osa("smith", "smiht") != 1:
+        failures.append("§1.3/C-004: osa must count a transposition as 1")
+    else:
+        ok("§1.3/C-004: osa is one substitution apart on müller/miller, so "
+           "the unit is a code point")
+
+    # CORE >= 2 code points. `Bé` is two code points and three bytes; a
+    # byte-length floor would accept a one-code-point surname that happens to
+    # be multi-byte, which is the failure that has no visible symptom.
+    cits, _u, _e = extract("The result (Bé, 2020) holds.")
+    if not cits or cits[0]["citation_key"] != "bé|2020":
+        failures.append(f"§1.3/C-004: a two-code-point CORE must parse — "
+                        f"got {keys(cits)}")
+    else:
+        cits2, _u2, _e2 = extract("The result (É, 2020) holds.")
+        if cits2 and cits2[0].get("citation_key"):
+            failures.append(f"§1.3/C-004: a one-code-point surname parsed as "
+                            f"{keys(cits2)}; CORE's floor is being measured "
+                            f"in bytes, where É is 2")
+        else:
+            ok("§1.3/C-004: CORE's floor is 2 code points — Bé parses, É "
+               "does not, though both are 2+ bytes")
+
+    # overlong > 1500 code points. An assembled entry of 1400 code points made
+    # of 2-byte characters is 2800 bytes: well over the threshold if it were
+    # read as bytes, well under it as code points.
+    long_ref = "Müller, A. (2020). " + ("ü" * 1400) + ". Journal, 1(1), 1-10.\n"
+    p = Path(_tf.mkdtemp()) / "p.md"
+    p.write_bytes((HEAD + "A claim (Müller, 2020) holds."
+                   + "\n\n## References\n\n" + long_ref).encode("utf-8"))
+    ls, _c = ce.run(p, {"ampersand"})
+    refs = [r for r in ls if r.get("type") == "reference"]
+    if not refs:
+        failures.append("§1.3/C-004: the overlong probe produced no reference")
+    elif "overlong" in (refs[0].get("suspect_reasons") or []):
+        failures.append(f"§1.3/C-004: a {len(long_ref)}-code-point entry "
+                        f"({len(long_ref.encode())} bytes) was flagged "
+                        f"overlong; the 1500 threshold is counting bytes")
+    else:
+        ok(f"§1.3/C-004: {len(long_ref.encode())} bytes of reference is not "
+           f"overlong at {len(long_ref)} code points")
+
     print()
     if failures:
         for f in failures:

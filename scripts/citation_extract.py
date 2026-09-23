@@ -2166,17 +2166,46 @@ FIXES = ("ampersand", "segments", "colon", "cp", "mathyear")
 
 
 def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
+    # rc3 D1, and it is emphatic about the ordering:
+    #
+    #     exclusion      does not change bytes    safe at any stage
+    #     substitution   changes bytes            every downstream offset
+    #                                             shifts
+    #
+    #     810 substitutions, each one byte shorter. Applied after canonical
+    #     bytes are fixed, every citation offset is wrong and NOTHING ERRORS.
+    #
+    #     A deterministic ingest transform BEFORE canonical bytes, hash and
+    #     offsets exist. Rule id `ampersand_unescape_v1`.
+    #
+    # That was this file's defect exactly, and the prediction held to the
+    # word. Both substitutions ran after `normalise`, on the already-split
+    # body, so under `--fix all` the body moved 106 characters and every
+    # coordinate in the output pointed somewhere else. Measured 22 September:
+    # 0 of 264 citations on paper 4918fd7d could slice their own
+    # `citation_group` out of the manuscript. With the transforms removed,
+    # 123 of 123 could.
+    #
+    # So the two byte-changing transforms now run HERE, before the hash and
+    # before the split, and `text` is `canonical_manuscript_bytes` decoded —
+    # the thing rc2 §2 says every coordinate indexes.
+    #
+    # Consequence worth naming: `canonical_sha256` now covers the transformed
+    # bytes, so it changes when the fixes are on. That is what D1 asks for —
+    # the transform precedes the hash — and it means the gold set's recorded
+    # `source.sha256` describes the pre-transform file rather than what the
+    # extractor reads.
     text = normalise(path.read_bytes())
-    body, section, sec_off, heads, ref_source = split_body_and_references(text)
     if "ampersand" in fixes:
-        body = body.replace("\\&", "&")
-        section = section.replace("\\&", "&")
+        text = text.replace("\\&", "&")
     if "mathyear" in fixes:
-        # rc3 §J fixes the order: ampersand first, then this. The two are
-        # independent — a year-only span contains no ampersand — but rc3 pins
-        # it anyway, "because two orders that happen to agree today are still
-        # two orders".
-        body = unwrap_math_years(body)
+        # rc3 §J pins the order: ampersand first, then this. The two are
+        # independent — a year-only span contains no ampersand — but rc3
+        # pins it anyway, "because two orders that happen to agree today are
+        # still two orders".
+        text = unwrap_math_years(text)
+
+    body, section, sec_off, heads, ref_source = split_body_and_references(text)
     sents = sentences(body)
 
     # rc2 §8 runs citation identity AFTER the bibliography, because authority
@@ -2212,6 +2241,13 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
               # over exactly canonical_manuscript_bytes" — the INPUT after
               # newline and NFC normalisation, not the output. No circularity,
               # which is what lets §13 name an output file after it.
+              #
+              # `text` here is post-ingest-transform, per rc3 D1. So the
+              # digest changes when `ampersand` or `mathyear` is on, and it
+              # is meant to: the bytes the offsets index are the bytes the
+              # hash covers, which is the whole point of moving those two
+              # transforms ahead of this line. A run with different fixes is
+              # a different manuscript and gets a different name.
               "canonical_sha256": hashlib.sha256(
                   text.encode("utf-8")).hexdigest(),
               # rc2 §6.2, C-006 and C-007. Whether the bibliography was found
@@ -2850,7 +2886,88 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
                                  and not unres
                                  and not any(m["citation_author_form"] == "exact"
                                              for m in mismatches)) else 1)})
+    # rc2 §2. Last thing before the records leave: every coordinate becomes a
+    # UTF-8 byte offset into the canonical manuscript. `text` is exactly
+    # `canonical_manuscript_bytes` decoded, which is what the offsets have
+    # been indexing all along — in code points.
+    to_byte_coordinates(lines, text)
+
     return lines, lines[-1]["exit"]
+
+
+# rc2 §2, C-002 to C-004:
+#
+#     Every manuscript coordinate is a half-open, zero-based UTF-8 byte
+#     offset into `canonical_manuscript_bytes`.
+#
+# Python string indices are CODE POINTS, and the two agree only while
+# everything to the left is ASCII. Measured on 22 September across the
+# thirteen in-profile papers: 14,834 of 15,570 emitted offsets — 95.3% —
+# named a byte position that holds something else entirely. Slicing the
+# manuscript by a record's own coordinates returned unrelated text:
+#
+#     record  citation_group = '(Kabat-Zinn, 2011)'
+#     bytes[82341:82359]     = 'o emphasize that m'
+#
+# Mathpix output makes this near-universal rather than an edge case: accented
+# surnames, en-dashes and curly quotes appear within the first few hundred
+# characters of every paper in this corpus, and every offset after the first
+# one is wrong from there on.
+#
+# Converted once at the end of `run`, not at each site. The extractor works in
+# code points throughout — `sentence_of`, the token walks and the §12.4 sort
+# all index the string — and rewriting those would be a far larger change for
+# no gain, since the mapping is monotonic and order is preserved either way.
+OFFSET_FIELDS = frozenset({
+    "group_start", "group_end", "segment_start", "segment_end",
+    "sentence_start", "previous_sentence_end", "start", "end",
+})
+
+
+def byte_offsets(text: str) -> list[int]:
+    """Prefix byte length at each code-point index, plus the total."""
+    out, n = [0] * (len(text) + 1), 0
+    for i, ch in enumerate(text):
+        out[i] = n
+        n += len(ch.encode("utf-8"))
+    out[len(text)] = n
+    return out
+
+
+def to_byte_coordinates(records: list[dict], text: str) -> None:
+    """Rewrite every manuscript coordinate in place, code points to bytes.
+
+    Strict on purpose. The first version skipped anything outside the table
+    instead of raising:
+
+        if isinstance(v, int) and 0 <= v < len(table):
+
+    which converts what it can and leaves the rest as code points, in the
+    same field, with no way for a reader to tell which is which. That is the
+    failure this whole change exists to remove — an offset that is wrong and
+    nothing errors. An out-of-range coordinate means a record was built
+    against a different string than `text`, and the run should stop.
+    """
+    table = byte_offsets(text)
+    for rec in records:
+        for field in OFFSET_FIELDS & rec.keys():
+            v = rec[field]
+            # Nullable by design: `previous_sentence_end` is None for the
+            # first sentence, and §11.3 nulls ten fields when the
+            # bibliography is absent.
+            if v is None:
+                continue
+            if not isinstance(v, int) or not 0 <= v < len(table):
+                # Exit 6 is rc2 §14's "internal invariant violation", which
+                # is the right category. Its reason string is NOT rc2's:
+                # §14's table gives exit 6 exactly one reason,
+                # `same_candidate_identity_double_resolution`. Recorded as a
+                # deviation rather than bent to fit — reusing that reason
+                # would report a §8.6 double resolution that did not happen.
+                raise Abort(6, f"coordinate_out_of_manuscript_range: "
+                               f"{rec.get('type')}.{field} = {v!r}, "
+                               f"manuscript is {len(table) - 1} code points")
+            rec[field] = table[v]
 
 
 # rc2 §12.3, the declared key order per record type.

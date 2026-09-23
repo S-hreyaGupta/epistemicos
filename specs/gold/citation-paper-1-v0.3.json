@@ -57,7 +57,7 @@
   },
   "source": {
     "sha256": "cff9bb85d74fbac8ffd69fd0c258812cb1d051b2963cbc8b8df8ebe447264615",
-    "what": "papers.markdown for this row — the bytes the extractor reads",
+    "what": "papers.markdown for this row — the file the extractor is given, before ingest transforms. NOT the run's canonical_sha256, which covers the bytes after ampersand_unescape_v1 and mathyear.",
     "corpus_paper": "ad1e3ff9",
     "annotated_from_pdf_sha256": "209af10a1a02c047b089d572a74dd99b48873a31c3d85701b8e98c77334b37f2",
     "note": "the annotation was made from a different copy of this paper than the corpus holds. 192 of the 193 annotated citations across both papers are present in these bytes; any that are not carry absent_from_source and are excluded from scoring."

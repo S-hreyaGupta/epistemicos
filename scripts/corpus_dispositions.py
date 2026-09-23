@@ -150,8 +150,13 @@ UNDISPOSED_NOTE = {
     # it is for.
     ("author_structure_mismatch", "count"):
         "rc2 §9.3's count check, pinned by C-062. "
-        "RC1-IS-BIGGER-THAN-THE-SPLIT names author-structure agreement as "
-        "the amendment with a live defect behind it",
+        "RC1-IS-BIGGER-THAN-THE-SPLIT called author-structure agreement the "
+        "amendment with a live defect behind it, and the check it said did "
+        "not exist now does: two of the six candidates it named are caught. "
+        "One of the remaining four that document already identified as its "
+        "own measuring error, two sit on ambiguous keys where no identity "
+        "was established, and the last cannot be checked at all. See the "
+        "coverage block below for why",
     ("author_structure_mismatch", "order"):
         "rc2 §9.3's order check, pinned by C-063. Same open question as the "
         "count half",
@@ -403,6 +408,49 @@ def ambiguity_sources(lines: list) -> tuple[Counter, list]:
     return out, detail
 
 
+def structure_coverage(lines: list) -> Counter:
+    """How much of the corpus rc2 §9.3's author-structure check can reach.
+
+    §7.4 anchors `reference_author_head` on "the text before the opening `(`
+    immediately containing the first YEAR token". A reference written
+    `Agle, B. R., Mitchell, R. K., & Sonnenfeld, J. A. 1999.` has no such
+    parenthesis, so the closed person-list parser never runs on it, and §7.4's
+    own fallback then says what follows:
+
+        Because `authors` and `author_count` are null, the entry takes no
+        part in author-structure validation.
+
+    So this is specified behaviour and the extractor is faithful to it. What
+    rc2 does not state, and what C-062 and C-063 being MET does not state
+    either, is how much of a corpus falls into that path. MET means the rule
+    holds where it runs. It has never meant the rule runs everywhere, and on
+    this corpus a third of the person references are outside it.
+
+    That gap is why this block exists rather than a defect claim. Whether a
+    check that cannot see a third of the bibliography is sufficient for freeze
+    is the review's call; the number is not.
+    """
+    out: Counter = Counter()
+    for r in lines:
+        if r.get("type") != "reference" or not r.get("reference_key"):
+            continue
+        if r.get("author_kind") != "person":
+            continue
+        out["person references carrying a key"] += 1
+        if r.get("authors") is not None:
+            out["  ...§9.3 can check them"] += 1
+            continue
+        out["  ...authors is null, so §9.3 takes no part"] += 1
+        # Which of §7.4's two null paths. The parenthesis is the anchor, so
+        # its absence is the one that takes a whole citation style out.
+        head = r["assembled"][:120]
+        if _re.search(r"\((?:1[5-9]|20)\d{2}", head):
+            out["      parenthesised year, so the list itself was unparsed"] += 1
+        else:
+            out["      BARE year, so §7.4 never located an author head"] += 1
+    return out
+
+
 def main() -> int:
     if not CORPUS.is_dir():
         print(f"  corpus not found at {CORPUS}")
@@ -414,6 +462,7 @@ def main() -> int:
     refusals: Counter = Counter()
     gaps: Counter = Counter()
     amb: Counter = Counter()
+    cover: Counter = Counter()
     unreadable: list = []
     by_scope: dict[str, Counter] = {"eleven": Counter(), "extra": Counter()}
     orphan_by_source: dict[str, list[int]] = {}
@@ -455,6 +504,7 @@ def main() -> int:
         refusals.update(grammar_refusals(lines))
         _a, _d = ambiguity_sources(lines)
         amb.update(_a)
+        cover.update(structure_coverage(lines))
 
         source = lines[0].get("references_source")
         refs = orph = 0
@@ -581,6 +631,26 @@ def main() -> int:
           "envelope catching")
     print("    prose, which C-010 and C-011 make the correct outcome rather "
           "than a drop.")
+
+    if cover:
+        print("\n  how much of the bibliography rc2 §9.3 can actually check")
+        for k in ("person references carrying a key",
+                  "  ...§9.3 can check them",
+                  "  ...authors is null, so §9.3 takes no part",
+                  "      BARE year, so §7.4 never located an author head",
+                  "      parenthesised year, so the list itself was unparsed"):
+            if cover.get(k):
+                print(f"    {cover[k]:5d}  {k}")
+        tot = cover["person references carrying a key"]
+        null = cover["  ...authors is null, so §9.3 takes no part"]
+        if tot:
+            print(f"    {null / tot:.0%} of person references take no part in "
+                  f"author-structure validation.")
+        print("    Specified, not a defect: §7.4 says so in terms. But C-062 "
+              "and C-063 read")
+        print("    MET, and MET means the rule holds where it runs, never "
+              "that it runs")
+        print("    everywhere. Nothing before today stated the coverage.")
 
     if amb:
         print("\n  ambiguous_citation, what is really ambiguous")

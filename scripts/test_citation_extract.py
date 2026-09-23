@@ -1980,13 +1980,27 @@ def main() -> int:
             self.stdout, self.returncode = stdout, returncode
 
     class _BinStdout:
-        """Stands in for sys.stdout, carrying the .buffer main() writes to."""
+        """Stands in for sys.stdout, carrying the .buffer main() writes to.
+
+        `write` MODELS A WINDOWS TEXT LAYER: it translates LF to CRLF, exactly
+        as text-mode stdout does there. Writes through `.buffer` are binary and
+        untranslated, which is the distinction §12.1 turns on.
+
+        Without this the two paths are indistinguishable on Linux — encoding a
+        string and writing bytes give the same result — so the mutation that
+        replaces `sys.stdout.buffer.write(payload)` with `print(...)` SURVIVED.
+        That is the defect this file carried until 22 September, when every run
+        on the author's Windows machine was emitting the CRLF §12.1 forbids,
+        invisible on Linux and invisible to any test that parsed the lines back.
+        A platform-specific defect nothing can catch on the other platform is
+        one that comes back.
+        """
 
         def __init__(self):
             self.buffer = _io.BytesIO()
 
         def write(self, s):
-            self.buffer.write(s.encode("utf-8"))
+            self.buffer.write(s.encode("utf-8").replace(b"\n", b"\r\n"))
 
         def flush(self):
             pass
@@ -3329,6 +3343,129 @@ def main() -> int:
         ok(f"§11.2: {diag} diagnostic occurrences within {inr} "
            f"identity_not_resolved, counted once each")
 
+    _spec_txt = (rc2_spec_path().read_text(encoding="utf-8")
+                 if rc2_spec_path() else "")
+
+    # ----------------------------------------- §13, §14, C-074/075/076/077
+    #
+    # The abort streams, as BYTES, against rc2's own declared shape. C-077 read
+    # NOT with the note "what is unpinned is the two-line error stream's exact
+    # bytes, which needs a byte golden this repository does not have". This is
+    # that golden, and it found a defect the moment it existed:
+    #
+    #     rc2 §14   2 -> unsupported citation style
+    #     emitted      unsupported citation style: 100% of 12 author-year
+    #                  parentheticals omit the comma before the year, ...
+    #
+    # rc2's reason table is a closed mapping from code to STRING, and the
+    # string is part of a two-line contract a consumer parses. Worse, the two
+    # exit-2 sites disagreed with each other — one bare, one long, same code.
+    # The explanation now goes to stderr, which §14 calls non-normative.
+    print("\nrc2 §13/§14 — the abort streams, byte for byte")
+
+    _rt = re.search(r"The `code` and `reason` vary by exit:.*?```text\n(.*?)```",
+                    _spec_txt, re.S)
+    reason_of = {}
+    if _rt:
+        for ln in _rt.group(1).strip().splitlines():
+            if "->" in ln:
+                c, _, r = ln.partition("->")
+                reason_of[int(c.strip())] = r.strip()
+
+    _bad = Path(_tf.mkdtemp()) / "utf8.md"
+    _bad.write_bytes(b"\xff\xfe not utf-8 at all")
+    _head = Path(_tf.mkdtemp()) / "head.md"
+    _head.write_bytes(b"# One\n\ntext\n\n# Two\n\nmore\n")
+    _style = Path(_tf.mkdtemp()) / "style.md"
+    _style.write_bytes((HEAD + " ".join(
+        f"Work follows (Smith{i} 20{10 + i})." for i in range(12))
+        + "\n\n## References\n\nSmith, J. (2020). A. J, 1, 1.\n").encode("utf-8"))
+
+    # 3 is the invalid-section-map abort and 6 the invariant failure. Neither
+    # is reachable from a document: §2.1 forbids a supplied map in the pilot
+    # scope, and 6 needs §15's test-only seam, which C-046 exercises. Named
+    # rather than quietly skipped.
+    ABORTS = [(5, _bad), (4, _head), (2, _style)]
+    UNREACHABLE_FROM_A_DOCUMENT = {3, 6}
+
+    if not reason_of:
+        failures.append("§14: rc2's reason table was not found, so the stream "
+                        "could not be checked against it")
+    else:
+        expected_meta = (
+            b'{"type":"meta","spec_version":"' + ce.SPEC_VERSION.encode()
+            + b'","citation_rule_version":"'
+            + ce.CITATION_RULE_VERSION.encode() + b'"}')
+        bad = []
+        for code, path in ABORTS:
+            cap, _o, _a = _BinStdout(), sys.stdout, sys.argv
+            sys.stdout, sys.argv = cap, [str(Path(ce.__file__)), str(path)]
+            try:
+                got_code = ce.main()
+            finally:
+                sys.stdout, sys.argv = _o, _a
+            raw = cap.buffer.getvalue()
+
+            if got_code != code:
+                bad.append(f"exit {code}: got {got_code}")
+                continue
+            # §12.1's byte properties apply to the error stream too.
+            if raw.startswith(b"\xef\xbb\xbf"):
+                bad.append(f"exit {code}: BOM")
+            elif b"\r" in raw:
+                bad.append(f"exit {code}: CR present, §12.1 is LF only")
+            elif not raw.endswith(b"\n"):
+                bad.append(f"exit {code}: no final LF")
+            elif len(raw.rstrip(b"\n").split(b"\n")) != 2:
+                bad.append(f"exit {code}: §14 says exactly two lines, got "
+                           f"{len(raw.rstrip(chr(10).encode()).splitlines())}")
+            else:
+                meta_line, err_line = raw.rstrip(b"\n").split(b"\n")
+                if meta_line != expected_meta:
+                    bad.append(f"exit {code}: meta line is\n        "
+                               f"{meta_line.decode()}\n      rc2 declares\n"
+                               f"        {expected_meta.decode()}")
+                else:
+                    want = (b'{"type":"error","code":' + str(code).encode()
+                            + b',"reason":"'
+                            + reason_of[code].encode("utf-8") + b'"}')
+                    if err_line != want:
+                        bad.append(f"exit {code}: error line is\n        "
+                                   f"{err_line.decode()}\n      rc2 declares\n"
+                                   f"        {want.decode()}")
+        if bad:
+            failures.append("§14/C-077: the abort stream does not match rc2's "
+                            "declared bytes —\n      " + "\n      ".join(bad))
+        else:
+            ok(f"§14/C-077: {len(ABORTS)} abort streams are byte-exact against "
+               f"rc2's table; {sorted(UNREACHABLE_FROM_A_DOCUMENT)} need a "
+               f"supplied map or §15's seam")
+
+        # §13: "For exits 2-5, the two-line error stream is written to the
+        # requested file as the authoritative error artifact." Same bytes, and
+        # no normal record anywhere in it.
+        _d = Path(_tf.mkdtemp())
+        _target = _d / "out.jsonl"
+        cap, _o, _a = _BinStdout(), sys.stdout, sys.argv
+        sys.stdout, sys.argv = cap, [str(Path(ce.__file__)), str(_bad),
+                                     "--out", str(_target)]
+        try:
+            _c = ce.main()
+        finally:
+            sys.stdout, sys.argv = _o, _a
+        if not _target.exists():
+            failures.append("§13: for exits 2-5 the error stream is written to "
+                            "the requested file as the authoritative artifact")
+        elif _target.read_bytes() != cap.buffer.getvalue():
+            failures.append("§13: the file and stdout must carry the same "
+                            "bytes; they differ")
+        elif b'"type":"citation"' in _target.read_bytes():
+            failures.append("§14: no normal record may precede the error "
+                            "stream, and none may be in the artifact")
+        else:
+            ok("§13: the abort artifact is the stdout stream exactly, two "
+               "lines, no normal record")
+
     # ------------------------------------------------------------ §1.1, C-068
     #
     # rc2 §1.1's rule-identity constants, read out of §1.1's own block rather
@@ -3421,8 +3558,6 @@ def main() -> int:
             ok("§14: invalid UTF-8 writes two lines, and the meta names the "
                "ruleset that refused the document")
 
-    _spec_txt = (rc2_spec_path().read_text(encoding="utf-8")
-                 if rc2_spec_path() else "")
 
     # ------------------------------------------------------------ C-031, and
     # every other closed set rc2 declares

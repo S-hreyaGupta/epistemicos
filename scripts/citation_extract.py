@@ -393,8 +393,33 @@ ROLE_KEYWORDS = [
 
 
 class Abort(Exception):
-    def __init__(self, code: int, reason: str):
-        self.code, self.reason = code, reason
+    """An abort, carrying rc2 §14's exact reason and an optional explanation.
+
+    rc2 §14's reason table is a closed mapping from exit code to STRING, and
+    the string is part of a two-line contract a consumer parses:
+
+        2 -> unsupported citation style
+        3 -> invalid section map
+        4 -> heading contract violated
+        5 -> invalid utf-8
+        6 -> same_candidate_identity_double_resolution
+
+    The style guard was emitting `unsupported citation style: 100% of 12
+    author-year parentheticals omit the comma before the year, which is
+    author-date rather than APA` — rc2's string plus a diagnostic tail. Useful
+    to a reader, and not what §14 declares, so a byte golden against rc2 would
+    have failed on that line. Worse, the two exit-2 sites disagreed with each
+    other: one emitted the bare string and the other the long one, for the
+    same code.
+
+    So `reason` is rc2's, exactly, and the explanation moves to `detail`. §14
+    says "stderr is non-normative", which is precisely where an explanation
+    belongs: it reaches the person running the tool without entering the
+    artifact a machine reads.
+    """
+
+    def __init__(self, code: int, reason: str, detail: str | None = None):
+        self.code, self.reason, self.detail = code, reason, detail
 
 
 def _has(lines, t):
@@ -2365,10 +2390,10 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
 
     share, total = comma_less_share(body)
     if total >= STYLE_MIN_SAMPLE and share > STYLE_COMMA_LESS_MAX:
-        raise Abort(2, f"unsupported citation style: {share:.0%} of "
-                       f"{total} author-year parentheticals omit the comma "
-                       f"before the year, which is author-date rather than "
-                       f"APA")
+        raise Abort(2, "unsupported citation style",
+                    f"{share:.0%} of {total} author-year parentheticals omit "
+                    f"the comma before the year, which is author-date rather "
+                    f"than APA")
 
     lines = [{"type": "meta", "spec_version": SPEC_VERSION,
               "citation_rule_version": CITATION_RULE_VERSION,
@@ -3529,6 +3554,11 @@ def main() -> int:
             {"type": "meta", "spec_version": SPEC_VERSION,
              "citation_rule_version": CITATION_RULE_VERSION},
             {"type": "error", "code": ab.code, "reason": ab.reason}])
+        # §14: "stderr is non-normative." So the explanation goes here, where
+        # it reaches the person running the tool without entering the two-line
+        # artifact a machine parses.
+        if ab.detail:
+            print(f"{ab.reason}: {ab.detail}", file=sys.stderr)
 
     # §12.1: UTF-8, LF only. Written through the binary buffer so the
     # platform's text layer cannot translate the line endings.

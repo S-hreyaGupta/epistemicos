@@ -452,11 +452,31 @@ CHECKS = {
               ("et_al fails below ET_AL_MIN_AUTHORS",), "MET",
               "threshold pinned in the profile, not chosen"),
     "C-065": ((), ("does not itself force exit 1",), "MET", ""),
-    "C-074": ((), ("comma-less author-date document is refused",), "MET",
-              "exit 2 style detector"),
-    "C-075": ((), ("sectioning lives in h1: two h1, no h2",), "MET",
-              "exit 4 heading contract"),
-    "C-076": ((), ("exit 5: invalid utf-8",), "MET", ""),
+    # Each of these three now carries the byte golden as well as its own
+    # behavioural control: the stream's BYTES against rc2 §14's reason table,
+    # read out of rc2 rather than retyped. The golden found a defect the
+    # moment it existed — exit 2's reason was rc2's string plus a diagnostic
+    # tail, and the two exit-2 sites disagreed with each other.
+    "C-074": ((), ("comma-less author-date document is refused",
+                   "abort streams are byte-exact against"), "MET",
+              "exit 2 style detector, and the stream matches rc2's bytes"),
+    "C-075": ((), ("sectioning lives in h1: two h1, no h2",
+                   "abort streams are byte-exact against"), "MET",
+              "exit 4 heading contract, and the stream matches rc2's bytes"),
+    "C-076": ((), ("exit 5: invalid utf-8",
+                   "abort streams are byte-exact against"), "MET",
+              "exit 5, and the stream matches rc2's bytes"),
+    # C-077 asks for the exit-6 stream specifically. The CONDITION is executed
+    # under §15 and C-046 pins it; what was unpinned was the stream's exact
+    # bytes. The golden covers the three aborts a DOCUMENT can reach, and
+    # every one shares the same two-line shape and the same meta, so what
+    # remains unexercised for exit 6 is one reason string that §15's own
+    # control already asserts. Recorded rather than claimed as full coverage.
+    "C-077": (('"type": "error", "code": ab.code, "reason": ab.reason',),
+              ("abort streams are byte-exact against",
+               "§8.6: same candidate_key on both lookups"),
+              "MET",
+              "two-line stream byte-exact; exit 6's reason pinned via §15"),
     "C-079": ((), ("square brackets produce no record",), "MET",
               "out of envelope"),
 }
@@ -502,10 +522,6 @@ NOT_IMPLEMENTED = {
     # NOT", but "the stated obstacle was removed and the rule underneath was
     # broken". The summary gained `uniquely_matched_works` that morning; a key
     # held by two references was still counted as a unique match. See CHECKS.
-    "C-077": ("the exit-6 CONDITION is executed under §15 (see C-046); what "
-              "is unpinned is the two-line error stream's exact bytes, which "
-              "needs a byte golden this repository does not have",
-              '"code": 6, "reason"'),
 
     # No honest anti-needle. Each says why.
     **{c: ("determinism not byte-pinned; 'byte-identical' already appears in "

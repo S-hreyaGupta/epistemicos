@@ -862,6 +862,36 @@ MUTATIONS = [
      '                  "total_citation_occurrences": n_parsed,',
      "total must equal extracted + unresolved"),
 
+    # rc2 §14's reason table, C-077. The defect this golden found the moment
+    # it existed: exit 2 emitted rc2's string plus a diagnostic tail, and the
+    # two exit-2 sites disagreed with each other.
+    ("rc2 §14: the style guard's reason grows a tail again",
+     '        raise Abort(2, "unsupported citation style",\n'
+     '                    f"{share:.0%} of {total} author-year parentheticals omit "',
+     '        raise Abort(2, f"unsupported citation style: {share:.0%} of "\n'
+     '                    f"XX{total} author-year parentheticals omit "',
+     "the abort stream does not match rc2's declared bytes"),
+
+    # §12.1's byte properties reach the error stream too. `print` would
+    # translate LF to CRLF on Windows, which is how the normal stream was
+    # broken until 22 September.
+    ("rc2 §12.1: the error stream goes through the text layer",
+     "    sys.stdout.buffer.write(payload)\n    sys.stdout.buffer.flush()",
+     "    print(payload.decode(), end='')",
+     "the abort stream does not match rc2's declared bytes"),
+
+    # §13: for exits 2-5 the requested file IS the error artifact.
+    # Surgical: only the ABORT path stops publishing. Widening it to every
+    # run made C-071 and C-072 fail first, which told us the mutation broke
+    # something rather than which rule it broke.
+    ("rc2 §13: an abort writes no artifact to --out",
+     "        if ab.detail:\n"
+     "            print(f\"{ab.reason}: {ab.detail}\", file=sys.stderr)",
+     "        if ab.detail:\n"
+     "            print(f\"{ab.reason}: {ab.detail}\", file=sys.stderr)\n"
+     "        a.out = None",
+     "the error stream is written to the requested file"),
+
     # rc2 §1.1, adopted 23 September. `meta` said v3.3 while every rule the
     # extractor runs is rc2's or rc3's, so the label was wrong rather than
     # undecided.

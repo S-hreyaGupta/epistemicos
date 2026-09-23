@@ -3246,6 +3246,70 @@ def main() -> int:
         ok(f"§11.4: {ghost['citation_key']!r} has a key and no authority, so "
            f"it counts toward neither resolved nor works cited")
 
+    # C-051, and §8.5's fourth bullet: "reserved indices ... do not count as
+    # uniquely matched unless independently matched by another unambiguous
+    # occurrence." §11.4 says the same thing from the other end —
+    # `uniquely_matched_occurrences` are occurrences whose key maps to EXACTLY
+    # ONE reference row.
+    #
+    # A key held by two entries was counted as a unique match until
+    # 23 September. The occurrence was `bibliography_key_ambiguous`, emitted
+    # `ambiguous_citation`, reserved both reference indices — and still
+    # reported `uniquely_matched_works: 1`. Ambiguous by every field in the
+    # output except the one this case is about.
+    #
+    # The conformance map had C-051 NOT for a reason that had stopped being
+    # true: "the summary has no uniquely-matched-works count to assert +0
+    # against". The count landed the same morning; the rule was still broken
+    # underneath it, which is why the case was tested rather than re-read.
+    # Its own fixture: `through_cli` hardcodes a one-entry bibliography, which
+    # cannot hold a duplicate key. Two Felfe 2006 entries are a real corpus
+    # shape, not a contrivance — five such groups across four papers, every one
+    # two genuinely different works by the same first author in the same year.
+    _p = Path(_tf.mkdtemp()) / "p.md"
+    _p.write_bytes((
+        HEAD + "As shown (Felfe, 2006) here. Also (Smith, 2020) elsewhere."
+        + "\n\n## References\n\n"
+        "Felfe, J. (2006). One work. Journal, 7(1), 1-10.\n\n"
+        "Felfe, J. (2006). A different work, same key. Journal, 8(1), 1-10.\n\n"
+        "Smith, J. (2020). A paper. Journal, 1(1), 1-10.\n"
+    ).encode("utf-8"))
+    ls, _c = ce.run(_p, {"ampersand"})
+    s = [l for l in ls if l.get("type") == "summary"][0]
+    amb = [l for l in ls if l.get("type") == "ambiguous_citation"]
+    if not amb:
+        failures.append("C-051: the fixture produced no ambiguous_citation, so "
+                        "there is nothing reserved and the case is untested")
+    elif s["bibliography_key_ambiguous_occurrences"] != 1:
+        failures.append(f"C-051: expected exactly one key-ambiguous "
+                        f"occurrence, got "
+                        f"{s['bibliography_key_ambiguous_occurrences']}")
+    # Both halves in one branch, and the message names the rule rather than
+    # the arithmetic. Split across two branches, the "must still count" guard
+    # fired FIRST under the mutation that re-admits duplicate keys — so the
+    # probe reported WRONG CONTROL for a control that was catching the defect,
+    # under a message about the opposite failure.
+    #
+    # Expected 1 and 1: Smith counts, Felfe does not. Over-counting gives 2,
+    # excluding everything gives 0, and counting the wrong one alone is caught
+    # by the key check below.
+    elif (s["uniquely_matched_occurrences"], s["uniquely_matched_works"]) != (1, 1):
+        failures.append(
+            f"C-051: a key held by two references counts +0 toward uniquely "
+            f"matched, and the unambiguous occurrence beside it still counts "
+            f"— got occurrences={s['uniquely_matched_occurrences']}, "
+            f"works={s['uniquely_matched_works']}, expected 1 and 1")
+    elif not any(c.get("type") == "citation"
+                 and c.get("citation_key") == "smith|2020"
+                 and c.get("identity_class") == "unique_reference_match"
+                 for c in ls):
+        failures.append("C-051: the surviving match must be smith|2020; a "
+                        "count of 1 that named the ambiguous work instead "
+                        "would satisfy the arithmetic and not the rule")
+    else:
+        ok(f"C-051: reserved indices {amb[0]['reference_indices']} count +0, "
+           f"and the unambiguous occurrence beside them still counts")
+
     # §11.2: the two candidate-level diagnostics are "over a SUBSET of
     # identity_not_resolved_occurrences", not additional partition states.
     # Their sum can therefore never exceed it — the check that would catch an

@@ -251,6 +251,14 @@ CHECKS = {
     # partition was pinned in the extractor's own vocabulary; the new control
     # checks rc2's equation over rc2's field names, with a resolved and an
     # unresolved occurrence both present so neither side can be empty.
+    # rc2 §8.5's fourth bullet and §11.4 together: a key mapped to more than
+    # one reference row is not a unique match, and reserved indices count +0
+    # "unless independently matched by another unambiguous occurrence". The
+    # control asserts both halves, because excluding everything would satisfy
+    # the first alone.
+    "C-051": (("keyed_once = {k for k, n in counts.items() if n == 1}",),
+              ("C-051: reserved indices",), "MET",
+              "a duplicated key counts +0; the unambiguous match still counts"),
     "C-052": ((), ("§11.2: the identity classes partition",
                    "§11.2/C-052: resolved + ambiguous + not_resolved"),
               "MET",
@@ -294,10 +302,19 @@ CHECKS = {
     # rc2 §9.4 / §9.5, implemented 21 September. These eight sat in
     # NOT_IMPLEMENTED for a full commit after the behaviour landed, which is
     # what the anti-needle guard below now exists to prevent.
-    "C-053": ((), ("§9.4: missing_reference preserves the candidate",),
-              "PARTIAL", "null key pinned; identity_authority not emitted"),
-    "C-054": ((), ("§9.4: a possible_mismatch establishes no citation_key",),
-              "PARTIAL", "null key pinned; identity_authority not emitted"),
+    # PARTIAL until 23 September on "identity_authority not emitted", which
+    # rc2 §12.3 declares as the literal `"candidate"`. Emitting it closes both,
+    # and it is a stronger statement than the two nulls it replaced: an absent
+    # `citation_key` cannot be misread as an unestablished one, and the literal
+    # says positively what authority the record carries. The controls now
+    # require the fields to be ABSENT rather than null.
+    "C-053": (('"identity_authority": "candidate",',),
+              ("§9.4: missing_reference preserves the candidate",),
+              "MET", "no citation_key at all, and identity_authority=candidate"),
+    "C-054": (('"identity_authority": "candidate",\n'
+               '                "reference_index": ri,',),
+              ("§9.4: a possible_mismatch establishes no citation_key",),
+              "MET", "same rule on the other diagnostic, same evidence"),
     # These three were PARTIAL on 21 September because each case is named for
     # a "precedence" that could not be exercised. Alex Zamurko amended §9.4
     # that evening, replacing the precedence list with "a pair qualifies when
@@ -382,8 +399,11 @@ NOT_IMPLEMENTED = {
     # Two of the eleven turned out to be unreachable rather than unbuilt, and
     # they are different kinds of unreachable. Both are NOT, with the reason
     # naming which.
-    "C-051": ("reserved-is-not-uniquely-matched is unpinned; the summary has "
-              "no uniquely-matched-works count to assert +0 against", None),
+    # C-051 moved out of here on 23 September. Its NOT reason had gone stale
+    # in the worse of the two directions: not "implemented and still reading
+    # NOT", but "the stated obstacle was removed and the rule underneath was
+    # broken". The summary gained `uniquely_matched_works` that morning; a key
+    # held by two references was still counted as a unique match. See CHECKS.
     "C-077": ("the exit-6 CONDITION is executed under §15 (see C-046); what "
               "is unpinned is the two-line error stream's exact bytes, which "
               "needs a byte golden this repository does not have",

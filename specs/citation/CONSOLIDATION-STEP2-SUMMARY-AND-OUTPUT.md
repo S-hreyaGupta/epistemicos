@@ -215,23 +215,25 @@ Both look like `DROP` and neither is.
 
 "Ambiguity-reserved entries do not count as uniquely matched unless
  independently matched elsewhere."
-    MOVED OUT OF THE NORMATIVE TEXT. rc2 keeps reservation itself (§8.5, and
-    §9.4's pool construction excludes reserved indices), but this specific
-    claim about `uniquely_matched` survives only as conformance case C-051,
-    "reserved is not uniquely matched | summary assertion | counts +0 absent
-    independent match".
+    MOVED, §11 -> §8.5, and still normative. rc2 §8.5's fourth bullet:
+    "do not count as uniquely matched unless independently matched by another
+    unambiguous occurrence."
 
-    A normative rule became a test case. That is a real weakening: a case in
-    the matrix is something to verify, a sentence in §11 is something to
-    implement. C-051 is currently NOT MET here for exactly the reason the
-    demotion predicts — the summary has no uniquely-matched-works count to
-    assert `+0` against.
+    CORRECTION. The first version of this document said the rule had been
+    demoted out of the normative text into conformance case C-051, and called
+    that a real weakening. That was wrong. The claim came from a grep for
+    `reserved`, which returned §8.5's list HEADING — "Reserved indices:" — and
+    the bullets under it were never read. Concluding a rule is absent because a
+    search for one word did not surface it is the same defect this suite keeps
+    finding in controls, committed here in prose.
+
+    The move is an improvement rather than a loss: the rule now sits beside
+    reservation itself instead of in the summary section, where a reader
+    looking at §8.5 can see what reservation does without cross-referencing.
 ```
 
 ```text
-disposition   both MOVE, neither DROP
-open          C-051 should be restored to §11's normative text in the
-              consolidated document, not left as a matrix row
+disposition   both MOVE, neither DROP, and both stay normative
 ```
 
 ---
@@ -372,7 +374,7 @@ C-031, and all three are implemented.
                                                   nine null and one zero
 §11.4  field semantics                  REPLACE   rc1 undefined six of its terms
 §11    "per occurrence not per record"  MOVE      narrowed to two fields
-§11    ambiguity-reserved sentence      MOVE      demoted to C-051; restore it
+§11    ambiguity-reserved sentence      MOVE      to §8.5, still normative
 §12.2  block order                      REPLACE
 §12.2  mode enum                        REPLACE
 §12.3  author_resolution / author_kind  REPLACE
@@ -383,8 +385,9 @@ C-031, and all three are implemented.
 §12.4  two sort keys                    REPLACE
 ```
 
-No `DROP`. Two `MOVE`s, one of which weakens a normative rule into a test case
-and should be reversed in the consolidated document.
+No `DROP`, and no rule lost. Both `MOVE`s keep their rule normative — one
+narrowed from a general statement to two per-field ones, the other relocated
+from §11 to §8.5 beside the mechanism it constrains.
 
 One `UNRESOLVED`, and it is not a conflict between rc1 and rc2:
 

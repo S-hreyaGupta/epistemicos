@@ -862,6 +862,16 @@ MUTATIONS = [
      '                  "total_citation_occurrences": n_parsed,',
      "total must equal extracted + unresolved"),
 
+    # C-051 and rc2 §11.4. The state this file was in until 23 September: a key
+    # held by two references counted as a unique match, so an occurrence that
+    # was `bibliography_key_ambiguous` by every other field in the output was
+    # `uniquely_matched` by this one. Worth 11 occurrences and 3 works on the
+    # corpus, and invisible without a control that builds a duplicate key.
+    ("rc2 §11.4: a key in the bibliography at all counts as uniquely matched",
+     "    keyed_once = {k for k, n in counts.items() if n == 1}",
+     "    keyed_once = {k for k, n in counts.items() if n >= 1}",
+     "counts +0 toward uniquely matched, and the unambiguous"),
+
     # rc2 §12.3's declared FIELDS, as against their order. Twelve were absent
     # across five record types until 23 September and §12.3's control passed on
     # all of it: it filtered rc2's declared keys down to the ones the record

@@ -2331,12 +2331,39 @@ def run(path: Path, fixes: set[str]) -> tuple[list[dict], int]:
     # produce a confident-looking wrong answer.
     if absent:
         refs = []
-    keyed = {r["reference_key"] for r in refs if r["reference_key"]}
+    # rc2 §11.4: `uniquely_matched_occurrences` are "occurrences with an
+    # authoritative citation_key mapped to EXACTLY ONE reference row", and
+    # §8.5's fourth bullet says reserved indices "do not count as uniquely
+    # matched unless independently matched by another unambiguous occurrence".
+    #
+    # `keyed` asked only whether the key appeared in the bibliography at all,
+    # so a key held by two entries counted as a unique match. Demonstrated
+    # 23 September: `(Felfe, 2006)` against two 2006 Felfe entries emits
+    # `ambiguous_citation`, reserves reference indices [0, 1], classifies the
+    # occurrence `bibliography_key_ambiguous` — and still reported
+    # `uniquely_matched_works: 1`. The occurrence was ambiguous by every other
+    # field in the output and uniquely matched by this one.
+    #
+    # That is C-051, and the conformance map had it NOT for the wrong reason:
+    # "the summary has no uniquely-matched-works count to assert +0 against".
+    # The count landed this morning; the rule was still broken underneath it.
+    #
+    # The other reservation source, §8.5 clause 1, needs nothing here. An
+    # occurrence whose two candidates disagree gets `author_resolution=
+    # ambiguous` and a null `citation_key` under §8.3 rows 6-9, so it is
+    # already absent from this list, and §8.5 explicitly permits the
+    # references it named to be counted when some OTHER unambiguous occurrence
+    # matches them.
+    counts: dict[str, int] = {}
+    for r in refs:
+        if r["reference_key"]:
+            counts[r["reference_key"]] = counts.get(r["reference_key"], 0) + 1
+    keyed_once = {k for k, n in counts.items() if n == 1}
     cite_keys = []
     for c in cits:
         if c["citation_key"] not in cite_keys:
             cite_keys.append(c["citation_key"])
-    matched = [c for c in cits if c["citation_key"] in keyed]
+    matched = [c for c in cits if c["citation_key"] in keyed_once]
 
     # ------------------------------------------- rc2 §8.2 and §8.3, identity
     #

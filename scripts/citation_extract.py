@@ -1260,13 +1260,20 @@ def classify_exclusion(body: str, s: int, e: int, heads, maths=None):
     # `non_citation_year` is NOT detected, and the reason is a measurement.
     #
     # rc3 §F gives one instance — "three consecutive (2011, 2012, and 2013)" —
-    # and no rule. The obvious rule, a pure year list with no reachable author
-    # run, was tried against the corpus first: it matches 19 spans, of which 8
-    # are D2's math-wrapped citations, one is §C's `Fremout et al (2022)`, and
-    # several more are narrative boundary failures that §F says in terms MUST
-    # NOT be removed from the denominator as false positives. One instance in
-    # nineteen is not a rule, so nothing is excluded under this reason until
-    # rc2 or Alex Zamurko supplies one.
+    # and no rule. The obvious rule, a pure year list, was tried against the
+    # corpus first and rejected: it matches 19 candidates corpus-wide and only
+    # one of them is §F's instance. Excluding all nineteen to catch one would
+    # take eighteen real candidates off the denominator, which §F says in
+    # terms MUST NOT happen. So nothing is excluded under this reason until
+    # rc2 or Alex Zamurko supplies a rule.
+    #
+    # The rule itself is `PURE_YEAR_LIST` in `corpus_dispositions.py`, which
+    # re-runs it every time and pins the split — 8 already `publisher_metadata`,
+    # 11 live `no_grammar_match`, exactly 1 of those being §F's instance. It is
+    # written down there because it was not written down anywhere on 22
+    # September: this paragraph quoted a count and a breakdown, and checking
+    # the claim on 24 September meant reconstructing the rule from the prose.
+    # A figure without its method can only be re-asserted, not re-derived.
     #
     # `leading_gloss` (11) and `conversion_artifact` (3) appear exactly once
     # each in the whole specs tree — in A2's own table. They carry counts and

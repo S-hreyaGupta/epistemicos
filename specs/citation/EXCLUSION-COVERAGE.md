@@ -53,6 +53,18 @@ a parenthetical that is a pure year list with no reachable author run — was
 written and run against the corpus before being adopted. It matches **nineteen
 spans**, of which:
 
+> **The table below is stale as of 24 September, and the rule that produced it
+> was never written down.** Both halves matter. Six of the eight math-wrapped
+> spans now parse, so the first row has moved. And the rule could not be
+> recovered from the sentence above it: read as "the parenthetical is a pure
+> year list" it matches 1145 C1 spans, and only some further reading of "no
+> reachable author run" brings it to nineteen. The conclusion below survives
+> either reading. The count does not, and a count whose method is a sentence
+> can only be re-asserted. The replacement is `PURE_YEAR_LIST` in
+> `scripts/corpus_dispositions.py`, which is a different and narrower rule,
+> stated in code, re-run on every pass and pinned: 19 candidates, 8 already
+> `publisher_metadata`, 11 live `no_grammar_match`, exactly 1 of them §F's.
+
 ```text
 8   D2's math-wrapped citations     Baron ×2, Shepherd and Kay, Bicen and
                                     Johnson, Pichler, Hayes ×3
@@ -73,6 +85,26 @@ So the rule would take ten or more real citations off A5's denominator to
 catch one non-citation. Nothing is excluded under this reason until rc2 or
 Alex Zamurko supplies a rule that separates the case from the eighteen it
 resembles.
+
+Re-measured 24 September against the named spans, which are checkable even
+though the count was not:
+
+```text
+Baron (2012,2016) ×2           now parsed, both years        rc3 §G, D2
+Shepherd and Kay (2012,2014)   now parsed, both years
+Hayes (2012,2017) ×3           now parsed, both years
+Bicen and Johnson (2014,2015)  unresolved, stopword_surname  lead-in, B5
+Pichler (2012,2019)            unresolved, no_grammar_match  lead-in, B5
+Fremout et al (2022)           still §C's malformed form
+(2011, 2012, and 2013)         still unresolved, §F's own
+```
+
+Six of the eight math-wrapped spans left this list by parsing, which is the
+outcome §F's warning was protecting: they were real citations all along. The
+two that remain fail on a lead-in rather than on the year list, so they belong
+to B5 and not here. **The verdict is unchanged and is now better supported** —
+a `non_citation_year` rule built on this shape would have excluded six real
+citations that the corpus has since recovered.
 
 ## `math_expression`: implemented, and correctly fires zero times
 

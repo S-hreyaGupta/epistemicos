@@ -676,6 +676,115 @@ def small_group_shapes(lines: list, body: str, section: str) -> Counter:
     return out
 
 
+# rc3 §F's trial rule, written down so it can be run again.
+#
+# `citation_extract.py` declines to implement `non_citation_year` and gives a
+# measurement as the reason: the obvious rule matches nineteen spans and only
+# one is the instance §F names. The conclusion is sound. The rule itself was
+# never written down, and on 24 September it could not be recovered from the
+# prose — one reading of "a pure year list with no reachable author run" gives
+# nineteen and another gives 1145, and nothing on record says which was meant.
+#
+# So this is NOT that rule re-derived. It is a new one, stated here in code so
+# the next person gets the method with the number: every emitted candidate
+# whose whole text is a year list. It reaches the same verdict for the same
+# reason, and the old breakdown is marked stale in EXCLUSION-COVERAGE.md
+# rather than quietly replaced, because the two are not the same measurement.
+_YEAR = r"(?:(?:1[5-9]|20)\d{2}[a-z]?|n\.d\.)"
+PURE_YEAR_LIST = _re.compile(
+    rf"\A[\s$(]*{_YEAR}(?:\s*[,;]?\s*(?:and\s+)?{_YEAR})*[\s$)]*\Z")
+NON_CITATION_YEAR_PINNED = {
+    "publisher_metadata": 8, "no_grammar_match": 11, "§F's own instance": 1}
+
+
+def offsets_slice_their_own_text(lines: list, body: str, full: str) -> Counter:
+    """Every record's own coordinates, checked against its own quoted text.
+
+    rc2 §2 says every coordinate indexes the canonical manuscript, and
+    `citation_extract.py` converts all of `OFFSET_FIELDS` from code points to
+    BYTE offsets once at the end of `run`. Both halves are true and neither is
+    written where a reader of the output would meet it.
+
+    The cost of that on 24 September was two wrong measurements in a row. A
+    probe sliced the body with `body[start:end]` on a Python string, found that
+    2002 of 2116 citations could not reproduce their own `citation_group`, and
+    took it for the return of a defect this file's own docstring says was
+    fixed on 22 September. It was not. Slicing `body.encode("utf-8")` instead
+    gives 2116 of 2116.
+
+    Nothing in the repository asserted this, so nothing contradicted the wrong
+    reading — the defect class this project keeps finding, in the one place
+    that had no control at all. Now it is an invariant: a record that cannot
+    cut its own text out of the manuscript is a record whose coordinates are
+    not what they claim, whatever the reason.
+    """
+    out: Counter = Counter()
+    bb, fb = body.encode("utf-8"), full.encode("utf-8")
+    for r in lines:
+        t = r.get("type")
+        if t == "citation":
+            out["checked"] += 1
+            if bb[r["group_start"]:r["group_end"]].decode(
+                    "utf-8", "replace") != r["citation_group"]:
+                out["citation group does not match its offsets"] += 1
+        elif t in ("unresolved_citation", "excluded_candidate"):
+            out["checked"] += 1
+            if bb[r["start"]:r["end"]].decode(
+                    "utf-8", "replace") != r["text"]:
+                out[f"{t} text does not match its offsets"] += 1
+        elif t == "reference":
+            # References are cut from the section, which sits inside the full
+            # canonical text rather than the body.
+            #
+            # Compared with whitespace collapsed, and only here. §7.1's rule 5
+            # appends a continuation line to the open entry with a single
+            # space, so an entry that spans three source lines is assembled
+            # into one and no longer equals its own slice character for
+            # character. 66 of the corpus's references are that shape. The
+            # offsets are right; it is the join that differs, and collapsing
+            # whitespace is the narrowest way to say so. Citations above get
+            # no such licence, because nothing joins them.
+            out["checked"] += 1
+            asm = r.get("assembled")
+            if asm and _re.sub(r"\s+", " ", fb[r["start"]:r["end"]].decode(
+                    "utf-8", "replace")).strip() != _re.sub(
+                        r"\s+", " ", asm).strip():
+                out["reference text does not match its offsets"] += 1
+    return out
+
+
+def non_citation_year_probe(lines: list) -> Counter:
+    """Every candidate whose whole text is a year list, by what became of it.
+
+    rc3 §F gives one instance, `three consecutive (2011, 2012, and 2013)`, and
+    no rule. This asks what a rule built from that instance would catch.
+
+    The answer is the point. Eight are already excluded as
+    `publisher_metadata`, so a `non_citation_year` reason would not reach
+    them. Eleven are live `no_grammar_match` spans, and exactly one of those
+    eleven is §F's instance. The other ten are bare years and repeated
+    `(2015)` back-references, which §F does not describe and which §F says in
+    terms MUST NOT be removed from the denominator as false positives.
+
+    Excluding all nineteen to catch one would take eighteen real candidates
+    off the denominator. That is why nothing is excluded under this reason
+    until rc2 or Alex Zamurko supplies a rule.
+    """
+    out: Counter = Counter()
+    for r in lines:
+        if not r.get("candidate_state"):
+            continue
+        text = r.get("text", "")
+        if not PURE_YEAR_LIST.match(text):
+            continue
+        out[r.get("excluded_reason") or r.get("reason") or "parsed"] += 1
+        # §F's instance, matched on its shape rather than its paper, so a
+        # corpus change that moves it is noticed instead of assumed.
+        if _re.sub(r"[^\d,]", "", text) == "2011,2012,2013":
+            out["§F's own instance"] += 1
+    return out
+
+
 def residual_probe(lines: list, body: str) -> Counter:
     """What is left of `uncited_reference` after the recall document's method.
 
@@ -795,6 +904,8 @@ def main() -> int:
     groups: Counter = Counter()
     recall: Counter = Counter()
     reasons: Counter = Counter()
+    ncy: Counter = Counter()
+    slices: Counter = Counter()
     causes: Counter = Counter()
     refusals: Counter = Counter()
     gaps: Counter = Counter()
@@ -851,6 +962,8 @@ def main() -> int:
             gaps.update(missing_gaps(lines, _sec))
             small.update(small_group_shapes(lines, _b, _sec))
             resid.update(residual_probe(lines, _b))
+            slices.update(offsets_slice_their_own_text(lines, _b, ctext))
+        ncy.update(non_citation_year_probe(lines))
         refusals.update(grammar_refusals(lines))
         _a, _d = ambiguity_sources(lines)
         amb.update(_a)
@@ -1174,6 +1287,31 @@ def main() -> int:
     print("    A reference the paper cites, reported as uncited, is a false")
     print("    reconciliation diagnostic. Classifying it is the review's.")
 
+    if slices:
+        # Printed as passes over checked, not checked over checked. The first
+        # draft of this line printed the same number twice and so could only
+        # ever read 3295/3295 — a claim true by construction, which is the
+        # defect this file exists to catch.
+        _miss = sum(v for k, v in slices.items() if k != "checked")
+        print(f"\n  every record cuts its own text out of the manuscript"
+              f"   {slices['checked'] - _miss:4d}/{slices['checked']}")
+        print("    rc2 §2's coordinates, checked rather than assumed. They")
+        print("    are BYTE offsets, converted from code points at the end of")
+        print("    `run`, and slicing a Python string with them instead reads")
+        print("    the wrong bytes without erroring — which is how this check")
+        print("    came to exist.")
+
+    if ncy:
+        own = ncy.get("§F's own instance", 0)
+        print("\n  rc3 §F's trial rule for `non_citation_year`, re-run")
+        for k, v in sorted(ncy.items()):
+            if k != "§F's own instance":
+                print(f"    {k:34s} {v:4d}")
+        print(f"    of which §F's named instance    {own:4d}")
+        print("    §F gives one instance and no rule. A rule built from it")
+        print("    would take eighteen other candidates off the denominator,")
+        print("    which §F itself forbids. The rule stays unimplemented.")
+
     if resid:
         print("\n  and the residual, probed against the body instead")
         for k in ("residual",
@@ -1327,6 +1465,29 @@ def main() -> int:
             f"{', '.join(f'{k} {a} -> {b}' for k, (a, b) in rdrift.items())}. "
             f"A row can change reason without leaving, which the totals above "
             f"cannot show, so {RECALL_DOC}'s second table has to move too")
+    broken = {k: v for k, v in slices.items() if k != "checked"}
+    if broken:
+        problems.append(
+            f"records whose coordinates do not cut their own text out of the "
+            f"canonical manuscript: "
+            f"{', '.join(f'{k} ({v})' for k, v in sorted(broken.items()))}, "
+            f"of {slices['checked']} checked. rc2 §2 says every coordinate "
+            f"indexes the canonical manuscript, so a record that cannot do "
+            f"this is pointing somewhere else and everything downstream that "
+            f"reads by position is reading the wrong bytes")
+
+    ndrift = {k: (NON_CITATION_YEAR_PINNED.get(k, 0), ncy.get(k, 0))
+              for k in set(NON_CITATION_YEAR_PINNED) | set(ncy)
+              if NON_CITATION_YEAR_PINNED.get(k, 0) != ncy.get(k, 0)}
+    if ncy and ndrift:
+        problems.append(
+            f"rc3 §F's trial rule now catches a different set: "
+            f"{', '.join(f'{k} {a} -> {b}' for k, (a, b) in ndrift.items())}. "
+            f"The extractor declines `non_citation_year` on the strength of "
+            f"this split, so the decision has to be re-read before the pin is "
+            f"moved. If §F's own instance is no longer among them, the reason "
+            f"the rule was rejected has gone with it")
+
     if reasons and sum(reasons.values()) != recall["person_matched"]:
         problems.append(
             f"the reason split sums to {sum(reasons.values())} but "

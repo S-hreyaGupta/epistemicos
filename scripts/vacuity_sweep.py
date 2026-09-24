@@ -2,10 +2,22 @@
 """Which controls in the citation suite still pass when the extractor emits nothing?
 
     python scripts/vacuity_sweep.py
+    python scripts/vacuity_sweep.py --census
 
 Exit 0 = the survivor set is exactly the pinned one.
 Exit 1 = it is not, and the difference is named.
 Exit 2 = could not run.
+
+Two questions, not one
+----------------------
+The default run asks whether a CONTROL is asleep: does it pass because the
+behaviour is right, or because its fixture produced nothing to judge?
+
+`--census` asks the complement, about the extractor rather than the suite:
+is each RECORD TYPE watched by anything at all? It disables one emitter at a
+time and counts the controls that go red. Zero would mean nothing in the
+suite notices that record vanishing. Thirteen suite runs, so it is a
+deliberate check rather than part of the default path.
 
 The question this asks
 ----------------------
@@ -110,6 +122,58 @@ EMITTERS = [
      '    _ = (rec)'),
 ]
 
+# The other nine record types the extractor emits, for `--census` only.
+#
+# These are NOT part of the survivor sweep above, and the reason is worth
+# stating because the obvious extension does not work. The sweep's signal
+# comes from nearly every control in the suite passing through citation
+# extraction, so a survivor is unusual and therefore interesting. Disable
+# `possible_mismatch` instead and 309 of 317 controls survive, because almost
+# none of them was ever about possible_mismatch. Pinning 309 names would be
+# noise wearing the shape of a result.
+#
+# So the narrow emitters get the complementary question instead, which needs
+# no pin: does ANY control go red when this record stops being emitted? Zero
+# would mean nothing in the suite watches that record type at all.
+NARROW_EMITTERS = [
+    ("reference",
+     '        refs.append({\n            "type": "reference", "index": 0,',
+     '        _ = ({\n            "type": "reference", "index": 0,'),
+    ("unresolved_reference",
+     '            unres.append({\n                "type": "unresolved_reference", "index": 0,',
+     '            _ = ({\n                "type": "unresolved_reference", "index": 0,'),
+    ("author_structure_mismatch",
+     '        mismatches.append({\n            "type": "author_structure_mismatch", "index": 0,',
+     '        _ = ({\n            "type": "author_structure_mismatch", "index": 0,'),
+    ("possible_mismatch",
+     '            diagnostics.append({\n                "type": "possible_mismatch", "index": 0,',
+     '            _ = ({\n                "type": "possible_mismatch", "index": 0,'),
+    ("missing_reference",
+     '            diagnostics.append({\n                "type": "missing_reference", "index": 0,',
+     '            _ = ({\n                "type": "missing_reference", "index": 0,'),
+    ("ambiguous_citation",
+     '            ambiguous_citations.append({\n                "type": "ambiguous_citation", "index": 0,',
+     '            _ = ({\n                "type": "ambiguous_citation", "index": 0,'),
+    ("ambiguous_author_resolution",
+     '            ambiguous_authors.append({\n                "type": "ambiguous_author_resolution", "index": 0,',
+     '            _ = ({\n                "type": "ambiguous_author_resolution", "index": 0,'),
+    # These two are built by comprehension rather than appended, so the
+    # disable guards the comprehension instead of a publish.
+    ("uncited_reference",
+     '    uncited = [{"type": "uncited_reference", "index": i,',
+     '    uncited = []\n    _ = [{"type": "uncited_reference", "index": i,'),
+    ("duplicate_reference_key",
+     '    duplicates = [] if absent else [',
+     '    duplicates = [] if True else ['),
+]
+
+# A record type no control notices the absence of is unwatched, whatever else
+# the suite says about it. Measured 24 September: every one of the twelve has
+# at least one, and the census prints the counts so the thin ones are visible.
+# `unresolved_reference` is thinnest at two.
+CENSUS_FLOOR = 1
+CENSUS_THIN = 2
+
 # Controls that legitimately survive with all three emitters off.
 #
 # Every one was read before it was listed. They fall into five groups, none of
@@ -188,6 +252,42 @@ def run_suite(source: str) -> set:
         EXTRACTOR.write_text(original, encoding="utf-8")
 
 
+def census(source: str, base: set) -> int:
+    """Per emitter, how many controls notice when it stops emitting.
+
+    The complement of the survivor sweep. That one asks whether a control is
+    asleep; this asks whether a record type is watched. One emitter at a
+    time, because the question is per record type and a combined disable
+    could not attribute the reds.
+
+    Thirteen suite runs, so this is not on the default path.
+    """
+    print("  census: controls that go red when one emitter is disabled\n")
+    problems = 0
+    for label, old_text, new_text in EMITTERS + NARROW_EMITTERS:
+        if source.count(old_text) != 1:
+            print(f"    {label:30}  PROBE BROKEN, {source.count(old_text)} "
+                  f"matches; reported rather than passed")
+            problems += 1
+            continue
+        survivors = set(run_suite(source.replace(old_text, new_text, 1))) & base
+        red = len(base) - len(survivors)
+        note = ""
+        if red < CENSUS_FLOOR:
+            note = "   NOTHING WATCHES THIS RECORD TYPE"
+            problems += 1
+        elif red <= CENSUS_THIN:
+            note = "   thin"
+        print(f"    {label:30}  {red:4d}{note}")
+    print()
+    if problems:
+        print("  A record type no control notices the absence of is unwatched,")
+        print("  whatever else the suite says about it.")
+        return 1
+    print(f"  every emitter has at least {CENSUS_FLOOR} control watching it.")
+    return 0
+
+
 def main() -> int:
     if not EXTRACTOR.is_file() or not SUITE.is_file():
         print("  extractor or suite not found")
@@ -229,6 +329,9 @@ def main() -> int:
         return 1
 
     base = set(base_labels)
+
+    if "--census" in sys.argv:
+        return census(source, base)
     print("  with all three citation-side emitters disabled")
     survivors = set(run_suite(disabled))
     print(f"    {len(survivors)} of {len(base)} still pass\n")

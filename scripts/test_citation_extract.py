@@ -878,8 +878,23 @@ def main() -> int:
     # delete three real citations — Baron $(2012,2016)$ …". It must NOT be
     # excluded; it is a citation awaiting D2's unwrapping, and excluding it
     # would take a real citation off A5's denominator.
+    #
+    # "Not excluded" is the wrong half to assert on its own: a span that was
+    # never a candidate is not excluded either, and that is the outcome rc3
+    # is warning against. So the span has to be SHOWN present first. It comes
+    # through as `no_grammar_match` over `(2012,2016)`, which is what "a
+    # citation awaiting D2's unwrapping" looks like before D2 runs.
+    #
+    # Found by extending `scripts/vacuity_sweep.py` to the excluded_candidate
+    # emitter on 24 September. With that emitter off this control passed while
+    # measuring nothing, and its partner below, which asserts a presence,
+    # correctly failed.
     body, cits, unres, x = doc("Additional work by Baron $(2012,2016)$ found.")
-    if x:
+    if "(2012,2016)" not in [u["text"] for u in unres]:
+        failures.append(f"B10/D2's span must survive as a candidate before "
+                        f"`not excluded` means anything — got "
+                        f"{[(u['reason'], u['text']) for u in unres]}")
+    elif x:
         failures.append(f"a year-only math span is D2's unwrap case and MUST "
                         f"NOT be excluded, got {[r['excluded_reason'] for r in x]}")
     else:

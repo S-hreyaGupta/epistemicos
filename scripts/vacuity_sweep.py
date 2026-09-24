@@ -39,24 +39,30 @@ why the citation work never went through that protocol.
 
 How it works
 ------------
-Two record emitters, `citation` and `unresolved_citation`, are disabled
-TOGETHER by replacing the `append` that publishes the record with a discard.
-The suite is then run and its `[ok]` lines collected. A control that still
-passes with both disabled is not testing anything either one produces.
+All three citation-side record emitters — `citation`, `unresolved_citation`
+and `excluded_candidate` — are disabled TOGETHER, by replacing the `append`
+that publishes each record with a discard. The suite is then run and its
+`[ok]` lines collected. A control that still passes with all three disabled is
+not testing anything the extractor emits.
 
-What it does NOT disable, and what that costs
----------------------------------------------
-`excluded_candidate` is the third citation-side emitter and this sweep leaves
-it running. Six of the pinned survivors below are pinned for that reason
-alone: they consume excluded records, so of course they survive. Those six are
-unmeasured rather than cleared, and extending the sweep to a third pass would
-move them out of the pin and into the result.
+Together rather than one at a time, because the question worth asking is the
+strongest one: does this control read any citation-side output at all? Which
+emitter a given control depends on is recorded in the pin below instead.
 
-Stated because the first version of this docstring said "each of the three
-citation-side record emitters is disabled in turn", which was wrong twice over
-in a file whose entire purpose is catching claims that overstate what was
-checked. Two, not three, and together, not in turn. Nothing in the file was
-wrong; only its account of itself.
+What this file got wrong about itself
+-------------------------------------
+The first version said "each of the three citation-side record emitters is
+disabled in turn" while disabling two, together. Wrong twice in five words, in
+the file whose entire purpose is catching claims that overstate what was
+checked. Corrected on 23 September to say two and together, which then made
+the gap obvious: six survivors were pinned only because `excluded_candidate`
+kept running, so they were untested rather than cleared.
+
+The third emitter was added on 24 September. Five of those six stopped
+surviving, which is the answer. The sixth, `B10/D2: a year-only math span is
+not math_expression`, was a real vacuous control: it asserted that a span was
+not excluded, and a span that was never a candidate is not excluded either.
+It now has to show the span present before the absence means anything.
 
 Most survivors are legitimate: a heading-detection control does not care that
 citations stopped being emitted, and a reference-side control does not either.
@@ -96,18 +102,23 @@ EMITTERS = [
     ("unresolved_citation",
      '    unres.append({\n        "type": "unresolved_citation", "index": 0,',
      '    _ = ({\n        "type": "unresolved_citation", "index": 0,'),
+    # Added 24 September, which is what the docstring correction below asked
+    # for. Six survivors were pinned only because this emitter kept running,
+    # so they were untested rather than cleared. They are measured now.
+    ("excluded_candidate",
+     '    excl.append(rec)',
+     '    _ = (rec)'),
 ]
 
-# Controls that legitimately survive with both disabled emitters off.
+# Controls that legitimately survive with all three emitters off.
 #
 # Every one was read before it was listed. They fall into five groups, none of
-# which consumes a citation record — though the excluded_candidate group is
-# only here because this sweep does not disable that emitter, so those six are
-# untested rather than cleared:
+# which reads a record the extractor emits:
 #
 #   heading and section detection      the `References` line rules, h1/h2
 #   the style guard                    §10, which runs on raw text pre-extraction
-#   excluded_candidate                 a third emitter, not disabled here
+#   direct calls                       a constant read, or an emitter called
+#                                      straight and required to raise
 #   aborts                             exit 2, 4, 5, which stop before extraction
 #   summary schema                     fields that must be absent, not counts
 #
@@ -130,15 +141,11 @@ PINNED_SURVIVORS = {
     "a stray comma-less citation among APA ones does not trip it",
     "comma_less_share counts both forms and reports the ratio",
     "too few parentheticals to judge a style: not refused",
-    # excluded_candidate, a third emitter this sweep does not disable
+    # excluded_candidate, and these two do not consume a record at all:
+    # one reads EXCLUDED_REASONS as a constant, the other calls the
+    # emitter directly and requires it to raise before anything is built
     "A2: a reason outside the closed set is refused, incl. bare_locator",
     "A2: excluded_reason is rc3's closed six-member set",
-    "A4: an excluded span is emitted, not silently dropped",
-    "a mathpix cdn image URL is excluded_candidate/url_or_image",
-    "§E: a candidate above the first h2 is publisher_metadata",
-    "§E: a candidate under `## Citation information` is excluded",
-    "B10/D2: a year-only math span is not math_expression",
-    "B10: a math span that is not year-only is math_expression",
     # aborts, which stop before extraction runs
     "exit 2: a comma-less author-date document is refused",
     "exit 4: sectioning lives in h1: two h1, no h2",
@@ -222,7 +229,7 @@ def main() -> int:
         return 1
 
     base = set(base_labels)
-    print("  with the citation and unresolved_citation emitters disabled")
+    print("  with all three citation-side emitters disabled")
     survivors = set(run_suite(disabled))
     print(f"    {len(survivors)} of {len(base)} still pass\n")
 

@@ -75,7 +75,12 @@ CORPUS = REPO / "data/md_full"
 # exactly two gained, ZERO lost. `unresolved_citation` falls by the two
 # records those groups were also producing, and `uncited_reference` falls
 # from 57 to 56 because Sonnentag & Frese is now cited rather than residual.
-PINNED = {"parsed": 2104, "unresolved_citation": 131, "excluded_candidate": 19}
+# MOVED 24 September, 2104/131 -> 2116/125. rc3 §G's D2 positive case
+# requires `Baron $(2012,2016)$` to key both years; the year-list
+# production required whitespace after the comma, so D2 unwrapped into a
+# form the grammar refused. Six of the eight spans recover, each yielding
+# two occurrences. RC2-RC3-DISCREPANCIES.md #6, resolved.
+PINNED = {"parsed": 2116, "unresolved_citation": 125, "excluded_candidate": 19}
 
 
 def main() -> int:

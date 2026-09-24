@@ -191,10 +191,16 @@ MUTATIONS = [
      "    if False and name.strip().lower() in ENVELOPE_OUT_NAMES:",
      "a candidate under `## Citation information` should be publisher_metadata"),
 
+    # The expected message moved on 24 September. That control gained a
+    # live-fixture guard — the span has to be shown present before "not
+    # excluded" means anything — and under this mutation the span IS excluded,
+    # so the guard fires first and the old message never appears. The probe
+    # reported WRONG CONTROL, which is exactly its job: the control still
+    # catches the mutation, and the fourth column had gone stale.
     ("rc3 B10: math exclusion is blanket, deleting D2's real citations",
      "    if span and not D2_YEAR_ONLY.match(body[span[0]:span[1]]):",
      "    if span:",
-     "a year-only math span is D2's unwrap case and MUST NOT be excluded"),
+     "B10/D2's span must survive as a candidate"),
 
     ("rc3 B10: math spans are never excluded, so the branch is vacuous",
      "    span = _in_math_span(maths, s, e)",
@@ -314,6 +320,70 @@ MUTATIONS = [
      "\nET_AL_MIN_AUTHORS = 3\n",
      "\nET_AL_MIN_AUTHORS = 2\n",
      "§9.3: et_al fails below ET_AL_MIN_AUTHORS"),
+
+    # ------------------------------------------- rc2 §7.1, the line rules
+    #
+    # `orphan_line` is 196 of the corpus's 202 unresolved_reference findings
+    # and had no behavioural control until 24 September, so it had no mutation
+    # either. The gap was found by `vacuity_sweep.py --census`, which counts
+    # the controls that notice when a record type stops being emitted:
+    # unresolved_reference came back at two, and neither was about the rule
+    # producing 196 of them.
+
+    # rc3 §G's D2 positive case, settled 24 September. The production was
+    # narrowed back for years and D2 recovered nothing; a mutation restoring
+    # the required whitespace must take that control red rather than any
+    # other, since the author/year comma uses the same `,{WS}` shape.
+    # Aimed at the NARRATIVE production specifically. The bare separator
+    # string appears at three sites and the probe refused it as ambiguous,
+    # which is the check working: a mutation that could have hit any of three
+    # productions cannot say which control should go red.
+    ("rc3 §G: the narrative year-list separator requires whitespace again",
+     'rf"{AUTHORS_NARR}{WS}\\([ \\t\\n]?(?:{YEAR})(?:,(?:{WS})?(?:{YEAR}))*"',
+     'rf"{AUTHORS_NARR}{WS}\\([ \\t\\n]?(?:{YEAR})(?:,{WS}(?:{YEAR}))*"',
+     "rc3 §G: D2's unwrapped form must key both years"),
+
+    # And the opposite direction: widening the AUTHOR/year comma instead,
+    # which would let a comma-less parenthetical through §10's guard.
+    ("rc2 §4: the comma between author and year becomes optional",
+     'rf"(?:{prefix})?{AUTHORS_PAREN},{WS}(?:{YEAR})"',
+     'rf"(?:{prefix})?{AUTHORS_PAREN},?(?:{WS})?(?:{YEAR})"',
+     "the author/year comma is still required"),
+
+    ("rc2 §7.1 rule 1: a blank line no longer closes the open entry",
+     "        if not stripped:\n            close()\n            continue",
+     "        if not stripped:\n            continue",
+     "§7.1 rule 1: a blank line inside an entry strands the rest of it"),
+
+    ("rc2 §7.1 rule 2: a heading no longer closes the open entry",
+     "        if HEAD_MD.match(line) or HEAD_HTML.match(line):\n"
+     "            close()\n            continue",
+     "        if HEAD_MD.match(line) or HEAD_HTML.match(line):\n"
+     "            continue",
+     "§7.1 rule 2: a heading closes the open entry too"),
+
+    # The reason label rather than the routing. C-031 checks only that the
+    # value sits inside rc2's closed set, and `no_year` does, so this mutation
+    # passes that control and has to be caught by one that reads the reason.
+    ("rc2 §7.1 rule 5: the orphan is reported under another closed reason",
+     '                          "reason": "orphan_line"})',
+     '                          "reason": "no_year"})',
+     "§7.1 rule 5: a line with no entry open yet is an orphan"),
+
+    # Cascade recovery, and the first aim was wrong. Dropping the continuation
+    # append does not change this fixture at all, because a stranded line is
+    # not appended to anything by definition; the probe reported the mutation
+    # caught by an unrelated control. What the control actually asserts is
+    # that the NEXT entry start recovers, so the mutation has to stop the
+    # entry opening.
+    ("rc2 §7.1: an entry start no longer opens an entry, so the strand runs on",
+     "        if ENTRY_START.match(stripped):\n"
+     "            close()\n"
+     "            open_entry = (span[0], span[1], [stripped])",
+     "        if ENTRY_START.match(stripped):\n"
+     "            close()\n"
+     "            open_entry = None",
+     "§7.1: and the next ENTRY_START recovers, so a cascade is bounded"),
 
     ("rc2 §7.4: the trailing period is stripped even from an initial",
      '        if head.endswith(".") and not re.search(r"(?:^|[ \\-])[A-ZÀ-Þ]\\.$", head):',

@@ -1116,6 +1116,108 @@ def main() -> int:
     else:
         ok("rc2 §7.4: an institutional reference entry is keyed, not refused")
 
+    # ----------------------------------------- rc2 §7.1, the five line rules
+    #
+    # `orphan_line` is 196 of this corpus's 202 `unresolved_reference`
+    # findings, the largest class after citations themselves, and until
+    # 24 September no control constructed one. Two controls touched
+    # `unresolved_reference` at all: C-030, which is about `no_year`, one
+    # finding of the 202; and C-031, which checks the reason label is inside
+    # rc2's closed set without asserting that the right line earns it.
+    #
+    # Found by `vacuity_sweep.py --census`, which counts the controls that go
+    # red when one record type stops being emitted. `unresolved_reference`
+    # came back at two, against 202 corpus findings, by far the widest gap of
+    # the twelve. Everything asserted below was measured before it was
+    # written, not assumed from the section text.
+    #
+    # It matters beyond coverage. `corpus_dispositions.py` tells the freeze
+    # review that all 196 trace to rule 1 and that 116 are cascade rather than
+    # independent. That analysis reads the extractor's output, so it inherits
+    # whatever the extractor does here, and nothing was holding that down.
+
+    print("\nrc2 §7.1 — the five line rules, and where orphan_line comes from")
+
+    E1 = "Smith, J. (2020). A paper about things. Journal of Work, 1(1), 1-10.\n"
+    E2 = "Brown, K. (2021). Another paper entirely. Other Journal, 2(2), 20-30.\n"
+
+    def bib(section_text):
+        refs, unres = ce.assemble_references(section_text, 0)
+        return ([r.get("reference_key") for r in refs],
+                [(u["reason"], u["text"]) for u in unres])
+
+    # The live-fixture guard, and it is the whole basis of the three below:
+    # these exact two entries, intact, produce two keys and no orphan at all.
+    # Every case after this one differs from it by one inserted line.
+    keys_, orph = bib(E1 + E2)
+    if keys_ != ["smith|2020", "brown|2021"] or orph:
+        failures.append(f"§7.1: the intact pair must assemble cleanly before "
+                        f"a break means anything — got {keys_}, {orph}")
+    else:
+        ok("§7.1: two intact entries, two keys, no orphan")
+
+    # Rule 1, the corpus case. A blank line inside an entry closes it, so the
+    # rest of that entry attaches to nothing. The entry still keys, on what it
+    # had before the blank, which is why this is silent: the bibliography
+    # looks complete and the entry is short.
+    split = ("Smith, J. (2020). A paper about things.\n\n"
+             "Journal of Work, 1(1), 1-10.\n" + E2)
+    keys_, orph = bib(split)
+    if orph != [("orphan_line", "Journal of Work, 1(1), 1-10.")]:
+        failures.append(f"§7.1 rule 1: a blank line inside an entry strands "
+                        f"the rest of it — got {orph}")
+    elif keys_ != ["smith|2020", "brown|2021"]:
+        failures.append(f"§7.1 rule 1: the truncated entry still keys on what "
+                        f"it had, which is what makes this quiet — got {keys_}")
+    else:
+        ok("§7.1 rule 1: a blank line inside an entry strands its tail")
+
+    # Rule 2, the same shape with a heading doing the closing.
+    #
+    # The heading sits IMMEDIATELY after the entry line, with no blank line
+    # anywhere. The first version of this control put blank lines either side
+    # of the heading, which meant rule 1 closed the entry before the heading
+    # was ever consulted: the control read as a rule 2 test and was a second
+    # rule 1 test. Caught by the mutation probe, which removed rule 2's close
+    # and watched this control pass anyway.
+    headed = ("Smith, J. (2020). A paper about things.\n"
+              "## Appendix\n"
+              "Journal of Work, 1(1), 1-10.\n" + E2)
+    _keys, orph = bib(headed)
+    if orph != [("orphan_line", "Journal of Work, 1(1), 1-10.")]:
+        failures.append(f"§7.1 rule 2: a heading closes the open entry too — "
+                        f"got {orph}")
+    else:
+        ok("§7.1 rule 2: a heading closes the open entry")
+
+    # Rule 5's other half: a continuation line before anything has opened.
+    # No entry is open because none has started, so it orphans on arrival.
+    _keys, orph = bib("  and so the tail runs on here.\n" + E1)
+    if orph != [("orphan_line", "and so the tail runs on here.")]:
+        failures.append(f"§7.1 rule 5: a line with no entry open yet is an "
+                        f"orphan — got {orph}")
+    else:
+        ok("§7.1 rule 5: a line before any entry start is an orphan")
+
+    # The cascade, which is the claim `corpus_dispositions.py` makes to the
+    # freeze review: once a line fails to attach, every line after it fails
+    # until the next ENTRY_START. Both stranded lines orphan, and the next
+    # entry recovers, so the damage is bounded by the next entry rather than
+    # running to the end of the bibliography.
+    cascade = ("Smith, J. (2020). A paper.\n\n"
+               "Journal of Work, 1(1), 1-10.\n"
+               "Second stranded line here.\n" + E2)
+    keys_, orph = bib(cascade)
+    if [t for _r, t in orph] != ["Journal of Work, 1(1), 1-10.",
+                                 "Second stranded line here."]:
+        failures.append(f"§7.1: the strand continues to the next entry start "
+                        f"— got {orph}")
+    elif keys_ != ["smith|2020", "brown|2021"]:
+        failures.append(f"§7.1: and the next ENTRY_START recovers, so a "
+                        f"cascade is bounded — got {keys_}")
+    else:
+        ok("§7.1: the strand cascades, and the next entry start ends it")
+
     # --------------------------- rc2 §6.7 / §9.3, author-structure coherence
     #
     # The check that was missing. §8 reconciled on `surname|year` and threw
@@ -1489,19 +1591,37 @@ def main() -> int:
     else:
         ok("D2: all three of rc3's negatives are left alone")
 
-    # And the finding. D2 unwraps correctly and recovers nothing, because the
-    # form it produces is refused by the grammar D2 says it satisfies. Pinned
-    # as a control so that if the year-list production is ever widened, this
-    # says so out loud rather than a corpus number quietly moving.
-    cits, unres, _x = extract("Additional work by Baron (2012,2016) found.")
-    if keys(cits):
-        failures.append(f"the year-list production has been widened to accept "
-                        f"a comma with no whitespace. v3.3 §4 is "
-                        f"`(?:, WS YEAR)*`; if this is now intended, D2 is "
-                        f"worth its +3 and RC2-RC3-DISCREPANCIES.md #6 is "
-                        f"resolved. Got {keys(cits)}")
+    # And the end of that finding, 24 September. This control used to assert
+    # the opposite: D2 unwrapped correctly and recovered nothing, because
+    # v3.3 §4 wrote the year list as `(?:, WS YEAR)*` and the unwrapped form
+    # has no whitespace. It was written as a tripwire so that widening the
+    # production could not happen quietly, and it did its job.
+    #
+    # rc3 §G settles it. Its D2 positive case states the expected outcome in
+    # terms — `Baron $(2012,2016)$ → unwrap → baron|2012 + baron|2016` — so
+    # the refusal was the implementation disagreeing with rc3, not a limit
+    # rc3 accepted. RC2-RC3-DISCREPANCIES.md #6 resolved, and D2 is worth 6
+    # spans and 12 occurrences on this corpus rather than the +3 estimated.
+    #
+    # The separator between YEARS moved. The separator between AUTHOR and
+    # year did not, so a comma-less parenthetical is still refused.
+    cits, _unres, _x = extract("Additional work by Baron (2012,2016) found.")
+    if keys(cits) != ["baron|2012", "baron|2016"]:
+        failures.append(f"rc3 §G: D2's unwrapped form must key both years — "
+                        f"got {keys(cits)}")
     else:
-        ok("D2: the unwrapped form still does not parse — worth 0, not +3")
+        ok("rc3 §G: D2's unwrapped form keys both years, as §G states")
+
+    # The half that must NOT move with it. §10's style guard reads a missing
+    # comma before the YEAR as author-date rather than APA, and widening the
+    # year-list separator must not reach that.
+    cits, unres, _x = extract("As shown (Smith 2020) here.")
+    if keys(cits):
+        failures.append(f"the author/year comma is still required; only the "
+                        f"separator between years was widened — got "
+                        f"{keys(cits)}")
+    else:
+        ok("§4: widening the year list left the author/year comma required")
 
     # -------------------------------------------- rc3 §C, citation errors
     print("\nrc3 §C — citation errors, a diagnostic class")

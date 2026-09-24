@@ -188,6 +188,43 @@ for the consolidation   either the year-list production drops the required
 Pinned as a conformance control, so if the production is ever widened the
 suite says so instead of a corpus figure moving quietly.
 
+### RESOLVED, 24 September 2026 — the first of the three exits was taken
+
+The control did its job: widening the production took it red rather than
+moving a corpus number quietly.
+
+What settles it is rc3's own §G, which this entry did not weigh. §G states
+D2's positive conformance case as an outcome, not a transform:
+
+```text
+D2    Baron $(2012,2016)$  ->  unwrap  ->  baron|2012 + baron|2016
+```
+
+So rc3 does not merely require the delimiters stripped. It requires the
+result to key both years. The refusal was therefore the implementation
+disagreeing with rc3, not a limit rc3 accepted, and the entry's reasoning
+above — "on the strength of a clause rc3 does not contain" — was wrong about
+what rc3 contains.
+
+```text
+taken     the year-list production drops the required whitespace
+scope     `(?:, WS YEAR)*` -> `(?:, WS? YEAR)*`, at three sites
+NOT       the AUTHOR/year comma, which is untouched, so a comma-less
+          parenthetical is still refused and §10's style guard still fires
+measured  6 of the 8 spans recover, +12 citation occurrences, 2104 -> 2116
+          the other 2 fail on a lead-in prefix instead, which is B5's case
+worth     D2 is worth 6 spans on this corpus, not the +3 §I estimated
+```
+
+One implementation note, because it cost a measurement. `WS` is `[ \t\n]+`,
+so writing `WS?` makes the run LAZY rather than optional and changes nothing
+at all. It has to be `(?:WS)?`. The lazy version looked exactly like a
+working fix for one run.
+
+The control now asserts the new outcome and names §G. Two mutations guard it,
+one restoring the whitespace requirement and one widening the author/year
+comma instead, so neither direction can move silently.
+
 ---
 
 ## 7. rc3 §C3 names the wrong deferred item.

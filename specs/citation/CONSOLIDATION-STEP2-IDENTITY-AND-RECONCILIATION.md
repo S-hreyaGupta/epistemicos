@@ -174,10 +174,15 @@ was outside the only script that checks these documents against the run, so
 nothing would have said so:
 
 ```text
-                                  §11.4    now
-uniquely_matched_occurrences       2000    2020
-uniquely_matched_works              955     960
+                                  §11.4    23 Sep    now
+uniquely_matched_occurrences       2000      2020    2032
+uniquely_matched_works              955       960     962
 ```
+
+The 24 September column is rc3 §G's D2 case. The year-list production
+required whitespace after the comma, so D2 unwrapped `$(2012,2016)$` into a
+form the grammar refused; six of the eight spans now key, two occurrences
+each. `RC2-RC3-DISCREPANCIES.md` #6.
 
 rc2 §6.7 derives `visible_authors` "when the source citation author syntax
 fully matches the person grammar", and §6.3 makes `stop_reduced_phrase` the

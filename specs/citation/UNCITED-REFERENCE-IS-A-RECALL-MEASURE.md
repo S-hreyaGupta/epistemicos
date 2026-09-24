@@ -3,11 +3,11 @@
 22 September 2026, found while implementing rc2 §9.6.
 
 ```text
-                                  22 Sep    23 Sep
-uncited_reference emitted            57        56
-of those, the reference IS cited     28        27
-                                     ──        ──
-plausible residual                   29        29
+                                  22 Sep    23 Sep    24 Sep
+uncited_reference emitted            57        56        54
+of those, the reference IS cited     28        27        25
+                                     ──        ──        ──
+plausible residual                   29        29        29
 ```
 
 **Both headline figures moved on 23 September and the residual did not.** rc2
@@ -22,10 +22,28 @@ The figures are re-derived by `scripts/corpus_dispositions.py`, by this
 document's own method, so the next move is noticed rather than absorbed.
 
 ```text
-by the failed span's own reason      22 Sep    23 Sep
-no_grammar_match                        24        23
-stopword_surname                         4         4
+by the failed span's own reason      22 Sep    23 Sep    24 Sep
+no_grammar_match                        24        23        19
+stopword_surname                         4         4         6
 ```
+
+**On 24 September this document's own prediction was acted on, and it held.**
+rc3 §G's D2 case settled the year-list question: §4 required whitespace after
+the comma, so `(2012,2016)` and its kin were refused. The two rows that left
+are `hayes|2012` and `hayes|2017`, and this method had already named both —
+it found surname and year inside `Hayes (2012,2017)`, a span the extractor saw
+and refused. Widening the separator let that span parse, the reference
+resolved, and both rows went. That is the first time a row this document
+called a parser failure was removed by fixing the parser.
+
+Four rows moved, not two. `no_grammar_match` falls by four and
+`stopword_surname` rises by two, which is the two Hayes rows leaving plus
+`bicen|2014` and `bicen|2015` crossing between the columns: `Similarly, Bicen
+and Johnson
+(2014,2015)` now gets past the year list and fails on the lead-in instead, so
+the same span reports a different reason rather than disappearing. A row
+changing column is not the row being fixed, and a table that only carried
+totals would have hidden that. `RC2-RC3-DISCREPANCIES.md` #6.
 
 ## The method does not reach non-person references
 
@@ -41,10 +59,10 @@ ad1e3ff9   non_person|bloomberg|2013
 All three were present on 22 September too, so this is a gap in the method
 rather than drift. Counting them takes the residual from 29 to 26. They are
 reported separately rather than folded in, because this document's breakdown
-below is over the person-shaped population and mixing the two would make the
-28 and the 27 stop being comparable.
+below is over the person-shaped population and mixing the two would stop the
+columns of that second row being comparable with each other.
 
-Just under half the rows are wrong. Each of the 27 names a reference the paper
+Just under half the rows are wrong. Each of the 25 names a reference the paper
 does cite, in a span the grammar could not read. The breakdown that follows was
 written over the 28 and one of its lead-in-cue cases has since parsed, so it
 describes the shapes rather than the current count.
@@ -100,7 +118,7 @@ pinned in `scripts/corpus_dispositions.py`, and so is the arithmetic: the
 residual is computed by subtraction and again by the probe's own loop, and the
 script refuses if the two disagree.
 
-The honest reading of the 56, then: 30 name a reference the paper cites, 3 more
+The honest reading of the 54, then: 28 name a reference the paper cites, 3 more
 name one the paper refers to invisibly, 4 sit where the extractor did emit
 something, and **19 have no trace in the body at all**. Nineteen is the number
 that behaves like the name of the field.

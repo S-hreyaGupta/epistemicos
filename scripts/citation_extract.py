@@ -903,14 +903,26 @@ def build_patterns(fixes: set[str]):
     prefix = "(?:" + "|".join(re.escape(c) for c in all_cues) + r")[,]?[ \t\n]+"
     trail = r",[ \t\n]*(?:" + \
             "|".join(re.escape(c) for c in LEAD_IN_CUES) + ")"
+    # rc3 §G's D2 positive case: `Baron $(2012,2016)$` unwraps and MUST key
+    # `baron|2012 + baron|2016`. v3.3 §4 wrote the year list as
+    # `(?:, WS YEAR)*`, with the whitespace required, so D2 unwrapped into a
+    # form this grammar then refused. RC2-RC3-DISCREPANCIES.md #6.
+    #
+    # The whitespace is optional here so that rc3's own stated outcome holds.
+    # It is `(?:WS)?` and not `WS?`: `WS` is `[ \t\n]+`, so `WS?` makes the
+    # run LAZY rather than optional and changes nothing. That mistake looked
+    # exactly like a fix for one measurement.
+    #
+    # Author/year separator untouched. Only the separator BETWEEN years moved,
+    # so `(Smith 2020)` is still comma-less and still refused by §10's guard.
     seg = (rf"(?:{prefix})?{AUTHORS_PAREN},{WS}(?:{YEAR})"
-           rf"(?:,{WS}(?:{YEAR}))*(?:{loc})?(?:{trail})?")
+           rf"(?:,(?:{WS})?(?:{YEAR}))*(?:{loc})?(?:{trail})?")
     return {
         "seg": re.compile(seg, re.U),
         "cite_paren": re.compile(rf"\([ \t\n]?{seg}(?:;[ \t\n]?{seg})*[ \t\n]?\)",
                                  re.U),
         "cite_narr": re.compile(
-            rf"{AUTHORS_NARR}{WS}\([ \t\n]?(?:{YEAR})(?:,{WS}(?:{YEAR}))*"
+            rf"{AUTHORS_NARR}{WS}\([ \t\n]?(?:{YEAR})(?:,(?:{WS})?(?:{YEAR}))*"
             rf"(?:{loc})?[ \t\n]?\)", re.U),
         # rc3 B8, "Possessive narrative, with a bounded gap. Worth 7". rc2
         # covers `Fine's (1998)`; new here is a noun between author and year:
@@ -940,7 +952,7 @@ def build_patterns(fixes: set[str]):
         "cite_narr_poss": re.compile(
             rf"{AUTHORS_NARR}(?<=['’]s){WS}"
             rf"(?:[^\s,;().]+{WS}){{1,{MAX_POSSESSIVE_YEAR_GAP_TOKENS}}}"
-            rf"\([ \t\n]?(?:{YEAR})(?:,{WS}(?:{YEAR}))*"
+            rf"\([ \t\n]?(?:{YEAR})(?:,(?:{WS})?(?:{YEAR}))*"
             rf"(?:{loc})?[ \t\n]?\)", re.U),
         "seg_anchored": re.compile(rf"\A{seg}\Z", re.U),
     }

@@ -132,17 +132,19 @@ def main() -> int:
          "duplicate_reference_key records emitted      0       5",
          counts.get("duplicate_reference_key", 0), 5),
         ("CONSOLIDATION-STEP2-SUMMARY-AND-OUTPUT.md",
-         "CORPUS           2235       2104",
-         counts.get("citation", 0), 2104),
+         "CORPUS           2241       2116",
+         counts.get("citation", 0), 2116),
         # The level, not the delta. The §11.4 before/after pair above it
         # records what that one change did and stays as written; these two
         # say where the corpus is now, and the document has to move with them.
+        # The literal ends at the last column on purpose: a later fix has to
+        # add a column and repoint this line, which is the point.
         ("CONSOLIDATION-STEP2-IDENTITY-AND-RECONCILIATION.md",
-         "uniquely_matched_occurrences       2000    2020",
-         counts.get("uniquely_matched_occurrences", 0), 2020),
+         "uniquely_matched_occurrences       2000      2020    2032",
+         counts.get("uniquely_matched_occurrences", 0), 2032),
         ("CONSOLIDATION-STEP2-IDENTITY-AND-RECONCILIATION.md",
-         "uniquely_matched_works              955     960",
-         counts.get("uniquely_matched_works", 0), 960),
+         "uniquely_matched_works              955       960     962",
+         counts.get("uniquely_matched_works", 0), 962),
     ]
     for name, literal, live, expected in FIGURES:
         text = docs.get(name, "")

@@ -67,8 +67,8 @@ paper           total  extracted  unres_extr   rc1 gap
 17bef7c6          118        101          17        17
 2af68a7f          152        134          18        18
 43338825          126        117           9         9
-4918fd7d          283        264          19        19
-50408397          241        236           5         5
+4918fd7d          285        268          17        17
+50408397          242        238           4         4
 5da73cf4          125        125           0         0
 849f8fc6           69         68           1         1
 ad1e3ff9          190        186           4         4
@@ -76,11 +76,17 @@ bf2fdc4a          169        160           9         9
 c1d56945          243        219          24        24
 e1b418a4          213        201          12        12
 ea07e5f5          110        107           3         3
-ed6a890a          196        186          10        10
-CORPUS           2235       2104         131       131
+ed6a890a          199        192           7         7
+CORPUS           2241       2116         125       125
 ```
 
-rc1's §11.2 would be off by 131 on thirteen papers. rc2's holds exactly on all
+*Re-measured 24 September. The four papers carrying math-wrapped year lists moved when
+rc3 §G's D2 case was settled: six spans that D2 unwrapped were being refused by the
+year-list production and now key two years each. `RC2-RC3-DISCREPANCIES.md` #6. The
+identity this table exists to demonstrate is unaffected, and rc1's gap is still exactly
+the unresolved column.*
+
+rc1's §11.2 would be off by 125 on thirteen papers. rc2's holds exactly on all
 thirteen. So this is not a preference between two formulations; rc2 corrects a
 defect, and the correction is undocumented anywhere outside the section text.
 

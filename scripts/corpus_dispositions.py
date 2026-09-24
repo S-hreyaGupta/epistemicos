@@ -219,8 +219,21 @@ UNDISPOSED_NOTE = {
 # f6280de and both moved when §3.1's five missing PREFIX cues landed in
 # e788440 the next day. Confirmed by re-running that extractor over this
 # corpus rather than inferred — 57/28 before, 56/27 after.
+#
+# Moved again on 24 September, 56/27 -> 54/25, when rc3 §G's D2 case settled
+# the year list. Same discipline: measured by reverting the one production and
+# re-running, not inferred from the delta. The two rows that left are
+# `hayes|2012` and `hayes|2017`, which this document's own method had already
+# named as parser failures rather than missing citations.
 RECALL_DOC = "specs/citation/UNCITED-REFERENCE-IS-A-RECALL-MEASURE.md"
-RECALL_PINNED = {"uncited": 56, "person_matched": 27, "non_person_matched": 3}
+RECALL_PINNED = {"uncited": 54, "person_matched": 25, "non_person_matched": 3}
+
+# The reason split, pinned separately and on purpose. The 24 September move
+# was 27 -> 25, but four rows moved, not two: two left and two crossed from
+# `no_grammar_match` to `stopword_surname` when the same span started failing
+# further along. A pin on the totals alone would have called that a clean
+# removal of two.
+RECALL_REASON_PINNED = {"no_grammar_match": 19, "stopword_surname": 6}
 
 # The same discipline for §9.3, after the §6.7 fix on 23 September moved both
 # halves: order 7 -> 4, count 5 -> 4. Four findings were the lead-in token
@@ -781,6 +794,7 @@ def main() -> int:
 
     groups: Counter = Counter()
     recall: Counter = Counter()
+    reasons: Counter = Counter()
     causes: Counter = Counter()
     refusals: Counter = Counter()
     gaps: Counter = Counter()
@@ -807,17 +821,25 @@ def main() -> int:
         # document" is the whole method: an earlier attempt matched surname
         # and year independently across all failed spans and counted
         # coincidence, so the containment test stays inside one span.
-        failed = [r["text"].lower() for r in lines
+        #
+        # The failed span's own `reason` is carried alongside, because the
+        # totals are not enough. On 24 September person_matched fell by two
+        # while four rows moved: two left and two kept their row but changed
+        # reason, the same span now failing further along the production.
+        failed = [(r["text"].lower(), r.get("reason")) for r in lines
                   if r.get("type") == "unresolved_citation"]
         for r in lines:
             if r.get("type") != "uncited_reference":
                 continue
             _kind, phrase, year = ce._split_key(r["reference_key"])
-            if any(phrase in span and year in span for span in failed):
-                if r["reference_key"].startswith("non_person|"):
-                    recall["non_person_matched"] += 1
-                else:
-                    recall["person_matched"] += 1
+            for span, why in failed:
+                if phrase in span and year in span:
+                    if r["reference_key"].startswith("non_person|"):
+                        recall["non_person_matched"] += 1
+                    else:
+                        recall["person_matched"] += 1
+                        reasons[why] += 1
+                    break
             recall["uncited"] += 1
 
         ctext = canonical_text(p, set(ce.FIXES), lines[0])
@@ -1145,6 +1167,10 @@ def main() -> int:
           f"its method does not reach these")
     print(f"    plausible residual, person only      {unc - pm:4d}")
     print(f"    plausible residual, both shapes      {unc - pm - npm:4d}")
+    if reasons:
+        print("      of the person keys, by the failed span's own reason")
+        for why, n in sorted(reasons.items(), key=lambda kv: -kv[1]):
+            print(f"        {why:32s} {n:4d}")
     print("    A reference the paper cites, reported as uncited, is a false")
     print("    reconciliation diagnostic. Classifying it is the review's.")
 
@@ -1290,6 +1316,22 @@ def main() -> int:
             f"{', '.join(f'{k} {a} -> {b}' for k, (a, b) in drift.items())}. "
             f"{RECALL_DOC} quotes these, so the document is now wrong and the "
             f"move has to be explained before the pin is touched")
+
+    # Checked even when the totals hold, which is the point of having it.
+    rdrift = {k: (RECALL_REASON_PINNED.get(k, 0), reasons.get(k, 0))
+              for k in set(RECALL_REASON_PINNED) | set(reasons)
+              if RECALL_REASON_PINNED.get(k, 0) != reasons.get(k, 0)}
+    if reasons and rdrift:
+        problems.append(
+            f"the recall reason split moved: "
+            f"{', '.join(f'{k} {a} -> {b}' for k, (a, b) in rdrift.items())}. "
+            f"A row can change reason without leaving, which the totals above "
+            f"cannot show, so {RECALL_DOC}'s second table has to move too")
+    if reasons and sum(reasons.values()) != recall["person_matched"]:
+        problems.append(
+            f"the reason split sums to {sum(reasons.values())} but "
+            f"person_matched is {recall['person_matched']}: every matched row "
+            f"must be attributed to exactly one failed span's reason")
 
     print()
     if problems:

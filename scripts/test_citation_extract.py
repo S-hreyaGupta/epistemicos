@@ -1134,11 +1134,45 @@ def main() -> int:
           "leadership. Journal, 1(1), 1-10.\n")
     body, cits, unres, x = doc("Varies across individuals (Pircher Verdorfer, "
                                "2016) markedly.", refs=PV)
-    if any(c["citation_key"].startswith("non_person|") for c in cits):
-        failures.append(f"a compound personal surname is not read as an "
-                        f"institution — got {keys(cits)}")
+    # REWRITTEN 25 September. What this control claimed, and what it did.
+    #
+    # It asserted that no emitted citation_key starts with `non_person|`, on the
+    # reasoning that only the bibliography can separate a compound personal
+    # surname from an institution of the same shape, and that here it says
+    # person. Measured, the premise is false in both halves:
+    #
+    #     reference   `Pircher Verdorfer, A. (2016).` is UNRESOLVED,
+    #                 reason entry_start_grammar. No key, so the bibliography
+    #                 says nothing about person or institution.
+    #     citation    `(Pircher Verdorfer, 2016)` is UNRESOLVED,
+    #                 reason no_grammar_match. No citation_key exists.
+    #
+    # So `any(... for c in cits)` ranged over an empty list and the control
+    # reported success about a key that was never built. Not only under the
+    # vacuity sweep: on the real extractor, since the day it was written.
+    #
+    # A two-word personal surname is refused on both sides. Whether either
+    # grammar SHOULD accept it is a question for rc2 §7.1 and §7.4 and is not
+    # settled here. What is recorded here is the behaviour as measured, so a
+    # change in either direction fires rather than passing silently.
+    _cs_unres = [u for u in unres if "Pircher Verdorfer" in u.get("text", "")]
+    if cits:
+        failures.append(
+            f"a compound surname now PARSES, which it did not on 25 September. "
+            f"That may be the repair rc2 §7.4 wants, but this control records "
+            f"the refusal — got {keys(cits)}. Re-read the gap note before "
+            f"changing this.")
+    elif len(_cs_unres) != 1:
+        failures.append(
+            f"the compound-surname parenthetical is neither parsed nor "
+            f"unresolved — got {len(_cs_unres)} unresolved records")
+    elif _cs_unres[0].get("reason") != "no_grammar_match":
+        failures.append(
+            f"the compound surname is refused for a different reason now — "
+            f"got {_cs_unres[0].get('reason')!r}, recorded no_grammar_match")
     else:
-        ok("a compound personal surname is not read as an institution")
+        ok("a compound personal surname is refused by the citation grammar, "
+           "recorded as a gap rather than asserted as correct")
 
     # rc2 §7.4's no-comma rule, on the reference side, with rc2's own reason:
     # a comma-containing organisation author cannot be told apart from an
@@ -1911,8 +1945,17 @@ def main() -> int:
     # so nothing here ever produces one.
     # A PARENTHETICAL still has one candidate, so its S stays no_match and the
     # first column is still what it reaches.
-    if any(c.get("stop_reduced_phrase") for c in
-           [ident("As shown (Smith, 2020) here.", R_ONE)[0]] if c):
+    #
+    # The `if c` filter was doing double duty and one of the two jobs was
+    # wrong: it skipped a missing citation AND let the control report success
+    # for having skipped it. `any` of an empty sequence is False, so a run that
+    # emitted nothing said the parenthetical kept its no_match. Split, so the
+    # absent case fails on its own terms. 25 September, vacuity sweep.
+    _par = ident("As shown (Smith, 2020) here.", R_ONE)[0]
+    if _par is None:
+        failures.append("§8.3: the parenthetical fixture emitted no citation, "
+                        "so its S was never reached")
+    elif _par.get("stop_reduced_phrase"):
         failures.append("a parenthetical occurrence gained a reduced phrase; "
                         "§6.3 creates one for NARRATIVE candidates only")
     else:
@@ -2263,8 +2306,18 @@ def main() -> int:
     # half the claim can be exercised. Both halves that CAN be are.
     cits, unres, summ = sgk("As shown (Smith, 2020) and (Nobody et al., "
                             "1899 BCE) here.", R_SG)
+    #
+    # The unres guard is not decoration. Both `any(...)` branches below are
+    # over `unres`, and `any` of an empty sequence is False, so a run that
+    # emitted no unresolved_citation reported that the field is present and
+    # null on records that do not exist. `1899 BCE` is what makes this fixture
+    # produce one; if it stops doing so, this control should say so rather than
+    # pass. 25 September, vacuity sweep.
     if "distinct_surface_groups" not in summ:
         failures.append("C-025: distinct_surface_groups is always emitted")
+    elif not unres:
+        failures.append("C-025: the fixture emitted no unresolved_citation, so "
+                        "the null-on-unresolved half was never exercised")
     elif any("citation_surface_group_key" not in u for u in unres):
         failures.append("§12: an unresolved_citation carries the field too")
     elif any(u["citation_surface_group_key"] is not None for u in unres):

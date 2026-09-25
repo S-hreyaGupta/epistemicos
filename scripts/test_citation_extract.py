@@ -196,7 +196,29 @@ def main() -> int:
         print(f"  [ok] {m}")
 
     def case(label: str, body: str, want_keys=None, want_unres=None,
-             want_text=None, want_authors=None, fixes=frozenset()):
+             want_text=None, want_authors=None, fixes=frozenset(),
+             alive=None):
+        # `alive` names a companion body that MUST still produce a citation.
+        #
+        # A control whose whole claim is that nothing was emitted — `[]` keys
+        # and `want_unres=[]` — is satisfied by an extractor that emits
+        # nothing at all, and three such controls passed the vacuity sweep
+        # with every citation-side emitter disabled. They were not wrong:
+        # each had a positive sitting immediately beside it in this file on
+        # the neighbouring fixture, so the pair as a whole did mean something.
+        # But that is adjacency, not structure. Reorder the file, delete the
+        # neighbour, or empty the record stream and the guarantee is gone with
+        # no test going red.
+        #
+        # Naming the companion makes the pairing part of the control. Absence
+        # only carries information once presence is shown possible on the same
+        # path, and this is where that gets said.
+        if alive is not None and not extract(alive, fixes)[0]:
+            failures.append(f"{label}\n      the companion fixture {alive!r} "
+                            f"produced no citation either, so this control's "
+                            f"'nothing was emitted' shows nothing about "
+                            f"{body!r}")
+            return
         cits, unres, _excl = extract(body, fixes)
         got = keys(cits)
         if want_keys is not None and got != want_keys:
@@ -317,13 +339,14 @@ def main() -> int:
     case("1500 is inside the envelope", "As shown (Smith, 1500).",
          ["smith|1500"])
     case("1499 is invisible, not unresolved", "As shown (Smith, 1499).",
-         [], want_unres=[])
+         [], want_unres=[], alive="As shown (Smith, 1500).")
     case("forename-first is unresolved, not a citation",
          "As shown (Adam Smith, 1776).", [], want_unres=["no_grammar_match"])
     case("dual date is unresolved", "As shown (Marx, 1867/1990).",
          [], want_unres=["no_grammar_match"])
     case("square brackets produce no record at all",
-         "As shown [Smith, 2020].", [], want_unres=[])
+         "As shown [Smith, 2020].", [], want_unres=[],
+         alive="As shown (Smith, 2020).")
 
     # ---- unresolved spans, §12 row 11 ----
     # Which span a rejection reports is specified and differs by reason: a
@@ -776,6 +799,15 @@ def main() -> int:
     if keys(cits):
         failures.append("without the segments flag a damaged group still "
                         f"yielded {keys(cits)}; §6.2 is whole-span")
+    elif not keys(extract(seg, {"segments"})[0]):
+        # The companion, asserted inside this control rather than relied on
+        # from the lines below it. "Loses everything" only means something if
+        # the same span yields citations with the flag ON; without that,
+        # nothing came out is equally true of an extractor that emits nothing
+        # at all, and the vacuity sweep found this passing in that state.
+        failures.append("the same span yields nothing WITH the segments flag "
+                        "either, so losing everything without it shows "
+                        "nothing about §6.2")
     else:
         ok("a damaged group loses everything without the segments flag")
     cits, unres, _excl = extract(seg, {"segments"})
@@ -1123,6 +1155,18 @@ def main() -> int:
     if cits:
         failures.append(f"rc2 §8: with no reference entry, the institution stays "
                         f"unresolved — it was keyed {keys(cits)}")
+    elif not unres:
+        # This control is named for the unresolved record and never looked at
+        # one. `not cits` holds just as well when the span is never detected,
+        # and a span silently dropped is not the refusal §8 asks for — it is
+        # the failure §8 exists to prevent, wearing the same absence.
+        failures.append("rc2 §8: `World Bank (2024)` is neither keyed nor "
+                        "unresolved, so it was dropped rather than refused "
+                        "and §8's requirement is not shown")
+    elif unres[0].get("reason") != "no_grammar_match":
+        failures.append(f"rc2 §8: the institution is unresolved for "
+                        f"{unres[0].get('reason')!r} rather than "
+                        f"no_grammar_match")
     else:
         ok("rc2 §8: with no reference entry, the institution stays unresolved")
 
@@ -1723,6 +1767,21 @@ def main() -> int:
         failures.append(f"the author/year comma is still required; only the "
                         f"separator between years was widened — got "
                         f"{keys(cits)}")
+    elif not unres:
+        # Named for a refusal and, until 25 September, testing only an
+        # absence. `not keys(cits)` is equally true of a span the grammar
+        # refused, a span never detected at all, and a run emitting nothing —
+        # and the control reported the first whichever one held. The vacuity
+        # sweep found it passing with all three citation-side emitters
+        # disabled, which is that third case made visible.
+        failures.append("§4: `(Smith 2020)` produced neither a key nor an "
+                        "unresolved record, so the absence of a key says "
+                        "nothing about the comma")
+    elif unres[0].get("reason") != "no_grammar_match":
+        failures.append(f"§4: `(Smith 2020)` is refused, but for "
+                        f"{unres[0].get('reason')!r} rather than "
+                        f"no_grammar_match, so the comma rule may not be "
+                        f"what is stopping it")
     else:
         ok("§4: widening the year list left the author/year comma required")
 
@@ -1803,6 +1862,18 @@ def main() -> int:
     if keys(cits):
         failures.append(f"§C: the grammar was loosened to accept a malformed "
                         f"form; rc3 forbids it. Got {keys(cits)}")
+    elif not unres:
+        # Same repair as §4 above, and found the same way. rc3 §C's whole
+        # claim is that naming a defect does not make the grammar accept it,
+        # so the refusal is the thing under test and has to be asserted. An
+        # empty record stream satisfied the old form of this control.
+        failures.append("§C: `(Lu and Shang 2017)` produced neither a key nor "
+                        "an unresolved record, so nothing here shows the "
+                        "grammar refused it rather than never seeing it")
+    elif unres[0].get("reason") != "no_grammar_match":
+        failures.append(f"§C: `(Lu and Shang 2017)` is refused for "
+                        f"{unres[0].get('reason')!r} rather than "
+                        f"no_grammar_match")
     else:
         ok("§C: naming the defect did not loosen the grammar")
 

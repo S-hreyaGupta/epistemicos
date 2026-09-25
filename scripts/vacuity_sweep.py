@@ -4,8 +4,8 @@
     python scripts/vacuity_sweep.py
     python scripts/vacuity_sweep.py --census
 
-Exit 0 = the survivor set is exactly the pinned one.
-Exit 1 = it is not, and the difference is named.
+Exit 0 = no surviving control reads citation-side output.
+Exit 1 = one does, and it is named along with the line that read.
 Exit 2 = could not run.
 
 Two questions, not one
@@ -60,6 +60,21 @@ not testing anything the extractor emits.
 Together rather than one at a time, because the question worth asking is the
 strongest one: does this control read any citation-side output at all? Which
 emitter a given control depends on is recorded in the pin below instead.
+
+That question is now measured rather than reasoned about. The disabled build
+returns read-logging lists, so each survivor is reported as one of two kinds:
+
+    read nothing the three emitters produce
+        testing a constant, the reference side, the output bytes or an abort.
+        Sound, and the reason belongs to its section rather than to it.
+
+    read the empty output and passed anyway
+        asked the citation side a question, got nothing back, and reported
+        success. This is the defect, and the marker names the line that read.
+
+The split matters because the first kind is the large majority and the second
+is the finding. Reading 109 labels by hand to separate them is work nobody
+completes; the interpreter already knows the answer.
 
 What this file got wrong about itself
 -------------------------------------
@@ -128,6 +143,119 @@ EMITTERS = [
     ("excluded_candidate",
      '    excl.append(rec)',
      '    _ = (rec)'),
+]
+
+# A fourth patch, applied only to the disabled build, answering the question
+# the docstring above states and the survivor list by itself cannot: does this
+# control READ any citation-side output at all?
+#
+# Grouping the survivors by the suite's own headings showed every one of the
+# twenty-three groups is all-or-nothing. Not one section has some controls
+# surviving and some going red. That is what a suite organised by subject looks
+# like, and it means the survivors are twenty-three group judgements rather
+# than 109 separate ones. What it does not do is separate the two kinds of
+# survivor, and only one kind is a finding:
+#
+#     a control that never touches `cits`, `unres` or `excl` survives because
+#     it is testing something else — a constant, the reference side, the
+#     output bytes, an abort — and is sound
+#
+#     a control that DOES touch them and still passes with all three empty is
+#     asserting over nothing, which is exactly what this file exists to find
+#
+# The compound-surname control was the second kind, and it was found by hand
+# after a separate investigation. This finds that shape on purpose.
+#
+# So the disabled build returns read-logging lists and prints a marker at each
+# read made from OUTSIDE the extractor. The module check is the whole trick:
+# `run()` consumes all three lists itself while building the summary, so a flag
+# set by any read at all would fire for every end-to-end control regardless of
+# what that control actually asserts.
+#
+# Cost is nil: with the emitters disabled all three lists are empty, so every
+# read is one call over zero elements.
+READ_PROBE = '''\
+class _VacSeen(list):
+    """A list that reports reads made from outside this module.
+
+    Injected by `vacuity_sweep.py` into the disabled build only. Never part of
+    the extractor as committed.
+    """
+
+    def _touch(self):
+        # By FILE, not by module name. Several controls run this file as a
+        # script and compare its stdout byte for byte; in that subprocess the
+        # module is `__main__`, a name check would not exclude it, and a
+        # marker would land inside the artifact being compared. The file is
+        # the same either way.
+        #
+        # And the frame reported is the caller's `main`, not the innermost
+        # one. `keys(cits)` is a two-line helper at the top of the suite, so
+        # the innermost frame says line 78 for every control that calls it,
+        # which names the helper instead of the control. Walking out to `main`
+        # gives the line in the suite body that is executing, which is the
+        # control itself.
+        me = os.path.basename(__file__)
+        f = sys._getframe(2)
+        # The IMMEDIATE caller decides whether this read counts. Walking past
+        # extractor frames to find `main` instead made every internal read
+        # `run()` performs look like a suite read, and the marker then landed
+        # in stdout that a control was about to parse as JSON.
+        if os.path.basename(f.f_code.co_filename) == me:
+            return
+        best = f
+        while f is not None:
+            if (f.f_code.co_name == "main"
+                    and os.path.basename(f.f_code.co_filename) != me):
+                best = f
+                break
+            f = f.f_back
+        # Straight to fd 2, not to `sys.stdout` or even `sys.stderr`. Controls
+        # capture stdout to compare it byte for byte or to json.loads it, and
+        # a diagnostic that corrupts the artifact under test is worse than no
+        # diagnostic. Attribution is by source line, so nothing here needs to
+        # interleave with the suite's own output.
+        os.write(2, f"[vacr] {os.path.basename(best.f_code.co_filename)}:"
+                    f"{best.f_lineno}\\n".encode())
+
+    def __iter__(self):
+        self._touch()
+        return list.__iter__(self)
+
+    def __len__(self):
+        self._touch()
+        return list.__len__(self)
+
+    def __getitem__(self, i):
+        self._touch()
+        return list.__getitem__(self, i)
+
+    def __contains__(self, x):
+        self._touch()
+        return list.__contains__(self, x)
+
+    def __bool__(self):
+        self._touch()
+        return list.__len__(self) != 0
+
+    def __eq__(self, other):
+        self._touch()
+        return list.__eq__(self, other)
+
+    __hash__ = None
+
+
+'''
+
+_EC_DEF = "def extract_citations(body: str, sents, heads, fixes: set[str],"
+
+# (label, exact source text, replacement). Applied after the emitter patches
+# and only to the disabled build.
+READ_PATCHES = [
+    ("the read probe", _EC_DEF, READ_PROBE + _EC_DEF),
+    ("the instrumented return",
+     "    return cits, unres, excl, errs",
+     "    return _VacSeen(cits), _VacSeen(unres), _VacSeen(excl), errs"),
 ]
 
 # The other nine record types the extractor emits, for `--census` only.
@@ -207,11 +335,23 @@ BASELINE_FLOOR = 320
 # over the thing this file exists to catch: a number that passes because
 # nobody looked at it.
 #
-# So the next piece of work is to read them, one at a time, and either accept
-# each into the pin with its reason or fix the control it exposes. Until then
-# this file refuses, and the refusal is the finding.
+# RESOLVED 25 September, and not by reading 130 labels.
 #
-# The reading has started, and the first pass found the shape to look for.
+# The twenty below are no longer the pass condition. Grouping the survivors by
+# the suite's own headings showed all twenty-three groups are all-or-nothing —
+# not one section has some controls surviving and some going red — which is
+# what a suite organised by subject looks like and is also a hint that
+# survival is a property of the SUBJECT rather than of the control. Measuring
+# it directly confirmed that: 106 of the 109 unpinned survivors read no
+# citation-side output at all, so an empty citation stream tells them nothing
+# either way and there is nothing in them to read.
+#
+# Three did read it and passed anyway, and those three were the whole finding.
+# They are repaired. The list below is kept as history and as a cross-check:
+# a label that was read by hand and called sound, but measures as reading the
+# empty output, means the hand reading and the measurement disagree.
+#
+# The first pass also found the shape to look for.
 #
 #     `any(...)` over an empty sequence is False.
 #     `all(...)` over an empty sequence is True.
@@ -276,8 +416,15 @@ PINNED_SURVIVORS = {
     "exit 5: invalid utf-8",
     # summary schema: an assertion that a field is absent
     "A5: the summary reports a parse rate and no accuracy figure",
-    # PAIRED ONLY. Guarded by a positive on the same fixture immediately
-    # beside it, not by anything internal.
+    # PAIRED ONLY, and REPAIRED 25 September. These three were pinned with
+    # the honest note that each was sound only because of a positive sitting
+    # beside it in the file, not because of anything inside itself. The read
+    # probe then measured exactly these three, and no others, reading the
+    # empty output — the measurement and the hand reading agreeing to the
+    # label. Each now names its companion fixture itself, via `case(alive=)`
+    # or an inline `elif`, so the pairing is structure rather than adjacency
+    # and all three go red on an empty run. They are kept here as the record
+    # of that agreement.
     "1499 is invisible, not unresolved",          # paired: "1500 is inside"
     "square brackets produce no record at all",   # paired: §10/C-080
     "a damaged group loses everything without the segments flag",  # paired:
@@ -288,6 +435,116 @@ PINNED_SURVIVORS = {
 
 def ok_labels(text: str) -> list:
     return [m.group(1) for m in re.finditer(r"^\s*\[ok\] (.+)$", text, re.M)]
+
+
+def labels_by_section(text: str) -> dict[str, list[str]]:
+    """Passing controls, grouped by the suite heading they printed under.
+
+    The survivor list is 130 long and reading it one control at a time is the
+    wrong unit. The original twenty were accepted as five groups with one
+    reason each — heading detection, the style guard, direct calls, aborts,
+    summary schema — because a reason that holds for a group is checked once
+    and applies to all of it.
+
+    The suite already prints its own section headings. Attributing each `[ok]`
+    to the last heading above it costs nothing and turns an undifferentiated
+    list into the shape the reasons are actually written in.
+
+    A group whose members all survive for the same reason is one judgement. A
+    group where some survive and some go red is the interesting case, because
+    the difference between them is the thing worth reading.
+    """
+    out: dict[str, list[str]] = {}
+    section = "(before any heading)"
+    for line in text.splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        m = re.match(r"^\s*\[ok\] (.+)$", line)
+        if m:
+            out.setdefault(section, []).append(m.group(1))
+        elif not s.startswith(("[ok]", "FAIL:", "[")) and not line.startswith(" "):
+            # A heading is a non-indented, non-record line. The suite writes
+            # them as `rc2 §11 — summary fields and the invariants over them`.
+            section = s
+    return out
+
+
+def ok_sites(src: str) -> list:
+    """(line number, the literal text a label starts with) for each control.
+
+    Used to turn a read's suite line number into the control that made it.
+    Labels built with an f-string are keyed on the run of literal text before
+    the first `{`, which is enough to match them by prefix.
+
+    `case(...)` counts as a site as well as `ok(...)`, because `case` is the
+    suite's own helper and calls `ok(label)` from inside itself, at line 227,
+    on behalf of a control written hundreds of lines away. Without it every
+    `case` call's reads pile onto the next literal `ok(` in the file: that is
+    what put `B6: expand_year leaves an ordinary year and n.d. alone` on the
+    finding list with five reads at lines 1642 to 1656, none of them its own.
+    It calls `ce.expand_year` and reads no record at all.
+
+    Line 227 is the only `ok()` in the suite that names another control; every
+    other non-literal call sits at its own control's position.
+    """
+    out = []
+    # Anywhere on the line, not just at its start: the suite writes
+    # `else: ok(...)` in several places, and a site this misses widens the
+    # span of its neighbour rather than simply being absent.
+    for m in re.finditer(r"(?<![\w.])(?:ok|case)\(\s*f?(['\"])(.*?)\1", src):
+        out.append((src.count("\n", 0, m.start()) + 1, m.group(2).split("{")[0]))
+    return out
+
+
+def reads_by_label(text: str, err: str, suite_src: str) -> tuple:
+    """For each control, the citation-side reads made by its own source lines.
+
+    Attribution is by POSITION IN THE SOURCE, not position in the output
+    stream, and the difference is the whole correctness of this function.
+
+    The obvious reading — every `[vacr]` marker printed since the previous
+    `[ok]` belongs to the control that just passed — is wrong here, and wrong
+    in the direction that manufactures findings. The suite collects its
+    failures and prints them on the way out, so a control that goes red prints
+    NOTHING at its own position. In the disabled run 193 of 323 go red, and
+    every read all 193 made is credited to whichever survivor happens to print
+    next. The first version of this said 8 survivors read the empty output,
+    with clusters of twenty-two and thirty reads attached to single controls,
+    which is what that leak looks like from the outside.
+
+    Source position has no such failure mode. Each read reports the suite line
+    that made it, each control owns the lines between the previous `ok()` call
+    and its own, and a control that never ran contributes nothing to anyone.
+
+    Returns (reads per label, labels whose `ok()` could not be located).
+    """
+    lines = [int(m.group(1)) for m in
+             re.finditer(r"^\[vacr\] [^:]+:(\d+)$", err, re.M)]
+    sites = ok_sites(suite_src)
+    labels = ok_labels(text)
+
+    # label -> (start, end] of the source lines that control owns
+    span: dict[str, tuple] = {}
+    unlocated: list[str] = []
+    for lab in labels:
+        # Longest matching literal, not the first. Several labels in this
+        # suite share an opening run such as `§9.4: `, and taking the first
+        # match would file a read against a control several hundred lines away.
+        hit, best = None, -1
+        for i, (line, lit) in enumerate(sites):
+            if lit and lab.startswith(lit) and len(lit) > best:
+                hit, best = i, len(lit)
+        if hit is None:
+            unlocated.append(lab)
+            continue
+        span[lab] = (sites[hit - 1][0] if hit else 0, sites[hit][0])
+
+    out: dict[str, list[str]] = {}
+    for lab, (lo, hi) in span.items():
+        out[lab] = [f"{SUITE.name}:{n}" for n in sorted({
+            n for n in lines if lo < n <= hi})]
+    return out, unlocated
 
 
 def duplicates(labels: list) -> list:
@@ -333,6 +590,13 @@ def run_suite(source: str) -> set:
                 "the suite crashed rather than failing controls, so its "
                 "output says nothing about which controls hold:\n"
                 + "\n".join((r.stderr or "").strip().splitlines()[-3:]))
+        # The raw text is kept because grouping survivors by the suite's own
+        # headings needs the lines between the `[ok]`s, and a list of labels
+        # has thrown those away.
+        run_suite.last_stdout = r.stdout
+        # The read markers arrive here rather than on stdout, for the reason
+        # given in READ_PROBE.
+        run_suite.last_stderr = r.stderr
         return ok_labels(r.stdout)
     finally:
         # Restored in a finally so an interrupted sweep cannot leave a
@@ -398,6 +662,32 @@ def main() -> int:
             return 2
         disabled = disabled.replace(old, new, 1)
 
+    # The read probe is applied to the disabled build only, and a missing
+    # anchor is reported rather than skipped: a sweep that silently ran
+    # without it would print "reads nothing" for all 109 survivors, which is
+    # the most convincing wrong answer this file could give.
+    for label, old, new in READ_PATCHES:
+        if disabled.count(old) != 1:
+            print(f"  {label} has no unique anchor ({disabled.count(old)} "
+                  f"matches). Without it every survivor would be reported as "
+                  f"reading nothing, so this refuses rather than running.")
+            return 2
+        disabled = disabled.replace(old, new, 1)
+
+    # The patched build is compiled before it is ever written over the working
+    # tree's extractor. `READ_PROBE` is injected Python held in an ordinary
+    # string, so an escape that the sweep expands on its way in produces a
+    # build that does not parse — and the symptom is the suite dying, which
+    # reads like a finding about the suite. Compiling here names the real
+    # cause, and does it before the extractor has been touched.
+    try:
+        compile(disabled, str(EXTRACTOR), "exec")
+    except SyntaxError as e:
+        print(f"  the patched extractor does not parse: {e.msg} at line "
+              f"{e.lineno}. The patch is wrong, not the suite, and nothing "
+              f"has been written to the working tree.")
+        return 2
+
     print("  baseline: the suite as it stands")
     base_labels = run_suite(source)
     if not base_labels:
@@ -445,33 +735,120 @@ def main() -> int:
 
     # A control that stops passing is not interesting here; that is the
     # expected outcome. Only the survivors are the question.
+    #
+    # Every survivor is examined, not only the ones outside the pinned list.
+    # The pin was a list of twenty labels read by hand, and this file spent a
+    # week refusing because the real figure is 130 and re-pinning to 130 would
+    # have asserted, twenty times over, the thing it exists to catch. The way
+    # out was not to read 130 labels. It was to find the property that makes
+    # reading them unnecessary and check THAT:
+    #
+    #     no surviving control reads citation-side output
+    #
+    # A survivor that reads nothing the three emitters produce is testing a
+    # constant, the reference side, the output bytes or an abort, and an empty
+    # citation stream tells it nothing either way. A survivor that DOES read
+    # is the defect. So the pass condition is a measured invariant over all of
+    # them rather than a list, and it cannot go stale as the suite grows.
     survivors &= base
-    new = sorted(survivors - PINNED_SURVIVORS)
-    gone = sorted(PINNED_SURVIVORS - survivors)
+    new = sorted(survivors)
+
+    # Grouped by the suite's own headings rather than listed flat. A reason
+    # that holds for a group is one judgement covering all of it, which is how
+    # the original twenty were accepted; 130 read singly is the wrong unit and
+    # does not get done.
+    out = getattr(run_suite, "last_stdout", "")
+    sections = labels_by_section(out)
+    where = {lab: sec for sec, labs in sections.items() for lab in labs}
+    reads, unlocated = reads_by_label(
+        out, getattr(run_suite, "last_stderr", ""),
+        SUITE.read_text(encoding="utf-8"))
+
+    # The survivors split in three, and only one part is a finding. This is a
+    # measurement, not a heuristic over the labels: a control either read
+    # `cits`, `unres` or `excl` on its own source lines or it did not.
+    unk = [n for n in new if n in unlocated]
+    reading = [n for n in new if n not in unlocated and reads.get(n)]
+    blind = [n for n in new if n not in unlocated and not reads.get(n)]
 
     if new:
-        print("  NOT PINNED, and passing with nothing emitted:\n")
-        for n in new:
-            print(f"    {n}")
-        print("\n  Each of these is satisfied by a run that produced no")
-        print("  records at all. Either add a live-fixture guard, or read it")
-        print("  and pin it with the reason it does not need one.\n")
+        print("  Passing with nothing emitted.\n")
+        print(f"  {len(reading)} of the {len(new)} READ citation-side output "
+              f"and passed anyway.")
+        print(f"  {len(blind)} never touched it, so they are testing "
+              f"something else.")
+        if unk:
+            print(f"  {len(unk)} could not be located in the suite source, so "
+                  f"they are neither.")
+        print()
 
-    if gone:
-        print("  pinned and no longer surviving:\n")
-        for g in gone:
-            print(f"    {g}")
-        print("\n  A control that used to pass with nothing emitted and now")
-        print("  does not has been repaired or removed. Good either way, and")
-        print("  the pin has to move deliberately rather than quietly.\n")
+        if reading:
+            print("  READ THE EMPTY OUTPUT AND STILL PASSED. This is the whole")
+            print("  finding; everything below it is context. Each of these")
+            print("  asked the citation side a question, got nothing, and")
+            print("  reported success:\n")
+            for lab in reading:
+                print(f"    {lab}")
+                print(f"      {where.get(lab, '(no heading found)')}")
+                for site in reads[lab]:
+                    print(f"      read at {site}")
+                print()
+            print("  A control here is either asserting an absence, which an")
+            print("  empty run satisfies for free, or counting over a sequence")
+            print("  that is empty. Read the line named above, then either add")
+            print("  a live-fixture guard or record what it is really for.\n")
 
-    if new or gone:
+        if blind:
+            print("  Read nothing the three emitters produce. Grouped by the")
+            print("  suite's own headings, because the reason is the group's")
+            print("  rather than the control's:\n")
+            grouped: dict[str, list[str]] = {}
+            for n in blind:
+                grouped.setdefault(
+                    where.get(n, "(no heading found)"), []).append(n)
+            for sec in sorted(grouped, key=lambda s: (-len(grouped[s]), s)):
+                labs = grouped[sec]
+                total = len(sections.get(sec, labs))
+                print(f"    {sec}")
+                print(f"      {len(labs)} of this section's {total} survive, "
+                      f"none reading citation output")
+            print()
+            print("  A whole section reading nothing is the expected shape: it")
+            print("  is testing a constant, the reference side, the output")
+            print("  bytes or an abort. One reason covers the section. What")
+            print("  would NOT be expected, and is worth looking for, is a")
+            print("  section whose subject IS the citation side appearing in")
+            print("  this list at all.\n")
+
+        if unk:
+            print("  Could not be matched to an `ok()` call in the suite")
+            print("  source, so nothing is claimed about them either way:\n")
+            for lab in unk:
+                print(f"    {lab}")
+            print("\n  A label built at run time from values this file cannot")
+            print("  see. Reported rather than silently filed as clean.\n")
+
+    # The twenty were read by hand before the read probe existed and judged
+    # sound. Any of them turning up in `reading` is the hand reading and the
+    # measurement disagreeing about the same control, which is worth saying
+    # out loud rather than letting the measurement quietly win.
+    contradicted = sorted(set(reading) & PINNED_SURVIVORS)
+    if contradicted:
+        print("  Read by hand and recorded as sound, but measured reading the")
+        print("  empty output. One of the two is wrong:\n")
+        for lab in contradicted:
+            print(f"    {lab}")
+        print()
+
+    if reading or unk:
         return 1
 
-    print(f"  the survivor set is exactly the pinned {len(PINNED_SURVIVORS)}.")
-    print("  Every one was read before it was listed, and three of them are")
-    print("  marked PAIRED ONLY: sound because of a positive beside them on")
-    print("  the same fixture, and not because of anything inside themselves.")
+    print(f"  no surviving control reads citation-side output.")
+    print(f"  {len(blind)} controls pass with all three emitters disabled and")
+    print("  not one of them asks the citation side anything, so an empty")
+    print("  citation stream tells them nothing either way. That is the")
+    print("  property worth holding, and unlike a list of labels it does not")
+    print("  go stale when the suite grows.")
     return 0
 
 

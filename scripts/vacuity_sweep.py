@@ -275,9 +275,32 @@ NARROW_EMITTERS = [
     ("reference",
      '        refs.append({\n            "type": "reference", "index": 0,',
      '        _ = ({\n            "type": "reference", "index": 0,'),
+    # THREE sites, not one. This entry named a record type and disabled a
+    # third of it until 25 September: the pattern below requires the type to
+    # sit on the line after `unres.append({`, which is true only where
+    # `no_year` is built. `entry_start_grammar` and `orphan_line` are written
+    # on one line and went on emitting throughout. The census row read
+    # `unresolved_reference  2  thin` and meant `no_year  2`.
+    #
+    # The uniqueness guard could not catch it. The pattern really does match
+    # exactly once, so `count(old) == 1` confirms a site was found and says
+    # nothing about whether it is the only one. That is why the completeness
+    # check in `census` counts emission sites in the source instead.
     ("unresolved_reference",
-     '            unres.append({\n                "type": "unresolved_reference", "index": 0,',
-     '            _ = ({\n                "type": "unresolved_reference", "index": 0,'),
+     ('            unres.append({\n                "type": "unresolved_reference", "index": 0,',
+      '            unres.append({"type": "unresolved_reference", "index": 0,\n'
+      '                          "text": stripped, "start": span[0], "end": span[1],\n'
+      '                          "reason": "entry_start_grammar"})',
+      '            unres.append({"type": "unresolved_reference", "index": 0,\n'
+      '                          "text": stripped, "start": span[0], "end": span[1],\n'
+      '                          "reason": "orphan_line"})'),
+     ('            _ = ({\n                "type": "unresolved_reference", "index": 0,',
+      '            _ = ({"type": "unresolved_reference", "index": 0,\n'
+      '                          "text": stripped, "start": span[0], "end": span[1],\n'
+      '                          "reason": "entry_start_grammar"})',
+      '            _ = ({"type": "unresolved_reference", "index": 0,\n'
+      '                          "text": stripped, "start": span[0], "end": span[1],\n'
+      '                          "reason": "orphan_line"})')),
     ("author_structure_mismatch",
      '        mismatches.append({\n            "type": "author_structure_mismatch", "index": 0,',
      '        _ = ({\n            "type": "author_structure_mismatch", "index": 0,'),
@@ -306,7 +329,12 @@ NARROW_EMITTERS = [
 # A record type no control notices the absence of is unwatched, whatever else
 # the suite says about it. Measured 24 September: every one of the twelve has
 # at least one, and the census prints the counts so the thin ones are visible.
-# `unresolved_reference` is thinnest at two.
+#
+# `unresolved_reference` read two and was the thinnest, which is what sent
+# anyone looking at it. What was actually thin was the probe: two of its three
+# emission sites were never disabled, so the row was about `no_year` alone.
+# The real figure is whatever the fixed probe prints, and the lesson is that a
+# suspiciously thin row is worth reading as a claim about the PROBE first.
 CENSUS_FLOOR = 1
 CENSUS_THIN = 2
 
@@ -624,12 +652,39 @@ def census(source: str, base: set) -> int:
     print("  census: controls that go red when one emitter is disabled\n")
     problems = 0
     for label, old_text, new_text in EMITTERS + NARROW_EMITTERS:
-        if source.count(old_text) != 1:
-            print(f"    {label:30}  PROBE BROKEN, {source.count(old_text)} "
-                  f"matches; reported rather than passed")
+        pairs = (list(zip(old_text, new_text))
+                 if isinstance(old_text, tuple) else [(old_text, new_text)])
+
+        # How many places in the extractor build this record, counted in the
+        # source rather than assumed. A census row is only about a RECORD TYPE
+        # if every site that produces it is disabled; patch two of three and
+        # the row silently becomes about one code path, still printing the
+        # record type's name. `unresolved_reference` was in exactly that state
+        # and read `2  thin`.
+        #
+        # This counts sites against patches. It does not verify that each
+        # patch lands on a site, which a patch like `duplicates = [] if True`
+        # makes awkward, but it is what catches the defect that occurred and
+        # it fails loudly when a new emission site is added later.
+        sites = source.count(f'"type": "{label}"')
+        if sites != len(pairs):
+            print(f"    {label:30}  PROBE INCOMPLETE, {len(pairs)} patch(es) "
+                  f"for {sites} emission site(s); reported rather than passed")
             problems += 1
             continue
-        survivors = set(run_suite(source.replace(old_text, new_text, 1))) & base
+
+        patched, broken = source, None
+        for old, new in pairs:
+            if patched.count(old) != 1:
+                broken = patched.count(old)
+                break
+            patched = patched.replace(old, new, 1)
+        if broken is not None:
+            print(f"    {label:30}  PROBE BROKEN, a patch matched {broken} "
+                  f"times; reported rather than passed")
+            problems += 1
+            continue
+        survivors = set(run_suite(patched)) & base
         red = len(base) - len(survivors)
         note = ""
         if red < CENSUS_FLOOR:

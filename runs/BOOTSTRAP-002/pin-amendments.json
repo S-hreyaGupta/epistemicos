@@ -1,0 +1,21 @@
+{
+  "schema": "run-pin-amendments/1",
+  "amendments": [
+    {
+      "reason": "specs/evidence-schema-v1.0.md is pinned as run-governing and is also one of the ten components the bootstrap gate requires to be covered by the review target. An artifact cannot hold both roles: it would have to stay byte-identical for the run while also being changeable to resolve a finding raised about it. The gate added it to COMPONENTS deliberately, because MC-2 checks evidence against it and covering the checker but not the document it reads its expectations from leaves a seam through the middle of what the review claims to cover. Removing it from the pin set resolves the collision in the direction the gate requires, leaving the protocol as the sole governing pin. Authorised by Alex Zamurko, Slack, 25 September 2026 15:40.",
+      "affected_artifacts": [
+        "specs/evidence-schema-v1.0.md"
+      ],
+      "prior_pin_set": [
+        "specs/evidence-schema-v1.0.md",
+        "specs/implementation-review-protocol-v1.1.md"
+      ],
+      "new_pin_set": [
+        "specs/implementation-review-protocol-v1.1.md"
+      ],
+      "effective_cycle": 2,
+      "authorized_by": "Alex Zamurko",
+      "at": "2026-09-25T10:41:12Z"
+    }
+  ]
+}

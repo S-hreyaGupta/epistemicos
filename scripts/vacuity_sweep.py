@@ -211,6 +211,29 @@ BASELINE_FLOOR = 320
 # each into the pin with its reason or fix the control it exposes. Until then
 # this file refuses, and the refusal is the finding.
 #
+# The reading has started, and the first pass found the shape to look for.
+#
+#     `any(...)` over an empty sequence is False.
+#     `all(...)` over an empty sequence is True.
+#
+# So a control written as "fail if anything is wrong, otherwise ok" reports
+# success when there is nothing to be wrong. C-027 did exactly that: two
+# `any()` branches over the citations of its fixture, an `else: ok()`, and no
+# check that the fixture produced any. C-026 sits directly above it on the same
+# fixture and does NOT have the defect, because it compares a list against
+# [1, 2, 3] rather than asking whether anything is wrong. One survived the
+# empty run and the other did not, four lines apart.
+#
+# `not any(...)` and `not all(...)` are the safe direction: empty makes them
+# fire rather than pass. The suite has 23 of these constructs and about
+# thirteen are the unsafe shape. Each needs reading for a preceding emptiness
+# guard; C-027 is the one confirmed so far and is fixed.
+#
+# The general discriminator, for whoever continues this: a survivor is
+# legitimate when its fixture produces no citation record even in the baseline
+# run, and vacuous when its fixture produces them normally and the assertion
+# simply stops having anything to range over.
+#
 # Controls that legitimately survive with all three emitters off.
 #
 # Every one was read before it was listed. They fall into five groups, none of

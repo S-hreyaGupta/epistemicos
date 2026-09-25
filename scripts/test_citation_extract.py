@@ -2939,7 +2939,18 @@ def main() -> int:
     # before this sentence begins. Checking that it merely ascends is not
     # enough: pointing each record at its OWN content_end also ascends, and
     # the mutation probe caught that control passing.
-    if any(c["previous_sentence_end"] is None for c in sc):
+    #
+    # The live-fixture guard is first, and it is not tidiness. Both branches
+    # below are `any(...)` over `sc`, and `any` of an empty sequence is False,
+    # so an empty `sc` falls through to `ok()` and this control reports success
+    # having compared nothing. Found 25 September by the vacuity sweep, on its
+    # first completed empty run: C-026 above catches an empty `sc` because it
+    # compares a list against [1, 2, 3], and C-027 did not because it only ever
+    # asked whether anything was wrong.
+    if len(sc) != 3:
+        failures.append(f"C-027: the fixture must emit three citations for "
+                        f"this to compare anything — got {len(sc)}")
+    elif any(c["previous_sentence_end"] is None for c in sc):
         failures.append("C-027: only the FIRST body sentence has a null "
                         "previous_sentence_end")
     elif any(c["previous_sentence_end"] >= c["sentence_start"] for c in sc):

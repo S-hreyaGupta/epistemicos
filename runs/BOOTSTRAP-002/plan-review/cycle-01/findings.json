@@ -1,0 +1,55 @@
+{
+  "schema": "cycle-findings/1",
+  "review_result_status": "VALID",
+  "raw_finding_count": 8,
+  "finding_id_grammar": "^[A-Z]{0,2}\\d{2}-F\\d{2,3}$",
+  "cycle": 1,
+  "extracted_at": "2026-09-25T17:08:28Z",
+  "source": "captures/attempt-01/raw.md",
+  "source_attempt": 1,
+  "source_sha256": "ded9718612531f52fbfd7b2fb3b699a51c36865ba89d525df3a4c716f094525d",
+  "count": 8,
+  "zero_findings_asserted": false,
+  "findings": [
+    {
+      "id": "C01-F01",
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "kind": "finding"
+    },
+    {
+      "id": "C01-F02",
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "kind": "finding"
+    },
+    {
+      "id": "C01-F03",
+      "class": "MISSING REQUIREMENT",
+      "kind": "finding"
+    },
+    {
+      "id": "C01-F04",
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "kind": "finding"
+    },
+    {
+      "id": "C01-F05",
+      "class": "MISSING REQUIREMENT",
+      "kind": "finding"
+    },
+    {
+      "id": "C01-F06",
+      "class": "MISSING REQUIREMENT",
+      "kind": "finding"
+    },
+    {
+      "id": "C01-F07",
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "kind": "finding"
+    },
+    {
+      "id": "C01-F08",
+      "class": "MISSING REQUIREMENT",
+      "kind": "finding"
+    }
+  ]
+}

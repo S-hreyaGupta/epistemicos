@@ -1,6 +1,8 @@
 # Consolidation Step 2 — the architecture document, rc1 against rc2
 
-Against Alex Zamurko's consolidation workflow v6, 21 September 2026.
+21 September 2026. Written to Alex Zamurko's consolidation workflow v6 as he
+conveyed it. The v6 text is not in the repository, so no gate cited here can
+be checked against its source.
 
 > **Gate.** Every substantive change is represented in the consolidation table.
 > No wording change is hidden inside a formatting-only group.

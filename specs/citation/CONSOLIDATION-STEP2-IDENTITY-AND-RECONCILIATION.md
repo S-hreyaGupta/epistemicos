@@ -1,6 +1,8 @@
 # Consolidation Step 2 — §8 identity and §9 reconciliation, rc1 against rc2
 
-Against Alex Zamurko's consolidation workflow v6. 23 September 2026.
+23 September 2026. Written to Alex Zamurko's consolidation workflow v6 as he
+conveyed it. The v6 text is not in the repository, so no gate cited here can
+be checked against its source.
 
 The last large pair, and the one `CONSOLIDATION-STEP2-EXECUTION.md` flagged as
 where CIT-ARCH-01 is decided rather than merely surfaced. That turned out to be

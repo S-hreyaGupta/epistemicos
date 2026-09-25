@@ -1,7 +1,10 @@
 # Consolidation Step 2 — the matrix and register pairs
 
-Against Alex Zamurko's consolidation workflow v6, 21 September 2026. These are
-the last two pairs, and they complete Step 2's structural coverage.
+21 September 2026. Written to Alex Zamurko's consolidation workflow v6 as he
+conveyed it. The v6 text is not in the repository, so no gate cited here can
+be checked against its source.
+
+These are the last two pairs, and they complete Step 2's structural coverage.
 
 ```text
 citation-v3.4-rc1-conformance-matrix.md      73f4ba54…  227 lines  SUPERSEDED

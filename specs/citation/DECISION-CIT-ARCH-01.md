@@ -1,7 +1,9 @@
 # Decision CIT-ARCH-01 — citation identity authority
 
-Recorded in the form Alex Zamurko's consolidation workflow v6 requires for
-Step 3 adjudication.
+Recorded in the form understood to be required for Step 3 adjudication under
+Alex Zamurko's consolidation workflow v6, as he conveyed it. The v6 text is
+not in the repository, so the form itself cannot be checked against its
+source. The decision below, its date and its channel can be.
 
 ```text
 Decision ID      CIT-ARCH-01

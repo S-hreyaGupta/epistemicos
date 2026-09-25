@@ -1,6 +1,8 @@
 # Consolidation Step 2 — §11 summary invariants and §12 canonical output, rc1 against rc2
 
-Against Alex Zamurko's consolidation workflow v6. 23 September 2026.
+23 September 2026. Written to Alex Zamurko's consolidation workflow v6 as he
+conveyed it. The v6 text is not in the repository, so no gate cited here can
+be checked against its source.
 
 Two of the ten CHANGED sections `CONSOLIDATION-STEP2-EXECUTION.md` identified
 and left undispositioned, taken together because §12's record shapes are what

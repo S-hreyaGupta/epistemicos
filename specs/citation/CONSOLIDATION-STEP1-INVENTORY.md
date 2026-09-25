@@ -1,6 +1,8 @@
 # Consolidation Step 1 — Inventory
 
-Against Alex Zamurko's consolidation workflow v6, 21 September 2026.
+21 September 2026. Written to Alex Zamurko's consolidation workflow v6 as he
+conveyed it. The v6 text is not in the repository, so no gate cited here can
+be checked against its source.
 
 > **Gate.** Every known relevant source is listed. Missing referenced material
 > is recorded explicitly; affected items cannot be treated as resolved.

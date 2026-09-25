@@ -1,6 +1,8 @@
 # Consolidation Step 2 — §0, §2, §10, §14, §17, §19, rc1 against rc2
 
-Against Alex Zamurko's consolidation workflow v6. 23 September 2026.
+23 September 2026. Written to Alex Zamurko's consolidation workflow v6 as he
+conveyed it. The v6 text is not in the repository, so no gate cited here can
+be checked against its source.
 
 The six sections left after §8, §9, §11 and §12. Small by line count and not
 small in consequence: **§19 unblocks the pilot**, and §14 turned out to contain

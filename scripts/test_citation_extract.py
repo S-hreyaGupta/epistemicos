@@ -39,6 +39,21 @@ import re
 import sys
 from pathlib import Path
 
+# This suite prints `→`, and cp1252 cannot encode it. On a Windows console
+# that kills the run mid-print with a traceback, which is not a control
+# failure and must not be read as one. Measured 25 September: four of the
+# citation checks died this way, and `vacuity_sweep.py --census` read the
+# truncated output as a completed run, reported a baseline of 179 controls
+# against a real 323, and printed NOTHING WATCHES THIS RECORD TYPE for seven
+# record types that are all watched.
+#
+# Set here rather than left to the caller. A check that only runs on some
+# consoles is not a check, and "export PYTHONUTF8=1 first" is knowledge that
+# lives in one person's shell history.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 SRC = Path(__file__).resolve().parent
 sys.path.insert(0, str(SRC))
 
@@ -76,6 +91,27 @@ def keys(cits):
 # Guarding all seventeen is the wrong shape; the defect is that the report is
 # only emitted on the happy path. `__main__` below now prints the failures
 # whatever happens, so a crash reports a crash AND the findings.
+#
+# 25 September, revisited, because that resolution is right for the mutation
+# probe and insufficient for the sweep.
+#
+# The mutation probe reads `FAIL:` lines, so printing on the way out is enough
+# for it. `vacuity_sweep.py` counts `[ok]` lines, and a crash truncates that
+# list — the controls after the crash look like non-survivors because they
+# never printed, not because they went red. Printing the failures cannot
+# recover them. So the sweep could never finish the run its whole method
+# depends on, and pinned 20 survivors from a run that stopped partway.
+#
+# The two changes together are the fix. The sweep now REFUSES a crashed run
+# instead of scoring it, and the handful of sites an empty run actually reaches
+# are guarded — not all seventeen, and not for tidiness. Each guard states what
+# the missing fixture means, which is a real assertion: "no citation was
+# emitted, so this establishes nothing" is the honest reading, and a control
+# that raises instead says nothing at all while looking like it passed.
+#
+# Which sites those are is measured rather than guessed. `_diag/crash_census.py`
+# runs every emitter-disable variant and names each crash, so the list is the
+# one the method reaches and not the one that looked likely.
 FAILURES: list[str] = []
 
 
@@ -1006,6 +1042,25 @@ def main() -> int:
 
     if "candidate_parse_rate" not in s:
         failures.append("A5: the summary carries no candidate_parse_rate")
+    elif not s["extraction_denominator"]:
+        # A paper with no candidates at all. The extractor writes `None` here
+        # rather than dividing, and until 25 September this control divided
+        # anyway: `ZeroDivisionError` inside the suite, which is a crash and
+        # not a failing control.
+        #
+        # It had never been reached, because no corpus paper has zero
+        # candidates. `vacuity_sweep.py` reaches it on every run — emptying the
+        # emitters is the whole method — and then read the truncated output as
+        # a completed suite. So the sweep built to find controls that pass for
+        # the wrong reason was reporting its own survivor set from a run that
+        # died partway through. Asserting the declared behaviour rather than
+        # skipping: `None` is what rc2's A5 division means here.
+        if s["candidate_parse_rate"] is not None:
+            failures.append("A5: with a zero extraction_denominator "
+                            "candidate_parse_rate must be null, got "
+                            f"{s['candidate_parse_rate']!r}")
+        else:
+            ok("A5: a zero denominator gives a null parse rate, not a crash")
     elif abs(s["candidate_parse_rate"]
              - s["parsed"] / s["extraction_denominator"]) > 1e-9:
         failures.append("A5: candidate_parse_rate is parsed / "
@@ -1365,7 +1420,14 @@ def main() -> int:
     # cheapest wrong way to make the controls above pass is to reduce
     # `author_phrase` itself, which is exactly what C-020 forbids.
     c, _m = redu("Similarly, Smith (2020) showed this.", R1)
-    if c["author_phrase"] != "Similarly, Smith":
+    # `redu` returns None for the citation when none was emitted. Reading a
+    # field off it raised TypeError, which is a crash and not this control
+    # failing. Same shape as the four others found on 25 September once
+    # crashes stopped being counted as verdicts.
+    if c is None:
+        failures.append("C-020: no citation was emitted, so nothing here is "
+                        "about which fields reduction rewrote")
+    elif c["author_phrase"] != "Similarly, Smith":
         failures.append(f"C-020: author_phrase is still the complete run — "
                         f"got {c['author_phrase']!r}")
     elif c["citation_surface_group_key"][0] != "similarly, smith":
@@ -1509,8 +1571,15 @@ def main() -> int:
     # does not count as uniquely matched. Both, in one document.
     lines, code = run_doc("As shown (Smith & Brown, 2020) here.", R1)
     s = lines[-1]
-    cit = next(l for l in lines if l.get("type") == "citation")
-    if cit["citation_key"] != "smith|2020":
+    # A default on `next`, because a bare one raises StopIteration when the
+    # emitter is off and that killed the whole suite rather than failing this
+    # control. It was the last of the five crash sites the empty run reaches,
+    # and the only one left after 25 September's first pass.
+    cit = next((l for l in lines if l.get("type") == "citation"), None)
+    if cit is None:
+        failures.append("no citation was emitted, so nothing here is about "
+                        "whether a mismatch erases the identity")
+    elif cit["citation_key"] != "smith|2020":
         failures.append("a mismatch must not erase the established identity")
     elif s["uniquely_matched_occurrences"] != 0:
         failures.append(f"an author_structure_mismatch occurrence must not "
@@ -2063,7 +2132,14 @@ def main() -> int:
     # Same shape as §9.4's precedence list: well formed, and with no input.
     # Recorded rather than asserted as behaviour, and the namespace split is
     # pinned instead, since that is the thing actually holding.
-    if cit["candidate_key_full"] == cit["candidate_key_stop_reduced"]:
+    #
+    # `cit` is the §8.4 fixture's citation from further up, and the guard there
+    # records a failure without stopping the run, so this needs its own. It was
+    # the last crash the empty run reaches.
+    if cit is None:
+        failures.append("§8.6: no citation was emitted, so nothing here shows "
+                        "the two candidate keys cannot collide")
+    elif cit["candidate_key_full"] == cit["candidate_key_stop_reduced"]:
         failures.append("§8.6: the two candidate keys collided, so the "
                         "double-resolution abort is now reachable")
     elif not cit["candidate_key_full"].startswith("non_person|"):
@@ -2092,9 +2168,12 @@ def main() -> int:
     # Asserted on the serialized bytes, because "it is an array" is exactly
     # the claim a quoted string would also satisfy in Python.
     cits, _u, _s = sgk("As shown (Smith, 2020) here.", R_SG)
-    key = cits[0]["citation_surface_group_key"]
+    key = cits[0]["citation_surface_group_key"] if cits else None
     blob = _json.dumps(key, separators=(",", ":"), ensure_ascii=False)
-    if blob != '["smith",2020]':
+    if not cits:
+        failures.append("C-022: no citation was emitted, so there is no "
+                        "surface group key to check the serialization of")
+    elif blob != '["smith",2020]':
         failures.append(f"C-022: the key serializes as a JSON array with an "
                         f"integer year — got {blob}")
     elif not isinstance(key, list) or isinstance(key[1], str):
@@ -2146,7 +2225,16 @@ def main() -> int:
 
     # §6.8 names this field as one the possessive strip MUST NOT touch.
     cits, _u, _s = sgk("Following Fine's (1998) formula, we did this.", R_SG)
-    if "fine's" not in cits[0]["citation_surface_group_key"][0]:
+    # The live-fixture guard has to come first, and not because of tidiness.
+    # Emptying the STOP list makes `Following` a surname, this citation stops
+    # parsing, and `cits[0]` then raised IndexError — a crash inside the suite,
+    # which `mutate_citation_suite.py` reads as no verdict at all rather than as
+    # this control biting. Found 25 September once crashes stopped being counted
+    # as control failures.
+    if not cits:
+        failures.append("§6.8: the fixture produced no citation, so nothing "
+                        "here is about the possessive")
+    elif "fine's" not in cits[0]["citation_surface_group_key"][0]:
         failures.append(f"§6.8: the possessive survives in the SURFACE key — "
                         f"got {cits[0]['citation_surface_group_key']!r}")
     elif cits[0]["citation_key"] != "fine|1998":
@@ -2217,9 +2305,13 @@ def main() -> int:
     if lines and cit is None:
         failures.append("§10: a manuscript with no bibliography is still "
                         "READ — Pass 1 extraction is performed")
-    elif summ["references_source"] != "not_available":
+    # `.get` on purpose. When the mutation restores v3.3's abort, `absent`
+    # returns no summary at all, the branch above records that correctly, and
+    # this line then raised KeyError — turning a control that had already
+    # caught its mutation into a crash with no verdict. 25 September.
+    elif (summ or {}).get("references_source") != "not_available":
         failures.append(f"C-009: references_source is not_available — got "
-                        f"{summ['references_source']!r}")
+                        f"{(summ or {}).get('references_source')!r}")
     elif not any(l.get("type") == "bibliography_absent" for l in lines):
         failures.append("C-009: exactly one bibliography_absent record")
     else:
@@ -2252,6 +2344,14 @@ def main() -> int:
                  "author_structure_mismatch"}
     lines2, _c, _s = absent("As shown (Smith, 2020; Jones, 2019) and "
                             "Brown (2018) argued this.")
+    # `absent` returns None when the run aborts, which is exactly what the
+    # mutation restoring v3.3's abort makes it do. Iterating None raised
+    # TypeError, so this control crashed instead of reporting, and the probe
+    # recorded no verdict. A refusal to run is not an empty leak set. 25 Sep.
+    if lines2 is None:
+        failures.append("§10: a missing bibliography aborted the run, so "
+                        "nothing here establishes which records leaked")
+        lines2 = []
     leaked = sorted({l["type"] for l in lines2} & forbidden)
     if leaked:
         failures.append(f"§10: these MUST NOT be emitted with no "
@@ -2283,8 +2383,12 @@ def main() -> int:
     nulled = nulled + ("author_structure_mismatches",)
     wrong = [k for k in nulled if summ.get(k, "missing") is not None]
     if wrong:
+        # `.get` in the message as well as the test. An absent key is counted
+        # wrong above, and then reporting it with `summ[k]` raised KeyError —
+        # so the control crashed on exactly the input it was built to catch.
+        # Found 25 September by the mutation that restores v3.3's abort.
         failures.append(f"C-067: not-evaluated quantities are null, never 0 — "
-                        f"got {[(k, summ[k]) for k in wrong]}")
+                        f"got {[(k, summ.get(k, 'ABSENT')) for k in wrong]}")
     elif summ["identity_resolution_performed"] is not False:
         failures.append("§11.4: identity_resolution_performed says so plainly")
     elif summ["parsed"] != 1 or summ["distinct_surface_groups"] != 1:
@@ -2645,7 +2749,18 @@ def main() -> int:
                 _p.write_text(HEAD + _body + ("\n" if _refs is None else
                                               "\n\n## References\n\n" + _refs),
                               encoding="utf-8")
-                _ls, _cc = ce.run(_p, {"ampersand", "segments"})
+                # `Abort` caught, not allowed out. The last fixture in this
+                # list has no references section on purpose, so the mutation
+                # that restores v3.3's abort makes this call raise and the
+                # traceback took the whole suite down — the mutation probe then
+                # had no verdict about the control it names. Swallowing it here
+                # is safe because the `unreached` check below already fails
+                # when a declared record type could not be sampled, which is
+                # exactly what an abort causes. 25 September.
+                try:
+                    _ls, _cc = ce.run(_p, {"ampersand", "segments"})
+                except ce.Abort:
+                    continue
                 for _ln in ce.serialize(_ls).rstrip(b"\n").split(b"\n"):
                     _r = _json.loads(_ln.decode("utf-8"))
                     rec_by_type.setdefault(_r["type"], _r)
@@ -2841,8 +2956,11 @@ def main() -> int:
                       "## References\n\nSmith, J. (2020). A. J, 1, 1.\n",
                       encoding="utf-8")
         ls, _c = ce.run(sp, {"ampersand", "segments"})
-    first = next(l for l in ls if l.get("type") == "citation")
-    if first["previous_sentence_end"] is not None:
+    first = next((l for l in ls if l.get("type") == "citation"), None)
+    if first is None:
+        failures.append("C-026/C-027/C-028: no citation was emitted, so the "
+                        "sentence-relative fields cannot be judged here")
+    elif first["previous_sentence_end"] is not None:
         failures.append(f"C-027: the first body sentence has null — got "
                         f"{first['previous_sentence_end']!r}")
     elif first["sentence_index"] != 0:
@@ -2945,8 +3063,11 @@ def main() -> int:
         failures.append(f"C-047: a shared reference index across different "
                         f"candidate keys must NOT abort — got exit {ab[0]}")
     else:
-        c = next(l for l in lines if l.get("type") == "citation")
-        if c["author_resolution"] != "ambiguous":
+        c = next((l for l in lines if l.get("type") == "citation"), None)
+        if c is None:
+            failures.append("C-047: no citation was emitted, so the shared "
+                            "index cannot be shown to be ordinary ambiguity")
+        elif c["author_resolution"] != "ambiguous":
             failures.append(f"C-047: shared index is ordinary ambiguity — got "
                             f"{c['author_resolution']!r}")
         else:
@@ -2969,8 +3090,11 @@ def main() -> int:
     # after extraction, so this is structural — pinned anyway, because the
     # seam's whole licence is that it cannot reach backwards.
     lines, _ab = inject(("a|2020", "no_match", []), ("b|2020", "no_match", []))
-    c = next(l for l in lines if l.get("type") == "citation")
-    if c["author_phrase"] != "Smith" or c["group_start"] is None:
+    c = next((l for l in lines if l.get("type") == "citation"), None)
+    if c is None:
+        failures.append("§15: no citation was emitted, so this says nothing "
+                        "about whether the seam altered Pass-1 parsing")
+    elif c["author_phrase"] != "Smith" or c["group_start"] is None:
         failures.append(f"§15: the seam must not alter Pass-1 parsing or "
                         f"candidate spans — got {c['author_phrase']!r}")
     else:
@@ -3015,10 +3139,15 @@ def main() -> int:
              "year_transposition")]:
         mr, pm = diag(f"As shown {cite} here.",
                       "\n\n## References\n\n" + entry + "\n" + PAD)
-        if len(pm) != 1 or pm[0]["evidence"] != rule:
+        # `.get` because the field name is this control's own subject. The
+        # mutation that renames `evidence` back to `rule` made this line raise
+        # KeyError, so the control crashed instead of reporting, and the probe
+        # recorded no verdict about the rule it names. 25 September.
+        if len(pm) != 1 or pm[0].get("evidence") != rule:
             failures.append(f"§9.4 {label}: expected one possible_mismatch "
                             f"with rule {rule} — got "
-                            f"{[(x['rule']) for x in pm]}, {len(mr)} missing")
+                            f"{[x.get('evidence', x.get('rule')) for x in pm]},"
+                            f" {len(mr)} missing")
             break
     else:
         ok("§9.4: all three repair rules pair their reference")
@@ -3055,9 +3184,13 @@ def main() -> int:
     if len(pm) != 1:
         failures.append(f"§9.4: one candidate pairs at most once — got "
                         f"{len(pm)}")
-    elif pm[0]["evidence"] != "year_adjacent":
+    # `.get`, for the reason given at the §9.4 table above: the field name is
+    # this control's subject, so reading it directly turns the mutation that
+    # renames it into a crash rather than a verdict.
+    elif pm[0].get("evidence") != "year_adjacent":
         failures.append(f"§9.4: references are scanned in SOURCE order, so "
-                        f"the 1999 entry pairs first — got {pm[0]['rule']}")
+                        f"the 1999 entry pairs first — got "
+                        f"{pm[0].get('evidence', pm[0].get('rule'))}")
     else:
         ok("§9.4: reference source order decides which entry pairs")
 
@@ -3582,8 +3715,19 @@ def main() -> int:
     # tested half of it.
     for label, refs in (("with a bibliography", REFS),
                         ("with none at all", "\n\nPlain closing text.\n")):
-        s = summ_of("A claim (Smith, 2020) holds. Also (OECD, 2020) says so.",
-                    refs=refs)
+        # The second case has no references section on purpose, so the mutation
+        # restoring v3.3's abort makes this raise. Caught here rather than in
+        # `summ_of`, which other controls call and expect to raise: an abort
+        # means §11.1 could not be evaluated for this case, and saying so is
+        # the failure. Letting it out took the whole suite down instead, and
+        # the probe then had no verdict on the control it names. 25 September.
+        try:
+            s = summ_of("A claim (Smith, 2020) holds. Also (OECD, 2020) "
+                        "says so.", refs=refs)
+        except ce.Abort as a:
+            failures.append(f"§11.1: the run aborted {label} (exit {a.args[0]}),"
+                            f" so the invariant could not be evaluated there")
+            continue
         lhs = s["total_citation_occurrences"]
         extracted = s["extracted_citation_occurrences"]
         unres_occ = s["unresolved_extraction_occurrences"]
@@ -4422,8 +4566,20 @@ def main() -> int:
     p = Path(_tf.mkdtemp()) / "p.md"
     p.write_bytes((HEAD + "As shown (Felfe, 2006) here.\n\nPlain close.\n")
                   .encode("utf-8"))
-    ls_abs, _c = ce.run(p, {"ampersand"})
-    if any(r.get("type") == "duplicate_reference_key" for r in ls_abs):
+    # Third and last of the bibliography-less fixtures that let v3.3's abort
+    # out. A refusal to run is not the same as running and suppressing the
+    # record, which is what this control is about, so the abort is a failure
+    # here rather than a pass.
+    try:
+        ls_abs, _c = ce.run(p, {"ampersand"})
+    except ce.Abort as a:
+        ls_abs = None
+        failures.append(f"§10: a missing bibliography aborted (exit "
+                        f"{a.args[0]}) instead of being read, so suppression "
+                        f"was never tested")
+    if ls_abs is None:
+        pass
+    elif any(r.get("type") == "duplicate_reference_key" for r in ls_abs):
         failures.append("§10: duplicate_reference_key is suppressed when the "
                         "bibliography is absent")
     else:

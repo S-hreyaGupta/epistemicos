@@ -90,6 +90,14 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+# `→` in this file's output, and cp1252 cannot encode it, so a Windows console
+# kills the run mid-print. See `test_citation_extract.py` for what that cost on
+# 25 September. Not left to the caller: a check that only runs on some consoles
+# is not a check.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 # rc2 §19's gate has eight items and only one is mechanically checkable:
 # "Unicode 15.0.0 behavior required by this contract is demonstrated in the
 # execution environment". It is NOT one of the 86 conformance cases, so it does

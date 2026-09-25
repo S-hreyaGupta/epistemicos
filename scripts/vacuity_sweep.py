@@ -92,10 +92,18 @@ are what the review needs anyway.
 
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 import subprocess
 import sys
+
+# `→` in this file's output, and cp1252 cannot encode it, so a Windows console
+# kills the run mid-print. See `test_citation_extract.py` for what that cost on
+# 25 September — this file was the one that turned the crash into a finding.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 EXTRACTOR = REPO / "scripts" / "citation_extract.py"
@@ -174,6 +182,35 @@ NARROW_EMITTERS = [
 CENSUS_FLOOR = 1
 CENSUS_THIN = 2
 
+# The suite's own control count, as a floor rather than an equality so that
+# adding a control does not fail this file. It exists because a truncated
+# baseline is indistinguishable from a real one by size alone, and on
+# 25 September a run that died at 179 of 323 was used as the denominator for
+# a twelve-emitter census. Raise it when the suite grows; never lower it to
+# make a run pass.
+BASELINE_FLOOR = 320
+
+# KNOWN STALE as of 25 September, and left stale on purpose. This file now
+# REFUSES rather than passing, and that refusal is the honest state.
+#
+# These twenty were read before they were listed, and they are still twenty
+# controls that survive. What they are not is the ANSWER, because the run they
+# came from never finished. The first empty run hit a `ZeroDivisionError`
+# inside the suite after about twenty `[ok]` lines had printed, `run_suite`
+# could not tell a crash from a control failing, and the truncated output was
+# scored as a completed sweep. Every control after the crash looked like a
+# non-survivor because it never printed, not because it went red.
+#
+# With the crash sites fixed, the empty run completes for the first time and
+# the real figure is 134 of 323. Those 114 additional survivors have NOT been
+# read. Re-pinning to 134 to make this file green would assert twenty times
+# over the thing this file exists to catch: a number that passes because
+# nobody looked at it.
+#
+# So the next piece of work is to read them, one at a time, and either accept
+# each into the pin with its reason or fix the control it exposes. Until then
+# this file refuses, and the refusal is the finding.
+#
 # Controls that legitimately survive with all three emitters off.
 #
 # Every one was read before it was listed. They fall into five groups, none of
@@ -238,18 +275,53 @@ def duplicates(labels: list) -> list:
 
 
 def run_suite(source: str) -> set:
-    """Run the suite against a temporary extractor built from `source`."""
+    """Run the suite against a temporary extractor built from `source`.
+
+    A non-zero exit is EXPECTED here and is not an error: disabling an emitter
+    is supposed to take controls red. So the return code cannot be the test of
+    whether the run happened. A crash has to be told from a control failure
+    some other way, and a Python traceback is the one signal a failing control
+    never produces.
+
+    That distinction was missing and it produced a false finding. Run on a
+    Windows console on 25 September, the suite died on a `→` it could not
+    encode partway through printing, and this function read the truncated
+    output as a completed run: the census reported a baseline of 179 controls
+    where the real number is 323, and then announced NOTHING WATCHES THIS
+    RECORD TYPE for seven record types. Every one of those seven is watched.
+    The exit code was 1, so the tool was not silent, but the sentence it
+    printed was false and read like a finding.
+
+    Two guards, because the encoding fix alone would only close this instance.
+    The child is given UTF-8 explicitly, and a crash is refused rather than
+    counted.
+    """
     original = EXTRACTOR.read_text(encoding="utf-8")
-    EXTRACTOR.write_text(source, encoding="utf-8")
+    # newline="" so a run on Windows does not rewrite the extractor's line
+    # endings on its way past. `write_text` translates \n to \r\n by default,
+    # and the file it writes back is the working tree's own extractor.
+    EXTRACTOR.write_text(source, encoding="utf-8", newline="")
     try:
-        r = subprocess.run([sys.executable, str(SUITE)],
+        env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+        r = subprocess.run([sys.executable, str(SUITE)], env=env,
                            capture_output=True, text=True, timeout=600)
+        if "Traceback (most recent call last)" in (r.stderr or ""):
+            raise RuntimeError(
+                "the suite crashed rather than failing controls, so its "
+                "output says nothing about which controls hold:\n"
+                + "\n".join((r.stderr or "").strip().splitlines()[-3:]))
         return ok_labels(r.stdout)
     finally:
         # Restored in a finally so an interrupted sweep cannot leave a
         # disabled emitter in the working tree. A sweep that breaks the thing
         # it measures and does not put it back is worse than no sweep.
-        EXTRACTOR.write_text(original, encoding="utf-8")
+        #
+        # newline="" on the RESTORE as well as the write, which the first
+        # version of this fix missed. `read_text` collapses CRLF to \n and the
+        # default `write_text` expands it again, so on Windows every sweep
+        # rewrote all 3670 lines of the extractor's endings. Put back means put
+        # back byte for byte.
+        EXTRACTOR.write_text(original, encoding="utf-8", newline="")
 
 
 def census(source: str, base: set) -> int:
@@ -307,6 +379,18 @@ def main() -> int:
     base_labels = run_suite(source)
     if not base_labels:
         print("  the suite produced no [ok] lines at all; nothing to compare")
+        return 2
+    # A baseline is the denominator for every number below it, so a baseline
+    # that is merely PLAUSIBLE is worse than none. "no [ok] lines at all" was
+    # the only check here, and a run that died two thirds of the way through
+    # sails past it: on 25 September this printed 179 and went on to compute a
+    # whole census against it. The floor is the count the suite reports for
+    # itself, which it prints and this can read.
+    if len(base_labels) < BASELINE_FLOOR:
+        print(f"    {len(base_labels)} controls pass, but the suite has at "
+              f"least {BASELINE_FLOOR}. A short baseline means the run ended "
+              f"early, and every count below it would be measured against a "
+              f"denominator that is not the suite.")
         return 2
     print(f"    {len(base_labels)} controls pass\n")
 

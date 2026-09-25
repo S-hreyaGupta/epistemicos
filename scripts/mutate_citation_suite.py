@@ -61,11 +61,20 @@ surname` tests the outcome, not the mechanism, and reads like it tests both.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+# `→` in this file's output, and cp1252 cannot encode it, so a Windows console
+# kills the run mid-print. See `test_citation_extract.py` for what that cost on
+# 25 September. Four mutations here reported WRONG CONTROL about runs that had
+# crashed before reaching the control they name.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
 SRC = Path(__file__).resolve().parent
 EXTRACT = SRC / "citation_extract.py"
@@ -1377,9 +1386,25 @@ MUTATIONS[2] = (
 
 
 def run_suite(scripts_dir: Path) -> tuple[int, str]:
-    p = subprocess.run([sys.executable, str(scripts_dir / "test_citation_extract.py")],
-                       capture_output=True, text=True)
+    """The suite under a mutation, with UTF-8 forced on the child.
+
+    The suite prints `→` and `§`. On a Windows console the child inherits
+    cp1252, cannot encode them, and dies mid-print with a traceback. This file
+    then reads a non-zero exit with no `FAIL:` line and reports WRONG CONTROL
+    — a real verdict about the control, drawn from a run that never reached
+    it. Four of these appeared on 25 September and none of them was about a
+    control. `crashed` is returned so the caller can say which it is.
+    """
+    env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+    p = subprocess.run(
+        [sys.executable, str(scripts_dir / "test_citation_extract.py")],
+        capture_output=True, text=True, env=env)
     return p.returncode, p.stdout + p.stderr
+
+
+def crashed(out: str) -> bool:
+    """A traceback, which a failing control never produces."""
+    return "Traceback (most recent call last)" in out
 
 
 def main() -> int:
@@ -1406,11 +1431,33 @@ def main() -> int:
                               f"({src.count(old)} occurrences)")
                 print(f"  [??] {label}  — target ambiguous")
                 continue
+            # newline="" so the copy is byte-for-byte the mutated source. On
+            # Windows the default translates every \n to \r\n, which is how
+            # the working tree's extractor came to be CRLF on 25 September.
             (d / "citation_extract.py").write_text(
-                src.replace(old, new), encoding="utf-8")
+                src.replace(old, new), encoding="utf-8", newline="")
 
             code, out = run_suite(d)
             fails = [l for l in out.splitlines() if l.startswith("FAIL:")]
+            if crashed(out):
+                # Separated from WRONG CONTROL on purpose. That verdict says
+                # the named control did not bite; this one says the run never
+                # got far enough to have an opinion, and calling the second
+                # the first is how a broken environment reads as a finding.
+                # Enough of the traceback to name the SUITE frame, not just the
+                # exception. Three lines showed only where the extractor raised,
+                # which is the mutation working as intended and says nothing
+                # about which control failed to catch it.
+                _tb = [x for x in out.strip().splitlines()
+                       if "test_citation_extract.py" in x
+                       or "citation_extract.py" in x
+                       or "Error" in x or "Abort" in x][-8:]
+                broken.append(f"{label}\n      the suite crashed rather than "
+                              f"failing controls, so this mutation establishes "
+                              f"nothing:\n      "
+                              + "\n      ".join(_tb))
+                print(f"  [CRASHED] {label}  — establishes nothing")
+                continue
             if code == 0:
                 survivors.append(f"{label}\n      expected to break: {expected}")
                 print(f"  [SURVIVED] {label}")

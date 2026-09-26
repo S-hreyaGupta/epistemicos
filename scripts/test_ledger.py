@@ -1482,6 +1482,77 @@ def main() -> int:
     scenario_out("the fifth cycle is named rather than evaluated", 5,
                  fifth_after_cleared_fourth,
                  "ceiling still binds", "n=4", "cycle-05")
+
+    # C01-F05. Classification was `"DEVELOPMENT" if label.startswith("EXEMPT")
+    # else "PROTOCOL"`, so a missing, empty or unrecognised label all meant
+    # PROTOCOL. Absence bought the stronger claim.
+    #
+    # Codex removed only `bootstrap_review` from a development run, left the
+    # file and its valid enforcement status in place, and the ordinary
+    # invocation exited 0 with an unqualified "LOOP_STATUS: CONVERGED".
+    # Deleting the whole file was already refused; deleting the one field that
+    # says what the file is describing promoted the run.
+    print()
+    print("the run's classification, and what absence buys (C01-F05)")
+
+    def _classified(value):
+        """A one-cycle run whose bootstrap_review is set, blanked or removed."""
+        root, commit = make_repo()
+        made.append(root)
+        rev = root / "runs" / "T-001" / "plan-review"
+        make_cycle(root, rev, 1, commit)
+        rp = root / "runs" / "T-001" / "run.json"
+        doc = json.loads(rp.read_text(encoding="utf-8"))
+        if value is None:
+            doc.pop("bootstrap_review", None)
+        else:
+            doc["bootstrap_review"] = value
+        write_lf(rp, json.dumps(doc, indent=2) + "\n")
+        return loop(root, rev)
+
+    # The three shapes the finding names. All other prerequisites stay valid,
+    # so the only thing wrong is that the run does not say what it is.
+    for _label, _val in (("removed", None), ("left empty", "   "),
+                         ("an unrecognised value", "PENDING")):
+        _r = _classified(_val)
+        _blob = _r.stdout + _r.stderr
+        if _r.returncode == 0:
+            failures.append(
+                f"a run whose bootstrap_review is {_label} produced an "
+                f"outcome. A run that does not say what it is cannot be "
+                f"assumed to be the stronger kind.\n{_blob[:400]}")
+        elif "bootstrap_review" not in _blob:
+            failures.append(f"the refusal for {_label} does not name the field "
+                            f"that is missing\n{_blob[:400]}")
+        else:
+            print(f"  [ok] refused: bootstrap_review {_label}")
+
+    # Both baselines, or the three refusals above could be refusing for some
+    # unrelated reason and would look green while proving nothing.
+    _ok = _classified("APPROVED")
+    if _ok.returncode != 0:
+        failures.append(f"an APPROVED run was refused, so the refusals above "
+                        f"establish nothing\n{_ok.stderr}{_ok.stdout}")
+    else:
+        print("  [ok] an APPROVED run still produces an outcome")
+
+    # An exempt run is also refused by the ordinary invocation, and that is a
+    # different refusal: it has said what it is, and what it is cannot carry a
+    # protocol outcome without --development. Asserted separately so the two
+    # cannot be confused for one another.
+    _ex = _classified("EXEMPT - NOT_A_PROTOCOL_CYCLE")
+    _exblob = _ex.stdout + _ex.stderr
+    if _ex.returncode == 0:
+        failures.append("a development run produced an unqualified outcome "
+                        f"from the ordinary invocation\n{_exblob[:400]}")
+    elif "bootstrap_review" in _exblob:
+        failures.append(
+            "a development run was refused for want of a classification. It "
+            f"has one; the refusal should be about what it says.\n"
+            f"{_exblob[:400]}")
+    else:
+        print("  [ok] a development run is refused for being development "
+              "evidence, not for want of a label")
     # The status alone cannot show this: the loop stalls again at n=3, so it
     # reports STALLED either way. What distinguishes the two is whether the n=2
     # exit was cleared at all.

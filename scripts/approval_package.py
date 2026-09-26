@@ -44,6 +44,13 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO / "scripts"
 
+sys.path.insert(0, str(SCRIPTS))
+# C01-F05: the bootstrap classification rule is shared with the runner and the
+# controller rather than spelled out here. This file had its own
+# `.startswith("EXEMPT")`, which made a missing or unrecognised label produce a
+# package carrying no qualification at all.
+import run_pins  # noqa: E402
+
 # The ten items §7 names, in its order. Presence is reported against this list
 # rather than against whatever the package happened to manage, so an item that
 # silently stopped being produced shows up as absent instead of disappearing.
@@ -150,7 +157,18 @@ def main() -> int:
         W(quote(json.dumps(prov, indent=2)))
     W("")
 
-    if run.get("bootstrap_review", "").startswith("EXEMPT"):
+    # C01-F05: one classification rule, shared with the runner and the
+    # controller. The banner used to hang on `.startswith("EXEMPT")`, so a run
+    # whose label was missing or unrecognised produced a package with no
+    # qualification at all — which is the strongest thing this document can
+    # say, reached by saying nothing.
+    _kind, _problem = run_pins.run_kind(run)
+    if _problem:
+        W("> **This run's classification is not established.** " + " ".join(
+            _problem.split()) + " Nothing in this package may be cited as a "
+            "protocol result until that is recorded.")
+        W("")
+    elif _kind == run_pins.DEVELOPMENT:
         W("> **Development evidence, not a protocol outcome.** This run is "
           "marked `NOT_A_PROTOCOL_CYCLE`. Nothing in this package may be cited "
           "as a protocol result.")

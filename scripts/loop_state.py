@@ -375,8 +375,21 @@ def run_classification(review: Path) -> tuple[str, str]:
         run = json.loads(run_json.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         raise CannotCalculate(f"{run_json} is not valid JSON: {e}")
-    label = str(run.get("bootstrap_review", "")).strip()
-    kind = "DEVELOPMENT" if label.startswith("EXEMPT") else "PROTOCOL"
+    # C01-F05. This was `"DEVELOPMENT" if label.startswith("EXEMPT") else
+    # "PROTOCOL"`, so a missing, empty or unrecognised label meant PROTOCOL.
+    # Codex removed only `bootstrap_review` from a development run, left the
+    # file and its valid enforcement status, and got an unqualified
+    # "LOOP_STATUS: CONVERGED". Deleting the file was refused; deleting the
+    # field that says what the file describes promoted the run.
+    #
+    # Same shape as the mc1 check below and now the same mechanism: the rule
+    # is run_pins', shared with the runner and the approval package, and there
+    # is no default. Absence is a run whose identity is not established.
+    kind, problem = run_pins.run_kind(run)
+    if problem:
+        raise CannotCalculate(
+            f"{run_json} does not establish what kind of run this is, so no "
+            f"outcome can be\n  stated about it:\n  " + problem)
 
     # B01-F14, the half cycle 03 found still open. This function already read
     # run.json and already decided whether the run is authoritative, and then
@@ -392,14 +405,14 @@ def run_classification(review: Path) -> tuple[str, str]:
     # labelled as not a protocol result, so refusing it would be refusing
     # something that claims nothing. BOOTSTRAP-001 carries the field as
     # reconstructed and passes either way.
-    if kind == "PROTOCOL":
+    if kind == run_pins.PROTOCOL:
         problem = run_pins.mc1_enforcement_problem(run)
         if problem:
             raise CannotCalculate(
                 f"{run_json} cannot support an authoritative outcome:\n  "
                 + problem)
 
-    return kind, label
+    return kind, str(run.get("bootstrap_review", "")).strip()
 
 
 def _run(a) -> int:

@@ -129,6 +129,58 @@ def mc1_enforcement_problem(run: dict) -> str | None:
     return None
 
 
+# A run is either development evidence or a protocol run, and its own record
+# has to say which. `init` writes one of these: a label beginning EXEMPT for a
+# run created under --bootstrap-exempt, or APPROVED for an ordinary one.
+DEVELOPMENT, PROTOCOL = "DEVELOPMENT", "PROTOCOL"
+
+
+def run_kind(run: dict) -> tuple[str | None, str | None]:
+    """(kind, problem). Exactly one of the two is None.
+
+    C01-F05. Classification was `"DEVELOPMENT" if label.startswith("EXEMPT")
+    else "PROTOCOL"`, written out in four places. Under that rule a missing
+    field, an empty one, or a value nobody recognises all mean PROTOCOL, so
+    absence produced the STRONGER classification.
+
+    Codex removed only `bootstrap_review` from a run whose evidence was
+    development evidence, left the file and its valid enforcement status in
+    place, and the controller exited 0 with an unqualified
+    "LOOP_STATUS: CONVERGED". Deleting the whole file was refused; deleting
+    the one field that says what the file is describing promoted the run.
+
+    An existing JSON object with a valid enforcement status is not evidence
+    that a run is a protocol run. So there is no default: a label that is
+    missing, empty or unrecognised is a run whose identity has not been
+    established, and nothing authoritative can be said about it.
+
+    Returns a message rather than raising, and lives here rather than in a new
+    module, for the same two reasons as `mc1_enforcement_problem` directly
+    above: the callers report differently, and a new file would join the
+    bootstrap gate's covered set and invalidate the standing approval.
+    """
+    label = str(run.get("bootstrap_review", "")).strip()
+    if not label:
+        return None, (
+            "run.json records no bootstrap_review.\n"
+            "  That field is what says whether this run is a protocol run or "
+            "development\n  evidence, and without it the run's identity is not "
+            "established. It is not\n  assumed to be a protocol run: absence "
+            "would then buy the stronger claim.\n"
+            "  If this run predates the field, add it with a note saying it "
+            "was reconstructed,\n  rather than writing it as though it had "
+            "always been there.")
+    if label.startswith("EXEMPT"):
+        return DEVELOPMENT, None
+    if label == "APPROVED":
+        return PROTOCOL, None
+    return None, (
+        f"run.json records bootstrap_review {label!r}, which is not a "
+        f"recognised classification.\n  Expected APPROVED, or a label "
+        f"beginning EXEMPT for development evidence.\n"
+        f"  An unrecognised value is not a protocol run by default.")
+
+
 def amendments_path(run_dir: Path) -> Path:
     return run_dir / "pin-amendments.json"
 

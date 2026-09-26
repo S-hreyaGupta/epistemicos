@@ -431,7 +431,17 @@ def check_bootstrap_still_holds(run: dict) -> None:
     tooling is actually relied upon. So the gate is checked at both, and an
     exempt run stays exempt at both.
     """
-    if str(run.get("bootstrap_review", "")).startswith("EXEMPT"):
+    # C01-F05: one classification rule, shared. Written out here as
+    # `.startswith("EXEMPT")`, an unrecognised or missing label fell through to
+    # the protocol path, which is the same promotion-by-absence the controller
+    # had. A run whose identity is not established is refused rather than
+    # treated as either kind.
+    _kind, _problem = run_pins.run_kind(run)
+    if _problem:
+        raise Refused(f"what kind of run this is has not been established, so "
+                      f"the bootstrap gate\n  cannot be applied to it:\n  "
+                      + _problem)
+    if _kind == run_pins.DEVELOPMENT:
         # B02-F08. Returning here was the whole check for an exempt run, so a
         # run created under the exception kept freezing cycles after the
         # exception had ended. Codex: "The expiry check is performed only when
@@ -509,7 +519,11 @@ def check_loop_not_terminated(review_dir: Path, n: int, run: dict) -> None:
     # a caller that could choose would be choosing what its evidence counts as.
     argv = [sys.executable, str(REPO / "scripts" / "loop_state.py"),
             "--review", str(review_dir), "--quiet"]
-    if str(run.get("bootstrap_review", "")).startswith("EXEMPT"):
+    # C01-F05, same rule. An unrecognised label used to mean "not exempt", so
+    # the controller was invoked without --development and its outcome came
+    # back unqualified. The controller refuses such a run on its own account
+    # now; this stops the flag being decided by a second copy of the rule.
+    if run_pins.run_kind(run)[0] == run_pins.DEVELOPMENT:
         argv.append("--development")
     r = subprocess.run(argv, capture_output=True, text=True)
 

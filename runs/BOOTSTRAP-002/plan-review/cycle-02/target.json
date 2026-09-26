@@ -1,0 +1,59 @@
+{
+  "review_type": "plan",
+  "run_id": "BOOTSTRAP-002",
+  "cycle": 2,
+  "governing_pins": [
+    "specs/implementation-review-protocol-v1.1.md"
+  ],
+  "governing_pin_hashes": {
+    "specs/implementation-review-protocol-v1.1.md": "296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483"
+  },
+  "governing_artifacts_preserved": true,
+  "protocol_commit": "52013960b62aa4fa9f058142111dbfbe55560862",
+  "protocol_sha256": "296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483",
+  "spec_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "frozen_at": "2026-09-26T17:05:53Z",
+  "plan_files": [
+    {
+      "path": "scripts/authority.py",
+      "sha256": "c0a394d68ba5f13168dfc78b029ed6799f7bd16b25a21ba5f4ff4401e2efa6d6"
+    },
+    {
+      "path": "scripts/bootstrap_gate.py",
+      "sha256": "44e292a85ae299663e3713c403a04f34bc17d673fce6b31f5167b51a4190eb1c"
+    },
+    {
+      "path": "scripts/cycle_projection.py",
+      "sha256": "9433af0e4ff9140f5336b520ae46916569b4c41b23d7f42f52fe08833c646ef4"
+    },
+    {
+      "path": "scripts/findings_format.py",
+      "sha256": "27dcf377b0014b3ac2563da61597675fc0bca9c95bce18d1b776bcb22ee53a90"
+    },
+    {
+      "path": "scripts/ledger.py",
+      "sha256": "f15a27f2d604daa9c1502c22b82d26549df24e142cafa1e9b5193efb01ae1820"
+    },
+    {
+      "path": "scripts/loop_state.py",
+      "sha256": "5fffbdebdeba1e274603ad0ca1d540aa354845ae8adeebb5da34b81ad796e8f0"
+    },
+    {
+      "path": "scripts/run_pins.py",
+      "sha256": "af4f139fffe1ef52c2e440821d23b8c76ac9b53856f344ca95acd2f83283bbaf"
+    },
+    {
+      "path": "scripts/run_review.py",
+      "sha256": "8e34120f7aaea6c741d748aa093098d9b242d1ac3fc1b1ba7ac38fa712bd5d7b"
+    },
+    {
+      "path": "scripts/validate_cycle.py",
+      "sha256": "52e67e358443e33111144c6d49936cd2509ca4cda515710837e3651de2770934"
+    },
+    {
+      "path": "specs/evidence-schema-v1.0.md",
+      "sha256": "4203ba64bd5ba1db9cd56357c8bf9dd8e6efb419fab7f7635a415c272d3a739c"
+    }
+  ],
+  "auxiliary_evidence_sha256": "176fcdda6da9ec17a974c0fe0704a2c0230a87b47004d7f3a9deb3e02346a398"
+}

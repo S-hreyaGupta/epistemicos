@@ -1,0 +1,197 @@
+{
+  "findings": {
+    "C01-F01": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 1,
+      "history": [
+        {
+          "at": "2026-09-26T17:04:51Z",
+          "cycle": 1,
+          "event": "RAISED",
+          "note": "",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-26T17:04:55Z",
+          "cycle": 1,
+          "event": "ACCEPT",
+          "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C01-F02": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 1,
+      "history": [
+        {
+          "at": "2026-09-26T17:04:51Z",
+          "cycle": 1,
+          "event": "RAISED",
+          "note": "",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-26T17:04:56Z",
+          "cycle": 1,
+          "event": "ACCEPT",
+          "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C01-F03": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 1,
+      "history": [
+        {
+          "at": "2026-09-26T17:04:52Z",
+          "cycle": 1,
+          "event": "RAISED",
+          "note": "",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-26T17:04:56Z",
+          "cycle": 1,
+          "event": "ACCEPT",
+          "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C01-F04": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 1,
+      "history": [
+        {
+          "at": "2026-09-26T17:04:52Z",
+          "cycle": 1,
+          "event": "RAISED",
+          "note": "",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-26T17:04:57Z",
+          "cycle": 1,
+          "event": "ACCEPT",
+          "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C01-F05": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 1,
+      "history": [
+        {
+          "at": "2026-09-26T17:04:52Z",
+          "cycle": 1,
+          "event": "RAISED",
+          "note": "",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-26T17:04:57Z",
+          "cycle": 1,
+          "event": "ACCEPT",
+          "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C01-F06": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 1,
+      "history": [
+        {
+          "at": "2026-09-26T17:04:52Z",
+          "cycle": 1,
+          "event": "RAISED",
+          "note": "",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-26T17:04:57Z",
+          "cycle": 1,
+          "event": "ACCEPT",
+          "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C01-F07": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 1,
+      "history": [
+        {
+          "at": "2026-09-26T17:04:52Z",
+          "cycle": 1,
+          "event": "RAISED",
+          "note": "",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-26T17:04:58Z",
+          "cycle": 1,
+          "event": "ACCEPT",
+          "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C01-F08": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 1,
+      "history": [
+        {
+          "at": "2026-09-26T17:04:53Z",
+          "cycle": 1,
+          "event": "RAISED",
+          "note": "",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-26T17:04:58Z",
+          "cycle": 1,
+          "event": "ACCEPT",
+          "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    }
+  },
+  "review": "plan-review"
+}

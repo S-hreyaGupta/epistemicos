@@ -42,12 +42,29 @@ code performs the checks on itself.
 
 ## What this cycle is for
 
-**1. Are the five repairs demonstrated?** For each, does the current code fix
-what the original finding described, and do its controls establish that it does?
+**1. Are cycle 01's eight repairs demonstrated?** For each C01 finding, does
+the current code fix what that finding described, and do its controls establish
+that it does? Cycle 01 raised these against this same covered set, so this is
+the first time in either run that a reviewer sees repairs made in answer to a
+reviewer.
 
-**2. Is anything else wrong?** Every file in the target changed after cycle 04
-froze, and a good deal changed again on 17 September. None of it has been
-reviewed. New defects are ordinary findings.
+**2. Are the five BOOTSTRAP-001 repairs demonstrated NOW?** Cycle 01 found four
+of the five only partially demonstrated and the fifth demonstrated at the
+strength asked for. The four partials were repaired on 26 September. The
+question is not whether cycle 01 was right; it is whether the code now holds.
+
+**3. Is anything else wrong?** Every file in the target changed after cycle 04
+froze, again on 17 September, and seven of the ten again on 26 September. None
+of the 26 September work has been reviewed by anyone. New defects are ordinary
+findings.
+
+A note on the shape of what you will read. Seven of the eight repairs took the
+same form: a rule that existed in one place and not in the two or three others
+that needed it, collapsed into one shared implementation every caller goes
+through. That is the implementing agent's claim, not an established fact, and
+the obvious way for it to be wrong is a caller that still does not go through
+the shared path. Looking for a fourth copy is likely to be worth more than
+re-reading the three that were merged.
 
 ### What the first run's record suggests about how to spend the time
 
@@ -107,22 +124,27 @@ pinned `98a5920d…`; this run pins `4203ba64…`. It was amended after the firs
 froze, and until this cycle no reviewer had seen the version in the tree. Cycle
 01 said so, and it is still true, which is why the schema is in this target.
 
-### Cycle 01 was frozen and never run
+### Cycle 01 has now run, and every finding it raised has been repaired
 
-Its `target.json` and `codex-input.md` were written on 17 September and no
-capture was ever taken. It is left in place rather than deleted, because a
-frozen cycle with no reviewer output is itself a record of where this stopped.
+Frozen 17 September, run 25 September, MC-2 conformance PASS on all ten
+applicable checks. Eight findings, C01-F01 through C01-F08.
 
-Nothing in it has been carried forward as evidence. This prompt reproduces its
-substance because the material is still the material, not because cycle 01
-established any of it. If you see a claim here that cycle 01 is supposed to have
-settled, treat it as unestablished: no reviewer has read any of this before you.
+An earlier draft of this prompt said cycle 01 was frozen and never run, and
+that a tool here had reported it as review evidence because it checked that a
+target had been frozen and never that a reviewer had been shown it. Both were
+true when written. The first no longer is, and the sentence is replaced rather
+than left standing, because a prompt that describes a state the repository has
+left is the same defect this run keeps finding, in the document that asks about
+it.
 
-One consequence worth stating plainly. A tool in this repository reported cycle
-01 as review evidence on 25 September, because it checked that a target had been
-frozen and never that a reviewer had been shown it. Freezing a target is a
-statement of intent; only the capture is evidence. That mistake was made about
-this very cycle, by the implementing agent, hours before this prompt was written.
+All eight repairs are in the artifacts you are reviewing. That is the central
+thing about this cycle: **the code in this target was changed by the findings
+of the cycle before it, and nobody has checked the changes.** They are listed
+below with what each was and what was done, and the accounts are the
+implementing agent's own.
+
+Seven of the ten changed on 26 September for those repairs.
+`authority.py`, `bootstrap_gate.py` and the schema did not.
 
 ```text
 scripts/validate_cycle.py       the MC-2 conformance gate, fifteen checks
@@ -189,11 +211,105 @@ finding.
 
 ---
 
+## Cycle 01's eight findings, and what was done about each
+
+All eight were repaired on 26 September. Each account below is the implementing
+agent's own and establishes nothing. Each names the control that is supposed to
+hold it, so the cheapest way to test a claim is to break the repair and see
+whether that control notices.
+
+**C01-F01 · three copies of the transition rules.** `replay`,
+`last_authorized` and `skipped_events` each walked a finding's history with
+their own copy of the state machine, and the reopening guard had been added to
+the second alone. One record gave three answers: RESOLVED from the state
+rebuild, None from the prerequisite lookup, nothing from the diagnostic that
+exists to explain the difference. *Repair: `Walk.apply` in
+`cycle_projection.py` is now the only place a transition rule lives, and the
+three functions are one line each over it. Unknown-event handling was unified
+in the same move.* Control: `test_ledger.py`, the full six-event history
+written into the file with the cached state set to RESOLVED.
+
+**C01-F02 · the ceiling bound only at the last boundary.** A cleared exit at
+n=4 with a fifth cycle on disk fell through the walk and evaluation continued
+to n=5. *Repair: a cleared exit at or above `MAX_VALID_CYCLES` ends the walk at
+`MAX_4_REACHED` and names the cycles beyond it. The old check in the fallback
+is deleted rather than left beside the new one, because it could no longer
+fire.* Controls: a fifth cycle behind a cleared fourth boundary, and a second
+asserting the fifth cycle is named and not evaluated.
+
+**C01-F03 · check 9 read records, never artifacts.** Both governing files
+could be deleted with every record left agreeing and the validator still
+exited 0. *Repair: freeze preserves the governing artifacts into the cycle's
+`artifacts/` tree, as it already did for reviewed ones, and check 9 verifies
+the preserved copy. `governing_artifacts_preserved` in the target distinguishes
+a cycle frozen before this from one whose snapshots were deleted.* Controls:
+protocol and spec each removed, each edited, and one making the preserved-copy
+claim load-bearing.
+
+**C01-F04 · the gate replayed a history it never validated.** MC-2 called
+`load_amendments` and `pin_hashes_for_cycle` and neither `validate_chain` nor
+`check_frozen_assignments`, so the runner could reject a governing history
+while the gate accepted a cycle conducted against it. *Repair:
+`run_pins.validated_amendments` is the one place that sequence lives, and
+`governing_pins` and `governing_pin_hashes` are both over it.* Control: an
+amendment whose `prior_pin_set` names a set the run never held, replaying to
+exactly the set the target records.
+
+**C01-F05 · absence bought the stronger classification.** `startswith("EXEMPT")
+else PROTOCOL`, written out in four places, made a missing or unrecognised
+`bootstrap_review` mean PROTOCOL. *Repair: `run_pins.run_kind` returns
+(kind, problem) with no default, and all four consumers go through it.*
+Controls: the field removed, emptied, and set to an unrecognised value, plus
+both baselines.
+
+**C01-F06 · a ledger key is not a state.** A finding reported by a valid
+review, whose raising event sat in a cycle later invalidated, entered none of
+the three sets while the controller reported everything accounted for. *Repair:
+the controller refuses and names the findings, taking the correction's first
+route. Inferring OPEN would be inferring as much as inferring RESOLVED.*
+Controls: the two-cycle reproduction, plus the same fixture with a valid origin
+which must remain an ordinary open finding.
+
+**C01-F07 · uniqueness is not identity.** Check 7 asked only whether two
+targets claimed the same cycle number, never whether a target's number was its
+own directory's or its `run_id` the run it sits in. *Repair: the check
+validates the relationship between directory, target, run and review type.*
+Controls: each mismatch independently, including one across a pin-amendment
+boundary where the two cycle numbers select different governing documents.
+
+**C01-F08 · the commit and the hash described different bytes.** `init`
+recorded `HEAD` and hashed the working tree with nothing connecting them.
+*Repair: the blob is resolved at the recorded commit and compared.* Controls:
+a modified tracked protocol, one absent from the commit, the recorded pair
+agreeing, and one asserting an unrelated dirty tree still initialises, because
+a check that refused any dirty tree would satisfy the finding and break the
+tool.
+
+### One thing found and deliberately not repaired
+
+`specs/review/TERMINAL-EXIT-WITH-CYCLES-BEYOND-IT.md`. When a terminal exit
+governs at boundary n and valid cycles exist beyond it, `LOOP_STATUS` can read
+CONVERGED while the ledger holds the finding OPEN. The unauthorized
+continuation IS reported, in prose beneath the status line, so the gap is
+narrower than it first looked. Three positions are written up and none is
+taken, because choosing would be deciding a protocol question inside a repair
+for a different finding. The control records today's answer as a tripwire
+rather than as correct. **Whether that was the right call is in scope here.**
+
+The note also records that its first version was wrong: it claimed the later
+cycles were not reported at all, which came from reading the boundary walk
+instead of running it.
+
 ## The five repairs, to verify
 
 Each names its BOOTSTRAP-001 identifier. Those findings remain `OPEN` in that
 run's ledger and will stay `OPEN` permanently; what this cycle can establish is
 whether the repair holds.
+
+**Read these accounts as of 25 September.** Cycle 01 examined all five and
+found four only partially demonstrated; those four were repaired again on
+26 September, as C01-F01, F02, F03 with F04, and F05 above. Where the two
+descriptions differ, the one above is later.
 
 **B01-F02 · the budget could still be extended.** `MAX_4_REACHED` was made
 unclearable, and that was not enough: §6 evaluates `STALLED` before the budget,

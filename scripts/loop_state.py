@@ -543,6 +543,49 @@ def _run(a) -> int:
                      f"authorization: {auth['authorized_by']}")
         lines.append(f"        reason: {auth['reason']}")
         overridden.append(f"n={n} {status} (authorized by {auth['authorized_by']})")
+        # C01-F02. The ceiling was enforced only in the fallback below, which
+        # runs for the LATEST boundary. So with a fifth cycle already on disk,
+        # a cleared exit at n=4 was not the latest boundary, fell through, and
+        # the walk simply continued to n=5 and took the loop's outcome from a
+        # cycle outside the budget.
+        #
+        # Codex built exactly that: five MC-2-valid cycles, RAISED(1)
+        # ACCEPT(1) DEMONSTRATED(5), STALLED cleared by recorded authorization
+        # at boundaries 2, 3 and 4. The controller exited 0 reporting
+        # VALID_CYCLE_COUNT 5 and LOOP_STATUS CONVERGED, having derived
+        # convergence from the fifth-cycle demonstration and never reported
+        # the fifth cycle as an unauthorized continuation.
+        #
+        # "The runner's refusal to create a fifth cycle is useful, but does not
+        # repair the controller's handling of already-existing evidence."
+        #
+        # Clearing an exit says the loop may continue. It does not say there is
+        # anywhere left to continue to, and that sentence has to hold at every
+        # boundary rather than only the last one.
+        if n >= MAX_VALID_CYCLES:
+            lines.append(f"        {status} at n={n} was cleared, and the "
+                         f"four-valid-cycle ceiling still binds")
+            if len(valid) > n:
+                lines.append(
+                    f"        {len(valid) - n} valid cycle(s) exist beyond "
+                    f"n={n} and are NOT evaluated; the budget ends here")
+            detail = (
+                f"The {status} at n={n} was cleared by a recorded human "
+                f"authorization from {auth['authorized_by']}, and the loop "
+                f"still ends here.\n"
+                f"Reason given: {auth['reason']}\n\n"
+                f"{n} valid cycles have been spent and §2 allows "
+                f"{MAX_VALID_CYCLES}. An authorization clears one named exit "
+                f"at one\nnamed boundary. It does not create a cycle to spend "
+                f"it on, and no authorization\nextends the maximum: Alex "
+                f"Zamurko, 15 September. Escalate to human review.")
+            if len(valid) > n:
+                detail += (
+                    f"\n\n{len(valid) - n} valid cycle(s) exist beyond this "
+                    f"boundary. Nothing in them was evaluated, and no\n"
+                    f"authorization on record permits them.")
+            governing = (n, "MAX_4_REACHED", detail, cur, shown)
+            break
         if n == len(valid):
             cleared_latest = (status, auth)
 
@@ -588,31 +631,22 @@ def _run(a) -> int:
             # trusted to the shape of the exit that happened to be cleared.
             # Clearing an exit says the loop may continue; it does not say there
             # is anywhere left to continue to.
+            # The ceiling check that used to sit here has moved into the walk,
+            # where it binds at every boundary rather than only at the latest
+            # one (C01-F02). `cleared_latest` is now set only for a boundary
+            # BELOW the ceiling, because at or above it the walk stops with
+            # MAX_4_REACHED and never reaches this fallback. So the branch that
+            # re-tested the ceiling here could no longer fire, and a guard that
+            # cannot fire reads as protection while providing none.
             _st, _auth = cleared_latest
-            if n_latest >= MAX_VALID_CYCLES:
-                status = "MAX_4_REACHED"
-                detail = (
-                    f"The {_st} at n={n_latest} was cleared by a recorded human "
-                    f"authorization from {_auth['authorized_by']}, and the loop "
-                    f"still ends here.\n"
-                    f"Reason given: {_auth['reason']}\n\n"
-                    f"{n_latest} valid cycles have been spent and §2 allows "
-                    f"{MAX_VALID_CYCLES}. An authorization clears one named "
-                    "exit at one\nnamed boundary. It does not create a cycle to "
-                    "spend it on, and no authorization\nextends the maximum: "
-                    "Alex Zamurko, 15 September. Escalate to human review.")
-                lines.append(
-                    f"        {_st} at n={n_latest} was cleared, and the "
-                    f"four-valid-cycle ceiling still binds")
-            else:
-                status = "CONTINUE"
-                detail = (
-                    f"The {_st} at n={n_latest} was cleared by a recorded human "
-                    f"authorization from {_auth['authorized_by']}.\n"
-                    f"Reason given: {_auth['reason']}\n"
-                    "The loop continues on that authority. Repair the plan, "
-                    "produce a new version, and\nopen the next cycle with a new "
-                    "frozen target.")
+            status = "CONTINUE"
+            detail = (
+                f"The {_st} at n={n_latest} was cleared by a recorded human "
+                f"authorization from {_auth['authorized_by']}.\n"
+                f"Reason given: {_auth['reason']}\n"
+                "The loop continues on that authority. Repair the plan, "
+                "produce a new version, and\nopen the next cycle with a new "
+                "frozen target.")
         governing = (n_latest, status, detail, cur, shown)
 
     n, status, detail, cur, shown = governing

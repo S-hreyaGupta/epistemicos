@@ -1051,13 +1051,33 @@ def main() -> int:
     # today's answer. See specs/review/TERMINAL-EXIT-WITH-CYCLES-BEYOND-IT.md.
     _loop = loop(root, rev)
     _st = status_of(_loop.stdout)
+
+    # Settled, and asserted as such: whatever the status says, the cycles run
+    # after the exit have to be named. Without this the tripwire below would
+    # be the only thing here, and a tripwire on its own tests nothing.
+    if "UNAUTHORIZED CONTINUATION" not in _loop.stdout:
+        failures.append(
+            "the controller took its answer from boundary n=2 and said "
+            "nothing about cycles 03 and 04, which were run after that exit "
+            "and which contain the reopening\n" + _loop.stdout)
+    elif "cycle-03" not in _loop.stdout or "cycle-04" not in _loop.stdout:
+        failures.append(f"the continuation is flagged but the cycles are not "
+                        f"named\n{_loop.stdout}")
+    else:
+        print("  [ok] the cycles run after the exit are named")
+
+    # Not settled, so a tripwire rather than a tick. LOOP_STATUS reads
+    # CONVERGED while the ledger holds the finding OPEN. Both are right about
+    # their own question and the status is the line a caller acts on. Whether
+    # that should change is a ruling, and three positions are written up in
+    # specs/review/TERMINAL-EXIT-WITH-CYCLES-BEYOND-IT.md.
     if _st == "CONVERGED":
-        print("  [ok] recorded gap: the controller still converges at n=2 "
-              "while the ledger holds the finding OPEN")
+        print("  [ok] recorded gap: LOOP_STATUS is CONVERGED while the "
+              "ledger holds the finding OPEN")
     else:
         failures.append(
-            f"the controller now reports {_st} where it reported CONVERGED. "
-            f"That may be the repair, and it is not one made here, so read "
+            f"LOOP_STATUS is now {_st} where it was CONVERGED. That may be "
+            f"the repair, and it is not one made here, so read "
             f"specs/review/TERMINAL-EXIT-WITH-CYCLES-BEYOND-IT.md before "
             f"changing this control to expect it.")
 
@@ -1425,6 +1445,43 @@ def main() -> int:
                 "at": "2026-09-09T00:00:00Z"}]}, indent=2))
     scenario("an authorization naming a different outcome clears nothing", 4,
              authorization_for_another_exit, "STALLED")
+
+    # C01-F02. The ceiling was enforced only in the fallback that runs for the
+    # LATEST boundary. With a fifth cycle already on disk, a cleared exit at
+    # n=4 was not the latest boundary, so it fell through and the walk simply
+    # continued to n=5.
+    #
+    # Codex built it: five MC-2-valid cycles, RAISED(1) ACCEPT(1)
+    # DEMONSTRATED(5), STALLED cleared by recorded authorization at boundaries
+    # 2, 3 and 4. The controller exited 0 with VALID_CYCLE_COUNT 5 and
+    # LOOP_STATUS CONVERGED, having taken convergence from a demonstration in
+    # a cycle outside the budget.
+    #
+    # "The supplied control demonstrates the repaired case where boundary 4 is
+    # the latest boundary. It does not test boundary 4 after a later evidence
+    # directory exists." Which was the gap exactly: the existing controls put
+    # the cleared exit at the end, where the fallback's ceiling check could
+    # see it.
+    def fifth_after_cleared_fourth(root, rev):
+        ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--class", "UNTESTED RULE",
+               "--source", "CODEX_REVIEW")
+        ledger(root, "respond", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "fix")
+        ledger(root, "resolve", "--review", str(rev), "--cycle", "5",
+               "--id", "C01-F01", "--evidence", "done")
+        auth_record(rev, 2, 3, 4)
+    scenario("a cleared fourth boundary does not buy a fifth cycle", 5,
+             fifth_after_cleared_fourth, "MAX_4_REACHED")
+
+    # The status alone is not enough here. MAX_4_REACHED would also be the
+    # answer if the ceiling fired for some unrelated reason, so the output has
+    # to show that the fourth boundary governs and that the fifth cycle was
+    # seen and not evaluated. Without this, the control above would pass on a
+    # right answer reached for a wrong reason.
+    scenario_out("the fifth cycle is named rather than evaluated", 5,
+                 fifth_after_cleared_fourth,
+                 "ceiling still binds", "n=4", "cycle-05")
     # The status alone cannot show this: the loop stalls again at n=3, so it
     # reports STALLED either way. What distinguishes the two is whether the n=2
     # exit was cleared at all.

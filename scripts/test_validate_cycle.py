@@ -437,6 +437,73 @@ def main() -> int:
     expect_fail("a cycle claiming preserved governing copies that are not "
                 "there", 9, "plan", mutate=_governed(claim_preserved=True))
 
+    # ---- C01-F07: uniqueness among siblings is not identity ----
+    # Check 7 asked only whether two targets claimed the same cycle number. It
+    # never asked whether a target's number was its own directory's, or its
+    # run_id the run it sits in.
+    #
+    # Those fields are read by different components and read differently:
+    # cycle_dirs() takes the cycle number from the DIRECTORY NAME, while
+    # _governing_problems selects the pin history with target["cycle"] and
+    # cmd_record writes the findings record's cycle from the same field. So
+    # one accepted cycle could count as cycle 1 for event projection while
+    # being validated against cycle 2's governing pins.
+    #
+    # Codex tested the mismatches independently on passing fixtures, updating
+    # the target hash each time, and both exited 0 with checks 1 to 10 PASS.
+    print()
+    print("cycle identity: the directory, the target, the run (C01-F07)")
+
+    def _says(field, value):
+        def _m(target, cycle, root):
+            target[field] = value
+            return target
+        return _m
+
+    expect_fail("directory cycle-01 with a target that says cycle 2",
+                7, "plan", mutate=_says("cycle", 2))
+    expect_fail("a target claiming a run it does not sit in",
+                7, "plan", mutate=_says("run_id", "ANOTHER-RUN"))
+    expect_fail("a plan target sitting in the plan-review directory but "
+                "declaring itself an implementation review",
+                7, "plan", mutate=_says("review_type", "implementation"),
+                # Declaring the other review type legitimately takes checks 11
+                # to 15 with it: they become applicable and the plan fixture
+                # carries none of what they require. The identity check is
+                # still the one that catches the lie.
+                also=(9, 11, 12, 13, 14, 15))
+
+    # The one the correction asks for by name. Across a pin amendment the two
+    # cycle numbers select DIFFERENT governing documents, so the mismatch is
+    # not a bookkeeping slip: the cycle would be validated against a spec set
+    # it was never conducted under. Check 9 goes red too, which is the point,
+    # and check 7 is what names the cause.
+    def _mismatch_across_amendment(target, cycle, root):
+        _governed()(target, cycle, root)
+        run_dir = root / "runs" / "T-001"
+        run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+        prior = list(run_pins.initial_pin_set(run))
+        write_lf(root / "specs" / "later.md", "# added by amendment\n")
+        after = sorted(prior + ["specs/later.md"])
+        write_lf(run_dir / "pin-amendments.json", json.dumps({
+            "schema": run_pins.SCHEMA,
+            "amendments": [{
+                "reason": "fixture: a pin set that differs between cycle 1 "
+                          "and cycle 2, so the two numbers are not "
+                          "interchangeable",
+                "affected_artifacts": ["specs/later.md"],
+                "prior_pin_set": prior,
+                "new_pin_set": after,
+                "effective_cycle": 2,
+                "authorized_by": "review fixture",
+                "at": "2026-09-26T00:00:00Z"}]}, indent=2) + "\n")
+        target["cycle"] = 2
+        return target
+
+    expect_fail("a cycle-number mismatch across a pin-amendment boundary, "
+                "where the two numbers govern differently",
+                7, "plan", mutate=_mismatch_across_amendment, also=(9,))
+
     # And the historical case, which must NOT fail. Cycles 01 and 02 of
     # BOOTSTRAP-001 were frozen before governing_pin_hashes existed. Failing
     # them now would invalidate two completed cycles and strip authority from
@@ -518,8 +585,14 @@ def main() -> int:
     expect_fail("declared artifact hash is wrong", 9, "plan",
                 mutate=lambda t, c, r: {**t, "plan_files": [
                     {"path": "plan.md", "sha256": "b" * 64}]})
+    # C01-F07 added a genuine cascade here rather than a coincidental one: a
+    # review_type outside the closed set is also, necessarily, a review_type
+    # that disagrees with the plan-review directory the cycle sits in. Both
+    # checks are right to fire, and declaring it keeps the control honest
+    # about which one it is really about.
     expect_fail("review_type outside the closed set", 9, "plan",
-                mutate=lambda t, c, r: {**t, "review_type": "other"})
+                mutate=lambda t, c, r: {**t, "review_type": "other"},
+                also=(7,))
 
     root, commit, tree = fresh()
     cyc = build(root, commit, tree, "plan")

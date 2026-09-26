@@ -442,9 +442,64 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
                 continue
             if other.get("cycle") == target.get("cycle"):
                 clashes.append(s.name)
-        r.add(7, "cycle identifier unique", not clashes,
-              f"cycle {target.get('cycle')} also declared by: {', '.join(clashes)}"
-              if clashes else f"cycle {target.get('cycle')} in {cycle_dir.parent.name}")
+
+        # C01-F07. Uniqueness among siblings is not identity. This check asked
+        # only whether two targets claimed the same number, and never whether
+        # a target's number was its own directory's, or its run_id the run it
+        # sits in.
+        #
+        # Those are read by different components and read differently:
+        # `cycle_dirs()` takes the cycle number from the DIRECTORY NAME, while
+        # `_governing_problems` selects the pin history with target["cycle"]
+        # and `cmd_record` writes the findings record's cycle from the same
+        # field. Codex: directory cycle-01 with target cycle 2 passed checks 1
+        # to 10, and so did a target claiming run ANOTHER-RUN inside T-001.
+        #
+        # So one accepted cycle could count as cycle 1 for event projection
+        # while being validated against cycle 2's governing pins. Across a pin
+        # amendment those are different documents, and nothing said so.
+        mismatch = []
+        _m = re.match(r"cycle-(\d+)\Z", cycle_dir.name)
+        if _m is None:
+            mismatch.append(f"directory {cycle_dir.name!r} is not cycle-NN, so "
+                            f"the cycle it represents cannot be established")
+        elif int(_m.group(1)) != target.get("cycle"):
+            mismatch.append(
+                f"directory says cycle {int(_m.group(1))}, target says "
+                f"{target.get('cycle')!r}. Event projection takes the "
+                f"directory's number and\n          pin selection takes the "
+                f"target's, so this cycle would be two different\n          "
+                f"cycles depending on who is reading it")
+
+        _run_json = cycle_dir.parent.parent / "run.json"
+        if _run_json.is_file():
+            try:
+                _rid = json.loads(_run_json.read_text(encoding="utf-8")).get("run_id")
+            except json.JSONDecodeError:
+                _rid = None
+            if _rid is not None and _rid != target.get("run_id"):
+                mismatch.append(
+                    f"target claims run {target.get('run_id')!r} but sits in "
+                    f"run {_rid!r}, whose metadata\n          it is being "
+                    f"validated against")
+
+        _rt = cycle_dir.parent.name
+        if _rt.endswith("-review") and rtype is not None:
+            _want = _rt[:-len("-review")]
+            if _want != rtype:
+                mismatch.append(f"target declares review_type {rtype!r} inside "
+                                f"{_rt}")
+
+        ok7 = not clashes and not mismatch
+        detail = []
+        if clashes:
+            detail.append(f"cycle {target.get('cycle')} also declared by: "
+                          + ", ".join(clashes))
+        detail += mismatch
+        r.add(7, "cycle identity consistent and unique", ok7,
+              "\n          ".join(detail) if detail else
+              f"cycle {target.get('cycle')} in {cycle_dir.parent.name}, "
+              f"matching its directory and run")
 
     # 8. referenced git commit exists
     commits = [v for k, v in target.items()

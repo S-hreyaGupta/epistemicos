@@ -214,6 +214,76 @@ def main() -> int:
             return
         print(f"  [ok] refused: {label}")
 
+    # ---- C01-F08: the commit and the hash must describe the same bytes ----
+    # `cmd_init` recorded `git rev-parse HEAD` as protocol_commit and hashed
+    # the protocol from the WORKING TREE, with nothing connecting the two.
+    # Codex changed specs/protocol.md without committing it, initialised an
+    # ordinary run, and got exit 0; the blob at the recorded commit then
+    # hashed to something else.
+    #
+    # "A real run can begin under uncommitted protocol bytes while its record
+    # claims a commit containing different bytes."
+    print()
+    print("the protocol this run pins, at the commit it names (C01-F08)")
+
+    def _modified_protocol(tmp):
+        write_lf(tmp / "specs" / "protocol.md",
+                 "# Changed protocol, not committed\n")
+        return do_init(tmp)
+
+    def _untracked_protocol(tmp):
+        write_lf(tmp / "specs" / "elsewhere.md", "# never committed\n")
+        return runner(tmp, "init", "--run", "T-001", "--bootstrap-exempt",
+                      "--protocol", "specs/elsewhere.md",
+                      "--spec", "specs/spec.md")
+
+    expect_refused("a tracked protocol modified since the commit being pinned",
+                   "not the protocol at the commit", _modified_protocol)
+    expect_refused("a protocol that is not in the commit at all",
+                   "not in the commit", _untracked_protocol)
+
+    # The other half of the correction, stated in as many words: "Unrelated
+    # working-tree changes need not prevent initialization." A check that
+    # refused any dirty tree would satisfy the finding and break the tool, so
+    # it is controlled rather than assumed.
+    tmp = make_repo()
+    made.append(tmp)
+    write_lf(tmp / "plan" / "01-PLAN.md", "# plan\n\nedited, uncommitted\n")
+    r = do_init(tmp)
+    if r.returncode != 0:
+        failures.append(f"an unrelated uncommitted change prevented init, "
+                        f"which the correction excludes:\n{r.stderr}{r.stdout}")
+    else:
+        print("  [ok] an unrelated uncommitted change does not prevent init")
+
+    # And the positive one: the pair has to agree, not merely both exist. This
+    # reproduces Codex's own check rather than trusting that init refusing the
+    # bad cases means it recorded the good one correctly.
+    tmp = make_repo()
+    made.append(tmp)
+    r = do_init(tmp)
+    if r.returncode != 0:
+        failures.append(f"init failed on a clean tree:\n{r.stderr}{r.stdout}")
+    else:
+        _run = json.loads((tmp / "runs" / "T-001" / "run.json")
+                          .read_text(encoding="utf-8"))
+        _blob = subprocess.run(
+            ["git", "-C", str(tmp), "show",
+             f"{_run['protocol_commit']}:specs/protocol.md"],
+            capture_output=True)
+        _at_commit = hashlib.sha256(_blob.stdout).hexdigest()
+        if _blob.returncode != 0:
+            failures.append("the recorded protocol_commit does not contain "
+                            "the protocol at all")
+        elif _at_commit != _run["protocol"]["sha256"]:
+            failures.append(
+                f"the run records a commit and a digest that describe "
+                f"different bytes\n  at commit {_at_commit}\n  recorded  "
+                f"{_run['protocol']['sha256']}")
+        else:
+            print("  [ok] the recorded commit and digest describe the same "
+                  "protocol bytes")
+
     # ---- happy path first; every negative below is meaningless without it ----
     tmp = make_repo()
     made.append(tmp)

@@ -154,6 +154,31 @@ def git_head() -> str | None:
         return None
 
 
+def git_blob_sha256(commit: str, rel_path: str) -> str | None:
+    """sha256 of a path's bytes AS COMMITTED, or None if it is not there.
+
+    C01-F08. `cmd_init` recorded `git rev-parse HEAD` as protocol_commit and
+    hashed the protocol from the WORKING TREE, and nothing connected the two.
+    Codex changed specs/protocol.md without committing it, initialised an
+    ordinary run, and got exit 0; the blob at the recorded commit then hashed
+    to something else.
+
+    So a real run could begin under uncommitted protocol bytes while its own
+    record named a commit containing different ones. §0.1 asks for the exact
+    commit AND hash to identify one authoritative version, and a commit
+    recorded beside an unrelated digest identifies none.
+    """
+    try:
+        r = subprocess.run(["git", "-C", str(REPO), "show",
+                            f"{commit}:{rel_path}"],
+                           capture_output=True)
+    except FileNotFoundError:
+        return None
+    if r.returncode != 0:
+        return None
+    return hashlib.sha256(r.stdout).hexdigest()
+
+
 def require_file(p: Path, what: str) -> Path:
     if not p.is_file():
         raise Refused(f"{what} not found: {p}")
@@ -217,6 +242,31 @@ def cmd_init(args: argparse.Namespace) -> int:
     head = git_head()
     if head is None:
         raise Refused("cannot resolve git HEAD; the run must pin a commit")
+
+    # C01-F08. The commit and the hash have to describe the same bytes, or the
+    # pair identifies nothing. Only the protocol is checked here, because §0.1
+    # is about the governing protocol specifically and unrelated working-tree
+    # changes must not prevent a run from starting.
+    _prel = rel(protocol)
+    _committed = git_blob_sha256(head, _prel)
+    if _committed is None:
+        raise Refused(
+            f"the protocol is not in the commit this run would pin:\n"
+            f"  {_prel}\n  at {head}\n"
+            "  §0.1 requires the governing protocol to be committed before a "
+            "run begins. An\n  untracked file, or one absent from HEAD, "
+            "cannot be identified by a commit.\n  Commit it, then initialise "
+            "the run.")
+    if _committed != sha256_file(protocol):
+        raise Refused(
+            f"the protocol on disk is not the protocol at the commit this run "
+            f"would pin:\n  {_prel}\n"
+            f"    at {head[:12]}  {_committed}\n"
+            f"    working tree  {sha256_file(protocol)}\n"
+            "  The run would record a commit containing one document and a "
+            "digest describing\n  another, and §0.1 asks for the exact commit "
+            "and hash to identify ONE governing\n  version. Commit the change "
+            "first, or check out the version you mean to run under.")
 
     run = {
         "run_id": args.run,

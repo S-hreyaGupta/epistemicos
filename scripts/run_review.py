@@ -318,15 +318,18 @@ def check_pins_still_hold(run: dict, run_dir: Path | None = None,
         # and checked by nothing, so declaring a pin was enough to satisfy the
         # check that was supposed to enforce it.
         try:
-            items = run_pins.load_amendments(run_dir)
-            run_pins.validate_chain(run, items)
-            # B02-F06, the half cycle 03 found still open. This was scoped to
-            # the review directory freeze was working in, and the amendment
-            # history belongs to the run. Freezing one loop's cycle could accept
-            # a history that contradicted the other loop's completed cycle.
-            run_pins.check_frozen_assignments(
-                run, items, run_pins.frozen_assignments(run_dir))
-            effective = run_pins.pin_hashes_for_cycle(run, items, cycle_n)
+            # B02-F06, the half cycle 03 found still open: the frozen check was
+            # scoped to the review directory freeze was working in, and the
+            # amendment history belongs to the run, so freezing one loop's
+            # cycle could accept a history that contradicted the other loop's
+            # completed cycle.
+            #
+            # The load, chain and frozen-assignment sequence used to be written
+            # out here. It now lives in run_pins.validated_amendments, because
+            # MC-2 was deriving the same hashes without it (C01-F04) and two
+            # copies of a validation sequence is how one of them ends up
+            # shorter than the other.
+            effective = run_pins.governing_pin_hashes(run, run_dir, cycle_n)
         except run_pins.PinError as e:
             raise Refused(f"the run's pin history cannot be read, so what "
                           f"governs this cycle is undeterminable:\n  {e}")

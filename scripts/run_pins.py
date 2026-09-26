@@ -410,6 +410,32 @@ def pins_for_cycle(run: dict, items: list[dict], cycle_n: int) -> list[str]:
     return pins
 
 
+def validated_amendments(run: dict, run_dir: Path) -> list[dict]:
+    """The run's amendment history, checked before anything is derived from it.
+
+    One place where the sequence lives, so a caller cannot get a validated
+    answer to one question and an unvalidated answer to the next.
+
+    C01-F04. The freeze path ran load, validate_chain and
+    check_frozen_assignments before using the effective pins. MC-2 called
+    `load_amendments` and `pin_hashes_for_cycle` directly and neither of the
+    other two, so it derived a cycle's governing hashes from a history nobody
+    had checked. Codex added an amendment whose `prior_pin_set` named
+    `never-pinned.md`, a set the run had never held: direct chain validation
+    refused it with "amendment 0 does not follow the pin history", and MC-2
+    exited 0 with checks 1 to 10 passing, because the invalid replay happened
+    to produce the recorded final set.
+
+    So the runner could reject a governing history while the validator
+    accepted a completed cycle conducted against it. Check 9 was verifying
+    against an unchecked reconstruction and reporting that as verification.
+    """
+    items = load_amendments(run_dir)
+    validate_chain(run, items)
+    check_frozen_assignments(run, items, frozen_assignments(run_dir))
+    return items
+
+
 def governing_pins(run: dict, run_dir: Path, cycle_n: int) -> list[str]:
     """The effective pin set, with the whole history checked before it is used.
 
@@ -418,10 +444,19 @@ def governing_pins(run: dict, run_dir: Path, cycle_n: int) -> list[str]:
     B02-F06 survived its first repair. A history that contradicts a completed
     cycle is not a history any caller should be handed an answer from.
     """
-    items = load_amendments(run_dir)
-    validate_chain(run, items)
-    check_frozen_assignments(run, items, frozen_assignments(run_dir))
-    return pins_for_cycle(run, items, cycle_n)
+    return pins_for_cycle(run, validated_amendments(run, run_dir), cycle_n)
+
+
+def governing_pin_hashes(run: dict, run_dir: Path,
+                         cycle_n: int) -> dict[str, str]:
+    """path -> sha256 for the effective set, over a validated history.
+
+    The hash-returning sibling of `governing_pins`. Both are over
+    `validated_amendments`, which is the point: the paths and the hashes
+    cannot come from histories that were checked to different standards.
+    """
+    return pin_hashes_for_cycle(run, validated_amendments(run, run_dir),
+                                cycle_n)
 
 
 def pin_hashes_for_cycle(run: dict, items: list[dict],

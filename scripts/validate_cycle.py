@@ -278,8 +278,15 @@ def _governing_problems(target: dict, gph: dict, run_dir: Path) -> list[str]:
                 "was rewritten to stop."]
     try:
         run = json.loads(run_json.read_text(encoding="utf-8"))
-        items = run_pins.load_amendments(run_dir)
-        expect = run_pins.pin_hashes_for_cycle(run, items, int(target["cycle"]))
+        # C01-F04. This called `load_amendments` and `pin_hashes_for_cycle`
+        # directly, which replays the history without checking it is a valid
+        # one. The freeze path validated the chain and the frozen assignments
+        # first, so the runner could reject a governing history while this gate
+        # accepted a completed cycle conducted against it. Check 9 was
+        # comparing the target against an unchecked reconstruction and
+        # reporting that comparison as verification.
+        expect = run_pins.governing_pin_hashes(run, run_dir,
+                                               int(target["cycle"]))
         declared = str(run["protocol"]["path"])
     except (json.JSONDecodeError, KeyError, TypeError, ValueError,
             run_pins.PinError) as e:

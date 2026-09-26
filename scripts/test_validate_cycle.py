@@ -329,6 +329,48 @@ def main() -> int:
                 "self-consistent in every other way", 9, "plan",
                 mutate=_extra_pin)
 
+    # C01-F04. Every control above breaks something in the TARGET. This one
+    # leaves the target entirely correct and breaks the history it was derived
+    # from, which nothing in the target can show.
+    #
+    # The gate called `load_amendments` and `pin_hashes_for_cycle` and neither
+    # `validate_chain` nor `check_frozen_assignments`. The freeze path called
+    # all four. So the runner could reject a governing history while the gate
+    # accepted a completed cycle conducted against it.
+    #
+    # Codex's amendment: `prior_pin_set` names `never-pinned.md`, a set this
+    # run never held. Direct chain validation refuses it with "amendment 0
+    # does not follow the pin history". The replay nevertheless produces the
+    # set actually recorded, so every comparison check 9 was able to make
+    # agreed, and MC-2 exited 0 with checks 1 to 10 passing.
+    #
+    # The target has to carry a governing set for this to reach check 9 at all.
+    # Without one it is a cycle frozen before `governing_pin_hashes` existed,
+    # the governing comparison is skipped, and the control passes while testing
+    # nothing. That is how the first version of this control reported "gate
+    # passed": it was right, and it was right about a fixture that never got
+    # near the code under test.
+    def _invalid_chain(target, cycle, root):
+        _governed("a" * 64)(target, cycle, root)
+        run_dir = root / "runs" / "T-001"
+        run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+        final = list(run_pins.initial_pin_set(run))
+        write_lf(run_dir / "pin-amendments.json", json.dumps({
+            "schema": run_pins.SCHEMA,
+            "amendments": [{
+                "reason": "fixture: a prior set this run never held, replaying "
+                          "to exactly the set the target already records",
+                "affected_artifacts": final,
+                "prior_pin_set": ["never-pinned.md"],
+                "new_pin_set": final,
+                "effective_cycle": 1,
+                "authorized_by": "review fixture",
+                "at": "2026-09-26T00:00:00Z"}]}, indent=2) + "\n")
+        return target
+
+    expect_fail("an amendment history the runner rejects, replayed by the gate "
+                "without checking it", 9, "plan", mutate=_invalid_chain)
+
     # And the historical case, which must NOT fail. Cycles 01 and 02 of
     # BOOTSTRAP-001 were frozen before governing_pin_hashes existed. Failing
     # them now would invalidate two completed cycles and strip authority from

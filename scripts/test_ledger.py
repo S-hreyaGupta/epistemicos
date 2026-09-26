@@ -1483,6 +1483,96 @@ def main() -> int:
                  fifth_after_cleared_fourth,
                  "ceiling still binds", "n=4", "cycle-05")
 
+    # C01-F06. A ledger key is not a state.
+    #
+    # The controller checks that every finding a valid review reported exists
+    # in ledger["findings"], then rebuilds states from events in valid cycles.
+    # A finding whose replay returns None enters none of the three sets, and
+    # nothing reconciled that with what the valid review said.
+    #
+    # Codex's two cycles, exactly: C01-F01 raised in cycle 1 and recorded
+    # RAISED(1); cycle 2 reports it as REPAIR NOT DEMONSTRATED. With both
+    # valid the controller says STALLED. Invalidate only cycle 1 and cycle 2
+    # still carries the recurrence in both its raw and structured review, but
+    # the finding has nothing to recur from, so it vanishes from every set and
+    # the controller reported CONVERGED while saying every finding was
+    # accounted for.
+    print()
+    print("a valid review's finding with no authoritative state (C01-F06)")
+
+    def _reports_it(cdir, n, recurrence=False):
+        """This cycle's review names C01-F01.
+
+        A block is either a new finding with its own Class, or a recurrence
+        of an existing identifier with a Status. Carrying both makes the raw
+        review refuse to parse deterministically, which is what the first
+        version of this fixture did and what the baseline caught.
+        """
+        body = ("Finding ID: C01-F01\nStatus: REPAIR NOT DEMONSTRATED\n"
+                if recurrence else
+                "Finding ID: C01-F01\nClass: UNTESTED RULE\n")
+        entry = ({"id": "C01-F01"} if recurrence
+                 else {"id": "C01-F01", "class": "UNTESTED RULE"})
+        write_lf(cdir / "codex-output-raw.md", body)
+        write_lf(cdir / "findings.json", json.dumps({
+            "schema": "cycle-findings/1", "cycle": n, "count": 1,
+            "findings": [entry],
+        }, indent=2))
+
+    def _recurrence(origin_valid: bool):
+        root, commit = make_repo()
+        made.append(root)
+        rev = root / "runs" / "T-001" / "plan-review"
+        make_cycle(root, rev, 1, commit)
+        make_cycle(root, rev, 2, commit)
+        ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--class", "UNTESTED RULE",
+               "--source", "CODEX_REVIEW")
+        # Cycle 1's review reports the finding it raised. Leaving it asserting
+        # zero findings, which is what make_cycle writes, made the first
+        # version of this fixture refuse for that reason instead: a cycle
+        # whose review says nothing while the ledger raised something in it.
+        # The baseline caught it, which is what the baseline is for.
+        _reports_it(rev / "cycle-01", 1)
+        # Cycle 2 reports it again, unrepaired.
+        _reports_it(rev / "cycle-02", 2, recurrence=True)
+        if not origin_valid:
+            # Break cycle 1 only, and after its records are written. Codex
+            # invalidated its target hash; an empty required file is the same
+            # thing through check 5, and the recurrence in cycle 2 survives
+            # intact either way.
+            write_lf(rev / "cycle-01" / "codex-output-raw.md", "")
+        return loop(root, rev)
+
+    # The baseline: with the origin valid this is an ordinary unrepaired
+    # finding and the controller must still produce an outcome. Without it the
+    # refusal below could be refusing the fixture rather than the defect.
+    _both = _recurrence(origin_valid=True)
+    if _both.returncode != 0:
+        failures.append(f"a recurrence with a valid origin was refused, so "
+                        f"the refusal below establishes nothing\n"
+                        f"{_both.stderr}{_both.stdout}")
+    elif status_of(_both.stdout) == "CONVERGED":
+        failures.append("an unrepaired finding reported by a valid review "
+                        "produced CONVERGED")
+    else:
+        print(f"  [ok] with a valid origin it is an ordinary open finding "
+              f"({status_of(_both.stdout)})")
+
+    _orphan = _recurrence(origin_valid=False)
+    _oblob = _orphan.stdout + _orphan.stderr
+    if _orphan.returncode == 0:
+        failures.append(
+            f"invalidating the origin turned a valid review's unresolved "
+            f"finding into {status_of(_orphan.stdout)}. The recurrence is "
+            f"still reported by a cycle that counts.\n{_oblob[:400]}")
+    elif "C01-F01" not in _oblob:
+        failures.append(f"the refusal does not name the finding that has no "
+                        f"state\n{_oblob[:400]}")
+    else:
+        print("  [ok] refused: a valid review's finding with no "
+              "authoritative state, named")
+
     # C01-F05. Classification was `"DEVELOPMENT" if label.startswith("EXEMPT")
     # else "PROTOCOL"`, so a missing, empty or unrecognised label all meant
     # PROTOCOL. Absence bought the stronger claim.

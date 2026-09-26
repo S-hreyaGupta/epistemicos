@@ -509,6 +509,63 @@ def _run(a) -> int:
             "reaches CONVERGED.")
     lines.append("  every recorded finding is accounted for in the ledger")
 
+    # C01-F06. Being a KEY in the ledger is not the same as having a state.
+    #
+    # The check above asks only whether each reported identifier exists in
+    # ledger["findings"]. `sets_at` then rebuilds each finding's state from
+    # events in valid cycles, and a finding whose replay returns None enters
+    # none of OPEN, RESOLVED or DISPUTED. Nothing reconciled that omission
+    # with what the valid reviews actually reported.
+    #
+    # Codex's two cycles: C01-F01 raised in cycle 1 and recorded RAISED(1);
+    # cycle 2 reports it as REPAIR NOT DEMONSTRATED. Both valid, the
+    # controller says STALLED. Invalidate only cycle 1's target hash and
+    # cycle 2 still carries the recurrence in both its raw and structured
+    # review, yet:
+    #
+    #     cycle-02  1 finding(s): C01-F01
+    #     every recorded finding is accounted for in the ledger
+    #     OPEN_1 0   DISPUTED_1 0   RESOLVED_1 0
+    #     LOOP_STATUS: CONVERGED
+    #
+    # Ignoring the invalid originating event is required and is not the
+    # defect. Treating the surviving valid recurrence as satisfied because a
+    # ledger key exists is. A valid reviewer result still reports an
+    # unresolved defect, and convergence was derived from its absence.
+    #
+    # The correction offered two routes: refuse and identify, or define a
+    # reconstruction rule that preserves the identifier and the valid review's
+    # unresolved result. This takes the first. Inventing a state for a finding
+    # whose origin is not authoritative would be this controller deciding what
+    # a review found, and "do not infer resolution or zero findings" cuts both
+    # ways: inferring OPEN is still inferring.
+    _stateless: list[str] = []
+    _seen: set[str] = set()
+    for num, d in dirs:
+        if num not in valid:
+            continue
+        for i in authoritative_findings(d):
+            if i in _seen:
+                continue
+            if state_after(ledger["findings"][i], set(valid)) is None:
+                _seen.add(i)
+                _stateless.append(f"cycle-{num:02d}: {i}")
+    if _stateless:
+        raise CannotCalculate(
+            "findings a valid review reported have no authoritative state:\n  "
+            + "\n  ".join(_stateless) +
+            "\n\n  Each is in the ledger, so the check above is satisfied, and "
+            "none of them\n  reaches OPEN, RESOLVED or DISPUTED when the "
+            "history is replayed over the\n  valid cycles. Usually the event "
+            "that raised it sits in a cycle that was later\n  invalidated, "
+            "leaving a recurrence in a valid cycle with nothing to recur "
+            "from.\n\n  The loop state would be computed as though the valid "
+            "review had reported\n  nothing, which is how an unresolved "
+            "defect becomes CONVERGED. Repair the\n  invalidated cycle's "
+            "evidence, or raise the finding in a cycle that counts.")
+    lines.append("  and every one of them has a state the valid cycles "
+                 "produce")
+
     # B01-F02. Every valid cycle boundary is evaluated in order, and the first
     # terminal outcome governs. Evaluating only the latest boundary let a later
     # cycle overwrite an earlier mandatory exit: one finding accepted in cycle

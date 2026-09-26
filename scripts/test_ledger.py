@@ -972,6 +972,110 @@ def main() -> int:
         print("  [ok] replay does not honour a backdated acceptance already in "
               "the history")
 
+    # C01-F01, and the half the control above does not reach. Codex:
+    #
+    #   "The supplied ledger control inserts the backdated acceptance and then
+    #   attempts a new resolve command. That exercises the repaired
+    #   prerequisite lookup. It does not exercise state reconstruction from an
+    #   existing history that already contains the subsequent demonstration."
+    #
+    # Which was right, and the gap was real. `last_authorized` had the
+    # reopening guard; `replay` and `skipped_events` did not. So one record
+    # gave three answers: RESOLVED from the state rebuild, None from the
+    # prerequisite lookup, and nothing at all from the diagnostic that exists
+    # to explain the difference.
+    #
+    # Here no command is asked to refuse anything. The whole sequence goes into
+    # the file, demonstration included, and the only question is what the
+    # record MEANS:
+    #
+    #   RAISED(1) ACCEPT(1) DEMONSTRATED(2) REOPENED(3) ACCEPT(2) DEMONSTRATED(4)
+    root, rev = review_with({1: True, 2: True, 3: True, 4: True})
+    ledger(root, "raise", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
+    ledger(root, "respond", "--review", str(rev), "--cycle", "1", "--id", "C01-F01",
+           "--disposition", "ACCEPT", "--note", "will fix")
+    ledger(root, "resolve", "--review", str(rev), "--cycle", "2", "--id", "C01-F01",
+           "--evidence", "repaired")
+    ledger(root, "reopen", "--review", str(rev), "--cycle", "3", "--id", "C01-F01",
+           "--evidence", "it came back")
+    _lp = rev / "ledger.json"
+    _doc = json.loads(_lp.read_text(encoding="utf-8"))
+    _hist = _doc["findings"]["C01-F01"]["history"]
+    _hist.append({"cycle": 2, "event": "ACCEPT", "state": "OPEN",
+                  "at": "2026-09-16T00:00:00Z",
+                  "note": "dated before the reopening, written into the file"})
+    _hist.append({"cycle": 4, "event": "DEMONSTRATED", "state": "RESOLVED",
+                  "at": "2026-09-16T00:00:01Z",
+                  "evidence": "the closure that acceptance would authorize"})
+    # The cached state too. Leaving it OPEN would let this control pass on the
+    # stored field while the rebuild was still wrong, which is the shape of
+    # defect this whole file is about: a check that holds for a reason other
+    # than the one it is named for.
+    _doc["findings"]["C01-F01"]["state"] = "RESOLVED"
+    write_lf(_lp, json.dumps(_doc, indent=2) + "\n")
+
+    _show = ledger(root, "show", "--review", str(rev))
+    if "[RESOLVED]" in _show.stdout:
+        failures.append(
+            "an existing history closed the finding on an acceptance dated "
+            "before the reopening it answers. The command path refuses to "
+            "write one and the state rebuild still honours one already "
+            "recorded, which is C01-F01.\n" + _show.stdout)
+    elif "[OPEN]" not in _show.stdout:
+        failures.append(f"unexpected state rebuilding the backdated history\n"
+                        f"{_show.stdout}")
+    else:
+        print("  [ok] the rebuild refuses a backdated acceptance the record "
+              "already contains")
+
+    # The controller half, which is NOT the same defect and is not repaired
+    # here. Recorded as a tripwire rather than a green tick, because the
+    # behaviour has not been ruled on.
+    #
+    # The ledger now rebuilds this history as OPEN. The controller reports
+    # CONVERGED, and it is not wrong about the boundary it chose: at n=2 the
+    # finding really was resolved. It walks boundaries from n=1 and stops at
+    # the first uncleared terminal exit, so cycles 03 and 04 are never reached
+    # and the reopening never enters the answer.
+    #
+    # That leaves the ledger saying OPEN and the controller saying CONVERGED
+    # about one record, which is B01-F11's original shape one level up. But
+    # the repair is a protocol question rather than a coding one: whether a
+    # terminal exit at n with valid cycles beyond it should still govern, and
+    # what a controller should report when evidence exists past an exit nobody
+    # cleared. C01-F02 asks for the four-cycle ceiling to be enforced at every
+    # boundary, which is adjacent and not this.
+    #
+    # So this fires on any change in either direction rather than blessing
+    # today's answer. See specs/review/TERMINAL-EXIT-WITH-CYCLES-BEYOND-IT.md.
+    _loop = loop(root, rev)
+    _st = status_of(_loop.stdout)
+    if _st == "CONVERGED":
+        print("  [ok] recorded gap: the controller still converges at n=2 "
+              "while the ledger holds the finding OPEN")
+    else:
+        failures.append(
+            f"the controller now reports {_st} where it reported CONVERGED. "
+            f"That may be the repair, and it is not one made here, so read "
+            f"specs/review/TERMINAL-EXIT-WITH-CYCLES-BEYOND-IT.md before "
+            f"changing this control to expect it.")
+
+    # And the diagnostic has to say so. Reporting nothing skipped, while the
+    # state quietly differs from what the history appears to show, is worse
+    # than the wrong state: it removes the one thing that would explain it.
+    _diag = ledger(root, "resolve", "--review", str(rev), "--cycle", "4",
+                   "--id", "C01-F01", "--evidence", "x")
+    _dblob = _diag.stderr + _diag.stdout
+    if "cycle 02 ACCEPT" not in _dblob:
+        failures.append(f"the diagnostics do not name the acceptance that "
+                        f"never took effect\n{_dblob[:400]}")
+    elif "reopening" not in _dblob:
+        failures.append(f"the acceptance is named as skipped but not for "
+                        f"predating the reopening\n{_dblob[:400]}")
+    else:
+        print("  [ok] the diagnostic names it, and says why it did not take")
+
     # Direction two: a DEMONSTRATED recorded in an invalid cycle must not leave
     # the finding permanently RESOLVED. Before the projection the ledger refused
     # every later resolution while the controller still counted the finding

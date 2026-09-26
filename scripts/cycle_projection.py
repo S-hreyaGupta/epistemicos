@@ -214,6 +214,143 @@ class UnknownEvent(Exception):
     """History contains an event replay has no transition for. Not skippable."""
 
 
+class Walk:
+    """One pass over a finding's history, and the only place transitions live.
+
+    Three questions, one evaluator. `replay` wants the state it ends in,
+    `last_authorized` wants which events are still in force, and
+    `skipped_events` wants which authorized events did not apply. Those were
+    three separate loops until 26 September, each with its own copy of the
+    transition rules, and they disagreed.
+
+    C01-F01, which is B01-F11 surviving in the functions that determine the
+    authoritative state. The reopening guard had been added to
+    `last_authorized` alone, so a backdated acceptance was refused as the
+    prerequisite for a NEW resolve command while state reconstruction from an
+    EXISTING history honoured the same acceptance. Codex supplied the history
+    and got three answers from one record:
+
+        RAISED(1) ACCEPT(1) DEMONSTRATED(2) REOPENED(3) ACCEPT(2) DEMONSTRATED(4)
+
+        replay                  RESOLVED
+        last_authorized ACCEPT  None
+        skipped_events          []
+
+    A ledger and a controller saying RESOLVED while the prerequisite lookup
+    says there is no acceptance is not a disagreement anyone can act on, and
+    the diagnostic that exists to explain such a gap reported nothing skipped.
+
+    The reviewer asked for one shared transition evaluator so the three
+    implementations cannot disagree. This is it. Adding a rule here reaches
+    all three by construction, which is the property that was missing.
+    """
+
+    __slots__ = ("state", "accepted", "reopened_at", "live", "skipped")
+
+    def __init__(self) -> None:
+        self.state: str | None = None
+        self.accepted = False
+        # The cycle of the most recent reopening still in force. An ACCEPT
+        # dated before it answers the repair that reopening already spent.
+        self.reopened_at: int | None = None
+        # The most recent event of each kind whose effect STILL obtains,
+        # rather than the most recent one that was applied at the time.
+        self.live: dict[str, dict] = {}
+        # Authorized events whose move was not available from the state that
+        # actually obtained. Distinct from events disregarded for sitting in
+        # an invalid cycle: these are in a cycle that counts.
+        self.skipped: list[str] = []
+
+    def _not_open(self) -> str:
+        return f"finding was {self.state or 'unraised'}, not OPEN"
+
+    def apply(self, ev: str, c: int) -> tuple[bool, str | None]:
+        """Apply one event. Returns (applied, why not).
+
+        Every transition rule in this system is in this method. If a rule is
+        added anywhere else, the divergence C01-F01 describes is back.
+        """
+        if ev == "RAISED":
+            self.state, self.accepted, self.reopened_at = OPEN, False, None
+            # A finding starting over carries nothing forward.
+            self.live.clear()
+            return True, None
+        if ev == "ACCEPT":
+            if self.state != OPEN:
+                return False, self._not_open()
+            if self.reopened_at is not None and c < self.reopened_at:
+                # Insertion order says when a thing was written down. The
+                # cycle says which review it belongs to. A disposition has to
+                # answer the transition it follows, and one dated before the
+                # reopening answers a different question: it was a response to
+                # the first repair, which the reopening spent.
+                return False, (f"dated before the cycle {self.reopened_at:02d} "
+                               f"reopening it would have to answer")
+            self.accepted = True
+            return True, None
+        if ev == "REJECT_WITH_REASON":
+            if self.state != OPEN:
+                return False, self._not_open()
+            self.state = DISPUTED
+            return True, None
+        if ev == "DEMONSTRATED":
+            if self.state != OPEN:
+                return False, self._not_open()
+            if not self.accepted:
+                return False, "no ACCEPT in force"
+            self.state = RESOLVED
+            return True, None
+        if ev == "REOPENED":
+            if self.state != RESOLVED:
+                return False, (f"finding was {self.state or 'unraised'}, "
+                               f"not RESOLVED")
+            self.state, self.accepted, self.reopened_at = OPEN, False, c
+            # The acceptance and the demonstration it produced are both spent.
+            # Their events remain in the history and in `show`; they are simply
+            # no longer the prerequisite for anything.
+            self.live.pop("ACCEPT", None)
+            self.live.pop("DEMONSTRATED", None)
+            return True, None
+        raise UnknownEvent(f"no transition defined for event {ev!r}")
+
+
+def walk(history: list[dict], proj: Projection,
+         upto: set[int] | None = None) -> Walk:
+    """Replay a finding's authorized history once.
+
+    `upto` restricts to a set of cycle numbers, which is how the controller
+    asks for the state at an earlier cycle boundary. The ledger passes None and
+    means "as things stand".
+
+    An unknown event refuses here rather than being ignored, and refuses for
+    all three callers rather than only for `replay`. That asymmetry was its own
+    instance of the same defect: `replay` would have raised while
+    `last_authorized` skipped past and returned a stale prerequisite, so a
+    resolve could proceed on an authority the state rebuild would not grant.
+    """
+    w = Walk()
+    for e in history:
+        c = e["cycle"]
+        if upto is not None and c not in upto:
+            continue
+        if not proj.authorizes(c):
+            continue
+        ev = e.get("event")
+        if ev not in KNOWN_EVENTS:
+            # A new event type that replay does not know would otherwise pass
+            # through as a no-op, and the state it was supposed to produce
+            # would silently not happen.
+            raise UnknownEvent(
+                f"no transition defined for event {ev!r} in cycle {c:02d}. "
+                f"Known events: {', '.join(KNOWN_EVENTS)}.")
+        applied, why = w.apply(ev, c)
+        if applied:
+            w.live[ev] = e
+        elif why:
+            w.skipped.append(f"cycle {c:02d} {ev} ({why})")
+    return w
+
+
 def replay(history: list[dict], proj: Projection,
            upto: set[int] | None = None) -> str | None:
     """The state a finding reached, by replaying legal transitions.
@@ -242,37 +379,7 @@ def replay(history: list[dict], proj: Projection,
     controller asks for the state at an earlier cycle boundary. The ledger passes
     None and means "as things stand".
     """
-    state: str | None = None
-    accepted = False
-    for e in history:
-        c = e["cycle"]
-        if upto is not None and c not in upto:
-            continue
-        if not proj.authorizes(c):
-            continue
-        ev = e.get("event")
-        if ev not in KNOWN_EVENTS:
-            # Refusing rather than ignoring. A new event type that replay does
-            # not know would otherwise pass through as a no-op, and the state it
-            # was supposed to produce would silently not happen.
-            raise UnknownEvent(
-                f"no transition defined for event {ev!r} in cycle {c:02d}. "
-                f"Known events: {', '.join(KNOWN_EVENTS)}.")
-        if ev == "RAISED":
-            state, accepted = OPEN, False
-        elif ev == "ACCEPT":
-            if state == OPEN:
-                accepted = True
-        elif ev == "REJECT_WITH_REASON":
-            if state == OPEN:
-                state = DISPUTED
-        elif ev == "DEMONSTRATED":
-            if state == OPEN and accepted:
-                state = RESOLVED
-        elif ev == "REOPENED":
-            if state == RESOLVED:
-                state, accepted = OPEN, False
-    return state
+    return walk(history, proj, upto).state
 
 
 def skipped_events(history: list[dict], proj: Projection) -> list[str]:
@@ -282,45 +389,13 @@ def skipped_events(history: list[dict], proj: Projection) -> list[str]:
     in a cycle that counts; the move they describe was simply not available from
     the state that actually obtained, usually because something they depended on
     was invalidated.
+
+    This reported nothing for the backdated acceptance in C01-F01, because it
+    carried its own copy of the rules and that copy had no reopening guard. A
+    diagnostic that exists to explain why a state is what it is has to be
+    reading the same rules that produced the state.
     """
-    out: list[str] = []
-    state: str | None = None
-    accepted = False
-    for e in history:
-        c = e["cycle"]
-        if not proj.authorizes(c):
-            continue
-        ev = e.get("event")
-        if ev not in KNOWN_EVENTS:
-            continue
-        if ev == "RAISED":
-            state, accepted = OPEN, False
-        elif ev == "ACCEPT":
-            if state == OPEN:
-                accepted = True
-            else:
-                out.append(f"cycle {c:02d} ACCEPT (finding was "
-                           f"{state or 'unraised'}, not OPEN)")
-        elif ev == "REJECT_WITH_REASON":
-            if state == OPEN:
-                state = DISPUTED
-            else:
-                out.append(f"cycle {c:02d} REJECT_WITH_REASON (finding was "
-                           f"{state or 'unraised'}, not OPEN)")
-        elif ev == "DEMONSTRATED":
-            if state == OPEN and accepted:
-                state = RESOLVED
-            else:
-                why = "no ACCEPT in force" if state == OPEN else \
-                    f"finding was {state or 'unraised'}, not OPEN"
-                out.append(f"cycle {c:02d} DEMONSTRATED ({why})")
-        elif ev == "REOPENED":
-            if state == RESOLVED:
-                state, accepted = OPEN, False
-            else:
-                out.append(f"cycle {c:02d} REOPENED (finding was "
-                           f"{state or 'unraised'}, not RESOLVED)")
-    return out
+    return walk(history, proj).skipped
 
 
 def last_authorized(history: list[dict], event: str,
@@ -336,67 +411,12 @@ def last_authorized(history: list[dict], event: str,
     alongside the state so that only events the replay actually applied are
     returned — the same rule `replay` uses, rather than a second opinion about
     which events matter.
+
+    Cycles 03 and 04 of BOOTSTRAP-001 each found a way for this to disagree
+    with the state: an event undone later still handed back as a prerequisite,
+    then an ACCEPT appended after a reopening but carrying an earlier cycle
+    number re-arming the finding. Both were repaired here and only here, which
+    is what left C01-F01 open. The rules now live in `Walk.apply`, so this
+    function cannot hold an opinion the state rebuild does not share.
     """
-    state: str | None = None
-    accepted = False
-    # The most recent event of each kind whose effect STILL obtains, rather than
-    # the most recent one that was applied at the time.
-    #
-    # B01-F11, the third part cycle 03 found still open. This kept one `found`
-    # and never cleared it, so an event undone later was still returned as a
-    # prerequisite. Codex's sequence: RAISED(1), ACCEPT(1), DEMONSTRATED(2),
-    # REOPENED(3). Replay ends OPEN with accepted False, because REOPENED
-    # disarms acceptance; this function still handed back the cycle-01 ACCEPT,
-    # and `resolve` used it as its precondition. So a finding could be resolved
-    # on an acceptance that the same history had already withdrawn.
-    #
-    # Reopening is exactly when a fresh ACCEPT should be required: the finding
-    # came back, and whoever accepts the new repair should have to say so.
-    live: dict[str, dict] = {}
-    # B01-F11, the part cycle 04 found still open. This walked insertion order
-    # and asked only whether the state was OPEN, so an ACCEPT appended AFTER a
-    # reopening but carrying an EARLIER cycle number re-armed the finding.
-    # Codex's sequence, every command exiting 0: RAISED(1), ACCEPT(1),
-    # DEMONSTRATED(2), REOPENED(3), then ACCEPT(2) appended last, then
-    # DEMONSTRATED(4). Stored state RESOLVED, with no acceptance belonging to
-    # the reopening cycle or later.
-    #
-    # Insertion order says when a thing was written down. The cycle says which
-    # review it belongs to. A disposition has to answer the transition it
-    # follows, and one dated before the reopening answers a different question
-    # -- it was a response to the first repair, which the reopening spent.
-    reopened_at: int | None = None
-    for e in history:
-        c = e["cycle"]
-        if not proj.authorizes(c):
-            continue
-        ev = e.get("event")
-        if ev not in KNOWN_EVENTS:
-            continue
-        applied = False
-        if ev == "RAISED":
-            state, accepted, applied = OPEN, False, True
-            # A finding starting over carries nothing forward.
-            live.clear()
-            reopened_at = None
-        elif ev == "ACCEPT":
-            if state == OPEN and (reopened_at is None or c >= reopened_at):
-                accepted, applied = True, True
-        elif ev == "REJECT_WITH_REASON":
-            if state == OPEN:
-                state, applied = DISPUTED, True
-        elif ev == "DEMONSTRATED":
-            if state == OPEN and accepted:
-                state, applied = RESOLVED, True
-        elif ev == "REOPENED":
-            if state == RESOLVED:
-                state, accepted, applied = OPEN, False, True
-                reopened_at = c
-                # The acceptance and the demonstration it produced are both
-                # spent. Their events remain in the history and in `show`; they
-                # are simply no longer the prerequisite for anything.
-                live.pop("ACCEPT", None)
-                live.pop("DEMONSTRATED", None)
-        if applied:
-            live[ev] = e
-    return live.get(event)
+    return walk(history, proj).live.get(event)

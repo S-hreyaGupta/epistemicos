@@ -814,10 +814,14 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     # an amendment appended after a review could still change what that review
     # had been conducted under. The assignment becomes a fact in the frozen
     # evidence rather than something replayed from a file that can still change.
+    #
+    # C01-F04: through the validated helpers. This block loaded the amendments
+    # and replayed them without `validate_chain` or `check_frozen_assignments`,
+    # so the set written into the target could come from a history the same
+    # runner refuses elsewhere in the same command.
     try:
-        _items = run_pins.load_amendments(run_dir)
-        _gov = run_pins.pins_for_cycle(run, _items, n)
-        _gov_hashes = run_pins.pin_hashes_for_cycle(run, _items, n)
+        _gov = run_pins.governing_pins(run, run_dir, n)
+        _gov_hashes = run_pins.governing_pin_hashes(run, run_dir, n)
     except run_pins.PinError as e:
         raise Refused(f"cannot determine the governing pin set for cycle "
                       f"{n:02d}:\n  {e}")
@@ -828,6 +832,14 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         "cycle": n,
         "governing_pins": _gov,
         "governing_pin_hashes": _gov_hashes,
+        # C01-F03. The claim that this cycle kept its own copies of the
+        # documents that governed it, so check 9 can verify their bytes rather
+        # than only their records. It is a field in the target because the
+        # check has to tell a cycle frozen before this existed from one whose
+        # snapshots were deleted, and those look identical from the outside.
+        # target.sha256 covers this file, and check 6 verifies that digest, so
+        # the claim cannot be removed without breaking a different check.
+        "governing_artifacts_preserved": True,
         "protocol_commit": run["protocol_commit"],
         # B01-F07. These were copied verbatim from run.json, so they described
         # the pin set as it stood at init and not the one governing this cycle.
@@ -1029,6 +1041,35 @@ def cmd_freeze(args: argparse.Namespace) -> int:
             raise Refused(f"snapshot of {ref['path']} does not match the hash "
                           "recorded for it; refusing to freeze a cycle whose "
                           "preserved copy already disagrees with its own record")
+
+    # C01-F03, and the same argument one artifact class over. The reviewed
+    # artifacts were preserved and the GOVERNING ones were not, so check 9
+    # could compare the target's digests with the run's history and never
+    # establish that the protocol and specs it names exist or say what they
+    # said. Codex deleted both governing files without touching either record
+    # and the validator still exited 0.
+    #
+    # Snapshotted here rather than re-read at validation time, and for the
+    # same reason the reviewed artifacts are: the live files are meant to
+    # change. Checking a completed cycle against today's protocol would
+    # invalidate it the moment a legitimate amendment lands, which is the
+    # retroactive invalidation B02-F07 was about.
+    for _p, _h in sorted(_gov_hashes.items()):
+        _src = REPO / _p
+        if not _src.is_file():
+            raise Refused(
+                f"governing artifact is not on disk, so this cycle cannot "
+                f"preserve it:\n  {_p}\n"
+                "  A cycle that cannot keep a copy of what governs it cannot "
+                "later be shown to\n  have been conducted against anything.")
+        _dest = snapshot / _p
+        _dest.parent.mkdir(parents=True, exist_ok=True)
+        _dest.write_bytes(_src.read_bytes())
+        if sha256_file(_dest) != _h:
+            raise Refused(
+                f"snapshot of governing artifact {_p} does not match the "
+                f"hash the run's history records for it:\n"
+                f"    history  {_h}\n    on disk  {sha256_file(_dest)}")
 
     # ---- auxiliary evidence: the controls, recorded but not targeted ----
     # B03-F02. Cycle 03's prompt told the reviewer "the suites are in the

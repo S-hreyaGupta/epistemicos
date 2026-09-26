@@ -227,20 +227,55 @@ def main() -> int:
     # MC-2 returned PASS. The protocol's check 9 is "recorded hashes match the
     # referenced artifacts", so that is where this belongs; it needed no new
     # check and no change to the schema.
-    def _governed(protocol_hash: str, spec_hash: str | None = None,
-                  drop_hashes: bool = False):
-        """A target carrying a governing pin set, as freeze writes since B02-F06."""
-        pins = {"specs/protocol.md": "a" * 64, "specs/spec.md": "b" * 64}
+    def _governed(protocol_hash: str | None = None,
+                  spec_hash: str | None = None,
+                  drop_hashes: bool = False,
+                  remove: str | None = None,
+                  edit: str | None = None,
+                  claim_preserved: bool = False):
+        """A target carrying a governing pin set, as freeze writes since B02-F06.
 
+        C01-F03 changed what this has to provide. The pins used to be "a" * 64
+        and "b" * 64 for files whose contents nobody looked at, which was a
+        valid fixture while check 9 compared records with records. Check 9 now
+        verifies the artifacts too, so a target recording a digest no file has
+        is not a baseline any more; it is the defect.
+
+        So the files are written and the recorded digests are theirs. Each
+        override still takes a literal, and `None` means "the real one", which
+        keeps every control below breaking exactly one thing.
+        """
         def _m(target, cycle, root):
+            write_lf(root / "specs" / "protocol.md", "# protocol\n\nrules\n")
+            write_lf(root / "specs" / "spec.md", "# spec\n\nrequirements\n")
+            pins = {"specs/protocol.md": sha256_file(root / "specs/protocol.md"),
+                    "specs/spec.md": sha256_file(root / "specs/spec.md")}
+            run_dir = root / "runs" / "T-001"
+            run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+            run["protocol"] = {"path": "specs/protocol.md",
+                               "sha256": pins["specs/protocol.md"]}
+            run["spec_files"] = [{"path": "specs/spec.md",
+                                  "sha256": pins["specs/spec.md"]}]
+            write_lf(run_dir / "run.json", json.dumps(run, indent=2) + "\n")
+
             target["governing_pins"] = sorted(pins)
             if not drop_hashes:
                 target["governing_pin_hashes"] = pins
-            target["protocol_sha256"] = protocol_hash
+            target["protocol_sha256"] = (
+                protocol_hash if protocol_hash is not None
+                else pins["specs/protocol.md"])
             target["spec_sha256"] = (
                 spec_hash if spec_hash is not None
                 else run_pins.spec_digest([{"path": "specs/spec.md",
-                                            "sha256": "b" * 64}]))
+                                            "sha256": pins["specs/spec.md"]}]))
+            if claim_preserved:
+                target["governing_artifacts_preserved"] = True
+            # Last, so the records above describe the file as it was.
+            if remove:
+                (root / remove).unlink()
+            if edit:
+                write_lf(root / edit,
+                         "# edited after the digest was recorded\n")
             return target
         return _m
 
@@ -257,8 +292,7 @@ def main() -> int:
     # some unrelated reason and the controls would look green while proving
     # nothing, which is what cycle 03 caught in B01-F11's control.
     root, commit, tree = fresh()
-    rc, out = run(root, build(root, commit, tree, "plan",
-                              mutate=_governed("a" * 64)))
+    rc, out = run(root, build(root, commit, tree, "plan", mutate=_governed()))
     if rc != 0 or marks(out).get(9) != "PASS":
         failures.append(f"a cycle whose digests DO describe its governing set "
                         f"was refused, so the refusals below establish "
@@ -271,9 +305,9 @@ def main() -> int:
     expect_fail("a protocol digest that is well formed but not this cycle's",
                 9, "plan", mutate=_governed("c" * 64))
     expect_fail("a spec digest that does not describe the governing set",
-                9, "plan", mutate=_governed("a" * 64, spec_hash="d" * 64))
+                9, "plan", mutate=_governed(spec_hash="d" * 64))
     expect_fail("governing pins declared with no hashes to check them against",
-                9, "plan", mutate=_governed("a" * 64, drop_hashes=True))
+                9, "plan", mutate=_governed(drop_hashes=True))
 
     # The two cycle 04 asked for. Codex: "The named negative controls change one
     # assertion while retaining the other, leaving consistent false assertions
@@ -351,7 +385,7 @@ def main() -> int:
     # passed": it was right, and it was right about a fixture that never got
     # near the code under test.
     def _invalid_chain(target, cycle, root):
-        _governed("a" * 64)(target, cycle, root)
+        _governed()(target, cycle, root)
         run_dir = root / "runs" / "T-001"
         run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
         final = list(run_pins.initial_pin_set(run))
@@ -370,6 +404,38 @@ def main() -> int:
 
     expect_fail("an amendment history the runner rejects, replayed by the gate "
                 "without checking it", 9, "plan", mutate=_invalid_chain)
+
+    # C01-F03. Every control so far compares records. Codex established a
+    # passing fixture with real governing files and their real digests
+    # recorded consistently in the run and the target, then deleted both files
+    # without changing either record. The validator still exited 0.
+    #
+    # "Agreement between the target and run history does not establish that
+    # the mandatory governing artifacts are present or that their contents
+    # match the recorded hashes."
+    #
+    # The baseline above already covers the passing case: `_governed()` now
+    # writes real files and records their real digests, so check 9 passing
+    # there means the artifacts were found and matched.
+    #
+    # Independently, as the correction asks: each artifact class on its own,
+    # so neither refusal can be resting on the other.
+    expect_fail("the governing protocol is gone, every record still agreeing",
+                9, "plan", mutate=_governed(remove="specs/protocol.md"))
+    expect_fail("a governing spec is gone, every record still agreeing",
+                9, "plan", mutate=_governed(remove="specs/spec.md"))
+    expect_fail("the governing protocol was edited after its digest was "
+                "recorded", 9, "plan", mutate=_governed(edit="specs/protocol.md"))
+    expect_fail("a governing spec was edited after its digest was recorded",
+                9, "plan", mutate=_governed(edit="specs/spec.md"))
+
+    # And the claim that a cycle preserved its governing copies has to be
+    # load-bearing. Without this, deleting a snapshot from a cycle frozen by
+    # the current runner would fall back to the live file and pass whenever
+    # the live file still happened to match, which is the whole defect one
+    # level down.
+    expect_fail("a cycle claiming preserved governing copies that are not "
+                "there", 9, "plan", mutate=_governed(claim_preserved=True))
 
     # And the historical case, which must NOT fail. Cycles 01 and 02 of
     # BOOTSTRAP-001 were frozen before governing_pin_hashes existed. Failing

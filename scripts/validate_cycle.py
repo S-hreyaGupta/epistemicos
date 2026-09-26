@@ -215,7 +215,8 @@ def _hash_of_declared_file(target: dict, hash_field: str, path_field: str,
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 
 
-def _governing_problems(target: dict, gph: dict, run_dir: Path) -> list[str]:
+def _governing_problems(target: dict, gph: dict, run_dir: Path,
+                        cycle_dir: Path, repo_root: Path) -> list[str]:
     """Check 9's governing digests, against the run rather than themselves.
 
     B01-F07, the half cycle 04 found still open. The previous version compared
@@ -326,6 +327,57 @@ def _governing_problems(target: dict, gph: dict, run_dir: Path) -> list[str]:
         return [f"spec_sha256 does not describe this cycle's governing set\n"
                 f"      recorded {target.get('spec_sha256')!r}\n"
                 f"      derived  {want!r} over {len(rest)} non-protocol pin(s)"]
+
+    # C01-F03. Everything above compares records with records. None of it
+    # establishes that the artifacts those records name exist, or that they
+    # say what they said. Codex built a passing fixture with real governing
+    # files and real digests, deleted both files without touching either
+    # record, and the validator still exited 0 with checks 1 to 10 passing.
+    #
+    # "Agreement between the target and run history does not establish that
+    # the mandatory governing artifacts are present or that their contents
+    # match the recorded hashes. Declaring this limitation does not satisfy
+    # that requirement." The docstring above used to declare exactly that
+    # limitation, which is why this is written under it rather than beside it.
+    #
+    # The preserved copy is authoritative where it exists, as it is for the
+    # reviewed artifacts. Checking a completed cycle against today's protocol
+    # would invalidate it the moment a legitimate amendment lands, which is
+    # the retroactive invalidation B02-F07 was about.
+    preserved = bool(target.get("governing_artifacts_preserved"))
+    bad = []
+    for p, want_h in sorted(gph.items()):
+        snap = cycle_dir / "artifacts" / p
+        if snap.is_file():
+            got = sha256_file(snap)
+            if got != want_h:
+                bad.append(f"{p}\n        preserved copy {got}\n"
+                           f"        recorded       {want_h}\n"
+                           "        The snapshot has been altered since the "
+                           "freeze.")
+            continue
+        if preserved:
+            # Not a fallback case. This cycle's own target says it kept
+            # copies, so their absence is a missing artifact rather than an
+            # older cycle that never had them.
+            bad.append(f"{p}\n        This cycle records that it preserved "
+                       f"its governing artifacts, and\n        this one is "
+                       f"not there.")
+            continue
+        live = repo_root / p
+        if not live.is_file():
+            bad.append(f"{p}\n        Not preserved by this cycle and not on "
+                       f"disk, so nothing establishes\n        what governed "
+                       f"the review.")
+        elif sha256_file(live) != want_h:
+            bad.append(f"{p}\n        live file  {sha256_file(live)}\n"
+                       f"        recorded   {want_h}\n"
+                       "        No preserved copy exists, so this was checked "
+                       "against the live file.\n        A cycle frozen by the "
+                       "current runner would have one.")
+    if bad:
+        return ["the governing artifacts this cycle names cannot be shown to "
+                "be what it\n      recorded:\n      " + "\n      ".join(bad)]
     return []
 
 
@@ -455,7 +507,8 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
             "governing_pin_hashes, so the protocol and spec digests it states "
             "cannot be checked against anything")
     else:
-        problems += _governing_problems(target, _gph, cycle_dir.parent.parent)
+        problems += _governing_problems(target, _gph, cycle_dir.parent.parent,
+                                        cycle_dir, repo_root)
 
     if rtype == "plan":
         files = target.get("plan_files")

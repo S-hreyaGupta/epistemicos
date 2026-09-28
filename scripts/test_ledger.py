@@ -1350,6 +1350,63 @@ def main() -> int:
                    "--id", f"C{c:02d}-F01", "--class", "UNTESTED RULE", "--source", "CODEX_REVIEW")
     scenario("STALLED is tested before MAX_4", 4, four_no_progress, "STALLED")
 
+    # ---- the ceiling must not swallow the exits above it ----
+    # Alex Zamurko, 28 September, asking for boundary tests at cycle 4 in
+    # particular. The point is sharp: every other exit is tested where the
+    # ceiling is not in play, so nothing established that a fourth cycle which
+    # genuinely converges reports CONVERGED rather than MAX_4_REACHED. Exit D is
+    # last in §6's order, so the protocol says it cannot fire here, and the two
+    # controls below are what makes that a fact about the code rather than a
+    # fact about the order the branches happen to be written in.
+    #
+    # Both fixtures must show progress at every boundary or STALLED fires first
+    # and the control passes for the wrong reason, which is how the earlier
+    # four-cycle fixture had to be rewritten.
+    def four_then_converged(root, rev):
+        four_with_progress(root, rev)
+        # The fourth finding, accepted in 3 and demonstrated in 4. Nothing is
+        # left open or disputed at the ceiling.
+        ledger(root, "respond", "--review", str(rev), "--cycle", "3",
+               "--id", "C01-F04", "--disposition", "ACCEPT", "--note", "fix")
+        ledger(root, "resolve", "--review", str(rev), "--cycle", "4",
+               "--id", "C01-F04", "--evidence", "done")
+    scenario("a fourth cycle that converges is CONVERGED, not MAX_4", 4,
+             four_then_converged, "CONVERGED")
+
+    def four_then_only_disputed(root, rev):
+        for i in range(1, 5):
+            ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+                   "--id", f"C01-F{i:02d}", "--class", "UNTESTED RULE",
+                   "--source", "CODEX_REVIEW")
+        for k, cyc in ((1, 1), (2, 2), (3, 3)):
+            ledger(root, "respond", "--review", str(rev), "--cycle", str(cyc),
+                   "--id", f"C01-F{k:02d}", "--disposition", "ACCEPT",
+                   "--note", "fix")
+            ledger(root, "resolve", "--review", str(rev), "--cycle", str(cyc + 1),
+                   "--id", f"C01-F{k:02d}", "--evidence", "done")
+        # The last one becomes a dispute in the fourth cycle, so OPEN empties
+        # and DISPUTED does not.
+        ledger(root, "respond", "--review", str(rev), "--cycle", "4",
+               "--id", "C01-F04", "--disposition", "REJECT_WITH_REASON",
+               "--note", "spec disagrees", "--spec-evidence", "§4 closed vocabulary")
+    scenario("a fourth cycle with only a dispute left needs a human, not MAX_4",
+             4, four_then_only_disputed, "HUMAN_ADJUDICATION_REQUIRED")
+
+    # The pair: one ledger, and the only thing that differs is how many valid
+    # cycles it has had. The four-cycle half is `budget exhausted, progress every
+    # cycle` above; this is the three-cycle half, and together they show the
+    # ceiling is what changed the answer rather than anything in the findings.
+    #
+    # Worth recording what this control is NOT, because the version originally
+    # asked for cannot exist. An identical ledger at cycle 4 has reduced nothing,
+    # resolved nothing and disputed nothing since cycle 3, which is the STALLED
+    # condition, and §6 tests STALLED before the ceiling. So a genuinely
+    # unchanged ledger reports STALLED at 4, never MAX_4_REACHED. The honest pair
+    # is a ledger still making progress, which is this one.
+    scenario("the same progressing ledger continues at 3", 3,
+             lambda root, rev: four_with_progress(root, rev, cycles=(1, 2, 3)),
+             "CONTINUE")
+
     # B01-F02. This scenario used to assert CONVERGED, and Codex named the
     # control itself as reinforcing the defect: "Later cycles can override an
     # earlier mandatory termination. The supplied four_then_resolved control

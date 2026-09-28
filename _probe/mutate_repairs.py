@@ -138,6 +138,26 @@ MUTATIONS = [
      "        if False:",
      "test_validate_cycle.py",
      "artifacts were preserved"),
+
+    # Not repairs. The §6 exit order, which Alex Zamurko asked on 28 September
+    # to be tested at cycle 4 specifically, because every other exit was only
+    # ever exercised where the ceiling was not competing with it. Disabling
+    # either branch sends its scenario to MAX_4_REACHED, which is the exact
+    # failure the new controls exist to refuse, so these two mutations are what
+    # make them evidence rather than decoration.
+    ("exit A  converging at the ceiling is CONVERGED, not MAX_4",
+     "loop_state.py",
+     "    if not cur[OPEN] and not cur[DISPUTED]:",
+     "    if False:",
+     "test_ledger.py",
+     "a fourth cycle that converges"),
+
+    ("exit B  a dispute at the ceiling needs a human, not MAX_4",
+     "loop_state.py",
+     "    if not cur[OPEN] and cur[DISPUTED]:",
+     "    if False:",
+     "test_ledger.py",
+     "only a dispute left"),
 ]
 
 

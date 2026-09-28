@@ -106,6 +106,24 @@ def make_cycle(root: Path, review: Path, n: int, commit: str, valid: bool = True
         write_lf(c / "codex-output-raw.md", "")
 
 
+def report_recurrence(review: Path, n: int, fid: str) -> None:
+    """Make cycle n's review report `fid` as a recurrence, in both files.
+
+    Both, because the controller reparses codex-output-raw.md and requires the
+    structured result to match it identifier for identifier. Writing only
+    findings.json would fail that check instead of reaching the one under test,
+    and the control would be green for the wrong reason.
+    """
+    c = review / f"cycle-{n:02d}"
+    write_lf(c / "codex-output-raw.md",
+             f"Finding ID: {fid}\nStatus: REPAIR NOT DEMONSTRATED\n")
+    write_lf(c / "findings.json", json.dumps({
+        "schema": "cycle-findings/1", "cycle": n, "count": 1,
+        "zero_findings_asserted": False,
+        "findings": [{"id": fid, "class": None, "kind": "recurrence"}],
+    }, indent=2))
+
+
 # Fixture-validity audit, Alex Zamurko 16 September: "each negative control
 # should first establish that its fixture satisfies all prerequisites except the
 # single condition it intends to violate."
@@ -1405,6 +1423,94 @@ def main() -> int:
     # is a ledger still making progress, which is this one.
     scenario("the same progressing ledger continues at 3", 3,
              lambda root, rev: four_with_progress(root, rev, cycles=(1, 2, 3)),
+             "CONTINUE")
+
+    # Alex Zamurko, 28 September, ruling on the one case the exit order leaves
+    # ambiguous to a reader: "For Cycle 4 with both OPEN and DISPUTED findings,
+    # report MAX_4_REACHED, because the cycle ceiling caused termination and
+    # HUMAN_ADJUDICATION_REQUIRED applies only when no OPEN findings remain."
+    #
+    # That is what the code already does, because exit B tests OPEN_n = 0 first.
+    # Until now it did so by accident of the branch order rather than because
+    # anything asked. The outstanding dispute stays visible in the recorded
+    # ledger state, which is a separate requirement and a separate control.
+    def four_open_and_disputed(root, rev):
+        for i in range(1, 5):
+            ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+                   "--id", f"C01-F{i:02d}", "--class", "UNTESTED RULE",
+                   "--source", "CODEX_REVIEW")
+        for k, cyc in ((1, 1), (2, 2)):
+            ledger(root, "respond", "--review", str(rev), "--cycle", str(cyc),
+                   "--id", f"C01-F{k:02d}", "--disposition", "ACCEPT",
+                   "--note", "fix")
+            ledger(root, "resolve", "--review", str(rev), "--cycle", str(cyc + 1),
+                   "--id", f"C01-F{k:02d}", "--evidence", "done")
+        # A new dispute in cycle 4 is progress under §6, so STALLED cannot fire,
+        # and C01-F03 is still open when the ceiling arrives.
+        ledger(root, "respond", "--review", str(rev), "--cycle", "4",
+               "--id", "C01-F04", "--disposition", "REJECT_WITH_REASON",
+               "--note", "spec disagrees", "--spec-evidence", "§4 closed vocabulary")
+    scenario("open and disputed together at the ceiling is MAX_4, per the ruling",
+             4, four_open_and_disputed, "MAX_4_REACHED")
+
+    # And the literal form of the third boundary test, recorded as a control
+    # rather than argued in a message. The ledger below is unchanged between
+    # cycle 3 and cycle 4: nothing reduced, nothing resolved, nothing disputed.
+    # That is the STALLED condition, and §6 tests STALLED before the ceiling, so
+    # this reports STALLED and never MAX_4_REACHED. It pairs with the
+    # progressing version above, where the cycle count really is the only thing
+    # that differs.
+    scenario("an unchanged ledger at the ceiling stalls, it does not reach MAX_4",
+             4, lambda root, rev: four_with_progress(root, rev, cycles=(1, 2, 3)),
+             "STALLED")
+
+    # ---- C02-F04: a recurrence must move the finding out of RESOLVED ----
+    # Alex Zamurko, 9 September 2026, issue 7: a previously RESOLVED finding
+    # raised again as the same underlying finding "transitions RESOLVED -> OPEN.
+    # The recurrence is recorded as a reopen event with cycle and evidence."
+    #
+    # The controller checked that a reported identifier was in the ledger and
+    # that it reached some state. Neither asks whether the state agrees with
+    # what the review said, so a missed reopen leaves the finding RESOLVED and
+    # the boundary sees nothing open.
+    #
+    # Two findings rather than one, deliberately. With a single finding the loop
+    # converges at cycle 2 and that boundary governs, so cycle 3's recurrence
+    # could never change the reported status whatever the ledger said. The
+    # second finding keeps the loop alive to cycle 3, which is where the
+    # question actually lives.
+    def _two_then_recurrence(root, rev, reopen: bool):
+        for fid in ("C01-F01", "C01-F02"):
+            ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+                   "--id", fid, "--class", "UNTESTED RULE",
+                   "--source", "CODEX_REVIEW")
+        ledger(root, "respond", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "fix")
+        ledger(root, "resolve", "--review", str(rev), "--cycle", "2",
+               "--id", "C01-F01", "--evidence", "done")
+        ledger(root, "respond", "--review", str(rev), "--cycle", "2",
+               "--id", "C01-F02", "--disposition", "ACCEPT", "--note", "fix")
+        ledger(root, "resolve", "--review", str(rev), "--cycle", "3",
+               "--id", "C01-F02", "--evidence", "done")
+        # Cycle 3's reviewer says the first repair is still not demonstrated.
+        report_recurrence(rev, 3, "C01-F01")
+        if reopen:
+            ledger(root, "reopen", "--review", str(rev), "--cycle", "3",
+                   "--id", "C01-F01", "--evidence", "cycle 3 reports it again")
+
+    # Without the reopen the ledger says RESOLVED, the boundary sees nothing
+    # open and nothing disputed, and the loop would converge over a defect its
+    # own reviewer reported. Refused and named rather than computed.
+    scenario_refuses("a recurrence reported against a RESOLVED ledger entry", 3,
+                     lambda root, rev: _two_then_recurrence(root, rev, False),
+                     "not demonstrated")
+
+    # And with it recorded, the same evidence computes: the finding is OPEN at
+    # cycle 3, so the loop does not converge. This is the half that shows the
+    # refusal above is about the missing reopen rather than about recurrences in
+    # general, without which the repair could be "refuse every recurrence".
+    scenario("a recorded reopen keeps the loop off CONVERGED", 3,
+             lambda root, rev: _two_then_recurrence(root, rev, True),
              "CONTINUE")
 
     # B01-F02. This scenario used to assert CONVERGED, and Codex named the

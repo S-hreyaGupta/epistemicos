@@ -139,6 +139,15 @@ MUTATIONS = [
      "test_validate_cycle.py",
      "artifacts were preserved"),
 
+    ("C02-F04  a recurrence must not stand against a RESOLVED entry",
+     "loop_state.py",
+     "            if state_after(f, upto) == RESOLVED:\n"
+     "                _unreopened.append(",
+     "            if False:\n"
+     "                _unreopened.append(",
+     "test_ledger.py",
+     "a recurrence reported against a RESOLVED ledger entry"),
+
     # Not repairs. The §6 exit order, which Alex Zamurko asked on 28 September
     # to be tested at cycle 4 specifically, because every other exit was only
     # ever exercised where the ceiling was not competing with it. Disabling
@@ -158,6 +167,15 @@ MUTATIONS = [
      "    if False:",
      "test_ledger.py",
      "only a dispute left"),
+
+    ("exit C  an unchanged ledger stalls rather than reaching the ceiling",
+     "loop_state.py",
+     "        if stalled:\n"
+     "            return (\"STALLED\",",
+     "        if False:\n"
+     "            return (\"STALLED\",",
+     "test_ledger.py",
+     "an unchanged ledger at the ceiling"),
 ]
 
 

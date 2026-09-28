@@ -111,8 +111,15 @@ def load_ledger(review: Path) -> dict:
         raise CannotCalculate(f"ledger.json is not valid JSON: {e}")
 
 
-def authoritative_findings(cycle_dir: Path) -> list[str]:
-    """The finding IDs the runner extracted for this cycle.
+def authoritative_items(cycle_dir: Path) -> list[dict]:
+    """What the runner extracted for this cycle, entries intact.
+
+    C02-F04. This used to return identifiers only, and the `kind` the parser
+    assigns each entry was dropped here, one step before the controller checks
+    whether the ledger accounts for the review. A recurrence and a new finding
+    became the same thing to every check downstream, which is how a reviewer
+    saying a repair is still not demonstrated could sit beside a RESOLVED
+    ledger entry with nothing to notice.
 
     Alex Zamurko, issue 4: "Controller refuses to calculate loop state if
     findings.json is missing or invalid."
@@ -217,7 +224,17 @@ def authoritative_findings(cycle_dir: Path) -> list[str]:
         raise CannotCalculate(
             f"{p.parent.name}/findings.json records zero findings without "
             "zero_findings_asserted.\n  Zero has to be asserted, never inferred.")
-    return [f["id"] for f in items if isinstance(f, dict) and "id" in f]
+    return [f for f in items if isinstance(f, dict) and "id" in f]
+
+
+def authoritative_findings(cycle_dir: Path) -> list[str]:
+    """The finding IDs, in order.
+
+    A view over `authoritative_items` rather than a second reader, because two
+    readers of one file is how the two drift apart, which is the shape seven of
+    cycle 01's eight findings had.
+    """
+    return [f["id"] for f in authoritative_items(cycle_dir)]
 
 
 def state_after(f: dict, valid_upto: set[int]) -> str | None:
@@ -565,6 +582,52 @@ def _run(a) -> int:
             "evidence, or raise the finding in a cycle that counts.")
     lines.append("  and every one of them has a state the valid cycles "
                  "produce")
+
+    # C02-F04. Having a state is not the same as having the right one.
+    #
+    # A recurrence is a reviewer saying, of a finding it has seen before, that
+    # the repair is still not demonstrated. Alex Zamurko, 9 September 2026,
+    # issue 7: such a finding "transitions RESOLVED -> OPEN. The recurrence is
+    # recorded as a reopen event with cycle and evidence."
+    #
+    # The two checks above ask whether the identifier is in the ledger and
+    # whether it reaches any state at all. Neither asks whether that state
+    # agrees with what the review said about it. So a valid cycle can report
+    # REPAIR NOT DEMONSTRATED, the reopen can go unrecorded, and the finding
+    # stays RESOLVED. OPEN and DISPUTED are then both empty at that boundary and
+    # the loop reports CONVERGED over a defect the review says is still there.
+    # Nothing has to be fabricated for this. A transcription step has to be
+    # missed, which is the same weight as the omissions the two checks above
+    # already refuse.
+    #
+    # Refused and named rather than inferred. Writing the reopen here would be
+    # the controller deciding a finding's state from a document instead of from
+    # the ledger, and the stateless check above declined to invent a state in
+    # the other direction for the same reason.
+    _unreopened: list[str] = []
+    for num, d in dirs:
+        if num not in valid:
+            continue
+        upto = {c for c in valid if c <= num}
+        for item in authoritative_items(d):
+            if item.get("kind") != "recurrence":
+                continue
+            f = ledger["findings"][item["id"]]
+            if state_after(f, upto) == RESOLVED:
+                _unreopened.append(f"cycle-{num:02d}: {item['id']}")
+    if _unreopened:
+        raise CannotCalculate(
+            "a valid review reports these repairs as not demonstrated, and the "
+            "ledger still\n  holds them RESOLVED at that cycle:\n  "
+            + "\n  ".join(_unreopened) +
+            "\n\n  Issue 7 of 9 September requires a recurrence to move the "
+            "finding RESOLVED ->\n  OPEN, recorded as a reopen event carrying "
+            "its cycle and evidence. Without it\n  the boundary sees nothing "
+            "open and nothing disputed, and the loop converges\n  over a defect "
+            "its own reviewer says is still present. Record the reopen "
+            "against\n  the cycle that reported it.")
+    lines.append("  and no recurrence is left standing against a RESOLVED "
+                 "ledger entry")
 
     # B01-F02. Every valid cycle boundary is evaluated in order, and the first
     # terminal outcome governs. Evaluating only the latest boundary let a later

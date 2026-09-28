@@ -1,0 +1,10 @@
+{
+  "authoritative_attempt": 1,
+  "authoritative_sha256": "bf9f5c08f0cd96a59323bc00f4c721a173a37bda197c4eb5d1c1e8f0551dd2e6",
+  "attempts_recorded": 1,
+  "invocation": "manual",
+  "recorded_at": "2026-09-28T07:33:26Z",
+  "source": "C:\\EpistemicOS\\epistemicos\\runs\\BOOTSTRAP-002\\plan-review\\cycle-02\\raw.txt",
+  "note": "",
+  "unproven": "This file records how the review was invoked. It does not establish that codex-output-raw.md came from codex-input.md."
+}

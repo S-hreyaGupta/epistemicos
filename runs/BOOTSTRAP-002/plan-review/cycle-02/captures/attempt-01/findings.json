@@ -1,0 +1,70 @@
+{
+  "schema": "cycle-findings/1",
+  "review_result_status": "VALID",
+  "raw_finding_count": 11,
+  "finding_id_grammar": "^[A-Z]{0,2}\\d{2}-F\\d{2,3}$",
+  "cycle": 2,
+  "extracted_at": "2026-09-28T07:33:26Z",
+  "source": "captures/attempt-01/raw.md",
+  "source_attempt": 1,
+  "source_sha256": "bf9f5c08f0cd96a59323bc00f4c721a173a37bda197c4eb5d1c1e8f0551dd2e6",
+  "count": 11,
+  "zero_findings_asserted": false,
+  "findings": [
+    {
+      "id": "C02-F01",
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "kind": "finding"
+    },
+    {
+      "id": "C02-F02",
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "kind": "finding"
+    },
+    {
+      "id": "C02-F03",
+      "class": "MISSING REQUIREMENT",
+      "kind": "finding"
+    },
+    {
+      "id": "C02-F04",
+      "class": "MISSING REQUIREMENT",
+      "kind": "finding"
+    },
+    {
+      "id": "C02-F05",
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "kind": "finding"
+    },
+    {
+      "id": "C02-F06",
+      "class": "WRONG OWNERSHIP",
+      "kind": "finding"
+    },
+    {
+      "id": "C02-F07",
+      "class": "MISSING REQUIREMENT",
+      "kind": "finding"
+    },
+    {
+      "id": "C02-F08",
+      "class": "MISSING REQUIREMENT",
+      "kind": "finding"
+    },
+    {
+      "id": "C02-F09",
+      "class": "MISSING REQUIREMENT",
+      "kind": "finding"
+    },
+    {
+      "id": "C02-F10",
+      "class": "UNTESTED RULE",
+      "kind": "finding"
+    },
+    {
+      "id": "C02-F11",
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "kind": "finding"
+    }
+  ]
+}

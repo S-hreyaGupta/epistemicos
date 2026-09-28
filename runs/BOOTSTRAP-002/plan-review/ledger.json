@@ -191,6 +191,193 @@
       "requirement_id": "",
       "source": "CODEX_REVIEW",
       "state": "OPEN"
+    },
+    "C02-F01": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-28T07:34:56Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "the cycle-02 prompt tells the reviewer to number new findings C01-Fnn, which check_id refuses at cycle 2",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "protocol 4, V40; canonical identifier preservation",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C02-F02": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-28T07:34:56Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "Walk lacks the acceptance, demonstration and reopening ordering guards the ledger commands apply, so replay accepts histories the commands reject",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "protocol 5; chronological transition rules",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C02-F03": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-28T07:34:57Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "a target omitting both governing fields skips the governing checker entirely, even while claiming governing_artifacts_preserved",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "MC-2 check 9; B01-F07; C01-F03, C01-F04",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C02-F04": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-28T07:37:23Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "a recurrence reported as REPAIR NOT DEMONSTRATED can coexist with a RESOLVED state and still report CONVERGED",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "protocol 5-6, V40; recurrence accounting",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C02-F05": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-28T07:37:24Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "check 7 accepts cycle-1 and cycle-001 while projection accepts only two digits, so an accepted cycle can be invisible to the controller",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "MC-2 check 7 and 6; C01-F07",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C02-F06": {
+      "class": "WRONG OWNERSHIP",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-28T07:37:24Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "an interruption between writing a capture and designating it lets a later attempt take the first valid capture's place",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "first-valid-capture designation ruling; MC-1",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C02-F07": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-28T07:37:24Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "the bootstrap gate never checks that the supplied review evidence concerns the supplied target",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "protocol 2.2; MC-2 target binding; B01-F09",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C02-F08": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-28T07:37:25Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "the runner can freeze a real candidate commit while embedding an unrelated diff; nothing binds reviewed content to the candidate",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "protocol 10.1-11; candidate implementation supplied to the reviewer",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C02-F09": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-28T07:37:25Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "missing implementation snapshots fall back to live files, so deleting preserved evidence can still pass",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "MC-2 checks 13-15; preserved implementation evidence ruling; B02-F07",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C02-F10": {
+      "class": "UNTESTED RULE",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-28T07:37:25Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "the control suites are not in the review packet, only a count, so no claimed control-based demonstration can be verified",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "V04; repair-demonstration requirements; B02-F04 conditional ruling",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C02-F11": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-09-28T07:37:25Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "the zero-valid-cycle early return prints a bare LOOP_STATUS, dropping the development label under --quiet",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "development-evidence labelling ruling; protocol 2-3",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
     }
   },
   "review": "plan-review"

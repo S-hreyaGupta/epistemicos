@@ -1,0 +1,175 @@
+BOOTSTRAP-002 / plan review / cycle 02
+
+TARGET_SHA256: 2803ddd044cf8ae9157f60c117393e460a4558be07223fecbe7e48527bde87bf
+PROTOCOL_SHA256: 296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483
+SPEC_SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+This is a static review of the complete supplied codex-input.md, including its embedded protocol and ten artifacts. No reviewed program, test, mutation, or git command was executed. No other repository file was consulted. Reproduction cases below are deductions from the supplied code, not reports of executed experiments. The quoted target digest identifies the requested target; I have not independently hashed a target.json that was not supplied. This is development evidence under CONVENTION_ONLY, not an authoritative protocol outcome.
+
+Identifier handling: the prompt requires new findings to start again at C01-F01, while also saying that C01-F01 through C01-F08 already identify cycle 01 findings. The embedded protocol expressly governs conflicts with the prompt and requires persistent identities. The schema says the digits identify the raising cycle, and ledger.check_id enforces that rule. I therefore retain C01 identifiers when discussing existing findings and use C02-Fnn for new findings raised in this cycle. This avoids redefining existing findings or producing new identifiers the supplied ledger cannot accept in cycle 02. The conflict itself is reported below.
+
+Repair assessment: cycle 01
+
+These assessments separate source-level demonstration from control verification. None of the five test suites, their concrete fixtures, or their execution results is embedded. Their named controls and counts therefore remain unverified throughout this assessment.
+
+C01-F01: The specific six-event backdated-ACCEPT reproduction is repaired in the supplied source. Walk.apply rejects ACCEPT(2) after REOPENED(3), leaves accepted false, and skips DEMONSTRATED(4); replay, last_authorized, and skipped_events now consume the same walk. However, the stronger claim that every transition rule lives there is false: command-only chronological guards remain, and ledger.state_after still copies cached event states. The new finding below distinguishes this residual defect from the repaired ACCEPT case.
+
+C01-F02: Demonstrated by source inspection for the reported budget bypass. A cleared terminal boundary at n >= 4 now establishes MAX_4_REACHED and breaks before a fifth boundary can govern. decide also caps ordinary continuation, and the runner independently refuses freeze after four valid cycles. Later-cycle findings are still inspected before the boundary walk; therefore “nothing in them was evaluated” is broader than the implementation, but the fifth cycle no longer supplies the governing resolution in the reported case. The two claimed controls cannot be verified here.
+
+C01-F03: Demonstrated for targets that carry governing_pin_hashes and governing_artifacts_preserved: true. Freeze preserves those artifacts, and _governing_problems rejects absent or changed snapshots without substituting live files. The outer check-9 legacy branch can still bypass the entire verification if both pin fields are absent, including when governing_artifacts_preserved remains true. Thus the general mandatory-artifact requirement is only partially satisfied; see the separate finding below.
+
+C01-F04: The reported malformed prior_pin_set is now rejected: both governing helpers call validated_amendments, which validates the chain and checks frozen assignments. This demonstrates the specific repair statically. There is also a new cross-cycle failure mode: each historical MC-2 evaluation now inherits contradictions from every later target in the run. That consequence is reported separately rather than treated as proof the original malformed-history acceptance persists.
+
+C01-F05: Demonstrated for the supplied runner/controller callers. Missing, empty, and unrecognised bootstrap_review values have no PROTOCOL default. run_classification refuses them; check_bootstrap_still_holds refuses them before freeze; check_loop_not_terminated derives its flag through run_kind and invokes a controller that independently refuses ambiguity. The prompt's additional approval-package consumer is not embedded, so the claim about all four consumers is unverified. A separate early-return branch still drops the development label for a known development run with zero valid cycles.
+
+C01-F06: The exact stateless-origin case is repaired. _stateless checks the full valid-cycle replay and refuses a reported finding with no state. However, merely having any state still does not establish that the ledger accounts for a valid recurrence. An unresolved reviewer recurrence can remain RESOLVED because nobody records REOPENED. The adjacent case is reported below.
+
+C01-F07: The specifically described numeric, run-record, and review-type mismatches are rejected where their expected metadata exists. The cycle-directory grammar is still inconsistent: MC-2 accepts cycle-1 and cycle-001 as cycle 1, while projection enumerates only cycle-01. Thus identity agreement between consumers is only partially demonstrated. Missing run_id metadata also makes the run-identity comparison conditional, but the finding below focuses on the concrete directory mismatch.
+
+C01-F08: Demonstrated by source inspection for init. git_blob_sha256 reads the exact protocol blob at the recorded HEAD, refuses an absent blob, and compares that digest with the working file before writing run.json. It does not prohibit unrelated dirty files. The four claimed controls remain unverified. This assessment does not claim that historical target protocol_commit fields are independently revalidated against protocol bytes by MC-2; check 8 still checks existence only.
+
+Repair assessment: BOOTSTRAP-001
+
+B01-F02: The specified cleared-fourth-boundary extension, including the fifth-cycle-on-disk case, is repaired statically through C01-F02. This is a demonstration about the supplied implementation, not a RESOLVED transition in BOOTSTRAP-001.
+
+B01-F07: The history comparison, protocol-role selection, digest syntax checks, and preserved-artifact checks now cover the described internally consistent invented-pin case when the governing fields are present. The both-fields-absent branch still permits bypassing those requirements, so the overall requirement remains partially demonstrated. No historical ledger transition is asserted.
+
+B01-F11: The exact acceptance-before-reopening defect is repaired across the three walk consumers, as described under C01-F01. General chronological transition validity is not uniformly enforced, as the new transition finding explains. The backdated ACCEPT repair should not be represented as proof that all replay/command disagreements are gone.
+
+B01-F14: Missing run.json now prevents classification and emits no authoritative result; missing or unknown bootstrap_review also refuses rather than promoting a run. Protocol runs validate mc1_enforcement through the shared rule. These specific repairs are demonstrated statically. The zero-valid-cycle development-label omission is a separate remaining reporting defect.
+
+B02-F04: At the expressly accepted structural strength, the repair is demonstrated in the supplied source. Every capture-log.json write in cmd_record uses write_lf_atomic, whose destination changes through os.replace only after staging succeeds. The exception handler attempts staging cleanup and re-raises the original failure. This is not behavioural crash or durability evidence. The three claimed primitive tests and their preconditions are absent, so the condition requiring behavioural evidence for the primitive remains unverified in this review. No claim is made about power-loss durability, concurrent writers, or fault injection.
+
+Findings
+
+Finding ID: C02-F01
+Class: CONTRADICTORY IMPLEMENTATION MAPPING
+Requirement ID: Protocol §4 persistent identifiers and V40; schema Canonical Finding ID grammar
+Evidence:
+The cycle-02 prompt says “Finding ID: C01-F01 and upward,” while naming C01-F01 through C01-F08 as existing cycle-01 findings. The schema describes the two digits as the cycle, and ledger.check_id rejects an identifier whose cycle digits do not equal the raising cycle. cmd_raise also refuses an already-existing identifier. findings_format.extract accepts a Class block with a previously used identifier without resolving this collision.
+Finding:
+Following the prompt's numbering would either redefine an existing persistent identity or create a new C01 identifier that cannot be raised in cycle 02. The rule does not merely select a run prefix: it also fixes the origin-cycle digits to the wrong cycle. The supplied workflow would accept the format at capture and refuse or misinterpret the same identity at ledger entry.
+Required correction:
+Specify C02-Fnn for new cycle-02 findings and retain C01-Fnn only for the same existing defect. Check generated prompts against both the raising-cycle rule and existing identifiers. Do not repair this by renaming already captured findings during transcription. Record an explicit correction to the review instructions while preserving this frozen prompt as historical evidence.
+
+Finding ID: C02-F02
+Class: CONTRADICTORY IMPLEMENTATION MAPPING
+Requirement ID: Protocol §5; chronological transition rules documented in ledger.cmd_resolve, cmd_reopen, and check_not_before_raise
+Evidence:
+cycle_projection.Walk.apply validates state and a boolean accepted flag for DEMONSTRATED but never checks that its cycle is later than the acceptance. REOPENED checks RESOLVED but never checks that its cycle is later than the demonstration. REJECT_WITH_REASON lacks the reopening-date guard applied to ACCEPT. These checks remain in ledger commands instead. With valid cycles, an existing history RAISED(1), ACCEPT(1), DEMONSTRATED(1) replays as RESOLVED, while cmd_resolve refuses that same-cycle demonstration. The sequence RAISED(1), ACCEPT(1), DEMONSTRATED(2), REOPENED(3), REJECT_WITH_REASON(2) replays as DISPUTED even though cmd_respond rejects a disposition before reopening. ledger.state_after additionally copies e['state'], and snapshot(data, cycle) uses that implementation when proj is omitted.
+Finding:
+The repair of C01-F01/B01-F11 centralises three readers, but not the complete transition rules or all state readers. An on-disk history that commands would reject still authorizes resolution or dispute during replay. This is directly within the stated threat model: the C01-F01 repair was specifically required to refuse using an invalid history, not merely refuse writing one. The comments claiming every transition rule lives in Walk.apply overstate what changed.
+Required correction:
+Move the chronological and causal prerequisites into the shared evaluator, including origin, acceptance/demonstration order, and reopening/disposition order. Have write commands consult that evaluator without maintaining a separate transition definition. Remove or convert the unprojected cached-state reconstruction. Add histories covering same-cycle demonstration, backdated rejection after reopening, and reopening before its demonstration; require consistent states, prerequisites, diagnostics, and snapshots.
+
+Finding ID: C02-F03
+Class: MISSING REQUIREMENT
+Requirement ID: Protocol §§5–6; V40; recurrence handling described in ledger.cmd_reopen
+Evidence:
+loop_state.authoritative_findings returns identifiers only. _run first checks ledger membership and then only whether state_after(..., set(valid)) is None. A RESOLVED state satisfies both checks. Consider valid cycle 1 raising and accepting a finding, and valid cycle 2 reporting that same ID with Status: REPAIR NOT DEMONSTRATED. The ledger already contains a DEMONSTRATED(2) assertion but no reopen. The raw/structured ID comparison can pass, the recurrence can be captured using the ledger's class, the non-null-state test passes, and the boundary calculation treats the finding as RESOLVED and reports CONVERGED. No check reconciles the negative review result with the claimed demonstration.
+Finding:
+C01-F06 fixes absence of state but leaves contradiction of state unchecked. A valid review explicitly reporting an unresolved defect can still coexist with a clean loop outcome. Ordinary missing transcription of recurrence has the same effect as omitting a new finding, except the existing ledger key disguises it.
+Required correction:
+Preserve recurrence semantics through authoritative_findings and reconcile each valid review result with the lifecycle state at its boundary. Refuse an unresolved recurrence contradicted by a resolution unless a documented subsequent valid transition accounts for it. Do not silently infer that an existing RESOLVED key satisfies the recurrence, and do not require renaming the finding. Add a valid-origin, non-null-RESOLVED negative case beside the existing stateless-origin control.
+
+Finding ID: C02-F04
+Class: CONTRADICTORY IMPLEMENTATION MAPPING
+Requirement ID: MC-2 per-cycle validity; protocol §§2–3 invalid-cycle exclusion; prospective frozen-assignment rule
+Evidence:
+validate_cycle._governing_problems calls run_pins.governing_pin_hashes. Its validated_amendments call checks frozen_assignments(run_dir), which enumerates every target in every review directory, including later cycles that have never passed MC-2. A later cycle-02 target carrying a different governing_pin_hashes value causes check_frozen_assignments to raise while validating an otherwise unchanged cycle-01. The later target need not have a valid target.sha256 or a review output to participate in frozen_assignments. cycle_projection.project subsequently treats cycle-01 as invalid too.
+Finding:
+A damaged or incomplete later target can retroactively invalidate a completed earlier review, remove its events, and reduce the valid-cycle budget. This is not an actual amendment changing the history: the unchanged amendment history can be correct for cycle 01, while cycle 02's record is wrong. The new shared validation path makes that local contradiction contagious across the run. It therefore reintroduces the retroactive invalidation the frozen-evidence design was built to avoid.
+Required correction:
+Keep prospective amendment authorization/consistency checking separate from the per-cycle MC-2 verdict. A contradiction introduced by a later target must not establish that an earlier target was conducted under different pins. Preserve historical assignments using a defined amendment acceptance boundary or other recorded authority, and report later inconsistent targets as such. Test that adding an invalid contradictory target cannot change an unchanged earlier cycle's validity, lifecycle effects, or budget contribution, while a genuinely inconsistent amendment is still refused.
+
+Finding ID: C02-F05
+Class: MISSING REQUIREMENT
+Requirement ID: MC-2 check 9; C01-F03 and B01-F07 mandatory governing-artifact verification
+Evidence:
+validate_cycle.validate executes `if _gph is None and _gp is None: pass` before calling _governing_problems. That branch does not inspect governing_artifacts_preserved. A modern target can therefore declare governing_artifacts_preserved: true, omit both governing_pins and governing_pin_hashes, and carry arbitrary nonempty protocol_sha256/spec_sha256 values. With the target hash and embedded hash consistently generated for that target, existing commit references, and valid plan snapshots, check 9 performs no governing-artifact or governing-history verification. Deleting the governing snapshots then makes no difference. This is the same whole-field-removal shape already recognised by the prompt.
+Finding:
+The presence marker added for C01-F03 does not reliably distinguish modern evidence from historical evidence because the branch deciding whether to check it runs first. Newly composed deficient records obtain the historical exemption. This is a deterministic missing validation rule, not a claim that hashes should prevent coordinated rewriting under CONVENTION_ONLY.
+Required correction:
+Require coherent governing metadata whenever the preserved-artifact marker or an applicable evidence version establishes a modern cycle. Limit legacy handling to an explicit, justified historical classification rather than absence alone. Document that classification in the schema. Add a case retaining governing_artifacts_preserved while omitting both maps, alongside genuine historical baselines that must remain readable.
+
+Finding ID: C02-F06
+Class: CONTRADICTORY IMPLEMENTATION MAPPING
+Requirement ID: Evidence schema cycle-NN grammar; MC-2 cycle identity; C01-F07
+Evidence:
+validate_cycle check 7 matches `cycle-(\d+)`, whereas cycle_projection.cycle_dirs and run_review.next_cycle match exactly two digits. Thus a directory named cycle-1 or cycle-001 with target cycle 1 can pass the new identity comparison and all otherwise applicable MC-2 checks, but project and the controller do not enumerate it. A valid cycle-01 beside a validly checked cycle-002 leaves the latter's findings outside the loop's enumerated evidence. The schema requires zero-padded cycle-NN beginning at 01.
+Finding:
+The repaired numeric comparison still permits a cycle that means “valid cycle 2” to the checker and “not a cycle” to the controller and budget counter. This is the original identity inconsistency in the directory grammar rather than the target's numeric value.
+Required correction:
+Define and share one directory grammar and positive cycle-number rule across MC-2, projection, and freeze numbering. Refuse noncanonical directory names rather than merely converting their digits. Cover cycle-1, cycle-001, and cycle-00, and establish that every accepted cycle directory is discoverable by the consumers that count it.
+
+Finding ID: C02-F07
+Class: CONTRADICTORY IMPLEMENTATION MAPPING
+Requirement ID: Bootstrap/development evidence distinction; protocol MC-1 claim strength; B01-F14 reporting requirement
+Evidence:
+loop_state._run classifies a development run and builds labelled report lines. But its `if not valid` branch prints the literal `LOOP_STATUS: CONTINUE`, and with --quiet prints only that literal. It returns before the later status_line code adds `[DEVELOPMENT EVIDENCE — NOT A PROTOCOL OUTCOME]`. A recognised exempt run with cycle directories but no MC-2-valid cycle reaches this branch using --development --quiet.
+Finding:
+Development evidence again produces an unqualified status on the machine-readable interface. This does not promote a missing bootstrap_review field and does not claim false convergence, but it violates the exact interface property the existing comments say is guaranteed: the label must travel with the status, including --quiet.
+Required correction:
+Use a shared status formatter for every return that emits LOOP_STATUS, including zero-valid-cycle continuation. Verify both quiet and full reports for known development runs with zero valid cycles, and retain refusal for unreadable or ambiguous run metadata.
+
+Finding ID: C02-F08
+Class: CONTRADICTORY IMPLEMENTATION MAPPING
+Requirement ID: Protocol §§2.2, 10.1–10.2; embedded B02-F07 ruling requiring preserved implementation artifacts
+Evidence:
+_hash_of_declared_file falls back to repo_root when a diff or test-result snapshot is missing. Check 13 similarly substitutes the current plan approval record and live approved plan whenever their snapshots are absent. cmd_freeze always snapshots these artifacts, but check 13–15 do not distinguish such a modern target from a pre-snapshot cycle. The target already records approval_record_path and approved_plan_path; their presence does not require their snapshots to exist.
+Finding:
+Deleting preserved implementation evidence can remain a PASS while the live files happen to match, and later ordinary changes to those live files can invalidate the previously completed review. C01-F03 closes this exact absence-versus-age problem for governing artifacts but leaves implementation artifacts on the old fallback path. The claim that a completed cycle is checked against preserved bytes therefore does not hold consistently.
+Required correction:
+Record or derive a trustworthy snapshot requirement for all modern implementation artifacts and refuse missing required copies. Confine compatibility fallback to explicitly identified historical evidence. Add independent deletion cases for the approval record, approved plan, diff, and test results while matching live copies remain, then verify that later live changes cannot alter a complete frozen cycle's verdict.
+
+Finding ID: C02-F09
+Class: MISSING REQUIREMENT
+Requirement ID: Bootstrap review binding described in bootstrap_gate.cmd_record; protocol §2.2 target/input relationship
+Evidence:
+bootstrap_gate.cmd_record compares --target's plan_files with today's covered components through target_drift, and separately requires four nonempty files under bootstrap-review. It never checks that bootstrap-review/codex-input.md contains the supplied target's digest or that the supplied review evidence names that target. evaluate subsequently verifies the separately recorded hashes but still does not establish their relationship. Accordingly, an old review's four unchanged evidence files can accompany a newly frozen target matching today's components, and record APPROVE binds both unrelated sets without detecting the mismatch.
+Finding:
+The bootstrap approval can authorize current bytes using evidence of a different review. Checking that component files match a target and that review files exist is not checking that the review was of that target. This is narrower than proving reviewer authorship or actual reading: the required deterministic target/input binding is missing at the approval entry point.
+Required correction:
+Validate the supplied target against the exact review input and capture package used for the bootstrap decision before recording approval. Reuse the target-hash relationship rather than inventing an authorship guarantee. Preserve and recheck that relationship when using the decision. Add a control with intact old evidence and a different current target, each individually self-consistent, that must be refused.
+
+Finding ID: C02-F10
+Class: MISSING REQUIREMENT
+Requirement ID: First-runner approval and ACTIVE/CANDIDATE chain described in bootstrap_gate.cmd_approve_runner
+Evidence:
+cmd_approve_runner accepts any existing --runner file and any existing --review file. evaluate(REPO) verifies the fixed covered set, but the command never establishes that the arbitrary supplied runner belongs to that reviewed set or that --review reviewed its digest. It records the supplied runner hash alongside component_hashes(REPO). After the first approval, bootstrap_exception_available returns false, but this is used only for the ends_bootstrap_exception field and messaging; the command still does not require a review performed by the prior approved runner.
+Finding:
+The approval API can designate an unreviewed alternative runner on the strength of an approval for different components, and it can record later runner approvals without establishing the required prior-runner chain. A named human and an attributable note are procedural authority, but they do not establish the claimed byte-specific review relationship. The command advertises that relationship as the purpose of its required --review argument and of ending the exemption.
+Required correction:
+Require the runner digest to be an artifact of the referenced, valid review target. For later approvals, bind that review to the prior approved active runner and verify its approval evidence. Refuse an unrelated executable or unrelated review file even when the repository's bootstrap gate currently passes. Keep authorship claims at CONVENTION_ONLY strength.
+
+Finding ID: C02-F11
+Class: CONTRADICTORY IMPLEMENTATION MAPPING
+Requirement ID: Frozen-evidence stability; canonical grammar ownership; Run-Pin and Review-Target Separation invariant quoted in the input
+Evidence:
+findings_format.canonical_id_grammar always reads the live REPO/specs/evidence-schema-v1.0.md. extract is invoked during capture and again by loop_state.authoritative_findings. It receives no cycle-specific schema or grammar parameter. Although findings.json records finding_id_grammar, the reparse does not use or verify a frozen grammar contract. This cycle deliberately makes that same schema a mutable review target. A subsequent schema edit that changes the accepted identifier grammar, or temporarily removes its declaration, changes whether old unchanged captures can be interpreted.
+Finding:
+The supposedly frozen finding interpretation still depends on today's review candidate. Repairing the schema can make previous cycles unreadable to the controller even while their raw output, structured output, and snapshots remain unchanged. One shared parser removes duplicate implementations but does not solve version ownership. The live schema is serving both as a mutable candidate and as the effective governing input for historical parsing.
+Required correction:
+Bind parsing and ledger identifier validation to an explicitly versioned, preserved grammar for the applicable review, with a defined compatibility rule for persistent identifiers. Use the frozen schema/contract when reinterpreting historical captures. Do not simply trust a newly editable grammar string in findings.json without a binding. Test that a legitimate later schema change cannot silently drop or invalidate unchanged historical findings.
+
+Finding ID: C02-F12
+Class: UNTESTED RULE
+Requirement ID: This review's repair-verification requirement; conditional acceptance of B02-F04; deterministic/conformance control evidence
+Evidence:
+The input supplies counts of 33, 127, 87, 43, and 29 controls and prose descriptions of selected cases. It embeds none of those suites, none of their actual fixtures or assertions, no auxiliary-evidence.json contents, and no execution or mutation results. cmd_freeze records suite hashes in an auxiliary manifest but does not snapshot the suites or embed their text; its note explicitly says no MC-2 check verifies the manifest digest. The prompt also states that the 127-control runner suite was sampled rather than exhaustively audited. B02-F04's structural acceptance is expressly conditional on behavioural tests of the atomic primitive.
+Finding:
+The supplied evidence cannot establish that the named controls start from valid fixtures, isolate the intended failure, exercise adjacent paths, or that the atomic primitive's behavioural tests meet the condition attached to acceptance. A count produced by an unavailable tool is not usable control-verification evidence. This is an evidence insufficiency, not an assertion that the absent tests fail or do not exist.
+Required correction:
+Supply frozen relevant test bodies and their exact fixtures/assertions, together with attributable results, as reviewable auxiliary evidence. Include the atomic primitive's behavioural controls and the repair-specific negative/positive baselines. Preserve enough content to reproduce the claimed suite version rather than only its digest. No expansion of the production covered set is inherently necessary; auxiliary evidence can remain separately identified. Until supplied, report control verification as unverified and do not use counts or a sampled audit to claim complete repair demonstration.
+
+Additional requested assessments
+
+SOURCE and REPAIR_STATUS: In the embedded code, cmd_repair_status changes descriptive fields without adding a lifecycle event. Walk reads cycle/event history, and loop-state calculations do not read those descriptive fields. The --status enumeration excludes RESOLVED. This supports non-interference by source inspection. The reported byte-comparison control and refusal control are not present and cannot be evaluated. The requirement for independent verification before closing implementer-found defects remains procedural here: cmd_resolve requires an evidence string, not a verifiable independent-review record. I do not claim this implementation proves independent authorship, which the documented CONVENTION_ONLY model expressly cannot do. Merely changing SOURCE does not change loop arithmetic.
+
+Terminal exit with later cycles: Preserving the first uncleared terminal boundary is consistent with the supplied protocol's mandatory-stop rule and with the embedded B01-F02 ruling. I would not silently replace that boundary's result with later unauthorized evidence. The full controller report does disclose the unauthorized continuation, so the mere difference between the governing boundary's CONVERGED and a later ledger OPEN is not, by itself, a new demonstrated protocol violation. Deferring a new resumption policy to the human authority was reasonable. However, that result must be read as the historical governing-boundary result, not a statement that every later recorded defect is repaired. The quiet interface omits the continuation warning, and a human approval package under §§7/14 must still expose later unresolved findings separately. The referenced policy note and approval-package implementation were not embedded, so their contents and behaviour are unverified. The current tripwire's correctness cannot be established from a description of its existence.
+
+Schema: Its CONVENTION_ONLY qualification avoids the former immutability overclaim. Its explicit statement that MC-2 does not compare findings.json with raw output matches validate_cycle as supplied; loop_state performs a separate reconciliation. That separation should not be mistaken for demonstrated control coverage. The schema also omits the newer preservation/version discriminants needed to make its frozen-evidence promise mechanically precise, as reflected in the findings above.
+
+Disposition of this review
+
+This review makes no claim of convergence. The named exact repairs include several source-level demonstrations, but control verification is unavailable from this input and the new findings remain actionable. Nothing here closes or changes any BOOTSTRAP-001 ledger entry, authorizes another cycle beyond the four-valid-cycle maximum, approves a runner, or establishes an authoritative protocol outcome.

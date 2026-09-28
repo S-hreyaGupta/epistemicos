@@ -1,0 +1,12 @@
+{
+  "attempt": 1,
+  "recorded_at": "2026-09-28T07:33:26Z",
+  "source": "C:\\EpistemicOS\\epistemicos\\runs\\BOOTSTRAP-002\\plan-review\\cycle-02\\raw.txt",
+  "invocation": "manual",
+  "note": "",
+  "sha256": "bf9f5c08f0cd96a59323bc00f4c721a173a37bda197c4eb5d1c1e8f0551dd2e6",
+  "bytes": 31420,
+  "valid": true,
+  "problems": [],
+  "retry_reason": ""
+}

@@ -230,6 +230,7 @@ def main() -> int:
     def _governed(protocol_hash: str | None = None,
                   spec_hash: str | None = None,
                   drop_hashes: bool = False,
+                  drop_pins: bool = False,
                   remove: str | None = None,
                   edit: str | None = None,
                   claim_preserved: bool = False):
@@ -258,7 +259,8 @@ def main() -> int:
                                   "sha256": pins["specs/spec.md"]}]
             write_lf(run_dir / "run.json", json.dumps(run, indent=2) + "\n")
 
-            target["governing_pins"] = sorted(pins)
+            if not drop_pins:
+                target["governing_pins"] = sorted(pins)
             if not drop_hashes:
                 target["governing_pin_hashes"] = pins
             target["protocol_sha256"] = (
@@ -308,6 +310,37 @@ def main() -> int:
                 9, "plan", mutate=_governed(spec_hash="d" * 64))
     expect_fail("governing pins declared with no hashes to check them against",
                 9, "plan", mutate=_governed(drop_hashes=True))
+
+    # ---- C02-F03: the exemption for old evidence, claimed by new evidence ----
+    # Check 9 skipped the governing checker entirely when both fields were
+    # absent, reading absence as evidence older than the fields. Cycle 02:
+    # "a modern target can keep its explicit claim to have preserved governing
+    # artifacts while omitting both governing-set fields. Check 9 then skips all
+    # governing digest, run-history, chain, and artifact checks."
+    #
+    # The negative and the positive have to sit together, because the repair is
+    # a distinction rather than a rule. Refusing both would be easy and would
+    # retroactively invalidate BOOTSTRAP-001's first two cycles, which is the
+    # thing the exemption exists to prevent.
+    expect_fail("both governing fields removed from a target that still claims "
+                "its artifacts were preserved",
+                9, "plan", mutate=_governed(drop_pins=True, drop_hashes=True,
+                                            claim_preserved=True))
+
+    root, commit, tree = fresh()
+    rc, out = run(root, build(root, commit, tree, "plan",
+                              mutate=_governed(drop_pins=True,
+                                               drop_hashes=True)))
+    if rc != 0 or marks(out).get(9) != "PASS":
+        failures.append(
+            f"a cycle carrying no governing fields and no marker of the freeze "
+            f"that introduced them was refused. That is the shape of evidence "
+            f"frozen before B02-F06, and refusing it invalidates completed "
+            f"cycles retroactively, which is what the exemption is for. The "
+            f"control above would then be passing for the wrong "
+            f"reason:\n{out}")
+    else:
+        print("  [ok] check  9 still exempts evidence with nothing to date it")
 
     # The two cycle 04 asked for. Codex: "The named negative controls change one
     # assertion while retaining the other, leaving consistent false assertions

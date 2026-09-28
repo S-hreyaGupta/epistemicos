@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Break each of the 26 September repairs. Does its control notice?
+"""Break each repair in turn. Does its control notice?
 
     python _probe\\mutate_repairs.py
 
@@ -23,8 +23,9 @@ for an unrelated reason establishes nothing about the control named.
 
 `mutate_citation_suite.py` does this for the extractor and has done since
 September; the review layer, which is the more consequential of the two, has
-had no equivalent. This is a start on that rather than the whole of it: eight
-mutations covering eight repairs, not a general mutation probe.
+had no equivalent. This is a start on that rather than the whole of it: one
+mutation per repair as each is made, not a general mutation probe. A repair
+that arrives without a line here has not been shown to be watched.
 
 A crashed suite is refused rather than counted, for the reason
 `vacuity_sweep.py` records at length: a traceback is the one signal a failing
@@ -128,6 +129,15 @@ MUTATIONS = [
      "    if False:",
      "test_run_review.py",
      "protocol"),
+
+    ("C02-F03  the age exemption refused to evidence that is not old",
+     "validate_cycle.py",
+     "    if _gph is None and _gp is None:\n"
+     "        if _modern:",
+     "    if _gph is None and _gp is None:\n"
+     "        if False:",
+     "test_validate_cycle.py",
+     "artifacts were preserved"),
 ]
 
 

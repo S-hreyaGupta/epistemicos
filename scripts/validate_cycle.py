@@ -47,7 +47,30 @@ COMMON_FIELDS = ("review_type", "run_id", "cycle", "protocol_commit",
 IMPL_FIELDS = ("candidate_commit", "candidate_tree_hash", "approved_plan_hash",
                "diff_hash", "test_result_hash")
 
+# C02-F03. Fields only a freeze that writes the governing set produces.
+#
+# Several checks read a missing field as evidence older than that field. That
+# reading is sound only for a record that carries no trace of the freezer which
+# introduced it, and the target now carries one. A record that declares its
+# artifacts preserved was written by a freeze that also writes the governing
+# set, so the absence of the governing set in it is not age. It is an
+# incomplete record, and the historical exemption is not available to it.
+#
+# One list, consulted through one helper, because the same question is asked of
+# the implementation artifacts as well, and a second copy of the rule is how
+# the two drift apart. That is the shape seven of cycle 01's eight findings had.
+MODERN_MARKERS = ("governing_artifacts_preserved",)
+
 NA = "N/A"
+
+
+def modern_markers(target: dict) -> list[str]:
+    """Which markers of a modern freeze this target carries, if any.
+
+    Empty means nothing in the record dates it, which is the only state that
+    may be read as predating a field rather than omitting one.
+    """
+    return [k for k in MODERN_MARKERS if target.get(k) is not None]
 
 
 class Result:
@@ -547,15 +570,31 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
     # without the other is not old evidence, it is an incoherent record, and
     # that still fails.
     #
-    # The weakness, stated rather than left to be found: deleting both fields
-    # from a modern target buys a pass. This check cannot tell that from genuine
-    # age, because nothing in the target says which version of the freezer wrote
-    # it. Closing that needs the gate to know when the field was introduced, or
-    # the target to record its own schema version, and neither exists yet.
+    # That weakness used to be stated here and left open: deleting both fields
+    # from a modern target bought a pass, because nothing in the target said
+    # which version of the freezer wrote it. Cycle 02 found that something now
+    # does. C01-F03's repair added governing_artifacts_preserved, which only a
+    # freeze that also writes the governing set emits, and this branch ran
+    # before anything looked at it. Codex: the comment "explicitly acknowledges
+    # that deleting both fields buys a pass, but this branch does not even
+    # inspect the new preservation flag."
+    #
+    # So the exemption is now conditional on the record carrying no marker of
+    # the freezer that introduced the fields. MODERN_MARKERS says which those
+    # are. This does not close the case of a target with no marker at all; that
+    # needs an explicit evidence-format version, which C02-F03 also asks for and
+    # which is not claimed here. It closes the case the reviewer could build.
     _gph = target.get("governing_pin_hashes")
     _gp = target.get("governing_pins")
+    _modern = modern_markers(target)
     if _gph is None and _gp is None:
-        pass
+        if _modern:
+            problems.append(
+                "target omits both governing_pins and governing_pin_hashes "
+                "while declaring " + ", ".join(_modern) + ", which only a "
+                "freeze that writes the governing set emits. Absence of those "
+                "fields is read as evidence predating them, and this record "
+                "does not predate them")
     elif not isinstance(_gph, dict) or not _gph:
         problems.append(
             "target declares governing_pins but records no "

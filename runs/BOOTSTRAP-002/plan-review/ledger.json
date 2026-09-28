@@ -18,11 +18,18 @@
           "event": "ACCEPT",
           "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-28T08:26:52Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review : the stated six-event reproduction is repaired; replay, last_authorized and skipped_events all call walk. Residue carried as C02-F02. controls unverified, C02-F10",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C01-F02": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -42,11 +49,18 @@
           "event": "ACCEPT",
           "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-28T08:26:53Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review : the ceiling repair is demonstrated in source; a cleared terminal exit at n>=4 sets MAX_4_REACHED and breaks the walk. controls unverified, C02-F10",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C01-F03": {
       "class": "MISSING REQUIREMENT",
@@ -66,11 +80,18 @@
           "event": "ACCEPT",
           "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-28T08:26:53Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review : freezes snapshot the governing artifacts and missing claimed snapshots now fail instead of falling back. Residue carried as C02-F03. controls unverified, C02-F10",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C01-F04": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -90,11 +111,18 @@
           "event": "ACCEPT",
           "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-28T08:26:54Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review : both governing helpers call validated_amendments; the described invalid-prior-set reproduction is repaired on the normal path. controls unverified, C02-F10",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C01-F05": {
       "class": "MISSING REQUIREMENT",
@@ -114,11 +142,18 @@
           "event": "ACCEPT",
           "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-28T08:26:54Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review : run_kind has no default-to-PROTOCOL branch; missing, empty and unrecognised labels are refused. controls unverified, C02-F10",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C01-F06": {
       "class": "MISSING REQUIREMENT",
@@ -138,11 +173,18 @@
           "event": "ACCEPT",
           "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-28T08:26:55Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review : the stated invalid-origin reproduction is repaired; a valid review whose replay yields None triggers CannotCalculate. Residue carried as C02-F04. controls unverified, C02-F10",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C01-F07": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -162,11 +204,18 @@
           "event": "ACCEPT",
           "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-28T08:26:56Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review : target cycle against directory suffix, run_id and review type are all checked. Residue carried as C02-F05. controls unverified, C02-F10",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C01-F08": {
       "class": "MISSING REQUIREMENT",
@@ -186,11 +235,18 @@
           "event": "ACCEPT",
           "note": "accepted and repaired on 26 September; the demonstration is cycle 02's to establish, not this run's to assert",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-28T08:26:56Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review : init hashes the protocol blob at the pinned commit and compares it with the working file before writing run.json. controls unverified, C02-F10",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C02-F01": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",

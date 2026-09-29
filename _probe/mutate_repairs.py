@@ -246,6 +246,31 @@ def main() -> int:
                         newline="")
         try:
             r = run_suite(suite)
+        except subprocess.TimeoutExpired:
+            # Not a catch and not a miss. The suite never finished, so nothing
+            # at all is known about the control this mutation is aimed at, and
+            # saying so is the only honest report.
+            #
+            # Seen on 29 September with a remaining time of minus 2138 seconds,
+            # which is not a hang: a negative remainder means the deadline had
+            # already passed when the wait began, because the machine slept
+            # between starting the suite and waiting on it. Ninety minutes of
+            # sleep and a genuinely wedged suite arrive here identically, and
+            # neither says anything about the repair.
+            #
+            # Before this the exception escaped and killed the run. The restore
+            # still happened, because it is in the finally below, and the tree
+            # was clean afterwards. But the output was a traceback, which is the
+            # one signal a failing control never produces, so reading it as
+            # anything about the repairs would have been the same mistake this
+            # probe refuses everywhere else.
+            print(f"  [COULD NOT RUN] {finding}\n"
+                  f"      {suite} did not finish inside the timeout. Nothing is "
+                  f"established about\n      its control either way. If the "
+                  f"remaining time was negative the machine\n      slept "
+                  f"mid-run rather than the suite hanging. Re-run it.")
+            bad += 1
+            continue
         finally:
             path.write_text(original, encoding="utf-8", newline="")
 

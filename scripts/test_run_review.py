@@ -116,6 +116,19 @@ def approve_bootstrap(tmp: Path) -> subprocess.CompletedProcess:
                        for p, h in mod.covered(tmp).items()],
     }, indent=2) + "\n")
 
+    # C02-F07. The preserved input has to name the target the decision is
+    # about, so the fixture writes the digest into it. Rewritten here rather
+    # than in the loop above because the digest is of the file just frozen.
+    #
+    # This fixture had the same defect as the gate did: four files of
+    # placeholder text, approved without anything tying them to the target.
+    # That is worth noticing rather than patching quietly. A fixture that could
+    # only be built by exploiting the defect is evidence the defect was real.
+    import hashlib
+    write_lf(tmp / "bootstrap-review" / "codex-input.md",
+             "contents of codex-input.md\ntarget "
+             + hashlib.sha256((tmp / rel_target).read_bytes()).hexdigest() + "\n")
+
     return sh(sys.executable, str(tmp / "scripts" / "bootstrap_gate.py"),
               "record", "--decision", "APPROVE", "--decided-by", "Alex Zamurko",
               "--note", "#gap, 9 Sep 2026, Alex Zamurko: fixture approval",

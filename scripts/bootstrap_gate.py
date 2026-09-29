@@ -644,6 +644,40 @@ def cmd_record(a: argparse.Namespace) -> int:
             "  The ruling requires the exact input, the raw Codex output, the "
             "findings and\n  the responses to be preserved alongside the decision.")
 
+    # C02-F07. The block above checks those four files exist and are non-empty,
+    # and stops there. The block before it checks today's components match the
+    # supplied target. Both are true of a pairing that has nothing to do with
+    # itself: stale evidence for target A sitting beside a --target naming B
+    # whose components happen to match the current tree. The decision then
+    # records both, hashes both, and `check` verifies those hashes forever
+    # without either of them ever being about the other.
+    #
+    # Codex, cycle 02: "Checking that component files match a target and that
+    # review files exist is not checking that the review was of that target."
+    #
+    # The binding already exists one layer down. MC-2 check 10 requires a
+    # cycle's codex-input.md to carry its target's digest verbatim, which is how
+    # a reviewer's input is tied to the artifact it describes. The same rule read
+    # the same way closes this, so nothing new is invented. It establishes only
+    # that the input the reviewer was handed names this target; it claims
+    # nothing about authorship, and nothing about whether the reviewer read it.
+    _target = Path(a.target).resolve()
+    _tdigest = sha256_file(_target)
+    _input = (REVIEW_DIR / "codex-input.md").read_text(encoding="utf-8",
+                                                       errors="replace")
+    if _tdigest not in _input:
+        raise Refused(
+            "the review evidence does not name the target being decided "
+            "about.\n"
+            f"  target       {_target}\n"
+            f"  its digest   {_tdigest}\n"
+            f"  bootstrap-review/codex-input.md does not contain that digest.\n"
+            "\n  Four evidence files existing, and today's components matching "
+            "a target, are\n  two separate facts. Neither says the reviewer saw "
+            "this target. Without that\n  link a decision can approve bytes "
+            "reviewed under different evidence, which is\n  B01-F09 arriving "
+            "through the other side of the same command.")
+
     if RECORD.exists():
         prior = json.loads(RECORD.read_text(encoding="utf-8"))
         if not a.supersede:

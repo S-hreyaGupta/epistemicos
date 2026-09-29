@@ -83,6 +83,21 @@ def freeze_target(root: Path) -> Path:
         "plan_files": [{"path": rel, "sha256": digest}
                        for rel, digest in mod.covered(root).items()],
     }, indent=2) + "\n")
+
+    # C02-F07. The target and the input that names it are written together, by
+    # one function, so they cannot drift apart. Several fixtures below re-freeze
+    # after changing the covered set, which gives the target a new digest; when
+    # this lived in the caller the preserved input went on naming the old one,
+    # which is exactly the staleness the repair refuses. Writing them in two
+    # places is how the two disagree, and that is the shape of most of the
+    # findings this suite exists for.
+    #
+    # Guarded, because a fixture built with no evidence at all must stay that
+    # way: creating the input here would satisfy a completeness control that is
+    # supposed to fail.
+    inp = root / "bootstrap-review" / "codex-input.md"
+    if inp.parent.is_dir():
+        write_lf(inp, f"contents of codex-input.md\ntarget {sha256_file(tgt)}\n")
     return tgt
 
 
@@ -180,6 +195,41 @@ def main() -> int:
                         "useless as approving everything")
     else:
         print("  [ok] a complete review records, and check passes")
+
+    # ---- C02-F07: the evidence has to be about the target being decided ----
+    # Codex, cycle 02: "Checking that component files match a target and that
+    # review files exist is not checking that the review was of that target."
+    #
+    # Both halves of this pairing are individually valid, which is the whole
+    # point. The preserved evidence is a complete review naming target A. The
+    # target passed in is B, built from the same covered set so today's
+    # components match it exactly and the drift check is satisfied. Every check
+    # that existed before passes. Nothing but the binding tells them apart.
+    #
+    # The matching positive is the control immediately above: a review whose
+    # input does name its target still records and still passes check. Without
+    # it the repair could be "refuse every decision" and this control would look
+    # just as green.
+    # Its own repo and its own name. `root` is still carrying the approved
+    # fixture the next control needs, and rebinding it here made that control
+    # run against a fresh repo with no prior decision, where recording a second
+    # one is not a violation at all. It passed green for two runs before the
+    # suite caught it.
+    root7 = build(); made.append(root7)
+    write_lf(root7 / "runs" / "B-002" / "plan-review" / "cycle-01" / "target.json",
+             json.dumps({
+                 "review_type": "plan", "run_id": "B-002", "cycle": 1,
+                 "plan_files": json.loads(
+                     (root7 / TARGET).read_text(encoding="utf-8"))["plan_files"],
+             }, indent=2) + "\n")
+    expect_refused("a decision about a target the preserved review never names",
+                   "does not name the target",
+                   gate(root7, "record", "--decision", "APPROVE",
+                        "--decided-by", "Alex Zamurko",
+                        "--note", "#gap, 9 Sep 2026, Alex Zamurko: approved "
+                                  "after review",
+                        "--target",
+                        "runs/B-002/plan-review/cycle-01/target.json"))
 
     # ---- one-time by design ----
     expect_refused("record a second decision without --supersede",

@@ -148,6 +148,13 @@ MUTATIONS = [
      "test_ledger.py",
      "a recurrence reported against a RESOLVED ledger entry"),
 
+    ("C02-F07  the gate's evidence must name the target it decides about",
+     "bootstrap_gate.py",
+     "    if _tdigest not in _input:",
+     "    if False:",
+     "test_bootstrap_gate.py",
+     "never names"),
+
     # Not repairs. The §6 exit order, which Alex Zamurko asked on 28 September
     # to be tested at cycle 4 specifically, because every other exit was only
     # ever exercised where the ceiling was not competing with it. Disabling

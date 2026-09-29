@@ -800,6 +800,39 @@ def _run(a) -> int:
 
     lines += ["", f"LOOP_STATUS: {status}", detail]
 
+    # Alex Zamurko, 28 September 2026, item 6: "Record the stop-time ledger
+    # state separately from the terminal reason ... This prevents later ledger
+    # changes from obscuring the state that existed when termination occurred."
+    #
+    # Two states, named apart. The first is the §6 sets at the boundary that
+    # governed, which is what the status above means. The second is the ledger
+    # replayed over every valid cycle, which is where the findings stand now.
+    # Both are correct and they answer different questions, and until this block
+    # existed nothing in the output said which one a reader was looking at. That
+    # ambiguity is the terminal-exit question: a loop that stopped at n=2 keeps
+    # reporting n=2's sets however far the ledger has moved since.
+    #
+    # Reported rather than written to a file. Persisting a computed state would
+    # create a second authority able to disagree with the ledger it came from,
+    # and which of the two wins is a ruling nobody has made.
+    latest = sets_at(ledger, set(valid))
+    lines += ["", f"ledger at the stop boundary, n={n}",
+              f"  OPEN      {len(cur[OPEN]):>2}  {fmt(cur[OPEN])}",
+              f"  DISPUTED  {len(cur[DISPUTED]):>2}  {fmt(cur[DISPUTED])}",
+              f"  RESOLVED  {len(cur[RESOLVED]):>2}  {fmt(cur[RESOLVED])}"]
+    if any(latest[k] != cur[k] for k in (OPEN, RESOLVED, DISPUTED)):
+        lines += ["", "ledger now, replayed over every valid cycle",
+                  f"  OPEN      {len(latest[OPEN]):>2}  {fmt(latest[OPEN])}",
+                  f"  DISPUTED  {len(latest[DISPUTED]):>2}  {fmt(latest[DISPUTED])}",
+                  f"  RESOLVED  {len(latest[RESOLVED]):>2}  {fmt(latest[RESOLVED])}",
+                  "  This differs from the boundary above. The status reports "
+                  "the boundary, because",
+                  "  that is where the loop stopped. Neither set is wrong. They "
+                  "answer different",
+                  "  questions, and the difference is the thing worth seeing "
+                  "rather than the thing to",
+                  "  resolve by picking one."]
+
     # The cycles that should never have been opened. Reported rather than
     # silently absorbed, because the evidence in them was produced under a loop
     # that had already terminated and no one authorized restarting it.
@@ -836,6 +869,18 @@ def _run(a) -> int:
                    else f"LOOP_STATUS: {status}  [DEVELOPMENT EVIDENCE — "
                         "NOT A PROTOCOL OUTCOME]")
     if a.quiet:
+        # The stop state is deliberately NOT here, and the reason is worth
+        # keeping. It was here for one run, carrying four extra lines, and
+        # test_interfaces refused: --quiet "prints that line and nothing else",
+        # which is how the development label is proven to survive the machine
+        # interface. Adding lines would have relaxed a control to fit a change,
+        # which is the move this whole review exists to catch.
+        #
+        # So the stop state lives in the full report, which satisfies item 6 of
+        # Alex Zamurko's 28 September list: it asks for the state to be recorded
+        # apart from the terminal reason, not for it to travel on this
+        # interface. Putting it here as well is a change to the quiet contract
+        # and needs asking for rather than assuming.
         print(status_line)
     else:
         lines[lines.index(f"LOOP_STATUS: {status}")] = status_line

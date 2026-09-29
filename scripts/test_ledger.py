@@ -1453,6 +1453,16 @@ def main() -> int:
     scenario("open and disputed together at the ceiling is MAX_4, per the ruling",
              4, four_open_and_disputed, "MAX_4_REACHED")
 
+    # The second half of that ruling: "Record the outstanding dispute separately
+    # so the need for adjudication remains visible." The status alone cannot
+    # carry it, because MAX_4_REACHED says budget exhausted and says nothing
+    # about a human being owed a decision. Asserting the exit name would leave
+    # that requirement untested while looking covered.
+    scenario_out("and the dispute it swallowed stays visible in the stop state",
+                 4, four_open_and_disputed,
+                 "C01-F04", "Disputes for adjudication",
+                 "ledger at the stop boundary")
+
     # And the literal form of the third boundary test, recorded as a control
     # rather than argued in a message. The ledger below is unchanged between
     # cycle 3 and cycle 4: nothing reduced, nothing resolved, nothing disputed.

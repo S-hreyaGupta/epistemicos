@@ -259,6 +259,13 @@
           "note": "the cycle-02 prompt tells the reviewer to number new findings C01-Fnn, which check_id refuses at cycle 2",
           "source": "CODEX_REVIEW",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-29T15:40:59Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "accepted; the next prompt numbers new findings from its own cycle",
+          "state": "OPEN"
         }
       ],
       "requirement_id": "protocol 4, V40; canonical identifier preservation",
@@ -275,6 +282,13 @@
           "event": "RAISED",
           "note": "Walk lacks the acceptance, demonstration and reopening ordering guards the ledger commands apply, so replay accepts histories the commands reject",
           "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-29T15:41:00Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "accepted; the chronological guards move into the shared evaluator",
           "state": "OPEN"
         }
       ],
@@ -293,6 +307,13 @@
           "note": "a target omitting both governing fields skips the governing checker entirely, even while claiming governing_artifacts_preserved",
           "source": "CODEX_REVIEW",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-29T15:41:00Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "accepted and repaired; the age exemption is refused to evidence carrying a modern marker",
+          "state": "OPEN"
         }
       ],
       "requirement_id": "MC-2 check 9; B01-F07; C01-F03, C01-F04",
@@ -309,6 +330,13 @@
           "event": "RAISED",
           "note": "a recurrence reported as REPAIR NOT DEMONSTRATED can coexist with a RESOLVED state and still report CONVERGED",
           "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-29T15:41:01Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "accepted and repaired; a recurrence against a RESOLVED entry is refused rather than computed",
           "state": "OPEN"
         }
       ],
@@ -327,6 +355,13 @@
           "note": "check 7 accepts cycle-1 and cycle-001 while projection accepts only two digits, so an accepted cycle can be invisible to the controller",
           "source": "CODEX_REVIEW",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-29T15:41:01Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "accepted; one canonical cycle-directory grammar across checker, projection and numbering",
+          "state": "OPEN"
         }
       ],
       "requirement_id": "MC-2 check 7 and 6; C01-F07",
@@ -343,6 +378,13 @@
           "event": "RAISED",
           "note": "an interruption between writing a capture and designating it lets a later attempt take the first valid capture's place",
           "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-29T15:41:02Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "accepted; capture designation gets a durable pending state and recovers the first valid attempt",
           "state": "OPEN"
         }
       ],
@@ -361,6 +403,13 @@
           "note": "the bootstrap gate never checks that the supplied review evidence concerns the supplied target",
           "source": "CODEX_REVIEW",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-29T15:41:02Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "accepted and repaired; the gate requires its evidence to name the target it decides about",
+          "state": "OPEN"
         }
       ],
       "requirement_id": "protocol 2.2; MC-2 target binding; B01-F09",
@@ -377,6 +426,13 @@
           "event": "RAISED",
           "note": "the runner can freeze a real candidate commit while embedding an unrelated diff; nothing binds reviewed content to the candidate",
           "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-29T15:41:03Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "accepted; the reviewed diff is derived from the candidate commit rather than supplied beside it",
           "state": "OPEN"
         }
       ],
@@ -395,6 +451,13 @@
           "note": "missing implementation snapshots fall back to live files, so deleting preserved evidence can still pass",
           "source": "CODEX_REVIEW",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-29T15:41:03Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "accepted; missing implementation snapshots are refused rather than filled from live files",
+          "state": "OPEN"
         }
       ],
       "requirement_id": "MC-2 checks 13-15; preserved implementation evidence ruling; B02-F07",
@@ -412,6 +475,13 @@
           "note": "the control suites are not in the review packet, only a count, so no claimed control-based demonstration can be verified",
           "source": "CODEX_REVIEW",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-09-29T15:41:04Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "accepted; the next packet carries the tests behind each claim, mapped to what they protect",
+          "state": "OPEN"
         }
       ],
       "requirement_id": "V04; repair-demonstration requirements; B02-F04 conditional ruling",
@@ -428,6 +498,13 @@
           "event": "RAISED",
           "note": "the zero-valid-cycle early return prints a bare LOOP_STATUS, dropping the development label under --quiet",
           "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-09-29T15:41:04Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "accepted; every emitted status goes through one classification-aware formatter",
           "state": "OPEN"
         }
       ],

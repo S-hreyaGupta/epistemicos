@@ -22,6 +22,26 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+
+# C02-F01. Prompts whose finding-ID grammar is wrong, frozen, and recorded as a
+# finding. The value is the finding, and it is checked against the ledger rather
+# than believed, so this map cannot quietly grow into a list of things we have
+# stopped checking.
+FROZEN_GRAMMAR_DEFECT = {
+    "bootstrap-review-002-cycle-02.md": "C02-F01",
+}
+
+
+def _recorded(fid: str) -> bool:
+    """Is `fid` in the ledger, rather than merely claimed above?"""
+    import json
+    lp = REPO / "runs" / "BOOTSTRAP-002" / "plan-review" / "ledger.json"
+    if not lp.is_file():
+        return False
+    try:
+        return fid in json.loads(lp.read_text(encoding="utf-8")).get("findings", {})
+    except json.JSONDecodeError:
+        return False
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 # One rule for which prompts belong to finished cycles, shared with the tool
 # that refreshes them. A second copy here would be free to disagree, and the two
@@ -427,7 +447,40 @@ def main() -> int:
             # A prompt may legitimately show an earlier identifier when telling
             # the reviewer how to report an unrepaired finding against its
             # persistent id, so this only fails on a LATER or absent one.
-            if expected not in grammars:
+            # C02-F01. bootstrap-review-002-cycle-02.md tells the reviewer to
+            # number new findings C01-Fnn while it is cycle 2's prompt, so the
+            # ledger's check_id would refuse them. The reviewer spotted it,
+            # used C02-Fnn anyway, and raised the conflict rather than renaming
+            # anything.
+            #
+            # The prompt is frozen. It was the input to a recorded review and
+            # its digest is in that cycle's target, so correcting it now would
+            # rewrite evidence. Codex asked for the correction to be recorded
+            # and the prompt preserved as historical evidence, which is what
+            # specs/review/PROMPT-NUMBERS-FINDINGS-BY-CYCLE.md does.
+            #
+            # So this is an exemption, and an exemption is one word away from an
+            # excuse. What keeps them apart here: it is bound to the finding,
+            # not to the filename. It holds only while that finding is actually
+            # in the ledger, checked by reading the ledger rather than by
+            # asserting it. Remove the finding and this control goes red again.
+            # The exemption is only worth anything if it is really bound to the
+            # ledger, and a `_recorded` that returned True would look exactly
+            # like this one from the outside. So: both directions, once.
+            if not _recorded("C02-F01"):
+                failures.append(
+                    "the recorded finding C02-F01 is not in the ledger, so the "
+                    "frozen-prompt exemption below is resting on nothing")
+            elif _recorded("C99-F99"):
+                failures.append(
+                    "an identifier that is in no ledger was reported as "
+                    "recorded, so the exemption would hold for any finding "
+                    "anyone typed into the map above")
+            _defect = FROZEN_GRAMMAR_DEFECT.get(b.name)
+            if expected not in grammars and _defect and _recorded(_defect):
+                ok(f"{b.name} is frozen and its grammar defect is recorded as "
+                   f"{_defect}, so it is evidence rather than a fault")
+            elif expected not in grammars:
                 failures.append(
                     f"{b.name} never shows the {expected}-Fnn identifier its "
                     "cycle requires, so findings raised from it would be refused "

@@ -60,8 +60,14 @@ SCRIPTS = REPO / "scripts"
 MUTATIONS = [
     ("C01-F01  the reopening guard in the shared evaluator",
      "cycle_projection.py",
-     "if self.reopened_at is not None and c < self.reopened_at:",
-     "if False:",
+     # Disambiguated when C02-F02 gave REJECT_WITH_REASON the same guard, at
+     # which point this anchor matched two branches and the probe refused rather
+     # than mutating an arbitrary one. The comment line below it belongs to the
+     # ACCEPT branch alone.
+     "            if self.reopened_at is not None and c < self.reopened_at:\n"
+     "                # Insertion order says when a thing was written down.",
+     "            if False:\n"
+     "                # Insertion order says when a thing was written down.",
      "test_ledger.py",
      # "backdated" appears in the [ok] text and in comments, not in any
      # FAILURE message, so the first version of this needle reported WRONG
@@ -154,6 +160,13 @@ MUTATIONS = [
      "    if False:",
      "test_bootstrap_gate.py",
      "never names"),
+
+    ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
+     "test_prompts.py",
+     "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",
+     "        return True",
+     "test_prompts.py",
+     "in no ledger was reported as recorded"),
 
     # C02-F02 is three rules, so three mutations. One would leave the other two
     # unwatched while the line reported them as covered.
@@ -280,7 +293,7 @@ def main() -> int:
                         newline="")
         try:
             r = run_suite(suite)
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as _exc:
             # Not a catch and not a miss. The suite never finished, so nothing
             # at all is known about the control this mutation is aimed at, and
             # saying so is the only honest report.
@@ -298,11 +311,18 @@ def main() -> int:
             # one signal a failing control never produces, so reading it as
             # anything about the repairs would have been the same mistake this
             # probe refuses everywhere else.
+            # Say which of the two it was rather than leaving the reader to
+            # guess. A negative remainder is a deadline that passed while
+            # nothing was executing, which only happens if the machine slept.
+            _t = getattr(_exc, "timeout", None)
+            _why = ("the machine slept mid-run: the deadline passed while "
+                    "nothing was executing"
+                    if isinstance(_t, (int, float)) and _t < 0
+                    else "the suite genuinely ran past the limit")
             print(f"  [COULD NOT RUN] {finding}\n"
-                  f"      {suite} did not finish inside the timeout. Nothing is "
-                  f"established about\n      its control either way. If the "
-                  f"remaining time was negative the machine\n      slept "
-                  f"mid-run rather than the suite hanging. Re-run it.")
+                  f"      {suite} did not finish. Nothing is established about "
+                  f"its control\n      either way. Remaining time {_t}, so "
+                  f"{_why}. Re-run it.")
             bad += 1
             continue
         finally:

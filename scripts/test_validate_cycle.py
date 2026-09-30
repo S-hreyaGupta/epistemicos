@@ -537,6 +537,32 @@ def main() -> int:
                 "where the two numbers govern differently",
                 7, "plan", mutate=_mismatch_across_amendment, also=(9,))
 
+    # C02-F05. cycle-1 is not cycle-01, and the two readers disagreed about it.
+    # Check 7 matched cycle-(\d+) and the controller's cycle_dirs matched
+    # cycle-(\d{2}), so these names were an accepted cycle to conformance and
+    # not a cycle at all to the projection that counts them toward the budget.
+    # A cycle's findings would sit outside the loop's arithmetic while its
+    # target passed every check.
+    #
+    # The matching positive is `clean plan cycle passes` below: a correctly
+    # named directory still validates, so this is one grammar being enforced
+    # rather than directories being refused.
+    for _bad in ("cycle-1", "cycle-001", "cycle-00"):
+        _root, _commit, _tree = fresh()
+        _cyc = build(_root, _commit, _tree, "plan")
+        _renamed = _cyc.parent / _bad
+        _cyc.rename(_renamed)
+        _rc, _out = run(_root, _renamed)
+        if _rc == 0:
+            failures.append(
+                f"a directory named {_bad} passed MC-2. The controller does "
+                f"not enumerate it, so its findings would sit outside the loop "
+                f"while its target passed conformance.")
+        elif marks(_out).get(7) != "FAIL":
+            failures.append(f"{_bad} was refused, but not by check 7\n{_out}")
+        else:
+            print(f"  [ok] check  7 fails on: a directory named {_bad}")
+
     # And the historical case, which must NOT fail. Cycles 01 and 02 of
     # BOOTSTRAP-001 were frozen before governing_pin_hashes existed. Failing
     # them now would invalidate two completed cycles and strip authority from

@@ -161,6 +161,15 @@ MUTATIONS = [
      "test_bootstrap_gate.py",
      "never names"),
 
+    ("C02-F05  one cycle-directory grammar, not two that disagree",
+     "run_pins.py",
+     "    n = int(m.group(1))\n"
+     "    return n if n >= 1 else None",
+     "    n = int(m.group(1))\n"
+     "    return n",
+     "test_validate_cycle.py",
+     "cycle-00 passed MC-2"),
+
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
      "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",

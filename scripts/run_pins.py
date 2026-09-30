@@ -59,6 +59,35 @@ class PinError(Exception):
     """The pin history cannot be read, or does not describe a coherent chain."""
 
 
+# C02-F05. One cycle-directory grammar, read by everyone who needs it.
+#
+# The schema declares zero-padded cycle-NN beginning at 01. MC-2 check 7 read it
+# as cycle-(\d+) and the controller's cycle_dirs() as cycle-(\d{2}), so a
+# directory named cycle-1 or cycle-001 satisfied the checker as cycle 1 and was
+# invisible to every consumer that counts cycles. An accepted cycle the budget
+# cannot see is worse than a refused one: its findings sit outside the loop's
+# arithmetic while its target passes conformance.
+#
+# It lives in this module because both readers already depend on it and neither
+# can depend on the other. The checker cannot import the controller, since the
+# controller runs the checker.
+CYCLE_DIR = re.compile(r"cycle-(\d{2})\Z")
+
+
+def cycle_dir_number(name: str) -> int | None:
+    """The cycle a directory name represents, or None if it names none.
+
+    Zero is not a cycle. The schema begins at 01, so cycle-00 would otherwise
+    parse as a number no consumer will ever produce or look for, which is the
+    same defect in a different costume.
+    """
+    m = CYCLE_DIR.fullmatch(name)
+    if m is None:
+        return None
+    n = int(m.group(1))
+    return n if n >= 1 else None
+
+
 def spec_digest(entries: list[dict]) -> str:
     """One digest over a set of pinned artifacts.
 

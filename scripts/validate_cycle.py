@@ -482,13 +482,17 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
         # while being validated against cycle 2's governing pins. Across a pin
         # amendment those are different documents, and nothing said so.
         mismatch = []
-        _m = re.match(r"cycle-(\d+)\Z", cycle_dir.name)
-        if _m is None:
+        # C02-F05. This read the name as cycle-(\d+) while the controller read
+        # it as cycle-(\d{2}), so cycle-1 satisfied check 7 as cycle 1 and was
+        # not a cycle at all to anything that counts them. One grammar now,
+        # in run_pins, because this module cannot import the one that runs it.
+        _n = run_pins.cycle_dir_number(cycle_dir.name)
+        if _n is None:
             mismatch.append(f"directory {cycle_dir.name!r} is not cycle-NN, so "
                             f"the cycle it represents cannot be established")
-        elif int(_m.group(1)) != target.get("cycle"):
+        elif _n != target.get("cycle"):
             mismatch.append(
-                f"directory says cycle {int(_m.group(1))}, target says "
+                f"directory says cycle {_n}, target says "
                 f"{target.get('cycle')!r}. Event projection takes the "
                 f"directory's number and\n          pin selection takes the "
                 f"target's, so this cycle would be two different\n          "

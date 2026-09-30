@@ -48,6 +48,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import run_pins  # noqa: E402
+
 REPO = Path(__file__).resolve().parent.parent
 VALIDATOR = REPO / "scripts" / "validate_cycle.py"
 
@@ -64,11 +68,15 @@ MAX_VALID_CYCLES = 4
 
 
 def cycle_dirs(review: Path) -> list[tuple[int, Path]]:
+    # C02-F05. The grammar is run_pins', not a second copy written here. This
+    # one and MC-2 check 7 disagreed, and the checker was the looser of the two,
+    # so a directory could be an accepted cycle to conformance and not a cycle
+    # at all to the budget that counts them.
     out = []
     for d in sorted(review.iterdir()) if review.is_dir() else []:
-        m = re.fullmatch(r"cycle-(\d{2})", d.name)
-        if m and d.is_dir():
-            out.append((int(m.group(1)), d))
+        n = run_pins.cycle_dir_number(d.name)
+        if n is not None and d.is_dir():
+            out.append((n, d))
     return sorted(out)
 
 

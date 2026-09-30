@@ -245,7 +245,8 @@ class Walk:
     all three by construction, which is the property that was missing.
     """
 
-    __slots__ = ("state", "accepted", "reopened_at", "live", "skipped")
+    __slots__ = ("state", "accepted", "reopened_at", "accepted_at",
+                 "demonstrated_at", "live", "skipped")
 
     def __init__(self) -> None:
         self.state: str | None = None
@@ -253,6 +254,13 @@ class Walk:
         # The cycle of the most recent reopening still in force. An ACCEPT
         # dated before it answers the repair that reopening already spent.
         self.reopened_at: int | None = None
+        # C02-F02. The cycles of the acceptance and the demonstration in force.
+        # §5 resolves a finding once the repair is demonstrated in the NEXT
+        # review target, and a recurrence is observed later than the resolution
+        # it undoes. Both rules existed, in the write commands, and not here, so
+        # replay honoured histories the commands would have refused to write.
+        self.accepted_at: int | None = None
+        self.demonstrated_at: int | None = None
         # The most recent event of each kind whose effect STILL obtains,
         # rather than the most recent one that was applied at the time.
         self.live: dict[str, dict] = {}
@@ -272,6 +280,7 @@ class Walk:
         """
         if ev == "RAISED":
             self.state, self.accepted, self.reopened_at = OPEN, False, None
+            self.accepted_at = self.demonstrated_at = None
             # A finding starting over carries nothing forward.
             self.live.clear()
             return True, None
@@ -286,11 +295,19 @@ class Walk:
                 # the first repair, which the reopening spent.
                 return False, (f"dated before the cycle {self.reopened_at:02d} "
                                f"reopening it would have to answer")
-            self.accepted = True
+            self.accepted, self.accepted_at = True, c
             return True, None
         if ev == "REJECT_WITH_REASON":
             if self.state != OPEN:
                 return False, self._not_open()
+            # C02-F02. The same guard ACCEPT has, for the same reason. A
+            # disposition answers the transition it follows, and §5 gives a
+            # finding two of them, so a rejection dated before the reopening
+            # answers the repair that reopening undid just as an acceptance
+            # would. cmd_respond refused both; only one was refused here.
+            if self.reopened_at is not None and c < self.reopened_at:
+                return False, (f"dated before the cycle {self.reopened_at:02d} "
+                               f"reopening it would have to answer")
             self.state = DISPUTED
             return True, None
         if ev == "DEMONSTRATED":
@@ -298,13 +315,28 @@ class Walk:
                 return False, self._not_open()
             if not self.accepted:
                 return False, "no ACCEPT in force"
-            self.state = RESOLVED
+            # C02-F02. §5: RESOLVED "once the repair is demonstrated in the next
+            # review target", so the demonstration belongs to a later cycle than
+            # the acceptance. cmd_resolve refused a same-cycle demonstration and
+            # replay accepted one, which is a resolution the protocol would
+            # never have allowed to be written being honoured once it exists.
+            if self.accepted_at is not None and c <= self.accepted_at:
+                return False, (f"accepted in cycle {self.accepted_at:02d}; §5 "
+                               f"demonstrates the repair in a LATER cycle")
+            self.state, self.demonstrated_at = RESOLVED, c
             return True, None
         if ev == "REOPENED":
             if self.state != RESOLVED:
                 return False, (f"finding was {self.state or 'unraised'}, "
                                f"not RESOLVED")
+            # C02-F02. A recurrence is observed in a later cycle than the
+            # resolution it undoes. cmd_reopen refused otherwise; replay did not.
+            if self.demonstrated_at is not None and c <= self.demonstrated_at:
+                return False, (f"resolved in cycle {self.demonstrated_at:02d}; "
+                               f"a recurrence is observed LATER than the "
+                               f"resolution it undoes")
             self.state, self.accepted, self.reopened_at = OPEN, False, c
+            self.accepted_at = self.demonstrated_at = None
             # The acceptance and the demonstration it produced are both spent.
             # Their events remain in the history and in `show`; they are simply
             # no longer the prerequisite for anything.
@@ -312,6 +344,22 @@ class Walk:
             self.live.pop("DEMONSTRATED", None)
             return True, None
         raise UnknownEvent(f"no transition defined for event {ev!r}")
+
+
+def would_apply(f: dict, proj: Projection, event: str,
+                cycle: int) -> tuple[bool, str | None]:
+    """Is `event` at `cycle` available from this finding's history?
+
+    C02-F02. The write commands ask this instead of testing the ordering rules
+    themselves. Each of them used to carry its own copy while the evaluator
+    carried none, so a history the commands would have refused to write was
+    honoured once it existed by any other route. Asking here means admission and
+    replay cannot disagree, because there is only one answer to give.
+
+    The command still writes the refusal, because it knows what the operator was
+    trying to do and this does not. What it no longer does is decide.
+    """
+    return walk(f.get("history", []), proj).apply(event, cycle)
 
 
 def walk(history: list[dict], proj: Projection,

@@ -946,12 +946,112 @@ def main() -> int:
             "an acceptance dated before the reopening was recorded. It answers "
             "the repair the reopening undid, and it re-arms the finding for a "
             "second repair nobody agreed to.")
-    elif "reopened in cycle" not in _bblob:
+    # C02-F02 moved this rule into the evaluator, so the refusal now carries the
+    # evaluator's sentence rather than the command's. The needle follows the
+    # wording, not the other way round: it is tightened rather than loosened,
+    # because the surrounding framing text also says "reopening" and a needle
+    # that broad would match a refusal for any reason at all.
+    elif "dated before the cycle 03 reopening" not in _bblob:
         failures.append(f"the backdated acceptance was refused, but not for "
                         f"predating the reopening\n      {_bblob[:200]}")
     else:
         print("  [ok] refused: an acceptance dated before the reopening it "
               "answers")
+
+    # ---- C02-F02: replay must refuse what the commands refuse to write ----
+    # The three ordering rules lived in the write commands and not in the
+    # evaluator, so a history containing one of these orderings was refused at
+    # admission and honoured at replay. Any route other than the commands put
+    # one there: a hand edit, a merge, an older tool, a restored backup.
+    #
+    # Which is why these fixtures are forged rather than built. Building them
+    # through the commands is the thing that is now impossible, and a control
+    # that can only construct legal histories cannot show this at all.
+    #
+    # Each is observed through what the NEXT command permits, because that path
+    # recomputes the state from the history. Asserting on the stored state field
+    # would be asserting on a value the forgery never touched, which is a
+    # control that cannot come back false.
+    def _forge(*events):
+        """A three-cycle run whose finding carries a hand-written history."""
+        root, commit = make_repo()
+        made.append(root)
+        rev = root / "runs" / "T-001" / "plan-review"
+        for i in (1, 2, 3):
+            make_cycle(root, rev, i, commit)
+        ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--class", "UNTESTED RULE",
+               "--source", "CODEX_REVIEW")
+        lp = rev / "ledger.json"
+        data = json.loads(lp.read_text(encoding="utf-8"))
+        for ev, c in events:
+            data["findings"]["C01-F01"]["history"].append(
+                {"cycle": c, "event": ev, "state": "OPEN",
+                 "at": "2026-09-30T00:00:00Z", "note": "forged"})
+        write_lf(lp, json.dumps(data, indent=2) + "\n")
+        return root, rev
+
+    def _permits(root, rev, *args):
+        return ledger(root, *args, "--review", str(rev), "--id", "C01-F01")
+
+    # 1. A demonstration in the acceptance's own cycle. cmd_resolve refuses it;
+    #    replay used to resolve on it. If it had applied the finding would be
+    #    RESOLVED and a reopen would be available.
+    _r, _v = _forge(("ACCEPT", 2), ("DEMONSTRATED", 2))
+    _out = _permits(_r, _v, "reopen", "--cycle", "3", "--evidence", "x")
+    if _out.returncode == 0:
+        failures.append(
+            "a same-cycle demonstration resolved the finding on replay. §5 "
+            "demonstrates the repair in the NEXT review target, and the write "
+            "command refuses exactly this, so replay honoured a resolution the "
+            "protocol would never have allowed to be recorded.")
+    elif "not RESOLVED" not in (_out.stderr + _out.stdout):
+        failures.append(f"refused, but not for the finding not being "
+                        f"RESOLVED\n{(_out.stderr + _out.stdout)[:300]}")
+    else:
+        print("  [ok] replay refuses a demonstration in the acceptance's own "
+              "cycle")
+
+    # The pair. One cycle later is legal, so the refusal above is about the
+    # ordering rather than about forged histories being rejected wholesale.
+    _r, _v = _forge(("ACCEPT", 1), ("DEMONSTRATED", 2))
+    _out = _permits(_r, _v, "reopen", "--cycle", "3", "--evidence", "x")
+    if _out.returncode != 0:
+        failures.append(
+            f"a demonstration one cycle after its acceptance did not resolve "
+            f"the finding, so the control above proves nothing\n"
+            f"{(_out.stderr + _out.stdout)[:300]}")
+    else:
+        print("  [ok] and honours one a cycle later, so that is the rule")
+
+    # 2. A reopening not later than the resolution it undoes. If it had applied
+    #    the finding would be OPEN and a disposition would be available.
+    _r, _v = _forge(("ACCEPT", 1), ("DEMONSTRATED", 2), ("REOPENED", 2))
+    _out = _permits(_r, _v, "respond", "--cycle", "3",
+                    "--disposition", "ACCEPT", "--note", "x")
+    if _out.returncode == 0:
+        failures.append(
+            "a reopening dated to the same cycle as the resolution it undoes "
+            "took effect on replay. A recurrence is observed later than the "
+            "resolution, and cmd_reopen refuses this.")
+    else:
+        print("  [ok] replay refuses a reopening not later than its resolution")
+
+    # 3. A rejection dated before the reopening it would have to answer. ACCEPT
+    #    had this guard and REJECT_WITH_REASON did not, though §5 gives a
+    #    finding both dispositions. If it had applied the finding would be
+    #    DISPUTED and no disposition would be available.
+    _r, _v = _forge(("ACCEPT", 1), ("DEMONSTRATED", 2), ("REOPENED", 3),
+                    ("REJECT_WITH_REASON", 2))
+    _out = _permits(_r, _v, "respond", "--cycle", "3",
+                    "--disposition", "ACCEPT", "--note", "x")
+    if _out.returncode != 0:
+        failures.append(
+            f"a rejection dated before the reopening took effect on replay, "
+            f"leaving the finding DISPUTED. ACCEPT carried this guard and "
+            f"REJECT_WITH_REASON did not.\n{(_out.stderr + _out.stdout)[:300]}")
+    else:
+        print("  [ok] replay refuses a rejection dated before its reopening")
 
     # The other half, and the one that tests replay rather than the command.
     # Refusing to WRITE a backdated acceptance does nothing about a history that

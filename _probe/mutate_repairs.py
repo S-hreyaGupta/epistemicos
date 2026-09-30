@@ -155,6 +155,33 @@ MUTATIONS = [
      "test_bootstrap_gate.py",
      "never names"),
 
+    # C02-F02 is three rules, so three mutations. One would leave the other two
+    # unwatched while the line reported them as covered.
+    ("C02-F02a  a demonstration belongs to a later cycle than its acceptance",
+     "cycle_projection.py",
+     "            if self.accepted_at is not None and c <= self.accepted_at:",
+     "            if False:",
+     "test_ledger.py",
+     "same-cycle demonstration resolved"),
+
+    ("C02-F02b  a recurrence is observed later than the resolution it undoes",
+     "cycle_projection.py",
+     "            if self.demonstrated_at is not None and c <= self.demonstrated_at:",
+     "            if False:",
+     "test_ledger.py",
+     "same cycle as the resolution it undoes"),
+
+    ("C02-F02c  a rejection carries the same reopening guard as an acceptance",
+     "cycle_projection.py",
+     "            if self.reopened_at is not None and c < self.reopened_at:\n"
+     "                return False, (f\"dated before the cycle "
+     "{self.reopened_at:02d} \"",
+     "            if False:\n"
+     "                return False, (f\"dated before the cycle "
+     "{self.reopened_at:02d} \"",
+     "test_ledger.py",
+     "dated before the reopening took effect"),
+
     ("C02-F11  the label reaches the zero-valid-cycle return as well",
      "loop_state.py",
      "        print(\"\\n\".join(lines) if not a.quiet else labelled(\"CONTINUE\"))",

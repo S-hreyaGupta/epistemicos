@@ -458,15 +458,20 @@ def cmd_respond(a: argparse.Namespace) -> int:
     # move as reusing the spent acceptance directly, with a later write date on
     # it. Refused here so it is never recorded; the replay refuses to honour it
     # too, for histories that already contain one.
-    _re = authorized(f, "REOPENED", proj)
-    if _re is not None and a.cycle < _re["cycle"]:
+    # C02-F02. Asked of the evaluator, and asked for the disposition actually
+    # being recorded rather than for ACCEPT alone. Walk guarded ACCEPT and not
+    # REJECT_WITH_REASON, so a backdated rejection was refused here and honoured
+    # in replay. Both are dispositions and §5 gives a finding two of them.
+    _ok, _why = cycle_projection.would_apply(f, proj, a.disposition, a.cycle)
+    if not _ok:
         raise Refused(
-            f"{a.id} was reopened in cycle {_re['cycle']:02d} and this "
-            f"disposition is dated cycle {a.cycle:02d}.\n"
+            f"{a.id} cannot take a {a.disposition} in cycle {a.cycle:02d}: "
+            f"{_why}.\n"
             "  A reopening spends the acceptance before it, and asks whoever "
-            "accepts the new\n  repair to say so. A response dated earlier "
+            "answers the new\n  repair to say so. A response dated earlier "
             "answers the repair that was undone.\n"
-            "  Record it against the reopening cycle or a later one.")
+            "  Record it against the reopening cycle or a later one."
+            + note_ignored(f, proj))
 
     if a.disposition == "ACCEPT":
         # State deliberately unchanged. See the module docstring.
@@ -539,12 +544,13 @@ def cmd_reopen(a: argparse.Namespace) -> int:
             "finding is\n  present again, and the record has to say what shows "
             "it rather than leaving\n  the claim bare.")
 
-    last = authorized(f, "DEMONSTRATED", proj)
-    if last and a.cycle <= last["cycle"]:
+    # C02-F02, as in cmd_resolve: the rule lives in the evaluator now.
+    _ok, _why = cycle_projection.would_apply(f, proj, "REOPENED", a.cycle)
+    if not _ok:
         raise Refused(
-            f"{a.id} was resolved in cycle {last['cycle']:02d} and cannot "
-            f"recur in cycle {a.cycle:02d}.\n  A recurrence is observed in a "
-            "later cycle than the resolution it undoes.")
+            f"{a.id} cannot recur in cycle {a.cycle:02d}: {_why}.\n"
+            "  A recurrence is observed in a later cycle than the resolution "
+            "it undoes." + note_ignored(f, proj))
 
     f["history"].append({"cycle": a.cycle, "event": "REOPENED", "state": OPEN,
                          "at": now(), "note": a.evidence,
@@ -577,11 +583,19 @@ def cmd_resolve(a: argparse.Namespace) -> int:
                       "that was accepted and then repaired; a finding cannot become "
                       "resolved without first having been accepted."
                       + note_ignored(f, proj))
-    if a.cycle <= acc["cycle"]:
-        raise Refused(f"{a.id} was accepted in cycle {acc['cycle']:02d} and cannot be "
-                      f"resolved in cycle {a.cycle:02d}. §5 requires the repair to be "
-                      "demonstrated in the NEXT review target, so resolution belongs "
-                      "to a later cycle than the acceptance.")
+    # C02-F02. The ordering rule is the evaluator's, asked rather than repeated.
+    # This command used to test `a.cycle <= acc["cycle"]` itself, and replay had
+    # no such rule, so the same-cycle demonstration this refuses to write was
+    # honoured by state reconstruction for any history that already contained
+    # one. The message stays here, because the command knows what was attempted.
+    _ok, _why = cycle_projection.would_apply(f, proj, "DEMONSTRATED", a.cycle)
+    if not _ok:
+        raise Refused(f"{a.id} cannot be resolved in cycle {a.cycle:02d}: "
+                      f"{_why}.\n"
+                      "  §5 requires the repair to be demonstrated in the NEXT "
+                      "review target, so\n  resolution belongs to a later cycle "
+                      "than the acceptance."
+                      + note_ignored(f, proj))
     if not (a.evidence or "").strip():
         raise Refused("--evidence is required. The protocol resolves a finding when "
                       "the repair is demonstrated; recording what demonstrates it is "

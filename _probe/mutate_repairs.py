@@ -155,6 +155,13 @@ MUTATIONS = [
      "test_bootstrap_gate.py",
      "never names"),
 
+    ("C02-F11  the label reaches the zero-valid-cycle return as well",
+     "loop_state.py",
+     "        print(\"\\n\".join(lines) if not a.quiet else labelled(\"CONTINUE\"))",
+     "        print(\"\\n\".join(lines) if not a.quiet else \"LOOP_STATUS: CONTINUE\")",
+     "test_ledger.py",
+     "unlabelled status through --quiet"),
+
     # Not repairs. The §6 exit order, which Alex Zamurko asked on 28 September
     # to be tested at cycle 4 specifically, because every other exit was only
     # ever exercised where the ceiling was not competing with it. Disabling

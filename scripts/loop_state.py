@@ -495,11 +495,31 @@ def _run(a) -> int:
                          "events are ignored")
     lines += ["", f"VALID_CYCLE_COUNT: {len(valid)}"]
 
+    def labelled(status: str) -> str:
+        """Every LOOP_STATUS this controller emits, carrying its run's kind.
+
+        C02-F11. There are two places a status leaves here, and only one of them
+        knew about the label. The other is the early return just below, for a
+        run whose cycles all fail MC-2, and under --quiet it printed a bare
+        LOOP_STATUS: CONTINUE. So a recognised development run could hand a
+        caller an unqualified outcome through the machine interface, which is
+        the exact property the label exists to hold.
+        #
+        The comment further down said the label had to survive the interface
+        rather than merely appear in the report, and it was right about the path
+        it guarded. It guarded one path. A rule in two places with one copy
+        shorter than the other is the shape most of this run's findings have
+        had, so this is one function and both callers go through it.
+        """
+        return (f"LOOP_STATUS: {status}" if kind != "DEVELOPMENT"
+                else f"LOOP_STATUS: {status}  [DEVELOPMENT EVIDENCE — "
+                     "NOT A PROTOCOL OUTCOME]")
+
     if not valid:
-        lines += ["", "LOOP_STATUS: CONTINUE",
+        lines += ["", labelled("CONTINUE"),
                   "No valid cycle has been completed, so §6 has nothing to measure. "
                   "Repair the evidence and rerun."]
-        print("\n".join(lines) if not a.quiet else "LOOP_STATUS: CONTINUE")
+        print("\n".join(lines) if not a.quiet else labelled("CONTINUE"))
         return 0
 
     # Every valid cycle must carry an authoritative findings record, and the
@@ -798,7 +818,7 @@ def _run(a) -> int:
         detail = (f"Repair the plan, produce a new version, and open cycle "
                   f"{dirs[-1][0] + 1:02d} with a new frozen target.")
 
-    lines += ["", f"LOOP_STATUS: {status}", detail]
+    lines += ["", labelled(status), detail]
 
     # Alex Zamurko, 28 September 2026, item 6: "Record the stop-time ledger
     # state separately from the terminal reason ... This prevents later ledger
@@ -865,9 +885,6 @@ def _run(a) -> int:
     # get a bare CONVERGED off development evidence with nothing to mark it.
     # That is the finding restated: the distinction has to survive the
     # interface, not just appear in the report.
-    status_line = (f"LOOP_STATUS: {status}" if kind != "DEVELOPMENT"
-                   else f"LOOP_STATUS: {status}  [DEVELOPMENT EVIDENCE — "
-                        "NOT A PROTOCOL OUTCOME]")
     if a.quiet:
         # The stop state is deliberately NOT here, and the reason is worth
         # keeping. It was here for one run, carrying four extra lines, and
@@ -881,9 +898,12 @@ def _run(a) -> int:
         # apart from the terminal reason, not for it to travel on this
         # interface. Putting it here as well is a change to the quiet contract
         # and needs asking for rather than assuming.
-        print(status_line)
+        print(labelled(status))
     else:
-        lines[lines.index(f"LOOP_STATUS: {status}")] = status_line
+        # `lines` already carries the labelled status, built by the same
+        # function. It used to be inserted bare and patched back here by index,
+        # which is what let the early return above emit an unlabelled one: the
+        # patch only ever reached this path.
         print("\n".join(lines))
     return 0
 

@@ -1816,6 +1816,40 @@ def main() -> int:
     else:
         print("  [ok] a development run is refused for being development "
               "evidence, not for want of a label")
+
+    # C02-F11. Two places emit a status and only one carried the label. The
+    # other is the early return taken when a run has cycle directories but none
+    # passes MC-2, and under --quiet it printed a bare LOOP_STATUS: CONTINUE.
+    # A caller parsing the machine interface would get an unqualified outcome
+    # off development evidence, which is the single thing the label exists for.
+    #
+    # Quiet specifically. The full report carries a preamble saying what the run
+    # is, so the defect is invisible there, and the control above passes on a
+    # run that has one valid cycle and never reaches this branch.
+    _r11, _c11 = make_repo()
+    made.append(_r11)
+    _v11 = _r11 / "runs" / "T-001" / "plan-review"
+    make_cycle(_r11, _v11, 1, _c11, valid=False)
+    _rp11 = _r11 / "runs" / "T-001" / "run.json"
+    _d11 = json.loads(_rp11.read_text(encoding="utf-8"))
+    _d11["bootstrap_review"] = "EXEMPT - NOT_A_PROTOCOL_CYCLE"
+    write_lf(_rp11, json.dumps(_d11, indent=2) + "\n")
+    _out11 = sh(sys.executable, str(_r11 / "scripts" / "loop_state.py"),
+                "--review", str(_v11), "--development", "--quiet", cwd=_r11)
+    if _out11.returncode != 0:
+        failures.append(
+            "the zero-valid-cycle development run was refused rather than "
+            f"computed, so the label cannot be checked\n"
+            f"{_out11.stderr}{_out11.stdout}")
+    elif "LOOP_STATUS" not in _out11.stdout:
+        failures.append(f"no status emitted at all\n{_out11.stdout!r}")
+    elif "DEVELOPMENT EVIDENCE" not in _out11.stdout:
+        failures.append(
+            "a development run with no valid cycle emitted an unlabelled "
+            "status through --quiet. A caller parsing that gets a bare outcome "
+            f"off development evidence.\n{_out11.stdout!r}")
+    else:
+        print("  [ok] the label survives the zero-valid-cycle early return too")
     # The status alone cannot show this: the loop stalls again at n=3, so it
     # reports STALLED either way. What distinguishes the two is whether the n=2
     # exit was cleared at all.

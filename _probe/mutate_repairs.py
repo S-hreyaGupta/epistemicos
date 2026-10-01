@@ -161,14 +161,20 @@ MUTATIONS = [
      "test_bootstrap_gate.py",
      "never names"),
 
+    # The first version of this mutation removed the `n >= 1` guard and was
+    # reported MISSED, correctly. cycle-00 parses as 0 either way and check 7
+    # refuses it for mismatching a target that says cycle 1, so that control
+    # passes whether the guard is there or not: it exercises the mismatch path,
+    # not the rule. The rule this finding is about is the digit count, which is
+    # what the checker and the controller disagreed on, so that is what gets
+    # removed here. Putting it back to (\d+) makes cycle-1 and cycle-001 parse
+    # as cycle 1 again and satisfy check 7, which is the defect exactly.
     ("C02-F05  one cycle-directory grammar, not two that disagree",
      "run_pins.py",
-     "    n = int(m.group(1))\n"
-     "    return n if n >= 1 else None",
-     "    n = int(m.group(1))\n"
-     "    return n",
+     "CYCLE_DIR = re.compile(r\"cycle-(\\d{2})\\Z\")",
+     "CYCLE_DIR = re.compile(r\"cycle-(\\d+)\\Z\")",
      "test_validate_cycle.py",
-     "cycle-00 passed MC-2"),
+     "cycle-1 passed MC-2"),
 
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
@@ -280,7 +286,16 @@ def main() -> int:
     bad = 0
     for finding, fname, old, new, suite, needle in MUTATIONS:
         path = SCRIPTS / fname
-        original = path.read_text(encoding="utf-8")
+        # newline="" on the READ as well, not only on the writes below. Without
+        # it Python translates CRLF to LF on the way in, so `original` is not
+        # the file's bytes and restoring it rewrites every line ending in the
+        # file. That is how run_pins.py came back [LEFT MODIFIED] on
+        # 30 September after a restore that had put the source back correctly:
+        # the probe reported a real difference it had introduced itself.
+        # `Path.read_text` only grew a newline argument in 3.13, while
+        # `write_text` has had one since 3.10, so the read is spelled out.
+        with path.open("r", encoding="utf-8", newline="") as _f:
+            original = _f.read()
         found = original.count(old)
         if found != 1:
             hint = ""

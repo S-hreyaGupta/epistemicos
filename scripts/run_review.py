@@ -919,6 +919,10 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     }
 
     artifacts: list[tuple[dict, str]] = []
+    # C02-F08. Artifacts the runner produces rather than copies. The snapshot
+    # loop below reads every other artifact back out of the repository, which it
+    # cannot do for a diff that was derived and has never been a file there.
+    derived: dict[str, bytes] = {}
 
     if args.type == "plan":
         if not args.file:
@@ -997,17 +1001,106 @@ def cmd_freeze(args: argparse.Namespace) -> int:
             raise Refused("--approved-plan-hash must be a lowercase 64-char hex digest")
         target["approved_plan_hash"] = args.approved_plan_hash
 
-        for path_key, hash_key, arg, label in (
-                ("diff_path", "diff_hash", args.diff, "diff"),
-                ("test_result_path", "test_result_hash", args.test_results,
-                 "test results")):
-            if not arg:
-                raise Refused(f"implementation review requires --{label.replace(' ', '-')}")
-            ref = hashed_ref(require_file(Path(arg).resolve(), label))
-            target[path_key] = ref["path"]
-            target[hash_key] = ref["sha256"]
-            artifacts.append((ref, (REPO / ref["path"]).read_text(encoding="utf-8",
-                                                                 errors="replace")))
+        # ---- C02-F08: the diff is derived from the candidate, not supplied ----
+        # The reviewer is told these artifacts are the implementation's
+        # contents. Before this, nothing made that true: --diff named any file
+        # at all, and checks 11, 12 and 14 verified the commit resolves, the
+        # tree agrees, and the diff hashes to its own record. Three correct
+        # statements about two unrelated things.
+        #
+        # So the runner stops accepting a diff and produces one, from the
+        # resolved candidate and a comparison base it also resolves. There is
+        # then no supplied artifact to disagree with the commit, which is a
+        # smaller claim than checking agreement and a stronger one.
+        #
+        # --diff is refused rather than ignored. Silently dropping an argument
+        # someone passed would leave them believing the file they named was the
+        # one reviewed, which is the belief this finding is about.
+        if getattr(args, "diff", None):
+            raise Refused(
+                "--diff is no longer accepted for an implementation review.\n"
+                "  The reviewed diff is derived from --base and "
+                "--candidate-commit, so that what\n  the reviewer reads is the "
+                "change between two immutable objects rather than a\n  file "
+                "supplied beside them (C02-F08). Pass --base instead, and "
+                "--diff-path to\n  narrow the selection.")
+        if not args.base:
+            raise Refused(
+                "implementation review requires --base.\n"
+                "  A diff is a statement about two commits. Without the one it "
+                "is measured from,\n  the reviewed change has no definition and "
+                "the reviewer cannot be bound to it.")
+
+        rb = subprocess.run(
+            ["git", "-C", str(REPO), "rev-parse", "--verify",
+             f"{args.base}^{{commit}}"], capture_output=True, text=True)
+        if rb.returncode != 0:
+            raise Refused(f"--base does not resolve to a commit: {args.base}")
+        base_resolved = rb.stdout.strip()
+        if not re.fullmatch(r"[0-9a-f]{40}", base_resolved):
+            raise Refused(
+                f"--base resolved to {base_resolved!r}, which is not a full "
+                "commit SHA.")
+        if base_resolved == resolved:
+            raise Refused(
+                "--base and --candidate-commit resolve to the same commit, so "
+                "there is no change\n  to review. An empty diff is not an "
+                "implementation.")
+
+        target["base_commit"] = base_resolved
+        if args.base != base_resolved:
+            target["base_commit_supplied"] = args.base
+
+        # Sorted and de-duplicated so the same selection always produces the
+        # same argument list, and so the recorded selection is comparable with
+        # the one the gate rebuilds.
+        diff_paths = sorted({p for p in (args.diff_path or []) if p})
+        target["diff_paths"] = diff_paths
+
+        def _git_text(argv: list[str], what: str) -> str:
+            rr = subprocess.run(["git", "-C", str(REPO), *argv],
+                                capture_output=True, text=True)
+            if rr.returncode != 0:
+                raise Refused(f"deriving the {what} failed:\n  "
+                              f"{rr.stderr.strip()}")
+            return rr.stdout
+
+        raw = _git_text(run_pins.diff_raw_argv(base_resolved, resolved,
+                                               diff_paths), "change set")
+        if not raw.strip():
+            raise Refused(
+                f"no change between {base_resolved[:12]} and {resolved[:12]}"
+                + (f" under {', '.join(diff_paths)}" if diff_paths else "") +
+                ".\n  There is nothing to review, and a cycle frozen over an "
+                "empty change would pass\n  every check while reviewing "
+                "nothing.")
+        # The binding. The gate re-derives this from the two commits in the
+        # target and refuses a cycle whose recorded change set is not the one
+        # those objects produce.
+        target["diff_raw_sha256"] = sha256_bytes(raw.encode("utf-8"))
+
+        patch = _git_text(run_pins.diff_patch_argv(base_resolved, resolved,
+                                                   diff_paths), "diff")
+        patch_bytes = patch.encode("utf-8")
+        # Named as a cycle artifact rather than a repo path, because it is not
+        # one: it has never been a file in the working tree and a reader must
+        # not be invited to look for it there. The preserved copy under
+        # artifacts/ is the only copy, which is what B02-F07 asked for anyway.
+        target["diff_path"] = "candidate.diff"
+        target["diff_hash"] = sha256_bytes(patch_bytes)
+        target["diff_origin"] = "derived"
+        derived["candidate.diff"] = patch_bytes
+        artifacts.append(({"path": "candidate.diff",
+                           "sha256": target["diff_hash"]}, patch))
+
+        if not args.test_results:
+            raise Refused("implementation review requires --test-results")
+        _tr = hashed_ref(require_file(Path(args.test_results).resolve(),
+                                      "test results"))
+        target["test_result_path"] = _tr["path"]
+        target["test_result_hash"] = _tr["sha256"]
+        artifacts.append((_tr, (REPO / _tr["path"]).read_text(
+            encoding="utf-8", errors="replace")))
 
         # B02-F07. The approved plan and the record approving it are part of the
         # implementation evidence set and were not preserved, so check 13 read
@@ -1086,7 +1179,12 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     for ref, body in artifacts:
         dest = snapshot / ref["path"]
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes((REPO / ref["path"]).read_bytes())
+        # C02-F08. A derived artifact has no source in the working tree to copy
+        # from, and the hash check below is what makes writing it here the same
+        # kind of act as copying one: the bytes preserved are the bytes the
+        # target records, whichever way they arrived.
+        dest.write_bytes(derived[ref["path"]] if ref["path"] in derived
+                         else (REPO / ref["path"]).read_bytes())
         if sha256_file(dest) != ref["sha256"]:
             raise Refused(f"snapshot of {ref['path']} does not match the hash "
                           "recorded for it; refusing to freeze a cycle whose "
@@ -1875,7 +1973,16 @@ def build_parser() -> argparse.ArgumentParser:
     # §10.1 fields. candidate_tree_hash is derived from the commit, not passed.
     f.add_argument("--candidate-commit", dest="candidate_commit")
     f.add_argument("--approved-plan-hash", dest="approved_plan_hash")
-    f.add_argument("--diff")
+    # C02-F08. Kept so that passing it is refused with an explanation rather
+    # than failing as an unknown argument, which would read as a typo.
+    f.add_argument("--diff", help=argparse.SUPPRESS)
+    f.add_argument("--base",
+                   help="the commit the candidate is measured against. The "
+                        "reviewed diff is derived from --base to "
+                        "--candidate-commit, never supplied.")
+    f.add_argument("--diff-path", dest="diff_path", action="append",
+                   help="limit the derived diff to this path. Repeatable. The "
+                        "selection is recorded in the target.")
     f.add_argument("--test-results", dest="test_results")
     f.set_defaults(fn=cmd_freeze)
 

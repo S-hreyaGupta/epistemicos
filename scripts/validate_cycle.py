@@ -121,6 +121,23 @@ def git(repo_root: Path, *args: str) -> tuple[int, str]:
         return 127, ""
 
 
+def git_unstripped(repo_root: Path, args: list[str]) -> tuple[int, str]:
+    """As git() but without stripping, for output that is going to be hashed.
+
+    git() strips, which is right for reading a SHA back and wrong for anything
+    whose digest is being compared: the freeze hashed what git printed, and a
+    checker that hashes a trimmed copy of the same output disagrees with it on
+    every cycle. Separate function rather than a flag, so neither caller can
+    reach the wrong behaviour by forgetting one.
+    """
+    try:
+        r = subprocess.run(["git", "-C", str(repo_root), *args],
+                           capture_output=True, text=True)
+        return r.returncode, r.stdout
+    except FileNotFoundError:
+        return 127, ""
+
+
 def git_commit_exists(repo_root: Path, commit: str) -> bool:
     return git(repo_root, "cat-file", "-e", f"{commit}^{{commit}}")[0] == 0
 
@@ -748,6 +765,78 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
     # 14-15. diff and test results
     ok14, d14 = _hash_of_declared_file(target, "diff_hash", "diff_path",
                                        repo_root, cycle_dir)
+
+    # C02-F08. The hash above establishes that the preserved diff is the one the
+    # target recorded. It says nothing about whether that diff describes the
+    # candidate commit two checks earlier, and nothing did: "the runner can
+    # freeze a real candidate commit B while embedding a diff from A or an
+    # arbitrary nonempty diff. The validator can accept the commit/tree pair and
+    # the unrelated diff independently."
+    #
+    # So the change set is re-derived here from the two commits the target
+    # names, using the shared builder in run_pins, and compared with the digest
+    # recorded at freeze. Built from the target's fields rather than from an
+    # argument list stored in it: a target is evidence, and evidence must never
+    # become a command this process runs.
+    #
+    # Folded into check 14 rather than added as check 16. The protocol's check
+    # list is Alex Zamurko's to extend; what belongs to the check named "diff
+    # hash matches the reviewed diff" is the question of which diff was reviewed.
+    if ok14:
+        _b = target.get("base_commit")
+        _recorded = target.get("diff_raw_sha256")
+        _p14: list[str] = []
+        if _b or _recorded:
+            _c = target.get("candidate_commit")
+            # Forty hex characters, not sixty four. HEX64 is for digests, and
+            # reaching for it here refused every valid base on the first run.
+            if not (isinstance(_b, str)
+                    and re.fullmatch(r"[0-9a-f]{40}", _b)):
+                _p14.append(f"base_commit is {_b!r}, not a full commit SHA")
+            if not _recorded or not HEX64.match(str(_recorded)):
+                _p14.append("diff_raw_sha256 is absent or malformed, so the "
+                            "recorded change set\n          cannot be compared "
+                            "with the one these commits produce")
+            _paths = target.get("diff_paths", [])
+            if not isinstance(_paths, list) or not all(isinstance(p, str)
+                                                       for p in _paths):
+                _p14.append("diff_paths is not a list of paths, so the "
+                            "selection under review is undefined")
+            if not _p14:
+                _rc, _raw = git_unstripped(
+                    repo_root, run_pins.diff_raw_argv(str(_b), str(_c),
+                                                      list(_paths)))
+                if _rc != 0:
+                    _p14.append(
+                        f"the change set between {str(_b)[:12]} and "
+                        f"{str(_c)[:12]} cannot be derived here, so\n          "
+                        "the reviewed diff cannot be shown to describe this "
+                        "candidate")
+                else:
+                    _actual = hashlib.sha256(_raw.encode("utf-8")).hexdigest()
+                    if _actual != str(_recorded):
+                        _p14.append(
+                            f"the reviewed diff is not the change between the "
+                            f"commits this target names\n          recorded "
+                            f"{_recorded}\n          derived  {_actual}\n"
+                            f"          base {_b}\n          candidate {_c}")
+        elif modern_markers(target):
+            # The C02-F03 distinction, in the place the same mistake would
+            # otherwise arrive next. A target carrying a marker of a later
+            # freeze cannot also be claiming to predate the derivation it omits.
+            _p14.append(
+                "target omits base_commit and diff_raw_sha256 while carrying "
+                f"{', '.join(modern_markers(target))}.\n          A cycle "
+                "frozen recently enough to preserve its governing artifacts "
+                "was frozen\n          with a derived diff, so absence here is "
+                "not age; it is a diff bound to\n          nothing")
+        if _p14:
+            ok14, d14 = False, "\n          ".join(_p14)
+        elif _b:
+            d14 = (f"{d14}; derived from {str(_b)[:12]}..{str(_c)[:12]}"
+                   if d14 else
+                   f"the change between {str(_b)[:12]} and {str(_c)[:12]}")
+
     r.add(14, "diff hash matches the reviewed diff", ok14, d14)
     ok15, d15 = _hash_of_declared_file(target, "test_result_hash", "test_result_path",
                                        repo_root, cycle_dir)

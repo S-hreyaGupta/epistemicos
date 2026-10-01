@@ -49,6 +49,10 @@ def write_lf(p: Path, text: str) -> None:
         f.write(text)
 
 
+def sha256_file(p: Path) -> str:
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
 def make_repo() -> Path:
     tmp = Path(tempfile.mkdtemp(prefix="runner-")).resolve()
     (tmp / "scripts").mkdir()
@@ -167,6 +171,22 @@ def impl_approval(tmp: Path, run_id: str = "T-001") -> str:
                          "decided_by": "Alex Zamurko",
                          "decided_at": "2026-09-12T00:00:00Z"}, indent=2) + "\n")
     return digest
+
+
+def impl_base(tmp: Path, body: str = "def f():\n    return 1\n") -> str:
+    """Commit a change and return the commit before it.
+
+    C02-F08. An implementation freeze now derives the reviewed diff from a base
+    and a candidate, so a fixture needs two commits with something between them.
+    Until this finding, every implementation fixture here froze a real commit
+    beside a four-line diff of a file named x, and passed. That they could only
+    be built that way is what the finding says, so they are rebuilt rather than
+    adjusted: each one now reviews the change it claims to review.
+    """
+    write_lf(tmp / "src.py", body)
+    sh("git", "add", "-A", cwd=tmp)
+    sh("git", "commit", "-qm", "candidate work", cwd=tmp)
+    return sh("git", "rev-parse", "HEAD~1", cwd=tmp).stdout.strip()
 
 
 def do_freeze(tmp: Path, *extra: str) -> subprocess.CompletedProcess:
@@ -891,13 +911,13 @@ def main() -> int:
     # Implementation review: the §10.1 fields have to reach the reviewer.
     t4c = make_repo(); made.append(t4c)
     do_init(t4c)
-    write_lf(t4c / "diff.txt", "diff --git a/x b/x\n")
+    base4 = impl_base(t4c)
     write_lf(t4c / "results.txt", "3 passed\n")
     head4 = sh("git", "rev-parse", "HEAD", cwd=t4c).stdout.strip()
     plan4 = impl_approval(t4c)
     r = runner(t4c, "freeze", "--run", "T-001", "--type", "implementation",
                "--prompt", "specs/prompt.md", "--candidate-commit", head4,
-               "--approved-plan-hash", plan4, "--diff", "diff.txt",
+               "--approved-plan-hash", plan4, "--base", base4,
                "--test-results", "results.txt")
     if r.returncode != 0:
         failures.append(f"implementation freeze failed\n{r.stdout}{r.stderr}")
@@ -917,6 +937,96 @@ def main() -> int:
             print("  [ok] an implementation review input carries the §10.1 "
                   "target identity")
 
+    # ---- C02-F08: the reviewed diff is the candidate's own change ----
+    # "The runner can freeze a real candidate commit B while embedding a diff
+    # from A or an arbitrary nonempty diff. The validator can accept the
+    # commit/tree pair and the unrelated diff independently. The reviewer is
+    # told that the artifacts are the implementation's contents, but the
+    # supplied code establishes no such relationship."
+    print()
+    print("C02-F08  the reviewed diff derived from the candidate")
+
+    _t4 = t4c / "runs/T-001/implementation-review/cycle-01"
+    if (_t4 / "target.json").is_file():
+        _tg = json.loads((_t4 / "target.json").read_text(encoding="utf-8"))
+        _patch = (_t4 / "artifacts" / "candidate.diff")
+        if _tg.get("base_commit") != base4:
+            failures.append(f"the target does not record the base the diff was "
+                            f"measured from: {_tg.get('base_commit')!r}")
+        elif not _tg.get("diff_raw_sha256"):
+            failures.append("the target records no change-set digest, so the "
+                            "diff is bound to the commits by nothing")
+        elif not _patch.is_file():
+            failures.append("the derived diff was not preserved in the cycle")
+        elif "src.py" not in _patch.read_text(encoding="utf-8"):
+            failures.append(
+                "the preserved diff does not describe the candidate's own "
+                "change; it is some other file's")
+        elif sha256_file(_patch) != _tg.get("diff_hash"):
+            failures.append("the preserved diff does not match its record")
+        else:
+            print("  [ok] the diff is derived from the candidate, preserved, "
+                  "and bound by a change-set digest")
+
+    # Codex asked for exactly this fixture: "two valid candidate commits and
+    # swap only the diff/content between them; it must fail rather than passing
+    # because each independent hash is well formed."
+    #
+    # Done from the other side, which is the same swap and easier to build
+    # honestly: the cycle keeps its diff and is repointed at a second, equally
+    # valid candidate. Checks 11 and 12 pass, because that commit resolves and
+    # its tree agrees. Check 14's hash passes, because the preserved diff is
+    # untouched and still matches its record. Every independent hash is well
+    # formed, which was the whole complaint, and the cycle must still fail.
+    _th4 = (_t4 / "target.sha256").read_text(encoding="utf-8").strip()
+    write_lf(t4c / "reply4.md",
+             f"TARGET_SHA256 {_th4}\n\nNo findings in any category.\n")
+    _rec = runner(t4c, "record", "--cycle", str(_t4), "--output", "reply4.md",
+                  "--invocation", "manual", "--zero-findings")
+    if _rec.returncode != 0:
+        failures.append(f"the C02-F08 fixture could not be recorded:\n"
+                        f"{_rec.stdout}{_rec.stderr}")
+    else:
+        def _mc2(where: Path) -> subprocess.CompletedProcess:
+            return sh(sys.executable, str(t4c / "scripts" / "validate_cycle.py"),
+                      str(where), cwd=t4c)
+
+        _clean = _mc2(_t4)
+        if _clean.returncode != 0:
+            failures.append(
+                f"the fixture does not pass MC-2 before the swap, so a failure "
+                f"after it would say nothing:\n{_clean.stdout}{_clean.stderr}")
+        else:
+            print("  [ok] a derived-diff implementation cycle passes MC-2")
+
+            write_lf(t4c / "src.py", "def f():\n    return 2\n")
+            sh("git", "add", "-A", cwd=t4c)
+            sh("git", "commit", "-qm", "a second, equally valid candidate",
+               cwd=t4c)
+            _other = sh("git", "rev-parse", "HEAD", cwd=t4c).stdout.strip()
+            _otree = sh("git", "rev-parse", f"{_other}^{{tree}}",
+                        cwd=t4c).stdout.strip()
+            _tg = json.loads((_t4 / "target.json").read_text(encoding="utf-8"))
+            _tg["candidate_commit"] = _other
+            _tg["candidate_tree_hash"] = _otree
+            write_lf(_t4 / "target.json", json.dumps(_tg, indent=2))
+            write_lf(_t4 / "target.sha256",
+                     sha256_file(_t4 / "target.json") + "\n")
+
+            _sw = _mc2(_t4)
+            _out = _sw.stdout + _sw.stderr
+            if _sw.returncode == 0:
+                failures.append(
+                    "a cycle pinning one candidate and carrying another's diff "
+                    "passed MC-2. Every hash in it is well formed, which is "
+                    "why hashing them separately was never a binding.")
+            elif "not the change between the commits" not in _out:
+                failures.append(f"refused, but not for the unrelated diff\n"
+                                f"{_out}")
+            else:
+                print("  [ok] refused: the diff is not the change between the "
+                      "commits this target names")
+
     # ---- B01-F05: a mutable reference is resolved before it is recorded ----
     # Alex Zamurko, 10 September: "resolve any mutable reference such as HEAD to
     # an immutable commit SHA at freeze time and verify the corresponding tree
@@ -928,13 +1038,13 @@ def main() -> int:
 
     t5 = make_repo(); made.append(t5)
     do_init(t5)
-    write_lf(t5 / "diff.txt", "diff --git a/x b/x\n")
+    base5 = impl_base(t5)
     write_lf(t5 / "results.txt", "ok\n")
     head = sh("git", "rev-parse", "HEAD", cwd=t5).stdout.strip()
     plan5 = impl_approval(t5)
     r = runner(t5, "freeze", "--run", "T-001", "--type", "implementation",
                "--prompt", "specs/prompt.md", "--candidate-commit", "HEAD",
-               "--approved-plan-hash", plan5, "--diff", "diff.txt",
+               "--approved-plan-hash", plan5, "--base", base5,
                "--test-results", "results.txt")
     if r.returncode != 0:
         failures.append(f"freezing with HEAD was refused outright; the decision "
@@ -979,20 +1089,32 @@ def main() -> int:
             print("  [ok] the frozen target still names the commit that was "
                   "reviewed after HEAD moves on")
 
-    def impl_no_diff(t: Path):
+    def impl_no_base(t: Path):
         do_init(t)
         return runner(t, "freeze", "--run", "T-001", "--type", "implementation",
                       "--prompt", "specs/prompt.md", "--candidate-commit", "HEAD",
                       "--approved-plan-hash", GOOD_HASH)
-    expect_refused("implementation review with no diff", "requires --diff",
-                   impl_no_diff)
+    expect_refused("implementation review with no comparison base",
+                   "requires --base", impl_no_base)
 
-    def impl_no_test_results(t: Path):
+    # C02-F08. A supplied diff is refused rather than ignored, so nobody is left
+    # believing the file they named was the one reviewed.
+    def impl_supplied_diff(t: Path):
         do_init(t)
         write_lf(t / "candidate.diff", "--- a\n+++ b\n@@ -1 +1 @@\n-x\n+y\n")
         return runner(t, "freeze", "--run", "T-001", "--type", "implementation",
                       "--prompt", "specs/prompt.md", "--candidate-commit", "HEAD",
-                      "--approved-plan-hash", GOOD_HASH, "--diff", "candidate.diff")
+                      "--approved-plan-hash", GOOD_HASH, "--base", "HEAD~1",
+                      "--diff", "candidate.diff")
+    expect_refused("a diff supplied beside the candidate",
+                   "no longer accepted", impl_supplied_diff)
+
+    def impl_no_test_results(t: Path):
+        do_init(t)
+        _b = impl_base(t)
+        return runner(t, "freeze", "--run", "T-001", "--type", "implementation",
+                      "--prompt", "specs/prompt.md", "--candidate-commit", "HEAD",
+                      "--approved-plan-hash", GOOD_HASH, "--base", _b)
     expect_refused("implementation review with no test results",
                    "requires --test-results", impl_no_test_results)
 

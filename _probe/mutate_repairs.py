@@ -188,6 +188,18 @@ MUTATIONS = [
      "test_run_review.py",
      "designated after an interruption"),
 
+    # The comparison, not the derivation. Removing the git call would make the
+    # check fail to run, which goes red for the wrong reason: a checker that
+    # cannot derive anything is not the same as one that derives and does not
+    # look. This leaves the derivation in place and stops it mattering, which is
+    # exactly the pre-repair behaviour where each hash was well formed on its own.
+    ("C02-F08  the reviewed diff is the change between the target's commits",
+     "validate_cycle.py",
+     "                    if _actual != str(_recorded):",
+     "                    if False:",
+     "test_run_review.py",
+     "not the change between the commits"),
+
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
      "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",

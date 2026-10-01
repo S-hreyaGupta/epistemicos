@@ -302,6 +302,42 @@ def main() -> int:
     else:
         print("  [ok] check  9 passes on digests that match the governing set")
 
+    # ---- C02-F08: absence of a base is age, or it is a diff bound to nothing ----
+    # Check 14 derives the change set from the target's two commits and compares
+    # it with the digest recorded at freeze. Implementation cycles frozen before
+    # that existed carry neither, and refusing them would invalidate completed
+    # work, which is the retroactive invalidation Alex Zamurko ruled out on
+    # 10 September. So they are exempt.
+    #
+    # C02-F03 is what happens when that exemption is granted on absence alone: a
+    # modern target simply omits the fields and skips the check. The same
+    # distinction, in the place it would otherwise arrive next. A cycle frozen
+    # recently enough to preserve its governing artifacts was frozen by a runner
+    # that derives diffs, so from that cycle absence is not age.
+    def _modern_no_base(t, c, root):
+        t = _governed(claim_preserved=True)(t, c, root) or t
+        for _rel in ("specs/protocol.md", "specs/spec.md"):
+            _dst = c / "artifacts" / _rel
+            _dst.parent.mkdir(parents=True, exist_ok=True)
+            _dst.write_bytes((root / _rel).read_bytes())
+        return t
+
+    expect_fail("an implementation cycle claiming preserved governing "
+                "artifacts while its diff is bound to no commits",
+                14, "implementation", mutate=_modern_no_base)
+
+    root, commit, tree = fresh()
+    rc, out = run(root, build(root, commit, tree, "implementation"))
+    if rc != 0 or marks(out).get(14) != "PASS":
+        failures.append(
+            f"an implementation cycle carrying no base and no marker of the "
+            f"freeze that introduced it was refused. That is the shape of "
+            f"evidence frozen before C02-F08, and refusing it invalidates "
+            f"completed cycles retroactively. The control above would then be "
+            f"passing for the wrong reason:\n{out}")
+    else:
+        print("  [ok] check 14 still exempts a diff with nothing to date it")
+
     expect_fail("a protocol digest that is not a digest", 9, "plan",
                 mutate=_governed("not-a-hash"))
     expect_fail("a protocol digest that is well formed but not this cycle's",

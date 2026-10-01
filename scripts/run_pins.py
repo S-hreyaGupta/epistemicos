@@ -88,6 +88,63 @@ def cycle_dir_number(name: str) -> int | None:
     return n if n >= 1 else None
 
 
+# C02-F08. One canonical way to ask git what changed between two commits, read
+# by the runner that freezes an implementation review and by the gate that
+# validates it.
+#
+# The defect was that nothing connected them. Freeze resolved a candidate commit
+# and tree, then separately read whatever file --diff named, and checks 11, 12
+# and 14 each verified their own half: the commit resolves, the tree agrees, the
+# diff hashes to its record. Codex: "The runner can freeze a real candidate
+# commit B while embedding a diff from A or an arbitrary nonempty diff... A valid
+# commit and a hash of an unrelated diff do not bind the reviewer to exact
+# candidate code." Every fixture in the suite demonstrated it by accident, each
+# freezing a real commit beside a four-line diff of a file called x.
+#
+# Here rather than in either caller for the reason C02-F05 put the directory
+# grammar here: the checker cannot import the runner, because the runner runs
+# the checker, and two implementations of one rule is how they come to disagree.
+#
+# Why the binding is checked on --raw output and not on the patch text. The
+# patch is what a reviewer reads, and its exact bytes depend on diff.algorithm,
+# diff.renames, context width, textconv and the git version. Re-deriving it
+# later and demanding the same bytes would fail honest cycles on a git upgrade.
+# --raw is the change itself: mode, blob identities, status, path. It is stable
+# across configuration because there is no formatting in it, and it is the thing
+# the finding is actually about, since it names the exact objects on both sides.
+#
+# -M0 disables rename detection, which is heuristic and therefore another thing
+# that can vary. A rename then reads as a delete and an add, which is a less
+# convenient description of the same change and a reproducible one.
+GIT_DIFF_CONFIG = ("-c", "core.quotepath=false", "-c", "core.autocrlf=false")
+
+
+def diff_raw_argv(base: str, candidate: str,
+                  paths: list[str] | None = None) -> list[str]:
+    """git arguments for the change set between two commits, minus `-C <repo>`.
+
+    The repository location is left to the caller, so a target never carries a
+    machine's absolute paths and nothing has to be rewritten to validate a cycle
+    somewhere else.
+    """
+    argv = [*GIT_DIFF_CONFIG, "diff", "--raw", "--no-color", "--no-ext-diff",
+            "--full-index", "-M0", base, candidate]
+    if paths:
+        argv += ["--", *paths]
+    return argv
+
+
+def diff_patch_argv(base: str, candidate: str,
+                    paths: list[str] | None = None) -> list[str]:
+    """git arguments for the reviewable patch between two commits."""
+    argv = [*GIT_DIFF_CONFIG, "diff", "--no-color", "--no-ext-diff",
+            "--no-textconv", "--full-index", "--binary", "--unified=3", "-M0",
+            base, candidate]
+    if paths:
+        argv += ["--", *paths]
+    return argv
+
+
 def spec_digest(entries: list[dict]) -> str:
     """One digest over a set of pinned artifacts.
 

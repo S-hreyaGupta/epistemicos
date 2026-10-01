@@ -672,7 +672,13 @@ def main() -> int:
     run(root11, "run_review.py", "init", "--run", "I-001",
         "--bootstrap-exempt", "--protocol", "specs/protocol.md",
         "--spec", "specs/spec.md")
-    write_lf(root11 / "diff.txt", "diff --git a/x b/x\n+one\n")
+    # C02-F08. The reviewed diff is derived from a base and a candidate now, so
+    # this fixture makes a real change and reviews it, rather than naming a real
+    # commit beside two invented lines.
+    write_lf(root11 / "src.py", "def f():\n    return 1\n")
+    sh("git", "add", "-A", cwd=root11)
+    sh("git", "commit", "-qm", "candidate work", cwd=root11)
+    base11 = sh("git", "rev-parse", "HEAD~1", cwd=root11).stdout.strip()
     write_lf(root11 / "results.txt", "3 passed, 0 failed\n")
     head11 = sh("git", "rev-parse", "HEAD", cwd=root11).stdout.strip()
     plan_hash11 = sha256_file(root11 / "plan" / "01-PLAN.md")
@@ -689,7 +695,7 @@ def main() -> int:
             "--type", "implementation", "--prompt", "specs/prompt.md",
             "--candidate-commit", head11,
             "--approved-plan-hash", plan_hash11,
-            "--diff", "diff.txt", "--test-results", "results.txt")
+            "--base", base11, "--test-results", "results.txt")
     c11 = root11 / "runs" / "I-001" / "implementation-review" / "cycle-01"
     if r.returncode != 0:
         bad(f"seam 11 fixture: implementation freeze failed\n{r.stderr}{r.stdout}")

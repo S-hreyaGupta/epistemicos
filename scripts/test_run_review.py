@@ -1471,6 +1471,167 @@ def main() -> int:
     else:
         print("  [ok] no staging files are left behind in the cycle")
 
+    # ---- C02-F06: a designation earned but never written ----
+    # The atomic-write repair above made the designation a single moment. It did
+    # not say what happens to a capture that completed every check and was
+    # interrupted on the way to being named. Codex: "an interruption after the
+    # first attempt's findings.json is written and before the designation rename
+    # leaves a complete, valid first capture and a log with authoritative = None.
+    # On retry, recovery does nothing, and the caller can supply a different
+    # output. That later attempt is designated without supersession approval."
+    #
+    # Which makes it a route to choosing a more favourable review, with the
+    # party the supersession control constrains deciding when the control
+    # applies. The ruling it defeats is Alex Zamurko's of 9 September: the first
+    # capture meeting the validity requirements governs.
+    print()
+    print("C02-F06  designation interrupted before it was recorded")
+
+    def interrupt_before_designation(c: Path) -> None:
+        """Leave the cycle as a crash at the commit point leaves it.
+
+        Everything recording writes before the designation stays; everything it
+        writes after is removed. This is not an approximation of the interrupted
+        state, it is that state: the code under test reads the capture log, the
+        attempt directories and the working copies, and in all three this is
+        byte-identical to a process that died at that line. How the arrangement
+        arose is not something it can see.
+
+        Injecting a real crash would need the runner to be killed mid-command,
+        which these controls cannot do: they drive it as a subprocess.
+        """
+        lg = json.loads((c / "capture-log.json").read_text(encoding="utf-8"))
+        lg["authoritative"] = None
+        lg.pop("authoritative_sha256", None)
+        write_lf(c / "capture-log.json", json.dumps(lg, indent=2) + "\n")
+        for _n in ("codex-output-raw.md", "findings.json", "invocation.json"):
+            (c / _n).unlink(missing_ok=True)
+
+    def f06_fixture(first_body: str = "Finding ID: C01-F01\nClass: UNTESTED "
+                                      "RULE\nEvidence: the first capture\n"):
+        t = make_repo(); made.append(t)
+        do_init(t); do_freeze(t)
+        c = t / "runs" / "T-001" / "plan-review" / "cycle-01"
+        write_lf(t / "first.md", with_target(t, first_body))
+        write_lf(t / "second.md", with_target(
+            t, "Finding ID: C01-F02\nClass: MISSING REQUIREMENT\n"
+               "Evidence: a different, later capture\n"))
+        rr = runner(t, "record", "--cycle", str(c), "--output", "first.md",
+                    "--invocation", "manual")
+        if rr.returncode != 0:
+            failures.append(f"the C02-F06 fixture could not record its first "
+                            f"capture:\n{rr.stdout}{rr.stderr}")
+        interrupt_before_designation(c)
+        return t, c
+
+    t17, c17 = f06_fixture()
+    first_sha = hashlib.sha256((t17 / "first.md").read_bytes()).hexdigest()
+
+    r = runner(t17, "record", "--cycle", str(c17), "--output", "second.md",
+               "--invocation", "manual")
+    _lg = json.loads((c17 / "capture-log.json").read_text(encoding="utf-8"))
+    if r.returncode == 0:
+        failures.append(
+            "a later capture was designated after an interruption left the "
+            "first one complete and undesignated. The first valid capture "
+            "governs, and displacing it takes a supersession approval.")
+    elif _lg.get("authoritative") != 1:
+        failures.append(f"the interrupted designation was not recovered, so "
+                        f"nothing owns the review: {_lg}")
+    elif "C01-F01" not in (c17 / "findings.json").read_text(encoding="utf-8"):
+        failures.append("recovery designated the first attempt but published "
+                        "findings from somewhere else")
+    elif not _lg.get("recovered"):
+        failures.append("the designation was recovered without recording that "
+                        "it had been, so the log shows an owner no command "
+                        "wrote")
+    else:
+        print("  [ok] an interrupted designation is finished, and the first "
+              "valid capture still governs")
+
+    # The other half, and the reason this is a recovery rather than a lock: with
+    # the approval the ruling requires, the later capture does take over. Refuse
+    # both and the finding would be traded for a cycle nobody can correct.
+    write_lf(c17 / "capture-supersession-approval.json", json.dumps({
+        "schema": "capture-supersession/1",
+        "cycle": c17.name,
+        "superseded_sha256": first_sha,
+        "superseding_sha256": hashlib.sha256(
+            (t17 / "second.md").read_bytes()).hexdigest(),
+        "authorized_by": "Alex Zamurko",
+        "reason": "the first capture stopped mid-reply; recaptured in full",
+        "at": "2026-10-01T10:00:00Z"}, indent=2) + "\n")
+    r = runner(t17, "record", "--cycle", str(c17), "--output", "second.md",
+               "--invocation", "manual", "--supersede-capture",
+               "--reason", "recaptured in full after the first stopped short")
+    if r.returncode != 0:
+        failures.append(f"an authorized supersession of a recovered capture "
+                        f"was refused:\n{r.stdout}{r.stderr}")
+    else:
+        _lg = json.loads((c17 / "capture-log.json").read_text(encoding="utf-8"))
+        _inv = (_lg.get("invalidated") or [{}])[-1]
+        if _lg.get("authoritative") != 2:
+            failures.append(f"the approved supersession did not move the "
+                            f"designation: {_lg}")
+        elif _inv.get("attempt") != 1:
+            failures.append(f"the supersession did not invalidate the "
+                            f"recovered capture it replaced: {_inv}")
+        else:
+            print("  [ok] a recovered capture is still superseded by an "
+                  "approval bound to its bytes")
+
+    # Codex, on what must not become the discriminator: "distinguish a fully
+    # valid pending generation from an attempt that failed later semantic
+    # checks; do not trust the early valid boolean alone."
+    #
+    # capture.json records valid=true from capture_validity, which runs before
+    # the zero-findings assertion and recurrence resolution. An attempt refused
+    # by either still carries that flag and has no findings.json, because that
+    # file is written only once everything has passed. So the control is the
+    # file, and this proves the two are not confused: the same interruption with
+    # the findings record missing leaves nothing to recover.
+    t18, c18 = f06_fixture()
+    (c18 / "captures" / "attempt-01" / "findings.json").unlink()
+    r = runner(t18, "record", "--cycle", str(c18), "--output", "second.md",
+               "--invocation", "manual")
+    _lg = json.loads((c18 / "capture-log.json").read_text(encoding="utf-8"))
+    if r.returncode != 0:
+        failures.append(
+            f"an attempt interrupted before its findings record was written "
+            f"blocked the retry. It never met the designation prerequisites, "
+            f"so there is nothing for it to own:\n{r.stdout}{r.stderr}")
+    elif _lg.get("recovered"):
+        failures.append("an incomplete attempt was recovered as though it were "
+                        "a pending generation; valid=true was trusted on its "
+                        "own")
+    elif _lg.get("authoritative") != 2:
+        failures.append(f"the retry did not become authoritative: {_lg}")
+    else:
+        print("  [ok] an attempt that never completed is not recovered, and "
+              "the retry governs")
+
+    # A generation whose findings were read out of other bytes is damaged, not
+    # pending. Designating it would bind the cycle to findings its own capture
+    # does not support, which is the defect this repair exists to prevent
+    # arriving by the repair's own route.
+    t19, c19 = f06_fixture()
+    _fj = c19 / "captures" / "attempt-01" / "findings.json"
+    _doc = json.loads(_fj.read_text(encoding="utf-8"))
+    _doc["source_sha256"] = "0" * 64
+    write_lf(_fj, json.dumps(_doc, indent=2) + "\n")
+    r = runner(t19, "record", "--cycle", str(c19), "--output", "second.md",
+               "--invocation", "manual")
+    if r.returncode == 0:
+        failures.append("an undesignated generation whose findings do not "
+                        "describe its own capture was passed over silently, "
+                        "and a later capture took the cycle")
+    elif "does not describe its own capture" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the mismatched generation\n"
+                        f"{r.stdout}{r.stderr}")
+    else:
+        print("  [ok] refused: a findings record that does not describe its "
+              "own capture")
+
     # ---- B02-F04, the half cycle 04 found still open ----
     # The controls below corrupt working copies while leaving a readable
     # designation, so what they demonstrate is publication recovery. Codex:

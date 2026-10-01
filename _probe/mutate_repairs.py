@@ -176,6 +176,18 @@ MUTATIONS = [
      "test_validate_cycle.py",
      "cycle-1 passed MC-2"),
 
+    # Not the function, the call. Deleting the body would also take the
+    # damaged-generation refusal with it, and the control that then goes red is
+    # about mismatched findings rather than about ownership. Removing the call
+    # leaves exactly the pre-repair behaviour: recovery heals a designation that
+    # exists and does nothing for one that was earned and never written.
+    ("C02-F06  an interrupted designation is recovered before a new candidate",
+     "run_review.py",
+     "    _recovered = recover_pending_designation(cycle)",
+     "    _recovered = None",
+     "test_run_review.py",
+     "designated after an interruption"),
+
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
      "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",

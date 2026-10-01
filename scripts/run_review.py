@@ -1416,6 +1416,108 @@ def load_capture_log(cycle: Path) -> dict:
         raise Refused(f"capture-log.json is not valid JSON: {e}")
 
 
+# C02-F06. Publication recovery, above, heals a designation that exists. This
+# heals the one that was earned and never written.
+#
+# Recording prepares a generation and then commits it by naming it in the log.
+# Between those two moments the attempt directory already holds a complete,
+# fully checked capture and the log still says nothing governs. An interruption
+# there leaves `authoritative` None, so publish_from_designation returns early,
+# the "already authoritative" refusal does not fire, and the next `record` is
+# free to supply different output and have it designated. Codex: "the
+# interruption creates a route for selecting a later, more favorable review
+# without the outside authority required for replacing an already-designated
+# capture."
+#
+# Alex Zamurko's ruling of 9 September is that the first capture satisfying the
+# validity requirements BECOMES authoritative. Designation records that fact; it
+# does not confer it. So finishing an interrupted designation is restoring the
+# rule rather than making a fresh decision, and it is done without asking.
+#
+# What marks a generation as complete is findings.json inside the attempt
+# directory. That file is written only after capture validity, parsing, the
+# zero-findings assertion and recurrence resolution have all passed, so its
+# presence means every designation prerequisite was met. The `valid` flag in
+# capture.json is not the same thing and must not be used for this: it records
+# only the early capture_validity result, and an attempt refused afterwards for
+# asserting zero against a reply that carried findings still carries valid=true.
+# Codex named that distinction explicitly.
+def pending_generation(cycle: Path, log: dict) -> int | None:
+    """The earliest complete generation awaiting designation, or None.
+
+    Raises if a directory holds a findings record that does not describe its own
+    capture. That is damaged evidence rather than a pending decision, and
+    designating it would bind a cycle to findings read out of other bytes.
+    """
+    d = cycle / "captures"
+    if not d.is_dir():
+        return None
+    invalidated = {e.get("attempt") for e in (log.get("invalidated") or [])}
+    numbers = sorted(int(m.group(1)) for p in d.iterdir()
+                     if (m := re.fullmatch(r"attempt-(\d{2})", p.name)))
+    for n in numbers:
+        if n in invalidated:
+            continue
+        adir = d / f"attempt-{n:02d}"
+        raw, cap, fj = (adir / "raw.md", adir / "capture.json",
+                        adir / "findings.json")
+        if not (raw.is_file() and cap.is_file() and fj.is_file()):
+            continue
+        try:
+            doc = json.loads(fj.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            raise Refused(
+                f"{rel(fj)} is not valid JSON: {e}\n"
+                "  This attempt was prepared but never designated, and its "
+                "findings record cannot\n  be read, so whether it governs "
+                "cannot be established here.")
+        digest = sha256_file(raw)
+        if doc.get("source_attempt") != n or doc.get("source_sha256") != digest:
+            raise Refused(
+                f"attempt-{n:02d} holds a findings record that does not "
+                f"describe its own capture.\n"
+                f"  It names attempt {doc.get('source_attempt')!r} and "
+                f"{str(doc.get('source_sha256'))[:16]}…, while raw.md hashes "
+                f"to {digest[:16]}….\n  Nothing written. An undesignated "
+                "generation is only recoverable while its\n  findings and its "
+                "bytes are the same capture.")
+        return n
+    return None
+
+
+def recover_pending_designation(cycle: Path) -> int | None:
+    """Commit an interrupted designation. Returns the attempt, or None.
+
+    Idempotent in the same way publication is: with a designation already in
+    place this does nothing, so it is safe to call before every record.
+    """
+    log = load_capture_log(cycle)
+    if log.get("authoritative"):
+        return None
+    n = pending_generation(cycle, log)
+    if n is None:
+        return None
+
+    adir = cycle / "captures" / f"attempt-{n:02d}"
+    entry = json.loads((adir / "capture.json").read_text(encoding="utf-8"))
+    log["authoritative"] = n
+    log["authoritative_sha256"] = entry["sha256"]
+    # Recorded, not silent. A designation that appears without the command that
+    # wrote it is exactly the kind of event an auditor needs named, and this one
+    # moves ownership of a review.
+    log.setdefault("recovered", []).append({
+        "attempt": n,
+        "recovered_at": now(),
+        "sha256": entry["sha256"],
+        "note": "the generation was complete before its designation was "
+                "written. The first capture meeting the validity requirements "
+                "governs, so the interrupted designation is finished rather "
+                "than reopened.",
+    })
+    write_lf_atomic(cycle / "capture-log.json", json.dumps(log, indent=2) + "\n")
+    return n
+
+
 def cmd_record(args: argparse.Namespace) -> int:
     if args.invocation not in INVOCATIONS:
         raise Refused(f"--invocation must be one of {INVOCATIONS}")
@@ -1430,6 +1532,18 @@ def cmd_record(args: argparse.Namespace) -> int:
     # means this command starts from a whole cycle rather than adding a second
     # generation on top of a half-published one. Says so out loud, because a
     # repair that happens silently is one nobody can audit.
+    # C02-F06. Before publication recovery, because this is what gives it
+    # something to publish from, and before the authoritative check below, so a
+    # recovered capture is defended by the same refusal any other designated
+    # capture is: displacing it then takes --supersede-capture and an approval
+    # bound to its bytes.
+    _recovered = recover_pending_designation(cycle)
+    if _recovered:
+        print(f"designated attempt-{_recovered:02d} on recovery: it was a "
+              f"complete capture awaiting\n  designation when a previous run "
+              f"stopped. The first valid capture governs, so\n  this finishes "
+              f"that designation rather than starting a new one.")
+
     _healed = publish_from_designation(cycle)
     if _healed:
         print(f"recovered {', '.join(_healed)} from the designated capture "

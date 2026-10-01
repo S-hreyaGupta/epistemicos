@@ -198,7 +198,41 @@ MUTATIONS = [
      "                    if _actual != str(_recorded):",
      "                    if False:",
      "test_run_review.py",
-     "not the change between the commits"),
+     # The CONTROL's complaint, not the checker's refusal. Reported as a
+     # [WRONG CONTROL] on the first run, correctly: with the comparison removed
+     # nothing refuses, so the checker's message is exactly the text that cannot
+     # appear. What appears is the control saying the swap was accepted.
+     #
+     # Reported [WRONG CONTROL] a second time too, and that one was not about
+     # the needle. The control's fixture was being refused by check 10 over a
+     # stale digest in codex-input.md, so it had never established anything
+     # about check 14. Two probe runs, two different faults in my own work, both
+     # of them invisible to a green suite.
+     "carrying another's diff"),
+
+    # Three fallbacks, three mutations. One would leave the other two unwatched
+    # while the line reported them as covered, which is the mistake C02-F02
+    # already made once.
+    ("C02-F09a  a declared artifact's snapshot is not optional",
+     "validate_cycle.py",
+     "    if strict_markers:",
+     "    if False:",
+     "test_run_review.py",
+     "snapshot of the test results was deleted"),
+
+    ("C02-F09b  the approval record's snapshot is not optional",
+     "validate_cycle.py",
+     "    elif _snap_approval is not None and not _snap_approval.is_file() and _mod13:",
+     "    elif False:",
+     "test_run_review.py",
+     "snapshot of the approval record was deleted"),
+
+    ("C02-F09c  the approved plan's snapshot is not optional",
+     "validate_cycle.py",
+     "                if _mod13 and not snap.is_file():",
+     "                if False:",
+     "test_run_review.py",
+     "snapshot of the approved plan was deleted"),
 
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
@@ -289,7 +323,22 @@ def modified(rel_paths: list[str]) -> list[str]:
 
 
 def main() -> int:
-    targets = sorted({f"scripts/{m[1]}" for m in MUTATIONS})
+    # An optional filter, because a whole run is twenty-odd suite executions and
+    # correcting one line of this file should not cost all of them. Matched
+    # against the finding label, so `C02-F08` takes one mutation and `C02-F02`
+    # takes the three that make up that finding.
+    #
+    # A filtered run is not a verification run: it says nothing about the
+    # repairs it skipped, and the summary below says which it looked at rather
+    # than claiming the whole set.
+    want = [a for a in sys.argv[1:] if not a.startswith("-")]
+    selected = [m for m in MUTATIONS
+                if not want or any(w.lower() in m[0].lower() for w in want)]
+    if want and not selected:
+        print(f"  [CANNOT RUN] nothing matches {', '.join(want)}")
+        return 2
+
+    targets = sorted({f"scripts/{m[1]}" for m in selected})
     try:
         dirty = modified(targets)
     except RuntimeError as exc:
@@ -308,7 +357,7 @@ def main() -> int:
         return 2
 
     bad = 0
-    for finding, fname, old, new, suite, needle in MUTATIONS:
+    for finding, fname, old, new, suite, needle in selected:
         path = SCRIPTS / fname
         # newline="" on the READ as well, not only on the writes below. Without
         # it Python translates CRLF to LF on the way in, so `original` is not
@@ -408,12 +457,16 @@ def main() -> int:
         bad += 1
 
     print()
+    _of = (f"{len(selected)} selected repair(s)" if want
+           else f"{len(MUTATIONS)} repairs")
     if bad:
-        print(f"  {bad} of {len(MUTATIONS)} repairs are not demonstrably held "
-              f"by a control.")
+        print(f"  {bad} of {_of} are not demonstrably held by a control.")
         return 1
-    print(f"  all {len(MUTATIONS)} repairs go red when removed, each in a "
-          f"control that names what it is about.")
+    print(f"  all {_of} go red when removed, each in a control that names what "
+          f"it is about.")
+    if want:
+        print(f"  Only {', '.join(want)} was looked at. The rest of the set is "
+              f"not established\n  by this run.")
     print("  That is not proof the repairs are correct. It is proof they are")
     print("  watched, which is the claim each commit made.")
     return 0

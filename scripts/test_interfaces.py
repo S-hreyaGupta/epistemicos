@@ -714,7 +714,11 @@ def main() -> int:
             bad(f"seam 11 fixture: record failed\n{_rec11.stderr}{_rec11.stdout}")
 
         # The preserved copies must exist, or nothing below tests anything.
-        for f in ("diff.txt", "results.txt"):
+        # C02-F08 renamed the first of these. The reviewed diff is no longer a
+        # file the operator supplies; it is derived from the base and the
+        # candidate and preserved as candidate.diff, so that is the name the
+        # snapshot carries.
+        for f in ("candidate.diff", "results.txt"):
             if not (c11 / "artifacts" / f).is_file():
                 bad(f"freeze did not preserve {f} for an implementation review")
 
@@ -723,7 +727,14 @@ def main() -> int:
         # moves. A completed cycle must survive all of it — that is the whole
         # claim of snapshot-at-freeze, and B02-F07 is the places it was not
         # applied.
-        write_lf(root11 / "diff.txt", "diff --git a/x b/x\n+one\n+two\n")
+        # The work continues: more commits land on top of the candidate. Under
+        # C02-F08 this is the live movement that matters for the diff, because
+        # the diff is no longer a file anyone can edit. Check 14 re-derives from
+        # two commits the target names, and commits do not move, so a cycle must
+        # survive a repository that has gone on without it.
+        write_lf(root11 / "src.py", "def f():\n    return 99\n")
+        sh("git", "add", "-A", cwd=root11)
+        sh("git", "commit", "-qm", "work after the freeze", cwd=root11)
         write_lf(root11 / "results.txt", "4 passed, 0 failed\n")
         _p11 = root11 / "plan" / "01-PLAN.md"
         _p11.write_text(_p11.read_text(encoding="utf-8") + "\n## revised\n",
@@ -737,14 +748,14 @@ def main() -> int:
         rv = run(root11, "validate_cycle.py", str(c11))
         failed = failed_checks_of(rv)
         if {14, 15} & failed:
-            bad("checks 14 and 15 failed after the live diff and test results "
-                "changed, so a completed implementation cycle is invalidated by "
-                f"ordinary later work: {sorted(failed)}\n{rv.stdout}")
+            bad("checks 14 and 15 failed after later commits landed and the "
+                "test results were rerun, so a completed implementation cycle "
+                f"is invalidated by ordinary later work: {sorted(failed)}\n"
+                f"{rv.stdout}")
         elif failed:
             bad(f"unexpected checks failed: {sorted(failed)}\n{rv.stdout}")
         else:
-            ok("an implementation cycle survives later changes to the live diff "
-               "and test results")
+            ok("an implementation cycle survives later commits and rerun tests")
 
         # And tampering with the snapshot itself must still fail, or the check
         # has simply stopped looking at anything.

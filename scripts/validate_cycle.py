@@ -59,7 +59,20 @@ IMPL_FIELDS = ("candidate_commit", "candidate_tree_hash", "approved_plan_hash",
 # One list, consulted through one helper, because the same question is asked of
 # the implementation artifacts as well, and a second copy of the rule is how
 # the two drift apart. That is the shape seven of cycle 01's eight findings had.
-MODERN_MARKERS = ("governing_artifacts_preserved",)
+# C02-F09 extended this from one field to three. The same question is asked
+# about implementation evidence, and Codex found the implementation side still
+# answering it by absence: "the compatibility behavior is described as applying
+# to cycles frozen before snapshotting, but the code does not test that
+# condition. A target carrying the new governing-preservation marker and an
+# explicit approval_record_path still gets the fallback."
+#
+# Each entry is a field only a freeze from a known date onwards emits, so
+# carrying any one of them dates the record.
+MODERN_MARKERS = (
+    "governing_artifacts_preserved",  # B02-F06, 11 September
+    "approval_record_path",           # B02-F07, the implementation snapshot set
+    "base_commit",                    # C02-F08, the derived diff
+)
 
 NA = "N/A"
 
@@ -202,7 +215,9 @@ def _approval_plan_path(approval: Path) -> str | None:
 
 def _hash_of_declared_file(target: dict, hash_field: str, path_field: str,
                            repo_root: Path,
-                           cycle_dir: Path | None = None) -> tuple[bool, str]:
+                           cycle_dir: Path | None = None,
+                           strict_markers: list[str] | None = None
+                           ) -> tuple[bool, str]:
     """Recorded hash present, its artifact resolvable, and the two agree.
 
     B02-F07. This hashed repo_root/<path> — the live file — while freeze had
@@ -238,6 +253,27 @@ def _hash_of_declared_file(target: dict, hash_field: str, path_field: str,
                 f"          recorded {recorded}\n          actual   {actual}\n"
                 "          The snapshot has been altered since the freeze.")
         return True, f"{rel} (preserved copy)"
+
+    # C02-F09. The fallback below is for cycles frozen before snapshotting, and
+    # until now nothing tested that condition: any missing snapshot was quietly
+    # replaced by today's matching live file. Codex: "deleting an implementation
+    # cycle's preserved diff, test results, approved plan, or approval record
+    # does not necessarily invalidate it... The cycle consequently passes
+    # without the preserved evidence it was supposed to retain and becomes
+    # dependent on later working-tree changes again."
+    #
+    # A matching live file is not the point. Preservation is the requirement,
+    # and a requirement satisfied by whatever happens to be on disk today is not
+    # one. So a record that carries a marker of the freeze that preserves gets
+    # no fallback: its snapshot is missing, and that is the finding.
+    if strict_markers:
+        return False, (
+            f"{rel} has no preserved copy under artifacts/, and this target "
+            f"declares\n          " + ", ".join(strict_markers) +
+            ", which only a freeze that preserves emits.\n          A matching "
+            "live file is not a substitute: the cycle would then depend on a\n"
+            "          working tree that has moved on, which is what preserving "
+            "prevents.")
 
     p = repo_root / rel
     if not p.is_file():
@@ -692,10 +728,31 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
     # looking in different places.
     _appr_rel = target.get("approval_record_path")
     _snap_approval = (cycle_dir / "artifacts" / _appr_rel) if _appr_rel else None
+    # C02-F09. Same fallback, same repair. A declared approval snapshot that is
+    # not there sends this to the live run-level record, which is the dependency
+    # on mutable state that preserving the record removed. The refusal is
+    # collected rather than raised so check 13 still reports as one check.
+    _mod13 = modern_markers(target)
+    _p13_pre: list[str] = []
+    if _mod13 and not _appr_rel:
+        _p13_pre.append(
+            "the target declares " + ", ".join(_mod13) + " but records no "
+            "approval_record_path.\n          A freeze that preserves names "
+            "what it preserved; without it there is nothing to\n          "
+            "validate but the live record, which later approvals replace")
+    elif _snap_approval is not None and not _snap_approval.is_file() and _mod13:
+        _p13_pre.append(
+            f"the approval record snapshot is missing: artifacts/{_appr_rel}.\n"
+            "          The live record is not a substitute. A completed cycle "
+            "is validated against\n          the bytes that were approved, not "
+            "against whatever has replaced them")
     approval = (_snap_approval
                 if _snap_approval is not None and _snap_approval.is_file()
                 else cycle_dir.parent.parent / "plan-approval" / "approval.json")
-    if not ap:
+    if _p13_pre:
+        r.add(13, "approved-plan hash matches the frozen approved plan", False,
+              "\n          ".join(_p13_pre))
+    elif not ap:
         r.add(13, "approved-plan hash matches the frozen approved plan", False,
               "approved_plan_hash absent")
     elif not approval.is_file():
@@ -749,7 +806,16 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
                 snap = cycle_dir / "artifacts" / plan_ref
                 live = repo_root / plan_ref
                 src = snap if snap.is_file() else live
-                if not src.is_file():
+                # C02-F09, the third of the same fallback.
+                if _mod13 and not snap.is_file():
+                    problems13.append(
+                        f"the approved plan has no preserved copy: "
+                        f"artifacts/{plan_ref}.\n          This target declares "
+                        + ", ".join(_mod13) + ", so the snapshot was taken and "
+                        "is\n          gone. Ordinary work on the plan would "
+                        "otherwise decide whether a completed\n          cycle "
+                        "is still valid")
+                elif not src.is_file():
                     problems13.append(f"approved plan not found: {plan_ref}")
                 else:
                     actual = sha256_file(src)
@@ -763,8 +829,9 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
                   not problems13, "; ".join(problems13))
 
     # 14-15. diff and test results
+    _strict = modern_markers(target)
     ok14, d14 = _hash_of_declared_file(target, "diff_hash", "diff_path",
-                                       repo_root, cycle_dir)
+                                       repo_root, cycle_dir, _strict)
 
     # C02-F08. The hash above establishes that the preserved diff is the one the
     # target recorded. It says nothing about whether that diff describes the
@@ -838,8 +905,9 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
                    f"the change between {str(_b)[:12]} and {str(_c)[:12]}")
 
     r.add(14, "diff hash matches the reviewed diff", ok14, d14)
-    ok15, d15 = _hash_of_declared_file(target, "test_result_hash", "test_result_path",
-                                       repo_root, cycle_dir)
+    ok15, d15 = _hash_of_declared_file(target, "test_result_hash",
+                                       "test_result_path", repo_root, cycle_dir,
+                                       _strict)
     r.add(15, "test-result hash matches the supplied test results", ok15, d15)
 
     return r

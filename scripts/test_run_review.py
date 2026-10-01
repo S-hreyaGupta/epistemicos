@@ -1012,6 +1012,20 @@ def main() -> int:
             write_lf(_t4 / "target.json", json.dumps(_tg, indent=2))
             write_lf(_t4 / "target.sha256",
                      sha256_file(_t4 / "target.json") + "\n")
+            # Check 10 wants codex-input.md to quote the target's digest
+            # verbatim, and the swap changes that digest. Left stale, the cycle
+            # is refused by check 10 and this control passes on a refusal that
+            # has nothing to do with the diff, which is exactly the defect it
+            # exists to catch. Found by the probe: with the derivation check
+            # removed the cycle was still refused, and the control still looked
+            # green until it asked which check had spoken.
+            #
+            # Every other check is deliberately left satisfiable. The complaint
+            # is that each hash can be well formed on its own, so the fixture
+            # has to make all of them so.
+            _new_th = sha256_file(_t4 / "target.json")
+            _ci = _t4 / "codex-input.md"
+            write_lf(_ci, _ci.read_text(encoding="utf-8").replace(_th4, _new_th))
 
             _sw = _mc2(_t4)
             _out = _sw.stdout + _sw.stderr
@@ -1026,6 +1040,101 @@ def main() -> int:
             else:
                 print("  [ok] refused: the diff is not the change between the "
                       "commits this target names")
+
+    # ---- C02-F09: a missing snapshot is not replaced by a live file ----
+    # "Deleting an implementation cycle's preserved diff, test results,
+    # approved plan, or approval record does not necessarily invalidate it:
+    # each missing snapshot can be replaced implicitly by today's matching live
+    # file... The cycle consequently passes without the preserved evidence it
+    # was supposed to retain and becomes dependent on later working-tree
+    # changes again."
+    #
+    # One snapshot at a time, with the live file left exactly where it is, which
+    # is what Codex asked for. A matching live file is the hard case: the bytes
+    # agree, so nothing looks wrong, and the cycle has still lost the property
+    # that made it a record.
+    print()
+    print("C02-F09  preserved implementation evidence")
+
+    t9 = make_repo(); made.append(t9)
+    do_init(t9)
+    base9 = impl_base(t9, "def g():\n    return 7\n")
+    write_lf(t9 / "results.txt", "7 passed, 0 failed\n")
+    head9 = sh("git", "rev-parse", "HEAD", cwd=t9).stdout.strip()
+    plan9 = impl_approval(t9)
+    r = runner(t9, "freeze", "--run", "T-001", "--type", "implementation",
+               "--prompt", "specs/prompt.md", "--candidate-commit", head9,
+               "--approved-plan-hash", plan9, "--base", base9,
+               "--test-results", "results.txt")
+    c9 = t9 / "runs" / "T-001" / "implementation-review" / "cycle-01"
+    if r.returncode != 0:
+        failures.append(f"the C02-F09 fixture could not be frozen:\n"
+                        f"{r.stdout}{r.stderr}")
+    else:
+        _th9 = (c9 / "target.sha256").read_text(encoding="utf-8").strip()
+        write_lf(t9 / "reply9.md",
+                 f"TARGET_SHA256 {_th9}\n\nNo findings in any category.\n")
+        _r9 = runner(t9, "record", "--cycle", str(c9), "--output", "reply9.md",
+                     "--invocation", "manual", "--zero-findings")
+        if _r9.returncode != 0:
+            failures.append(f"the C02-F09 fixture could not be recorded:\n"
+                            f"{_r9.stdout}{_r9.stderr}")
+        else:
+            def _mc2_9() -> subprocess.CompletedProcess:
+                return sh(sys.executable,
+                          str(t9 / "scripts" / "validate_cycle.py"), str(c9),
+                          cwd=t9)
+
+            if _mc2_9().returncode != 0:
+                failures.append(
+                    "the C02-F09 fixture does not pass MC-2 with its evidence "
+                    "intact, so every deletion below would prove nothing")
+            else:
+                print("  [ok] a cycle with its implementation evidence "
+                      "preserved passes MC-2")
+
+            _tg9 = json.loads((c9 / "target.json").read_text(encoding="utf-8"))
+            for _rel, _needle, _what in (
+                    (_tg9["test_result_path"], "no preserved copy under",
+                     "the test results"),
+                    (_tg9["approval_record_path"],
+                     "approval record snapshot is missing",
+                     "the approval record"),
+                    (_tg9["approved_plan_path"],
+                     "approved plan has no preserved copy",
+                     "the approved plan")):
+                _snap = c9 / "artifacts" / _rel
+                if not _snap.is_file():
+                    failures.append(f"fixture: freeze did not preserve {_rel}")
+                    continue
+                if not (t9 / _rel).is_file():
+                    failures.append(
+                        f"fixture: {_rel} has no live copy, so deleting its "
+                        f"snapshot would not test the fallback")
+                    continue
+                _kept = _snap.read_bytes()
+                _snap.unlink()
+                _rr = _mc2_9()
+                _out9 = _rr.stdout + _rr.stderr
+                _snap.write_bytes(_kept)
+                if _rr.returncode == 0:
+                    failures.append(
+                        f"the snapshot of {_what} was deleted and the cycle "
+                        f"still passed: a live file standing in for preserved "
+                        f"evidence, which is C02-F09 exactly")
+                elif _needle not in _out9:
+                    failures.append(
+                        f"refused after deleting the snapshot of {_what}, but "
+                        f"not for the missing preserved copy\n{_out9}")
+                else:
+                    print(f"  [ok] refused: {_what} has no preserved copy, and "
+                          f"the live file is not a substitute")
+
+            if _mc2_9().returncode != 0:
+                failures.append(
+                    "the fixture did not survive its own controls; the "
+                    "restores above are incomplete and later results here are "
+                    "not attributable")
 
     # ---- B01-F05: a mutable reference is resolved before it is recorded ----
     # Alex Zamurko, 10 September: "resolve any mutable reference such as HEAD to

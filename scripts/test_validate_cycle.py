@@ -322,9 +322,14 @@ def main() -> int:
             _dst.write_bytes((root / _rel).read_bytes())
         return t
 
+    # also=(13, 15): C02-F09 made the same marker govern the implementation
+    # snapshots, and this fixture has no artifacts directory at all. So a target
+    # declaring preservation while preserving nothing legitimately fails three
+    # checks, and the cascade is declared rather than quietly tolerated. The
+    # audit caught it on the first run, which is what it is for.
     expect_fail("an implementation cycle claiming preserved governing "
                 "artifacts while its diff is bound to no commits",
-                14, "implementation", mutate=_modern_no_base)
+                14, "implementation", mutate=_modern_no_base, also=(13, 15))
 
     root, commit, tree = fresh()
     rc, out = run(root, build(root, commit, tree, "implementation"))

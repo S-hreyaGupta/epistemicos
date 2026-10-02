@@ -88,7 +88,26 @@ The artifacts hashed and listed in `target.json`, and the gate's covered set,
 which are not the same list. Both are below, because the difference is itself
 something to look at.
 
-The gate covers seventeen files:
+**The target pins ten**, the same ten cycle 02 pinned:
+
+```text
+scripts/authority.py              scripts/loop_state.py
+scripts/bootstrap_gate.py         scripts/run_pins.py
+scripts/cycle_projection.py       scripts/run_review.py
+scripts/findings_format.py        scripts/validate_cycle.py
+scripts/ledger.py                 specs/evidence-schema-v1.0.md
+```
+
+Seven of those ten changed since cycle 02, compared digest by digest against
+the hashes cycle 02's target recorded. `authority.py`, `findings_format.py` and
+the evidence schema are byte-identical to the versions cycle 02 reviewed.
+
+I first wrote nine here and checked afterwards. Twice now in this document a
+number I was confident about was wrong, and both times the check was something I
+chose to run rather than something that would have caught me. Treat the
+unchecked claims below with that in mind; they are the same kind of writing.
+
+**The gate covers seventeen:**
 
 ```text
 declared                          reached through the import closure
@@ -304,7 +323,7 @@ into the target that no review has seen. It enters through this review instead.
 
 ## What changed since cycle 02 and has been reviewed by nobody
 
-Nine of the ten covered artifacts changed. `run_pins.py` gained the shared cycle
+Seven of the ten pinned artifacts changed. `run_pins.py` gained the shared cycle
 grammar and the shared git invocations. `validate_cycle.py` gained the modern
 marker rule, the derived-diff comparison in check 14, and the snapshot
 requirements in checks 13 to 15. `run_review.py` gained designation recovery,

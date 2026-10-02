@@ -266,11 +266,18 @@
           "event": "ACCEPT",
           "note": "accepted; the next prompt numbers new findings from its own cycle",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-02T11:15:16Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03 review: demonstrated for this prompt; new findings use C03 identifiers and the preserved prompt control checks the historical exemption's ledger reference",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "protocol 4, V40; canonical identifier preservation",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C02-F02": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -362,11 +369,18 @@
           "event": "ACCEPT",
           "note": "accepted; one canonical cycle-directory grammar across checker, projection and numbering",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-02T11:15:16Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03 review: demonstrated; checker and projection consume the shared directory grammar, malformed-name controls target check 7",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-2 check 7 and 6; C01-F07",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C02-F06": {
       "class": "WRONG OWNERSHIP",
@@ -386,11 +400,18 @@
           "event": "ACCEPT",
           "note": "accepted; capture designation gets a durable pending state and recovers the first valid attempt",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-02T11:15:17Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03 review: demonstrated for the specified complete-generation interruption boundary; controls examine recovery, authorized replacement, incomplete generation and source mismatch",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "first-valid-capture designation ruling; MC-1",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C02-F07": {
       "class": "MISSING REQUIREMENT",
@@ -410,11 +431,18 @@
           "event": "ACCEPT",
           "note": "accepted and repaired; the gate requires its evidence to name the target it decides about",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-02T11:15:18Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03 review: demonstrated for the input-to-target digest binding; the separate coverage mismatch is raised as C03-F02",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "protocol 2.2; MC-2 target binding; B01-F09",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C02-F08": {
       "class": "MISSING REQUIREMENT",
@@ -458,11 +486,18 @@
           "event": "ACCEPT",
           "note": "accepted; missing implementation snapshots are refused rather than filled from live files",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-02T11:15:19Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03 review: supported by the shared strict snapshot checks and preserved deletion controls; the deletion loop does not separately delete the derived diff",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-2 checks 13-15; preserved implementation evidence ruling; B02-F07",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C02-F10": {
       "class": "UNTESTED RULE",
@@ -482,11 +517,18 @@
           "event": "ACCEPT",
           "note": "accepted; the next packet carries the tests behind each claim, mapped to what they protect",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-02T11:15:19Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03 review: demonstrated for supplying inspectable sources and recorded execution evidence; mutation execution and reproducibility remain unverified",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "V04; repair-demonstration requirements; B02-F04 conditional ruling",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C02-F11": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -506,9 +548,64 @@
           "event": "ACCEPT",
           "note": "accepted; every emitted status goes through one classification-aware formatter",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-02T11:15:20Z",
+          "cycle": 3,
+          "event": "DEMONSTRATED",
+          "note": "cycle 03 review: demonstrated; both status paths use the common formatter, with a zero-valid-cycle quiet-output control",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "development-evidence labelling ruling; protocol 2-3",
+      "source": "CODEX_REVIEW",
+      "state": "RESOLVED"
+    },
+    "C03-F01": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 3,
+      "history": [
+        {
+          "at": "2026-10-02T11:16:27Z",
+          "cycle": 3,
+          "event": "RAISED",
+          "note": "a completed review's interpretation depends on today's schema: canonical_id_grammar reads the live evidence schema during historical reconciliation, so a later grammar amendment changes what an unchanged past review means",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-10-02T11:16:28Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted. The parser selects the live schema rather than the one each cycle was frozen against. I had identified this and deliberately left it to enter through review rather than repair it off the draft.",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "2.1, 4, 5; V40",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    },
+    "C03-F02": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 3,
+      "history": [
+        {
+          "at": "2026-10-02T11:16:27Z",
+          "cycle": 3,
+          "event": "RAISED",
+          "note": "the covered set and the reviewed target disagree by construction: target_drift refuses covered files absent from the target, and seven files reach coverage through the import closure, four of them control suites",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-10-02T11:16:29Z",
+          "cycle": 3,
+          "event": "ACCEPT",
+          "note": "accepted, and checked against the code rather than taken on the reviewer's word. target_drift reports every covered file that is absent from the target. The cycle 03 prompt said the opposite and was wrong.",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "2.1; MC-2 check 9; bootstrap covered-target binding",
       "source": "CODEX_REVIEW",
       "state": "OPEN"
     }

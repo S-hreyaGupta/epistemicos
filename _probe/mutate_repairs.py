@@ -273,6 +273,23 @@ MUTATIONS = [
      "test_validate_cycle.py",
      "dated only by its auxiliary evidence manifest"),
 
+    # C02-F04's second pass. Two rules: a transcription that disagrees with the
+    # review is refused, and the classification every later check reads comes
+    # from the review rather than from the transcription.
+    ("C02-F04b  a restated classification is refused, not overruled quietly",
+     "loop_state.py",
+     "        if _mismatch:",
+     "        if False:",
+     "test_ledger.py",
+     "recorded in findings.json as a new finding"),
+
+    ("C02-F04c  the classification comes from the reparsed review",
+     "loop_state.py",
+     "            if f.get(\"id\") in raw_kinds:",
+     "            if False:",
+     "test_ledger.py",
+     "carries no classification"),
+
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
      "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",

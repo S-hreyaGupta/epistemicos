@@ -124,6 +124,29 @@ def report_recurrence(review: Path, n: int, fid: str) -> None:
     }, indent=2))
 
 
+def restate_kind(review: Path, n: int, fid: str, kind: str | None) -> None:
+    """Rewrite only the structured classification, leaving the raw review alone.
+
+    C02-F04, raised again by cycle 03. Codex asked for exactly this fixture:
+    "extend the existing control by changing only the structured classification
+    while retaining the raw recurrence, IDs, counts, and capture hashes." The
+    raw file is untouched, so every check that compares the two by identifier,
+    by count, or by capture digest still passes, and the only thing different is
+    what the transcription says the finding is.
+
+    `kind=None` removes the field, which is the shape of a record written before
+    the parser assigned one.
+    """
+    c = review / f"cycle-{n:02d}"
+    d = json.loads((c / "findings.json").read_text(encoding="utf-8"))
+    for f in d["findings"]:
+        if f.get("id") == fid:
+            f.pop("kind", None)
+            if kind is not None:
+                f["kind"] = kind
+    write_lf(c / "findings.json", json.dumps(d, indent=2))
+
+
 # Fixture-validity audit, Alex Zamurko 16 September: "each negative control
 # should first establish that its fixture satisfies all prerequisites except the
 # single condition it intends to violate."
@@ -1622,6 +1645,44 @@ def main() -> int:
     scenario("a recorded reopen keeps the loop off CONVERGED", 3,
              lambda root, rev: _two_then_recurrence(root, rev, True),
              "CONTINUE")
+
+    # ---- C02-F04, raised again by cycle 03 ----
+    # The guard above reads the structured entry's classification, and nothing
+    # required that to agree with the review it was transcribed from. Codex:
+    # "removing kind, or changing it to finding, in the structured entry leaves
+    # the raw recurrence and identifiers unchanged. Reconciliation passes, but
+    # the reopening guard skips the entry."
+    #
+    # So the same scenario, with one word changed in one file and the raw review
+    # left exactly as the reviewer wrote it.
+    def _recurrence_restated_as_finding(root, rev):
+        _two_then_recurrence(root, rev, False)
+        restate_kind(rev, 3, "C01-F01", "finding")
+
+    scenario_refuses("a recurrence recorded in findings.json as a new finding",
+                     3, _recurrence_restated_as_finding,
+                     "classifies findings differently")
+
+    # And the older-record case the correction also asks for: an entry with no
+    # classification at all. It is filled from the reparse rather than guessed
+    # at, so the reopening guard still sees a recurrence and still refuses.
+    def _recurrence_with_no_kind(root, rev):
+        _two_then_recurrence(root, rev, False)
+        restate_kind(rev, 3, "C01-F01", None)
+
+    scenario_refuses("a recurrence whose structured entry carries no "
+                     "classification at all", 3, _recurrence_with_no_kind,
+                     "not demonstrated")
+
+    # The positive that keeps both honest: with the reopen recorded, the same
+    # restated entry computes rather than refusing, so neither control above is
+    # simply "refuse anything whose kind was touched".
+    def _restated_but_reopened(root, rev):
+        _two_then_recurrence(root, rev, True)
+        restate_kind(rev, 3, "C01-F01", None)
+
+    scenario("a reopened recurrence computes even with no structured kind", 3,
+             _restated_but_reopened, "CONTINUE")
 
     # B01-F02. This scenario used to assert CONVERGED, and Codex named the
     # control itself as reinforcing the defect: "Later cycles can override an

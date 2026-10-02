@@ -140,6 +140,10 @@ def authoritative_items(cycle_dir: Path) -> list[dict]:
     # would otherwise never be noticed again.
     raw = cycle_dir / "codex-output-raw.md"
     p = cycle_dir / "findings.json"
+    # C02-F04. Filled from the reparse when there is one, and applied at the
+    # return below so the classification every later check reads is the
+    # reviewer's rather than the transcription's.
+    raw_kinds: dict[str, str | None] | None = None
 
     # Issue 6: "controller reads only the designated authoritative capture."
     # codex-output-raw.md is written from that attempt, so the two must agree.
@@ -197,6 +201,36 @@ def authoritative_items(cycle_dir: Path) -> list[dict]:
                 "  A finding dropped or renamed here is a finding the loop will "
                 "never see.")
 
+        # C02-F04, raised again by cycle 03. Identifiers matched and the
+        # classification did not have to. Codex: "removing kind, or changing it
+        # to finding, in the structured entry leaves the raw recurrence and
+        # identifiers unchanged. Reconciliation passes, but the reopening guard
+        # skips the entry."
+        #
+        # So the classification comes from the reparse below, not from the
+        # structured copy, and a structured copy that disagrees is refused
+        # rather than overruled quietly. Overruling would be the better outcome
+        # by accident: it would mean the loop is right while the record it
+        # publishes says something else, and a reader of findings.json would be
+        # misled in exactly the way the ledger exists to prevent.
+        raw_kinds = {f["id"]: f.get("kind") for f in parsed}
+        _mismatch = [
+            f"{f['id']}: raw says {raw_kinds.get(f['id'])!r}, "
+            f"findings.json says {f.get('kind')!r}"
+            for f in structured.get("findings", [])
+            if isinstance(f, dict) and f.get("id") in raw_kinds
+            and f.get("kind") is not None
+            and f.get("kind") != raw_kinds.get(f["id"])]
+        if _mismatch:
+            raise CannotCalculate(
+                f"{cycle_dir.name}: findings.json classifies findings "
+                "differently from the review it\n  was extracted from:\n    "
+                + "\n    ".join(_mismatch) +
+                "\n\n  A recurrence recorded as a new finding is a repair the "
+                "loop stops checking,\n  and a new finding recorded as a "
+                "recurrence is a defect with somebody else's\n  history. "
+                "Re-record the cycle rather than editing this file.")
+
     if not p.is_file():
         raise CannotCalculate(
             f"{p.parent.name} passed MC-2 but has no findings.json.\n"
@@ -224,7 +258,20 @@ def authoritative_items(cycle_dir: Path) -> list[dict]:
         raise CannotCalculate(
             f"{p.parent.name}/findings.json records zero findings without "
             "zero_findings_asserted.\n  Zero has to be asserted, never inferred.")
-    return [f for f in items if isinstance(f, dict) and "id" in f]
+    out = [f for f in items if isinstance(f, dict) and "id" in f]
+
+    # C02-F04. Codex also asked for "explicit handling for older entries
+    # lacking kind". They are filled from the reparse, which is sound because
+    # the raw review is the authority and it has just been read; and when there
+    # is no raw to reparse the entry keeps whatever it has, which for a record
+    # written before the field existed is nothing. That is the honest state: not
+    # a recurrence, not a finding, and the reopening guard treats an absent
+    # classification as absent rather than as either.
+    if raw_kinds is not None:
+        for f in out:
+            if f.get("id") in raw_kinds:
+                f["kind"] = raw_kinds[f["id"]]
+    return out
 
 
 def authoritative_findings(cycle_dir: Path) -> list[str]:

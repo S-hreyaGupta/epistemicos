@@ -53,6 +53,7 @@ import argparse
 import datetime as _dt
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -1157,6 +1158,58 @@ def cmd_freeze(args: argparse.Namespace) -> int:
         artifacts.append(({"path": _plan_rel, "sha256": sha256_file(_plan)},
                           _plan.read_text(encoding="utf-8", errors="replace")))
 
+    # ---- C02-F10, the deciding half: run the controls before anything exists -
+    # Split from the writing half below, which happens after the cycle
+    # directory is made. A refusal here used to arrive after `cycle.mkdir`, so
+    # a freeze stopped by a failing control left an empty cycle-01 behind and
+    # the next freeze refused for an entirely unrelated reason: "cycle 01 has
+    # no recorded output". The control that found it was mine, two lines later
+    # in the same test.
+    #
+    # Same rule the supersession path already follows. Every refusal a command
+    # can reach has to be reachable while nothing has been created, or a
+    # refused command is not a no-op.
+    aux = [{"path": rel(p).replace("\\", "/"), "sha256": sha256_file(p)}
+           for p in sorted((REPO / "scripts").glob("test_*.py"))]
+
+    # Run from the repository rather than from the preserved copies written
+    # later: the preserved copies are a snapshot for reading, and running them
+    # from a directory that is not the repository would exercise a layout no
+    # suite was written for.
+    _env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+    observed: list[dict] = []
+    for _e in aux:
+        try:
+            _r = subprocess.run([sys.executable, str(REPO / _e["path"])],
+                                capture_output=True, text=True, env=_env,
+                                cwd=str(REPO), timeout=900)
+            _code, _out = _r.returncode, (_r.stdout or "") + (_r.stderr or "")
+        except subprocess.TimeoutExpired:
+            # Not a pass and not a failure. Recorded as neither, for the reason
+            # the probe records the same case: a suite that did not finish
+            # establishes nothing about the controls in it, and calling that
+            # either outcome would be the invention this run exists to prevent.
+            _code, _out = None, "[DID NOT FINISH within 900s]"
+        observed.append({"path": _e["path"], "exit_code": _code,
+                         "output": _out})
+        _e["observed_exit_code"] = _code
+
+    _known = {k.strip() for k in (args.aux_known_red or []) if k.strip()}
+    _red = [o["path"] for o in observed if o["exit_code"] != 0]
+    _unexpected = [p for p in _red if Path(p).name not in _known]
+    if _unexpected:
+        raise Refused(
+            "these control suites did not pass, and this freeze would tell a "
+            "reviewer the\n  repairs are held by controls:\n    "
+            + "\n    ".join(_unexpected) +
+            "\n\n  Repair them, or name each one with --aux-known-red "
+            "<filename> and give\n  --aux-known-red-reason. A known failure "
+            "stated in the record is evidence; an\n  unstated one is the "
+            "assertion this finding is about.")
+    if _known and not (args.aux_known_red_reason or "").strip():
+        raise Refused("--aux-known-red requires --aux-known-red-reason, or the "
+                      "record carries a\n  failure with no account of it.")
+
     cycle.mkdir(parents=True)
 
     # ---- snapshot the reviewed bytes ----
@@ -1243,8 +1296,69 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     # and do exactly the damage described above. `test_*.py` does not match that
     # pattern. Deriving also avoids the hand-maintained list the gate's own
     # closure docstring warns about.
-    aux = [{"path": rel(p).replace("\\", "/"), "sha256": sha256_file(p)}
-           for p in sorted((REPO / "scripts").glob("test_*.py"))]
+    # ---- C02-F10: the controls themselves, not a list of their names ----
+    # The manifest below used to be the whole of it, and cycle 02 refused it:
+    # "a count and an implementer description cannot establish fixture
+    # validity, the intended refusal, absence of unintended failing
+    # prerequisites, mutation sensitivity, or interruption behavior... Preserve
+    # or otherwise make those exact suite bytes available, not only their
+    # path/hash manifest... with a clear distinction between source inspection,
+    # observed execution, and implementer assertion."
+    #
+    # Three kinds of evidence, and they are not interchangeable:
+    #
+    #   source inspection    the suite bytes, preserved below, which a reviewer
+    #                        can read and judge for themselves
+    #   observed execution   what happened when they were run, recorded below
+    #   implementer assertion   "319 controls pass", which is what cycle 02 was
+    #                        given and what it rejected
+    #
+    # Preserved under auxiliary/ rather than artifacts/, and the distinction is
+    # load-bearing. artifacts/ is the reviewed set: check 9 validates it and the
+    # gate's drift check reads it, so putting the controls there would make
+    # every control edit invalidate the bootstrap approval of the production
+    # code. Supporting evidence that is preserved is a different thing from
+    # evidence that was reviewed, and the directory says which this is.
+    # Unconditionally, before anything is written into it. A repository with no
+    # control suites still gets an auxiliary directory holding a run that
+    # observed nothing, which is a true record. Creating it only inside the loop
+    # below meant that in a fixture repo, where no test_*.py exists, the
+    # observed-run write found no directory and the whole freeze died.
+    auxdir = cycle / "auxiliary"
+    auxdir.mkdir(parents=True, exist_ok=True)
+    for _e in aux:
+        _dst = auxdir / _e["path"]
+        _dst.parent.mkdir(parents=True, exist_ok=True)
+        _dst.write_bytes((REPO / _e["path"]).read_bytes())
+        if sha256_file(_dst) != _e["sha256"]:
+            raise Refused(
+                f"the preserved copy of {_e['path']} does not match the digest "
+                f"recorded for it in the same breath. Nothing else in this "
+                f"cycle is trustworthy if that can happen.")
+        _e["preserved"] = f"auxiliary/{_e['path']}"
+
+    _runlog = [
+        "# Observed control run, recorded at freeze",
+        "",
+        f"interpreter  {sys.version.split()[0]}",
+        f"at           {now()}",
+        f"suites       {len(observed)}",
+        "",
+        "This is observed execution on one machine at one moment. It is not a",
+        "claim that these suites are correct, that their fixtures are valid, or",
+        "that they would pass elsewhere. It is the record of what happened when",
+        "they were run against the bytes preserved beside this file, offered so",
+        "that a reviewer is reading a result rather than a number somebody",
+        "typed.",
+        "",
+    ]
+    for _o in observed:
+        _runlog.append(f"--- {_o['path']}   exit {_o['exit_code']} ---")
+        _runlog.append((_o["output"] or "").rstrip("\n"))
+        _runlog.append("")
+    _orun = auxdir / "observed-run.txt"
+    write_lf(_orun, "\n".join(_runlog) + "\n")
+
     am = cycle / "auxiliary-evidence.json"
     write_lf(am, json.dumps({
         "note": "Control suites as they stood at freeze. NOT members of the "
@@ -1255,6 +1369,26 @@ def cmd_freeze(args: argparse.Namespace) -> int:
                 "covers target.json, so a change here is detectable by anyone "
                 "who compares the two. No MC-2 check performs that comparison: "
                 "this is a record, not an enforced binding.",
+        "establishes": {
+            "source_inspection": "the exact suite bytes are preserved under "
+                                 "auxiliary/ and each is digest-matched to "
+                                 "this record, so a reviewer can read what the "
+                                 "controls actually do rather than be told",
+            "observed_execution": "auxiliary/observed-run.txt holds the exit "
+                                  "code and output of each suite, run at "
+                                  "freeze on one machine",
+            "not_established": "that the fixtures are valid, that a passing "
+                               "control is checking what it is named for, or "
+                               "that these results reproduce elsewhere. "
+                               "Mutation sensitivity is a separate probe and "
+                               "is not claimed by this file.",
+        },
+        "observed_run": {
+            "path": "auxiliary/observed-run.txt",
+            "sha256": sha256_file(_orun),
+            "known_red": sorted(_known),
+            "known_red_reason": args.aux_known_red_reason or "",
+        },
         "suites": aux,
     }, indent=2) + "\n")
     # Recorded in the target so target.sha256 covers it. A scalar rather than an
@@ -1984,6 +2118,14 @@ def build_parser() -> argparse.ArgumentParser:
                    help="limit the derived diff to this path. Repeatable. The "
                         "selection is recorded in the target.")
     f.add_argument("--test-results", dest="test_results")
+    # C02-F10. A control suite that does not pass is recorded rather than
+    # hidden, and naming it is what makes it a record instead of a silence.
+    f.add_argument("--aux-known-red", dest="aux_known_red", action="append",
+                   help="a control suite known not to pass. Repeatable. "
+                        "Requires --aux-known-red-reason.")
+    f.add_argument("--aux-known-red-reason", dest="aux_known_red_reason",
+                   help="why the suites named by --aux-known-red do not pass, "
+                        "recorded in auxiliary-evidence.json.")
     f.set_defaults(fn=cmd_freeze)
 
     r = sub.add_parser("record", help="store raw reviewer output and run the MC-2 gate")

@@ -234,6 +234,21 @@ MUTATIONS = [
      "test_run_review.py",
      "snapshot of the approved plan was deleted"),
 
+    ("C02-F10a  the control sources are preserved, not only listed",
+     "run_review.py",
+     "        _dst.write_bytes((REPO / _e[\"path\"]).read_bytes())\n"
+     "        if sha256_file(_dst) != _e[\"sha256\"]:",
+     "        if False:",
+     "test_run_review.py",
+     "bytes were not preserved"),
+
+    ("C02-F10b  a control suite that does not pass has to be named",
+     "run_review.py",
+     "    if _unexpected:",
+     "    if False:",
+     "test_run_review.py",
+     "froze with a failing control suite and said nothing"),
+
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
      "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",

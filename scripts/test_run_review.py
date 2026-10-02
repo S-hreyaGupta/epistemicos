@@ -1136,6 +1136,117 @@ def main() -> int:
                     "restores above are incomplete and later results here are "
                     "not attributable")
 
+    # ---- C02-F10: the controls preserved and run, not counted ----
+    # "A count and an implementer description cannot establish fixture
+    # validity, the intended refusal, absence of unintended failing
+    # prerequisites, mutation sensitivity, or interruption behavior... Preserve
+    # or otherwise make those exact suite bytes available, not only their
+    # path/hash manifest... with a clear distinction between source inspection,
+    # observed execution, and implementer assertion."
+    print()
+    print("C02-F10  auxiliary control evidence")
+
+    GREEN_SUITE = ("import sys\n\nprint('  [ok] a control that holds')\n"
+                   "sys.exit(0)\n")
+    RED_SUITE = ("import sys\n\nprint('FAIL: a control that does not hold')\n"
+                 "sys.exit(1)\n")
+
+    t10 = make_repo(); made.append(t10)
+    write_lf(t10 / "scripts" / "test_green_fixture.py", GREEN_SUITE)
+    do_init(t10)
+    r = do_freeze(t10)
+    c10 = t10 / "runs" / "T-001" / "plan-review" / "cycle-01"
+    if r.returncode != 0:
+        failures.append(f"a freeze with a passing control suite was refused:\n"
+                        f"{r.stdout}{r.stderr}")
+    else:
+        _pres = c10 / "auxiliary" / "scripts" / "test_green_fixture.py"
+        _run = c10 / "auxiliary" / "observed-run.txt"
+        _man = json.loads((c10 / "auxiliary-evidence.json")
+                          .read_text(encoding="utf-8"))
+        _entry = next((s for s in _man["suites"]
+                       if s["path"].endswith("test_green_fixture.py")), None)
+        if not _pres.is_file():
+            failures.append(
+                "the control suite's bytes were not preserved, so the reviewer "
+                "has a filename and a digest and nothing to read. That is the "
+                "manifest cycle 02 refused.")
+        elif _pres.read_text(encoding="utf-8") != GREEN_SUITE:
+            failures.append("the preserved control suite is not the suite")
+        elif not _run.is_file():
+            failures.append("no observed run was recorded, so execution is "
+                            "still an assertion")
+        elif "test_green_fixture.py   exit 0" not in \
+                _run.read_text(encoding="utf-8"):
+            failures.append(f"the observed run does not record this suite's "
+                            f"outcome\n{_run.read_text(encoding='utf-8')[:400]}")
+        elif _entry is None or _entry.get("observed_exit_code") != 0:
+            failures.append(f"the manifest does not carry the observed "
+                            f"outcome: {_entry}")
+        elif _man["observed_run"]["sha256"] != sha256_file(_run):
+            failures.append("the manifest's digest does not describe the "
+                            "observed run beside it")
+        else:
+            print("  [ok] control sources preserved and their run observed, "
+                  "both bound to the record")
+
+    # A suite that does not pass must be named, or the freeze is telling a
+    # reviewer the repairs are held by controls while one of them is red.
+    t10b = make_repo(); made.append(t10b)
+    write_lf(t10b / "scripts" / "test_red_fixture.py", RED_SUITE)
+    do_init(t10b)
+    r = do_freeze(t10b)
+    if r.returncode == 0:
+        failures.append(
+            "a cycle froze with a failing control suite and said nothing. The "
+            "prompt would then claim the repairs are watched by controls, one "
+            "of which does not run.")
+    elif "test_red_fixture.py" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but without naming the suite that failed\n"
+                        f"{r.stdout}{r.stderr}")
+    elif (t10b / "runs" / "T-001" / "plan-review" / "cycle-01").exists():
+        failures.append(
+            "the refusal left a cycle directory behind, so the next freeze "
+            "fails over a half-made cycle rather than over whatever it is "
+            "actually given. A refused command has to be a no-op.")
+    else:
+        print("  [ok] refused: a control suite that does not pass, unnamed, "
+              "and nothing created")
+
+    r = do_freeze(t10b, "--aux-known-red", "test_red_fixture.py")
+    if r.returncode == 0:
+        failures.append("a known-red suite was accepted with no reason given")
+    elif "requires --aux-known-red-reason" not in (r.stdout + r.stderr):
+        failures.append(f"refused, but not for the missing reason\n"
+                        f"{r.stdout}{r.stderr}")
+    else:
+        print("  [ok] refused: a known failure with no account of it")
+
+    r = do_freeze(t10b, "--aux-known-red", "test_red_fixture.py",
+                  "--aux-known-red-reason",
+                  "pre-existing: an approval package for a run with no ledger "
+                  "stays silent, and silence reads as no findings")
+    if r.returncode != 0:
+        failures.append(f"a named and explained failure was still refused:\n"
+                        f"{r.stdout}{r.stderr}")
+    else:
+        _c = t10b / "runs" / "T-001" / "plan-review" / "cycle-01"
+        _m = json.loads((_c / "auxiliary-evidence.json")
+                        .read_text(encoding="utf-8"))
+        if _m["observed_run"]["known_red"] != ["test_red_fixture.py"]:
+            failures.append(f"the record does not name the known failure: "
+                            f"{_m['observed_run']}")
+        elif "silence reads as no findings" not in \
+                _m["observed_run"]["known_red_reason"]:
+            failures.append("the record does not carry the reason")
+        elif "exit 1" not in (_c / "auxiliary" / "observed-run.txt") \
+                .read_text(encoding="utf-8"):
+            failures.append("the observed run does not show the failure it was "
+                            "excused for")
+        else:
+            print("  [ok] a named failure is recorded with its reason and its "
+                  "output, not hidden")
+
     # ---- B01-F05: a mutable reference is resolved before it is recorded ----
     # Alex Zamurko, 10 September: "resolve any mutable reference such as HEAD to
     # an immutable commit SHA at freeze time and verify the corresponding tree

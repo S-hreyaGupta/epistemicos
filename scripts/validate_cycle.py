@@ -72,6 +72,7 @@ MODERN_MARKERS = (
     "governing_artifacts_preserved",  # B02-F06, 11 September
     "approval_record_path",           # B02-F07, the implementation snapshot set
     "base_commit",                    # C02-F08, the derived diff
+    "auxiliary_evidence_sha256",      # B03-F02, the control manifest
 )
 
 NA = "N/A"
@@ -82,7 +83,16 @@ def modern_markers(target: dict) -> list[str]:
 
     Empty means nothing in the record dates it, which is the only state that
     may be read as predating a field rather than omitting one.
+
+    C02-F03, second pass. A declared evidence format settles the question on its
+    own and the marker list is not consulted: the list dates a record by what it
+    happens to contain, which cycle 03 showed can be emptied, while a format is
+    a record saying what it is. The list stays for targets frozen before the
+    field existed, which is the only population it can honestly speak for.
     """
+    fmt = target.get("evidence_format")
+    if fmt is not None:
+        return [f"evidence_format {fmt!r}"]
     return [k for k in MODERN_MARKERS if target.get(k) is not None]
 
 
@@ -594,6 +604,19 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
 
     # 9. mandatory hashed artifacts for that review type
     problems: list[str] = []
+
+    # C02-F03, second pass. A declared format has to be one this gate knows.
+    # Accepting an unrecognised value would read it as "newer than me, therefore
+    # fine", which is the same mistake as reading absence as age with the sign
+    # flipped: in both cases the gate decides it need not look.
+    _fmt = target.get("evidence_format")
+    if _fmt is not None and _fmt not in run_pins.EVIDENCE_FORMATS:
+        problems.append(
+            f"target declares evidence_format {_fmt!r}, which this gate does "
+            f"not know.\n          Known: "
+            + ", ".join(run_pins.EVIDENCE_FORMATS) +
+            ".\n          A format this checker cannot interpret is not a "
+            "format it may validate against.")
 
     # B01-F07, the half cycle 03 found still open. The protocol's check 9 is
     # "all mandatory hashed artifacts for that review type are present and their

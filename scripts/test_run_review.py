@@ -1166,6 +1166,18 @@ def main() -> int:
                           .read_text(encoding="utf-8"))
         _entry = next((s for s in _man["suites"]
                        if s["path"].endswith("test_green_fixture.py")), None)
+        # C02-F03, second pass. The dating rule is worth nothing if the freeze
+        # does not emit the field, and a checker that never sees one would go
+        # on dating records by inference without anybody noticing.
+        _tg10 = json.loads((c10 / "target.json").read_text(encoding="utf-8"))
+        if _tg10.get("evidence_format") != "cycle-target/1":
+            failures.append(
+                f"the freeze did not declare the evidence format, so every "
+                f"target it writes still has to be dated by guessing at its "
+                f"contents: {_tg10.get('evidence_format')!r}")
+        else:
+            print("  [ok] a frozen target declares the evidence format it was "
+                  "written in")
         if not _pres.is_file():
             failures.append(
                 "the control suite's bytes were not preserved, so the reviewer "

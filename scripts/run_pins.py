@@ -145,6 +145,25 @@ def diff_patch_argv(base: str, candidate: str,
     return argv
 
 
+# C02-F03, raised again by cycle 03. The first repair dated a record by looking
+# for fields only a later freeze emits, and cycle 03 showed the obvious weakness:
+# the list has to be extended every time the freezer learns to write something
+# new, and until it is, a modern target can be stripped back to look historical.
+# Codex: "the exemption still accepts demonstrably modern evidence... this does
+# not require erasing every indication of a modern freeze."
+#
+# So a target now says what format it is, rather than being dated by inference.
+# A record that declares a format is not historical, whatever else is missing
+# from it, and a record that declares none is dated the old way because that is
+# all there is to go on.
+#
+# The closed tuple matters as much as the field. An unrecognised value is
+# refused rather than read as "newer than me and therefore fine", which is the
+# same mistake as reading absence as age, pointing the other way.
+EVIDENCE_FORMATS = ("cycle-target/1",)
+CURRENT_EVIDENCE_FORMAT = EVIDENCE_FORMATS[-1]
+
+
 def spec_digest(entries: list[dict]) -> str:
     """One digest over a set of pinned artifacts.
 

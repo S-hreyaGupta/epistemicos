@@ -917,6 +917,11 @@ def cmd_freeze(args: argparse.Namespace) -> int:
             [{"path": p, "sha256": h} for p, h in sorted(_gov_hashes.items())
              if p != run["protocol"]["path"]]),
         "frozen_at": now(),
+        # C02-F03, second pass. The record says what it is, so no later checker
+        # has to date it by what it happens to contain. Everything frozen from
+        # here declares a format; everything frozen before carries none, and
+        # that absence is now the only thing it means.
+        "evidence_format": run_pins.CURRENT_EVIDENCE_FORMAT,
     }
 
     artifacts: list[tuple[dict, str]] = []

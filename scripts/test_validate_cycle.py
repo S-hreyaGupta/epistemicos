@@ -343,6 +343,62 @@ def main() -> int:
     else:
         print("  [ok] check 14 still exempts a diff with nothing to date it")
 
+    # ---- C02-F03, second pass: the record says what it is ----
+    # Cycle 03 raised this again. Dating a target by the fields it happens to
+    # carry means the list has to grow every time the freezer learns to write
+    # something, and until it does, a modern target stripped back to the bone
+    # reads as historical. Codex: "this does not require erasing every
+    # indication of a modern freeze."
+    #
+    # Each control below removes the governing set and then adds back exactly
+    # one thing, so what fires is attributable to that one thing.
+    def _stripped_with(extra: dict):
+        _base = _governed(drop_pins=True, drop_hashes=True)
+
+        def _m(t, c, root):
+            t = _base(t, c, root) or t
+            t.update(extra)
+            return t
+        return _m
+
+    expect_fail("a target declaring an evidence format while omitting the "
+                "governing set it was frozen with",
+                9, "plan",
+                mutate=_stripped_with({"evidence_format": "cycle-target/1"}))
+
+    # Codex's own fixture: the auxiliary manifest alone dates the record, and
+    # before this it was not consulted.
+    expect_fail("a target dated only by its auxiliary evidence manifest",
+                9, "plan",
+                mutate=_stripped_with({"auxiliary_evidence_sha256": "e" * 64}))
+
+    # An unknown format, with the governing set intact so nothing else can be
+    # what fails. Accepting it would be reading "newer than me" as "fine",
+    # which is the same abdication as reading absence as age.
+    def _with_format(value: str):
+        _base = _governed()
+
+        def _m(t, c, root):
+            t = _base(t, c, root) or t
+            t["evidence_format"] = value
+            return t
+        return _m
+
+    expect_fail("a target declaring an evidence format this gate does not know",
+                9, "plan", mutate=_with_format("cycle-target/99"))
+
+    root, commit, tree = fresh()
+    rc, out = run(root, build(root, commit, tree, "plan",
+                              mutate=_with_format("cycle-target/1")))
+    if rc != 0 or marks(out).get(9) != "PASS":
+        failures.append(
+            f"a target declaring the current evidence format, with a complete "
+            f"governing set, was refused. The control above would then be "
+            f"failing on the format field rather than on the value:\n{out}")
+    else:
+        print("  [ok] check  9 accepts the format it knows, with a complete "
+              "governing set")
+
     expect_fail("a protocol digest that is not a digest", 9, "plan",
                 mutate=_governed("not-a-hash"))
     expect_fail("a protocol digest that is well formed but not this cycle's",

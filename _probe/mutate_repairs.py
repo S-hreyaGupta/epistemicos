@@ -249,6 +249,30 @@ MUTATIONS = [
      "test_run_review.py",
      "froze with a failing control suite and said nothing"),
 
+    # C02-F03's second pass, raised again by cycle 03. Three rules: the format
+    # dates the record, an unknown format is refused, and the marker list still
+    # dates the targets frozen before the field existed.
+    ("C02-F03b  a declared evidence format dates the record on its own",
+     "validate_cycle.py",
+     "    if fmt is not None:",
+     "    if False:",
+     "test_validate_cycle.py",
+     "declaring an evidence format while omitting"),
+
+    ("C02-F03c  an evidence format this gate does not know is refused",
+     "validate_cycle.py",
+     "    if _fmt is not None and _fmt not in run_pins.EVIDENCE_FORMATS:",
+     "    if False:",
+     "test_validate_cycle.py",
+     "evidence format this gate does not know"),
+
+    ("C02-F03d  the auxiliary manifest dates a record too",
+     "validate_cycle.py",
+     "    \"auxiliary_evidence_sha256\",      # B03-F02, the control manifest\n",
+     "",
+     "test_validate_cycle.py",
+     "dated only by its auxiliary evidence manifest"),
+
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
      "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",

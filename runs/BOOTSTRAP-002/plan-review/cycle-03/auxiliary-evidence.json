@@ -1,0 +1,100 @@
+{
+  "note": "Control suites as they stood at freeze. NOT members of the review target: these bytes were not reviewed, and their presence here is a record of which controls the stated counts came from, not a claim that any of them was examined. target.json records this file's SHA-256 and target.sha256 covers target.json, so a change here is detectable by anyone who compares the two. No MC-2 check performs that comparison: this is a record, not an enforced binding.",
+  "establishes": {
+    "source_inspection": "the exact suite bytes are preserved under auxiliary/ and each is digest-matched to this record, so a reviewer can read what the controls actually do rather than be told",
+    "observed_execution": "auxiliary/observed-run.txt holds the exit code and output of each suite, run at freeze on one machine",
+    "not_established": "that the fixtures are valid, that a passing control is checking what it is named for, or that these results reproduce elsewhere. Mutation sensitivity is a separate probe and is not claimed by this file."
+  },
+  "instruments": {
+    "note": "Preserved for reading and NOT run at freeze. Nothing in this file reports a result for them, and their presence here is not a claim that they were used or that they passed.",
+    "preserved": [
+      {
+        "path": "_probe/mutate_repairs.py",
+        "sha256": "b10a20d6b89f51656adac90981a2312dcdabfa4a5eae934a4df4d0e1a4a7024e",
+        "preserved": "auxiliary/_probe/mutate_repairs.py"
+      }
+    ]
+  },
+  "observed_run": {
+    "path": "auxiliary/observed-run.txt",
+    "sha256": "7bc4b2ab4fc85eab04daa2d2885ba55abc247ae4ed4b91bac37c77c375ba5f07",
+    "known_red": [
+      "test_approval_package.py"
+    ],
+    "known_red_reason": "pre-existing: an approval package for a run with frozen cycles and no ledger stays silent, and silence reads as no findings rather than as nobody having looked"
+  },
+  "suites": [
+    {
+      "path": "scripts/test_approval_package.py",
+      "sha256": "a17e81fafc406feb9ed56ace15f9d2ad5a4e034fe2738a956a6c2088ac31ed5b",
+      "observed_exit_code": 1,
+      "preserved": "auxiliary/scripts/test_approval_package.py"
+    },
+    {
+      "path": "scripts/test_bootstrap_gate.py",
+      "sha256": "b23ee221e789930a94349161fcae9b767505e0aa36e6181b9358acc88fbb0432",
+      "observed_exit_code": 0,
+      "preserved": "auxiliary/scripts/test_bootstrap_gate.py"
+    },
+    {
+      "path": "scripts/test_citation_candidate.py",
+      "sha256": "d87d608a5057352b70cd5aef0f4d6e5c161e308e21b58505068d8c42614ce8b2",
+      "observed_exit_code": 0,
+      "preserved": "auxiliary/scripts/test_citation_candidate.py"
+    },
+    {
+      "path": "scripts/test_citation_extract.py",
+      "sha256": "2bb13cdb54ff37695b3058067978317f2012756efc94ce922dd2dbe625ff5fdd",
+      "observed_exit_code": 0,
+      "preserved": "auxiliary/scripts/test_citation_extract.py"
+    },
+    {
+      "path": "scripts/test_convert_protocol.py",
+      "sha256": "a92eecd651d8e13e71541f24a27db48b54c4c855077e0a8f199e46e50c001471",
+      "observed_exit_code": 0,
+      "preserved": "auxiliary/scripts/test_convert_protocol.py"
+    },
+    {
+      "path": "scripts/test_gold_runner.py",
+      "sha256": "8c9e973da0e10e842f1d3d59ed803ab3655575c954f36ce1d4cbc862a9abce0e",
+      "observed_exit_code": 0,
+      "preserved": "auxiliary/scripts/test_gold_runner.py"
+    },
+    {
+      "path": "scripts/test_interfaces.py",
+      "sha256": "ec4419d1163454ede5d8a0c35055491f5bf1ca632c3a47d0fe7c7d4ac6fc4514",
+      "observed_exit_code": 0,
+      "preserved": "auxiliary/scripts/test_interfaces.py"
+    },
+    {
+      "path": "scripts/test_ledger.py",
+      "sha256": "585f5328c2653876dc08576717773247c3547020f15f8c37e0496e2f4927f001",
+      "observed_exit_code": 0,
+      "preserved": "auxiliary/scripts/test_ledger.py"
+    },
+    {
+      "path": "scripts/test_prompts.py",
+      "sha256": "cbfe8150f65d9e8cc80d4b9e31a65f594c06c7726acdee47746b6663dd49269e",
+      "observed_exit_code": 0,
+      "preserved": "auxiliary/scripts/test_prompts.py"
+    },
+    {
+      "path": "scripts/test_protocol_pin.py",
+      "sha256": "32ece0d6028238e6a54c0f6cf89b7a24670aee72930c7904acc60f3e6d595e86",
+      "observed_exit_code": 0,
+      "preserved": "auxiliary/scripts/test_protocol_pin.py"
+    },
+    {
+      "path": "scripts/test_run_review.py",
+      "sha256": "9baba26e8329eecac66993d81a99953c26d172ce97c2e50e2f819c1c7985093c",
+      "observed_exit_code": 0,
+      "preserved": "auxiliary/scripts/test_run_review.py"
+    },
+    {
+      "path": "scripts/test_validate_cycle.py",
+      "sha256": "e103e84326d1de751a902a31c82e76f434df6042199cfc351122b1d6b9a3ebdc",
+      "observed_exit_code": 0,
+      "preserved": "auxiliary/scripts/test_validate_cycle.py"
+    }
+  ]
+}

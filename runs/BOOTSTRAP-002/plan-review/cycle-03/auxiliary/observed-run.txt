@@ -1,0 +1,1107 @@
+# Observed control run, recorded at freeze
+
+interpreter  3.11.9
+at           2026-10-02T10:33:33Z
+suites       12
+
+This is observed execution on one machine at one moment. It is not a
+claim that these suites are correct, that their fixtures are valid, or
+that they would pass elsewhere. It is the record of what happened when
+they were run against the bytes preserved beside this file, offered so
+that a reviewer is reading a result rather than a number somebody
+typed.
+
+--- scripts/test_approval_package.py   exit 1 ---
+approval package
+  [ok] refused: a run with no run.json
+  [ok] refused: a review type this run never held
+  [ok] refused: a review with no frozen cycle
+  [ok] a package is produced for a run with frozen cycles
+  [ok] building a package writes nothing into the review it describes
+  [ok] the package states that it decides nothing
+  [ok] §7.2: disputes and unresolved findings are separate headings
+  [ok] a refusal by the owning tool is quoted, not worked around
+  [ok] all 10 §7 items appear in the coverage table, 1 marked absent
+  [ok] each absent §7 item carries a stated reason
+
+FAIL: a run with frozen cycles and no ledger does not say so. Silence there reads as 'no findings', which is the opposite of 'nobody has looked'.
+
+--- scripts/test_bootstrap_gate.py   exit 0 ---
+the gate refuses
+  [ok] refused: check with no bootstrap review at all
+  [ok] refused: record a decision with no evidence preserved
+  [ok] refused: record a decision with the raw output empty
+  [ok] refused: record a decision with no human named
+  [ok] refused: record an approval with no attribution
+  [ok] refused: attribution too thin to identify anything
+  [ok] refused: check after RETURN_FOR_REWORK
+
+the gate approves
+  [ok] a complete review records, and check passes
+  [ok] refused: a decision about a target the preserved review never names
+  [ok] refused: record a second decision without --supersede
+  [ok] --supersede preserves the decision it replaces
+
+approval covers bytes, not filenames
+  [ok] refused: approval surviving an edit to validate_cycle.py
+  [ok] refused: approval surviving an edit to run_review.py
+  [ok] refused: approval surviving an edit to ledger.py
+  [ok] refused: approval surviving an edit to loop_state.py
+  [ok] refused: approval surviving an edit to bootstrap_gate.py
+  [ok] refused: approval surviving deletion of a reviewed root
+  [ok] refused: approval surviving deletion of a pinned dependency
+  [ok] refused: a decision that never covered run_review.py
+  [ok] refused: a decision that never covered ledger.py
+  [ok] refused: a decision that never covered loop_state.py
+
+executable dependencies are derived, not listed
+  [ok] a referenced local module is discovered and pinned
+  [ok] refused: approval surviving an edit to a dependency
+  [ok] refused: a component reaching code the decision never saw
+  [ok] refused: a decision record that is not valid JSON
+
+the decision is bound to what was reviewed
+  [ok] refused: record a decision with no --target at all
+  [ok] refused: record a decision after a component changed post-freeze
+  [ok] refused: a covered file the review target never contained
+  [ok] refused: a reviewed artifact the gate does not cover
+  [ok] refused: approval surviving an edit to the evidence schema
+
+no claim stronger than CONVENTION_ONLY
+  [ok] 17 covered files carry no unqualified proof, immutability or prevention claim
+
+an approval is bound to the review it rests on (B01-F09)
+  [ok] a fresh approval passes
+  [ok] refused: the review evidence the approval rests on is gone
+  [ok] refused: the recorded review output was edited after the decision
+  [ok] refused: the reviewed target was edited after the decision
+
+the bootstrap exception ends at the first approved runner
+  [ok] before any runner approval the exception is available
+  [ok] a runner can be approved once the bootstrap review holds
+  [ok] the first runner approval ends the exception
+  [ok] the exception is withheld when the history cannot be read
+  [ok] deleting the approval does not reopen the exception, and the deletion is named
+  [ok] approve-runner commits the record, leaving no uncommitted window to delete
+  [ok] an approval written by approve-runner survives deletion
+  [ok] an existing exempt run cannot freeze once the exception has ended
+  [ok] --bootstrap-exempt is refused once a runner has been approved
+
+every refusal fired, and approval does not outlive the code it covered
+
+--- scripts/test_citation_candidate.py   exit 0 ---
+citation candidate adapter
+  [ok] refused: extractor output that is not there
+  [ok] refused: a gold set that does not exist
+  [ok] refused: output that is not valid JSON
+  [ok] refused: parsed citations that carry only a citation_key
+  [ok] occurrences collapse to distinct works, and the ratio is stated
+  [ok] unresolved and excluded candidates are counted, not scored
+  [ok] identity is taken from the gold set, not chosen by the adapter
+  [ok] a candidate carrying the gold set's own phrases scores 1.0 end to end
+
+  extractor output reaches the gold runner without either side bending toward the other
+
+--- scripts/test_citation_extract.py   exit 0 ---
+citation extractor — §12 conformance
+
+parenthetical
+  [ok] one author, parenthetical
+  [ok] two authors with &
+  [ok] et al., parenthetical
+  [ok] multi-segment, one occurrence each
+  [ok] multi-year, one occurrence per year
+  [ok] prefix e.g.
+  [ok] locator p. 14
+
+narrative
+  [ok] one author, narrative
+  [ok] and-terminated serial list
+  [ok] et al., narrative
+  [ok] particle surname
+  [ok] the same particle surname, sentence-initial
+  [ok] capitalised particle, parenthetical
+  [ok] two capitalised particles
+  [ok] capitalised particle after a conjunction
+  [ok] a particle inside the surname is still out of grammar
+  [ok] a lower-case core after a particle is a surname
+  [ok] a lower-case core without a particle is not
+
+adversarial narrative
+  [ok] However, Smith (2020) parses as smith|2020
+  [ok] In Smith (2020) parses as smith|2020
+  [ok] See Smith (2020) parses as smith|2020
+  [ok] Unlike Smith (2020) parses as smith|2020
+  [ok] Curiously, Smith (2020) parses as smith|2020
+  [ok] Following (2019) is a stopword surname
+
+institutional
+  [ok] World Bank (2024) does NOT degrade to bank|2024
+  [ok] European Commission (2023) stays whole and unresolved
+  [ok] OECD (2024) is all_caps_surname
+  [ok] (OECD, 2024) is all_caps_surname too
+
+historical range and envelope
+  [ok] Darwin 1859 keys, not no_year
+  [ok] Machiavelli 1532 parses
+  [ok] 1500 is inside the envelope
+  [ok] 1499 is invisible, not unresolved
+  [ok] forename-first is unresolved, not a citation
+  [ok] dual date is unresolved
+  [ok] square brackets produce no record at all
+
+rejection spans
+  [ok] In May (2020): text is the accepted parse, not the candidate
+
+the possessive is not part of the identity
+  [ok] a possessive surname keys to the bare name
+  [ok] the bare form keys identically
+  [ok] a possessive on the last of several authors
+  [ok] author_phrase keeps what the manuscript wrote
+  [ok] a name is not truncated at an internal apostrophe
+
+rc2 §6.3 — STOP reduction is additive, not destructive
+  [ok] §6.3: author_phrase is the full run, the reduced form is separate
+  [ok] §6.3: stop_reduced_phrase is null when nothing was removed
+  [ok] C-020: the full surface is kept and the identity still reduces
+
+author_phrase carries the whole production
+  [ok] comma-separated authors are not cut at the first comma
+  [ok] two comma-separated authors survive whole
+  [ok] ampersand pairs keep both names
+  [ok] et al. stays attached
+  [ok] narrative serial list keeps every author
+
+C2 sentence boundary
+  [ok] a previous sentence's last token cannot enter the run
+  [ok] a seven-token author list is reached in full
+  [ok] the run still stops at an ineligible token
+  [ok] and still never crosses the sentence start
+
+unicode
+  [ok] accented surnames key
+
+declared noise
+  [ok] bare year
+  [ok] comma-less
+  [ok] quantity parenthetical, admitted by the wider year range
+
+aborts
+  [ok] exit 4: sectioning lives in h1: two h1, no h2
+  [ok] a stray second h1 alongside h2 structure is tolerated
+
+an unmarked-up References label
+  [ok] a standalone `References` line is a section boundary
+  [ok] refused: a `References` line with nothing below it
+  [ok] refused: a `References` line with too few entries below it
+  [ok] refused: a `References` line with prose below it, not entries
+  [ok] refused: entries below the label are not in order
+  [ok] a marked-up heading still takes priority over a stray line
+  [ok] exit 5: invalid utf-8
+
+rc3 B7: and colleagues
+  [ok] Jost and colleagues, narrative
+  [ok] Colquitt and colleagues, narrative
+  [ok] Dalal and colleagues, narrative
+  [ok] parenthetical form
+  [ok] a real two-author pair is unaffected
+  [ok] the word alone is not a cue
+
+rc3 B8: possessive with a bounded gap
+  [ok] simple possessive, which rc2 already covered
+  [ok] et al.'s, no gap
+  [ok] one intervening noun
+  [ok] three intervening tokens, the measured maximum
+  [ok] four intervening tokens is too many
+  [ok] no possessive means no gap is allowed
+  [ok] the gap does not cross a comma
+
+rc3 B5: lead-in cues, a closed set
+  [ok] cue 'see'
+  [ok] cue 'see also'
+  [ok] cue 'see for example'
+  [ok] cue 'for an overview'
+  [ok] cue 'for a review'
+  [ok] cue 'for a recent review'
+  [ok] cue 'for a meta-analysis'
+  [ok] cue 'for a critique'
+  [ok] cue 'for critiques'
+  [ok] cue 'for a similar approach'
+  [ok] cue 'for comparative examples'
+  [ok] cue 'for details'
+  [ok] the trailing form, where the cue follows the citation
+  [ok] a cue outside the set is not a cue
+  [ok] the §4 prefix cues still work
+
+author-date style guard
+  [ok] an APA document passes the style guard
+  [ok] exit 2: a comma-less author-date document is refused
+  [ok] too few parentheticals to judge a style: not refused
+  [ok] a stray comma-less citation among APA ones does not trip it
+  [ok] comma_less_share counts both forms and reports the ratio
+
+the four corrections, on and off
+  [ok] escaped ampersand is invisible without the flag
+  [ok] and the ampersand parses with its flag
+  [ok] colon locator is unresolved without the flag
+  [ok] and the colon parses with its flag
+  [ok] colon flag does not swallow a following author
+  [ok] cp. is not a cue without the flag
+  [ok] and is one with it
+  [ok] a damaged group loses everything without the segments flag
+  [ok] with it, the good segments survive and the bad one is reported
+
+rc3 §A output contract — three terminal states
+  [ok] a mathpix cdn image URL is excluded_candidate/url_or_image
+  [ok] a citation beside a URL parses and is not url_or_image
+  [ok] an institutional author with a URL stays unresolved, not excluded
+  [ok] §E: a candidate above the first h2 is publisher_metadata
+  [ok] §E: a candidate under `## Citation information` is excluded
+  [ok] a citation under an ordinary heading is not excluded
+  [ok] B10/D2: a year-only math span is not math_expression
+  [ok] B10: a math span that is not year-only is math_expression
+  [ok] A2: excluded_reason is rc3's closed six-member set
+  [ok] A2: a reason outside the closed set is refused, incl. bare_locator
+  [ok] A1/A3: every detected candidate reaches exactly one of three states
+  [ok] A4: an excluded span is emitted, not silently dropped
+  [ok] A5: the denominator excludes excluded_candidate
+  [ok] A5: the summary reports a parse rate and no accuracy figure
+  [ok] A5: candidate_parse_rate is over the corrected denominator
+
+rc2 §7.4 / rc3 B1b — institutional authors
+  [ok] §G: (International Monetary Fund, 2022) keys the complete label
+  [ok] §G: a three-core institutional name reaches a candidate
+  [ok] §G: World Bank (2024) keys the whole label, never bank|2024
+  [ok] rc2 §8: with no reference entry, the institution stays unresolved
+  [ok] a compound personal surname is refused by the citation grammar, recorded as a gap rather than asserted as correct
+  [ok] rc2 §7.4: no comma, at least one letter, non-empty
+  [ok] rc2 §7.4: the head stops at the year paren, one period removed
+  [ok] rc2 §7.4: an institutional reference entry is keyed, not refused
+
+rc2 §7.1 — the five line rules, and where orphan_line comes from
+  [ok] §7.1: two intact entries, two keys, no orphan
+  [ok] §7.1 rule 1: a blank line inside an entry strands its tail
+  [ok] §7.1 rule 2: a heading closes the open entry
+  [ok] §7.1 rule 5: a line before any entry start is an orphan
+  [ok] §7.1: the strand cascades, and the next entry start ends it
+
+rc2 §6.7 / §9.3 — author-structure coherence
+  [ok] §6.7: exact form carries its visible authors and count
+  [ok] §6.7: et al. is a minimum constraint, not a count
+  [ok] §6.7: particles are retained in visible_authors
+  [ok] §6.7 exact: the lead-in is not author number one
+  [ok] §6.7 et_al: the lead-in is not author number one
+  [ok] §6.7: a lead-in with no comma no longer silences the check
+  [ok] §9.3: a real count mismatch behind a lead-in is still caught
+  [ok] §9.3: a real order mismatch behind a lead-in is still caught
+  [ok] §6.6: only visible_authors moved; the surface fields did not
+  [ok] §9.3: exact passes when count and order agree
+  [ok] §9.3: exact fails on count against a one-author reference
+  [ok] §9.3: exact fails on order when the second author differs
+  [ok] §9.3: count takes precedence when both halves fail
+  [ok] §9.3: et_al passes against a three-author reference
+  [ok] §9.3: et_al fails against a two-author reference
+  [ok] §9.3: an et_al phrase carries every visible author, not just one
+  [ok] a full-forename reference takes no part in the check
+  [ok] a reference containing et al. yields no author list
+  [ok] a list that parses partway yields nothing, not a partial list
+  [ok] a surname the grammar cannot express yields no structure
+  [ok] §6.8: a possessive surname compares as the bare name
+  [ok] rc2 §7.4: a period belonging to an initial is not stripped
+  [ok] a surname beginning with `and` is not split by the separator
+  [ok] a mismatch keeps the identity, loses the match, and exits 1
+  [ok] an et_al mismatch does not itself force exit 1
+
+rc3 B6 compact year-suffix, D2 math-wrapped years
+  [ok] B6: 2019a,b expands to two occurrences
+  [ok] B6: three suffixes expand to three
+  [ok] B6: the narrative form expands too
+  [ok] B6: an ordinary multi-year list is not a compact suffix list
+  [ok] B6: a single suffixed year is unchanged
+  [ok] B6: expand_year leaves an ordinary year and n.d. alone
+  [ok] B6: a bare base year does not take a following suffix
+  [ok] D2: a year-only span with an author context is unwrapped
+  [ok] D2: all three of rc3's negatives are left alone
+  [ok] rc3 §G: D2's unwrapped form keys both years, as §G states
+  [ok] §4: widening the year list left the author/year comma required
+
+rc3 §C — citation errors, a diagnostic class
+  [ok] §C1: one record per group, two defects listed, group-scoped
+  [ok] §C: Barbier parses and still carries one error — orthogonal axes
+  [ok] §C2: an uppercase locator is recognised, as C2 requires
+  [ok] §C: each of rc3's named defect shapes is detected
+  [ok] §C: well-formed groups, stop words and non-author years are clean
+  [ok] §C: naming the defect did not loosen the grammar
+  [ok] §C: the defect list is in declaration order, not discovery order
+
+rc2 §8.2 / §8.3 — identity states, per CIT-ARCH-01
+  [ok] §8.3: unique/no_match → full_phrase, one reference index
+  [ok] §8.3: nonunique/no_match → ambiguous_citation, key retained
+  [ok] §8.3: no_match → not_resolved, and the citation still parses
+  [ok] CIT-ARCH-01: an unconfirmed candidate is preserved, not discarded
+  [ok] §11.2: the identity classes partition the parsed occurrences
+  [ok] §8.3: a parenthetical has one candidate, so its S is no_match
+  [ok] §8.3 row 4: no_match/unique → stop_reduced, STOP key authoritative
+  [ok] §8.3 row 5: no_match/nonunique → stop_reduced + ambiguous_citation
+  [ok] §8.4: two internal candidates suppress the §9.4 diagnostic
+  [ok] §8.3 row 6: different keys → ambiguous, nothing established
+  [ok] C-048: the record is byte-exact against rc2's declared key order, both states, both keys, both index arrays
+  [ok] §8.5: ambiguity-reserved references leave the pool
+  [ok] §8.5: author-resolution ambiguity counts +0, and an independent unambiguous occurrence beside it still counts
+  [ok] §8.6: the two candidates cannot collide, so exit 6 has no input
+
+rc2 §6.6 — surface grouping is not identity
+  [ok] C-022: the surface key is a JSON array, bare year an integer
+  [ok] C-022: a suffixed year and n.d. are strings, not integers
+  [ok] C-023: punctuation and `and`/`&` remain surface-distinct
+  [ok] C-023: the count is of distinct groups, not of occurrences
+  [ok] §6.8: the possessive survives the surface key, not the identity
+  [ok] C-024: two surface groups, one identity — the key is not consumed
+  [ok] C-025: the summary count and the null on unresolved records
+
+rc2 §10 / §11.3 — bibliography-absent mode
+  [ok] §10: no bibliography is processed, not refused
+  [ok] C-066: not_evaluated is a different state from not_resolved
+  [ok] §10: all nine reconciliation record types are suppressed
+  [ok] C-067: identity counts null, extraction counts real
+  [ok] C-006: a marked-up References heading reports detected
+
+rc2 §13 / §12.1 — file output and canonical bytes
+  [ok] C-071: --out and stdout are byte-identical
+  [ok] §12.1: UTF-8, no BOM, LF only, one trailing LF
+  [ok] §12.1: non-ASCII characters are emitted raw
+  [ok] C-072: a directory target is named for canonical_sha256
+  [ok] §2: canonical_sha256 is over canonical_manuscript_bytes
+  [ok] C-073: atomic publication leaves no scratch file
+  [ok] §13: an abort publishes the two-line error stream, not a partial artifact
+  [ok] §12.2: blocks are in order and never interleave
+  [ok] §12.3: 14 of rc2's 15 record types lead with the key order rc2's own document declares; `error` is pinned by §13's byte goldens instead
+  [ok] §7.4: references carry identity_author_phrase
+  [ok] C-070: multi-year citations order by year, not by source
+  [ok] §12.4: citations are totally ordered, no two tied
+  [ok] C-030: a no-year entry is unresolved, not a keyless reference
+  [ok] C-032: suspect_reasons are closed and ordered
+  [ok] C-083: the same input produces byte-identical output twice
+
+rc2 §5 / §6 — sentence-relative fields
+  [ok] C-026: sentence_index continues across a heading
+  [ok] C-027: previous_sentence_end carries the prior content_end
+  [ok] C-027/C-028: first sentence null, and start alone is not standalone
+  [ok] C-028: standalone marks the citation-only sentence
+
+rc2 §15 — the invariant-injection seam
+  [ok] §15: all four different-key state pairs → ambiguous
+  [ok] C-047: a shared reference index is ambiguity, not exit 6
+  [ok] §15/§8.6: same candidate_key on both lookups → exit 6
+  [ok] §15: injection leaves Pass-1 parsing and spans untouched
+  [ok] §15: no CLI path can bind the seam, and it is unbound by default
+
+rc2 §9.4 — candidate-level missing reference and repair
+  [ok] §9.4: all three repair rules pair their reference
+  [ok] §9.4: reference source order decides which entry pairs
+  [ok] §9.4: the rules are mutually exclusive on one reference
+  [ok] §9.4: EXACTLY ONE rule can match, so no pair is ever ambiguous
+  [ok] §9.4: the CORE length floor stops short surnames pairing
+  [ok] §9.4: a person candidate never pairs with a non-person reference
+  [ok] §9.4: missing_reference preserves the candidate, establishes none
+  [ok] §9.4: a possible_mismatch establishes no citation_key
+  [ok] §9.5: merge_suspected is targeted at the candidate, not global
+  [ok] §9.4: a paired reference leaves the pool and pairs only once
+
+the canonical fix set
+  [ok] --fix all expands to exactly FIXES, whatever FIXES becomes
+
+rc2 §9.6 — uncited references
+  [ok] §9.6: every remaining keyed reference is emitted, in source order
+  [ok] §9.6: an exact authoritative match leaves the pool
+  [ok] §9.6: a mismatch-paired reference does not reappear as uncited
+  [ok] §9.6: a duplicated reference key is not a uncited candidate
+  [ok] §9.6: an unresolved_reference is never a uncited candidate
+
+rc2 §2 — coordinates are UTF-8 byte offsets
+  [ok] §2: on ASCII every one of 2 spans slices its own text
+  [ok] §2: after 15 bytes of multi-byte lead-in, all 8 spans still slice their own text
+  [ok] rc3 D1: three `\&` substitutions precede canonicalisation, so all 8 spans still slice their own text
+  [ok] rc3 §J: ampersand then mathyear, both before canonicalisation — all 7 spans hold
+  [ok] §2/D1: canonical_sha256 covers the post-transform bytes, and moves when the transform does
+  [ok] §2: an unconvertible coordinate aborts, exit 6, rather than staying in the record as a code-point index
+  [ok] §2: a null coordinate passes through as null, and the sibling offset still converts
+
+rc2 §11 — summary fields and the invariants over them
+  [ok] §11: all 21 of rc2's summary fields are emitted, with this file's 11 extras alongside
+  [ok] §11.1: total 2 = extracted 1 + unresolved 1, with a bibliography
+  [ok] §11.1: total 2 = extracted 1 + unresolved 1, with none at all
+  [ok] §11.2/C-052: resolved + ambiguous + not_resolved = extracted, with both a resolved and an unresolved occurrence present
+  [ok] §11.2: resolved = unique_reference_match + key_ambiguous, each side computed from a different field
+  [ok] §11.4: 'ghost|1999' has a key and no authority, so it counts toward neither resolved nor works cited
+  [ok] C-051: reserved indices [0, 1] count +0, and the unambiguous occurrence beside them still counts
+  [ok] §11.2: 2 diagnostic occurrences within 2 identity_not_resolved, counted once each
+
+rc2 §13/§14 — the abort streams, byte for byte
+  [ok] §14/C-077: 3 abort streams are byte-exact against rc2's table; [3, 6] need a supplied map or §15's seam
+  [ok] §13: the abort artifact is the stdout stream exactly, two lines, no normal record
+
+rc2 §1.1 — rule identity
+  [ok] §1.1: spec_version 3.4, profile apa7_like_v1, rule version and ET_AL_MIN_AUTHORS all match rc2's pinned block
+  [ok] §1.1: none of the 3 CLI options selects the profile, rule version or et-al threshold
+  [ok] §14: invalid UTF-8 writes two lines, and the meta names the ruleset that refused the document
+
+rc2's closed value enums — nothing outside any of them
+  [ok] C-031: every one of the 25 values across 8 closed enums is reached, and nothing outside them is emitted
+
+rc2 §3.1 — every parenthetical PREFIX, one case each
+  [ok] §3.1: all 11 cues, and no others — this file's set equals rc2's closed list exactly
+  [ok] §3.1/C-016: all 11 cues parse, and none leaks into author_phrase
+  [ok] §3.1/C-017: 6 shorter-inside-longer pair(s), every long form offered first (structural, see comment)
+
+rc2 §3.2 — every STOP token, one case each
+  [ok] §3.2: all 109 tokens, and no others — this file's set equals rc2's closed list exactly
+  [ok] §6: none of the 109 STOP tokens becomes a citation — 96 as stopword_surname, 13 as no_grammar_match because they cannot be a CORE
+  [ok] §6.3: all 96 non-abbreviated tokens reduce away, leaving smith|2020 (13 tokens that cannot be a CORE, excluded)
+
+rc2 §9.1 — duplicate reference keys
+  [ok] §9.1: one record for 'felfe|2006', indices [0, 1] ascending
+  [ok] §9.1: cited is true when an occurrence matches the key and false when none does, on the same bibliography
+  [ok] §9.1: candidate-level keys and duplicate keys are disjoint, so rc2's cited=true caveat cannot be violated here
+  [ok] §12.4: ['zeta|2001', 'alpha|2002'] — ordered by smallest member index, against alphabetical order of the keys
+  [ok] §10: no duplicate_reference_key without a bibliography
+
+rc2 §14 — the closed exit-1 finding set
+  [ok] §14/C-078: all 12 of rc2's finding conditions are evaluated, and the set is closed
+  [ok] §14: a clean document exits 0, so exit 1 below means something
+  [ok] §14: residual uncited_reference forces exit 1 with every citation still uniquely matched
+  [ok] §14: unresolved_reference forces exit 1 with every citation still uniquely matched
+  [ok] §14: any suspect reference forces exit 1 with every citation still uniquely matched
+  [ok] §2/C-002: CRLF and lone CR become LF, then NFC composes — canonical bytes are exactly pinned
+  [ok] §1.3/C-004: osa is one substitution apart on müller/miller, so the unit is a code point
+  [ok] §1.3/C-004: CORE's floor is 2 code points — Bé parses, É does not, though both are 2+ bytes
+  [ok] §1.3/C-004: 2843 bytes of reference is not overlong at 1442 code points
+
+rc2 §4.2 — the standalone heading contract
+  [ok] §4.2/C-005: all four patterns are rc2's, character for character
+  [ok] §4.2/C-005: a hash run needs a space or tab ('#t' no, '# t' yes)
+  [ok] §4.2/C-005: at most six hashes ('####### t' no, '###### t' yes)
+  [ok] §4.2/C-005: HEAD_MD is anchored at column 0 (' # t' no, '# t' yes)
+  [ok] §4.2/C-005: the HTML level must close itself ('<h1>t</h2>' no, '<h1>t</h1>' yes)
+  [ok] §4.2/C-005: HTML stops at h6 ('<h7>t</h7>' no, '<h6>t</h6>' yes)
+  [ok] §4.2/C-005: HTML must be the whole line ('x <h1>t</h1>' no, '<h1>t</h1>' yes)
+  [ok] §4.2/C-005: attributes need a separator ('<h1class="x">t</h1>' no, '<h1 class="x">t</h1>' yes)
+  [ok] §4.2/C-005: setext `=` is not a heading ('Title\n=====' no, '# Title' yes)
+  [ok] §4.2/C-005: setext `-` is not a heading ('Title\n-----' no, '## Title' yes)
+  [ok] §4.2/C-005: one trailing hash run comes off ('## Title ##' -> 'Title')
+  [ok] §4.2/C-005: hashes need whitespace before them ('## Title#' -> 'Title#')
+  [ok] §4.2/C-005: only ONE run comes off ('## Title ## ##' -> 'Title ##')
+  [ok] §4.2/C-005: trailing whitespace goes with it ('## Title   ' -> 'Title')
+  [ok] §4.2/C-005: residual tags leave the name ('<h2><em>Meth</em>ods</h2>' -> 'Methods')
+  [ok] §4.2/C-005: inner whitespace collapses ('<h2>a   b\tc</h2>' -> 'a b c')
+  [ok] §4.2/C-005: leading numbering is cleaned ('## 3. Methods' -> 'Methods')
+  [ok] §4.2/C-005: nested numbering with a paren ('## 3.1.4) Results' -> 'Results')
+  [ok] §4.2/C-005: numbering needs a separator ('## 3.Methods' -> '3.Methods')
+  [ok] §4.2/C-005: clean() does not know about years ('## 2024 Survey' -> 'Survey')
+  [ok] §4.2/C-005: two h1 and no h2 is refused
+  [ok] §4.2/C-005: two h1 WITH an h2 is allowed
+  [ok] §4.2/C-005: one h1 and no h2 is allowed
+
+rc2 §6.4 — verbatim text and byte offsets on every unresolved reason
+  [ok] §6.4/C-015: no_grammar_match is verbatim and byte-addressed (23 bytes over 23 code points)
+  [ok] §6.4/C-015: all_caps_surname is verbatim and byte-addressed (10 bytes over 10 code points)
+  [ok] §6.4/C-015: stopword_surname is verbatim and byte-addressed (12 bytes over 12 code points)
+  [ok] §6.4/C-015: all 3 reasons rc2 declares are reached, and no fixture produced one outside the set
+
+rc2 §7.2 — the reference source span
+  [ok] §7.2/C-029: the span is the byte region between the first and last non-whitespace bytes, inner newlines and indentation included
+  [ok] §7.2/C-029: three lines join on one ASCII space, and the result is deliberately not its own source text
+  [ok] §7.2/C-029: the multibyte entry spans 56 bytes over 53 code points
+
+rc2 C-080 — numeric citations produce no identity record
+  [ok] §10/C-080: 5 numeric brackets produced no record of any kind, and the author-date citation beside them still resolves
+
+rc2 §9.6 — what uncited_reference excludes
+  [ok] §9.6/C-061: rc2 still closes the list at three exclusions
+  [ok] §9.6/C-061: exclusion 1, the exact match goes and brown|2017 stays
+  [ok] §9.6/C-061: exclusion 2a, two distinct unique keys reserved by one ambiguous occurrence, neither surfacing as uncited
+  [ok] §9.6/C-061: exclusion 2b, duplicate-keyed rows stay out because the key is not unique, not because anything reserved them
+  [ok] §9.6/C-061: exclusion 3, the paired reference leaves the pool without the occurrence resolving to it
+  [ok] §9.6/C-061: an unresolved_reference row is never an uncited-reference candidate
+
+  the extractor agrees with §12 on the cases it pins, and with the
+  two rules §12 leaves unstated that a mutation probe found unheld
+unsupported citation style: 100% of 12 author-year parentheticals omit the comma before the year, which is author-date rather than APA
+
+--- scripts/test_convert_protocol.py   exit 0 ---
+  [ok] passes: complete document
+  [ok] fails on terminal marker: stops after the last row
+  [ok] fails on terminal marker: trailing fragment with no pipe
+  [ok] fails on fields: last row cut mid-write
+  [ok] fails on no gaps: gap in the sequence
+  [ok] fails on increase from V01: rows out of order
+  [ok] fails on increase from V01: table does not start at V01
+  [ok] fails on header: verification table absent
+  [ok] fidelity accepts identical text and rejects a changed word
+  [ok] structure catches invented headings that fidelity passes
+  [ok] structure catches dropped lines
+
+all controls fired; every completeness check is falsifiable
+
+--- scripts/test_gold_runner.py   exit 0 ---
+gold runner
+  [ok] refused: a gold set that declares no identity
+  [ok] refused: a candidate built from different source bytes
+  [ok] refused: no baseline and no acceptance criteria
+  [ok] refused: an item with an empty identity
+  [ok] refused: a gold set that is not there
+  [ok] an exact candidate scores 1.0, and §15.2 records NOT_APPLICABLE
+  [ok] identity ignores order and offset, as key_fields says it should
+  [ok] a lost case is reported as a regression and exits 3
+  [ok] the regressed case is named under Regressions, not just counted
+  [ok] all six §15.1 comparisons are reported separately
+  [ok] a candidate that lost nothing exits 0
+
+  aggregate improvement does not override a regression, and the runner proves it both ways
+
+--- scripts/test_interfaces.py   exit 0 ---
+seam 1  schema <-> checker
+        schema declares 7: candidate_commit, candidate_tree_hash, approved_plan_hash, diff_path, diff_hash, test_result_path, test_result_hash
+  [ok] a conformant implementation cycle passes all fifteen
+  [ok] an implementation cycle with a matching approved plan passes check 13
+  [ok] check 13 refuses an approval record that is not an APPROVE
+  [ok] check 13 refuses when no artifact is named for the hash
+  [ok] check 13 fails once the approved plan's contents change
+  [ok] an unmodified fixture passes at the probe layout, so probe failures below are attributable to the removed field
+  [ok] every field the schema calls mandatory fails its own check when removed (7/7)
+
+seam 2  runner <-> checker      seam 3  runner <-> evidence store
+  [ok] freeze wrote the documented layout (4 names checked against the schema)
+  [ok] a runner-produced cycle passes the gate with no hand-editing
+
+seam 4  ledger <-> controller
+  [ok] the controller reads the ledger's findings.json without drift
+
+seam 5  controller <-> live MC-2 result
+  [ok] breaking the evidence flips the verdict, so the gate is re-run rather than cached
+  [ok] an invalid cycle contributes nothing to the budget
+
+seam 7  runner <-> loop exit  (B01-F02)
+  [ok] the runner refuses to open a cycle after the loop has exited, with the previous cycle properly closed
+  [ok] an undeterminable loop state refuses the next cycle rather than assuming CONTINUE
+
+seam 9  run classification <-> loop outcome  (B01-F08)
+  [ok] the controller refuses an exempt run by default
+  [ok] --development computes it and labels the status line itself
+  [ok] the label survives --quiet, where the status line travels alone
+  [ok] a protocol run cannot be relabelled as development evidence
+
+seam 6  finding states <-> protocol exits
+  [ok] no findings -> CONVERGED
+  [ok] one OPEN -> CONTINUE
+  [ok] one OPEN, unchanged across two cycles -> STALLED
+  [ok] one RESOLVED -> CONVERGED
+  [ok] nothing open, one dispute -> HUMAN_ADJUDICATION_REQUIRED (protocol v1.1)
+
+seam 11  implementation evidence <-> later work  (B02-F07)
+  [ok] an implementation cycle survives later commits and rerun tests
+  [ok] altering a preserved copy still fails its check
+
+seam 10  authorized continuation <-> the runner  (B01-F02)
+  [ok] the runner refuses the next cycle at a terminal exit
+  [ok] an authorization for the wrong outcome still refuses
+  [ok] a matching authorization lets the runner open the next cycle
+
+seam 8  recorded hashes <-> what git hands back
+  [ok] all 8 hashed paths survive checkout unaltered
+
+all seams held
+
+--- scripts/test_ledger.py   exit 0 ---
+review-result integrity at gate time
+  [ok] a consistent raw/structured/ledger chain computes
+  [ok] refused: raw finding omitted from findings.json
+  [ok] refused: finding id changed between raw review and record
+
+recurrence of a resolved finding
+  [ok] recurrence keeps the identifier and moves RESOLVED -> OPEN
+  [ok] refused: reopen with no evidence
+  [ok] refused: reopen a finding that is still OPEN
+  [ok] refused: recurrence dated before the resolution it undoes
+
+one Finding ID grammar, parser and ledger (B02-F03)
+  [ok] 02-F01 (no prefix) parses and records unchanged
+  [ok] B02-F01 (one letter) parses and records unchanged
+  [ok] AB02-F01 (two letters) parses and records unchanged
+  [ok] refused: an identifier outside the canonical grammar
+  [ok] refused: a two-letter identifier whose cycle digits disagree
+  [ok] refused: the ledger with no canonical grammar to read
+
+events cannot predate the finding they act on (B01-F12)
+  [ok] refused: ACCEPT dated before the raising cycle
+  [ok] refused: REJECT_WITH_REASON dated before the raising cycle
+  [ok] refused: RESOLVE dated before the raising cycle
+  [ok] a disposition in the raising cycle itself is permitted
+  [ok] the duplicate-id refusal points at reopen, not a rename
+
+ledger
+  [ok] raise records a finding as OPEN
+  [ok] ACCEPT records a disposition and leaves the state OPEN
+  [ok] resolve from a later cycle moves OPEN -> RESOLVED
+  [ok] refused: duplicate finding id
+  [ok] refused: id declares a different cycle
+  [ok] refused: respond to a finding never raised
+  [ok] refused: a source outside the three
+  [ok] refused: a finding raised without saying who found it
+  [ok] a self-found defect enters the ledger, labelled, with ordinary state
+  [ok] show names the provenance of a self-found defect
+  [ok] repair-status records EXTERNALLY_DEMONSTRATED and leaves the state OPEN
+  [ok] recording repair status changes no authoritative output
+  [ok] refused: EXTERNALLY_DEMONSTRATED with no verification run
+  [ok] refused: a repair status outside the three
+  [ok] refused: respond to a RESOLVED finding
+  [ok] refused: REJECT_WITH_REASON with no reason
+  [ok] refused: REJECT_WITH_REASON with a reason but no spec evidence
+  [ok] refused: spec evidence that is only whitespace
+  [ok] refused: resolve with no prior ACCEPT
+  [ok] refused: resolve in the same cycle as the ACCEPT
+  [ok] refused: resolve with no evidence
+  [ok] refused: two dispositions in one cycle
+  [ok] REJECT_WITH_REASON moves OPEN -> DISPUTED
+  [ok] refused: respond to a DISPUTED finding
+  [ok] refused: raise OUT OF VOCABULARY as a finding
+  [ok] refused: raise it in lower case
+  [ok] refused: raise it with surrounding whitespace
+  [ok] three refusals wrote no findings.json at all
+  [ok] all six legitimate classes still accepted
+  [ok] refused: an invented seventh class
+  [ok] refused: resolve a DISPUTED finding
+
+invalid cycles neither authorize nor block (B01-F11)
+  [ok] refused: an ACCEPT in an invalid cycle does not authorize a resolution
+  [ok] the refusal names the disregarded event
+  [ok] the disregarded event is preserved and marked in show
+  [ok] invalidating an ACCEPT withdraws the resolution that rested on it
+  [ok] the controller does not converge on it (STALLED)
+  [ok] the refusal names the transition that never took effect
+  [ok] an acceptance in a gap between real cycles authorizes nothing
+  [ok] ledger and controller agree the finding is still open
+  [ok] a reopened finding needs a new acceptance, not the spent one
+  [ok] with a fresh acceptance it closes normally
+  [ok] refused: an acceptance dated before the reopening it answers
+  [ok] replay refuses a demonstration in the acceptance's own cycle
+  [ok] and honours one a cycle later, so that is the rule
+  [ok] replay refuses a reopening not later than its resolution
+  [ok] replay refuses a rejection dated before its reopening
+  [ok] replay does not honour a backdated acceptance already in the history
+  [ok] the rebuild refuses a backdated acceptance the record already contains
+  [ok] the cycles run after the exit are named
+  [ok] recorded gap: LOOP_STATUS is CONVERGED while the ledger holds the finding OPEN
+  [ok] the diagnostic names it, and says why it did not take
+  [ok] a resolution in an invalid cycle does not block a valid one
+  [ok] ledger and controller agree once the valid cycle resolves it
+
+loop controller
+  [ok] the fixture guard is quiet on success and fires on failure
+  [ok] CONVERGED      no findings at all
+  [ok] CONTINUE       one finding still open after cycle 1
+  [ok] CONVERGED      everything resolved by cycle 2
+  [ok] STALLED        no reduction, nothing resolved, nothing disputed
+  [ok] CONTINUE       a new dispute counts as progress, so not stalled
+  [ok] MAX_4_REACHED  budget exhausted, progress every cycle
+  [ok] STALLED        STALLED is tested before MAX_4
+  [ok] CONVERGED      a fourth cycle that converges is CONVERGED, not MAX_4
+  [ok] HUMAN_ADJUDICATION_REQUIRED a fourth cycle with only a dispute left needs a human, not MAX_4
+  [ok] CONTINUE       the same progressing ledger continues at 3
+  [ok] MAX_4_REACHED  open and disputed together at the ceiling is MAX_4, per the ruling
+  [ok] reported      and the dispute it swallowed stays visible in the stop state
+  [ok] STALLED        an unchanged ledger at the ceiling stalls, it does not reach MAX_4
+  [ok] refused       a recurrence reported against a RESOLVED ledger entry
+  [ok] CONTINUE       a recorded reopen keeps the loop off CONVERGED
+  [ok] STALLED        a later cycle cannot erase an earlier mandatory exit
+  [ok] reported      the cycles run after the exit are named
+  [ok] CONVERGED      recorded human authorizations let the loop continue past them
+  [ok] STALLED        clearing one boundary does not clear the next
+  [ok] CONTINUE       an authorization at the latest boundary permits continuation
+  [ok] reported      the continuation names the authority it rests on
+  [ok] STALLED        the same loop stops when nothing authorizes the latest exit
+  [ok] STALLED        an authorization naming a different outcome clears nothing
+  [ok] MAX_4_REACHED  a cleared fourth boundary does not buy a fifth cycle
+  [ok] reported      the fifth cycle is named rather than evaluated
+
+a valid review's finding with no authoritative state (C01-F06)
+  [ok] with a valid origin it is an ordinary open finding (STALLED)
+  [ok] refused: a valid review's finding with no authoritative state, named
+
+the run's classification, and what absence buys (C01-F05)
+  [ok] refused: bootstrap_review removed
+  [ok] refused: bootstrap_review left empty
+  [ok] refused: bootstrap_review an unrecognised value
+  [ok] an APPROVED run still produces an outcome
+  [ok] a development run is refused for being development evidence, not for want of a label
+  [ok] the label survives the zero-valid-cycle early return too
+  [ok] did not      clear an exit the authorization does not name
+  [ok] refused       an authorization with no attribution or reason is refused
+  [ok] MAX_4_REACHED  an invalid cycle does not consume the budget
+  [ok] HUMAN_ADJUDICATION_REQUIRED nothing open, one dispute outstanding
+  [ok] HUMAN_ADJUDICATION_REQUIRED precedes STALLED, which would otherwise swallow it
+  [ok] HUMAN_ADJUDICATION_REQUIRED everything resolved or disputed
+  [ok] CONTINUE       a dispute alongside an open finding does not trigger it
+  [ok] CONTINUE       a resolution recorded in an invalid cycle is ignored
+
+all controls fired; every refusal is reachable and every exit is shown firing and not firing
+
+--- scripts/test_prompts.py   exit 0 ---
+presence
+  [ok] all five prompts present, none a stub
+
+closed finding vocabulary
+        protocol declares 6
+          MISSING REQUIREMENT
+          WRONG OWNERSHIP
+          NONDETERMINISTIC WHERE D POSSIBLE
+          SEMANTIC STEP TOO BROAD
+          UNTESTED RULE
+          CONTRADICTORY IMPLEMENTATION MAPPING
+  [ok] both review prompts carry all six classes verbatim, and no seventh
+
+finding block
+  [ok] both review prompts require all 6 finding fields
+
+OUT OF VOCABULARY
+  [ok] both review prompts state all four non-finding constraints
+
+dispositions
+  [ok] the response prompt carries both dispositions and the ACCEPT limit
+
+protocol anchoring
+  [ok] every prompt cites the protocol section it implements
+
+PLAN_DEVIATION
+  [ok] the implementation prompt carries §9's record fields and its retrospective-legitimisation bar
+
+rulings of 8 September
+  [ok] the audit prompt keeps disposition and test status separate
+  [ok] the implementation prompt applies materiality criteria before the default, in its own words rather than the quoted ruling
+
+bootstrap prompt control counts
+  [ok] bootstrap-review-002-cycle-01.md still states what its own frozen cycle was run against (319)
+  [ok] bootstrap-review-002-cycle-02.md still states what its own frozen cycle was run against (319)
+  [ok] bootstrap-review-cycle-02.md still states what its own frozen cycle was run against (198)
+  [ok] bootstrap-review-cycle-03.md still states what its own frozen cycle was run against (263)
+  [ok] bootstrap-review-cycle-04.md still states what its own frozen cycle was run against (298)
+  [ok] bootstrap-review.md still states what its own frozen cycle was run against (123)
+  [ok] all 5 stated control counts across 1 unfrozen bootstrap prompt(s) match the suites
+  [ok] bootstrap-review-002-cycle-01.md states a total that matches its own counts (319)
+  [ok] bootstrap-review-002-cycle-02.md states a total that matches its own counts (319)
+  [ok] bootstrap-review-002-cycle-03.md states a total that matches its own counts (383)
+  [ok] bootstrap-review-cycle-03.md states a total that matches its own counts (263)
+  [ok] bootstrap-review-cycle-04.md states a total that matches its own counts (298)
+  [ok] bootstrap-review-002-cycle-01.md uses the finding-ID grammar its cycle requires
+  [ok] bootstrap-review-002-cycle-02.md is frozen and its grammar defect is recorded as C02-F01, so it is evidence rather than a fault
+  [ok] bootstrap-review-002-cycle-03.md uses the finding-ID grammar its cycle requires
+  [ok] bootstrap-review-cycle-02.md uses the finding-ID grammar its cycle requires
+  [ok] bootstrap-review-cycle-03.md uses the finding-ID grammar its cycle requires
+  [ok] bootstrap-review-cycle-04.md uses the finding-ID grammar its cycle requires
+  [ok] the prompt's artifact count agrees with its list (6)
+  [ok] the prompt's not-yet-built claims match the filesystem
+  [ok] the prompt names all 6 declared roots
+  [ok] bootstrap-review-002-cycle-03.md names all 17 files the gate covers, closure included
+
+the five prompts agree with the protocol
+
+--- scripts/test_protocol_pin.py   exit 0 ---
+======================================================================
+PROTOCOL PIN
+======================================================================
+
+record document
+  [ok] declares v1.1, governing file agrees
+  [ok] PROTOCOL_HASH matches the file on disk (296594a3c06cd2f9…)
+
+protocol files present
+  [ok] 2 protocol file(s): implementation-review-protocol-v1.1.md governs, 1 recorded as superseded
+
+operational references
+        declared amendment may name specs/implementation-review-protocol-v1.0.md
+  [ok] 131 operational file(s) scanned, every protocol reference names v1.1
+        not scanned: specs/PROTOCOL_STATUS.md
+                     the supersession record; naming the superseded file is its purpose, and check 1 verifies it is internally consistent
+
+negative controls
+  [ok] declares v1.1, governing file agrees
+  [ok] PROTOCOL_HASH matches the file on disk (296594a3c06cd2f9…)
+  [ok] 2 protocol file(s): implementation-review-protocol-v1.1.md governs, 1 recorded as superseded
+  [ok] 1 operational file(s) scanned, every protocol reference names v1.1
+  [ok] an unmodified copy passes
+  [ok] declares v1.1, governing file agrees
+  [ok] PROTOCOL_HASH matches the file on disk (296594a3c06cd2f9…)
+  [ok] 2 protocol file(s): implementation-review-protocol-v1.1.md governs, 1 recorded as superseded
+  [ok] caught: a validator pinned to a superseded version
+  [ok] declares v1.1, governing file agrees
+  [ok] PROTOCOL_HASH matches the file on disk (296594a3c06cd2f9…)
+  [ok] 2 protocol file(s): implementation-review-protocol-v1.1.md governs, 1 recorded as superseded
+  [ok] caught: a prompt naming a superseded version
+  [ok] declares v1.1, governing file agrees
+  [ok] PROTOCOL_HASH matches the file on disk (296594a3c06cd2f9…)
+  [ok] 2 protocol file(s): implementation-review-protocol-v1.1.md governs, 1 recorded as superseded
+  [ok] caught: a stale reference nested below specs/
+  [ok] declares v1.1, governing file agrees
+  [ok] PROTOCOL_HASH matches the file on disk (296594a3c06cd2f9…)
+  [ok] 2 protocol file(s): implementation-review-protocol-v1.1.md governs, 1 recorded as superseded
+  [ok] 1 operational file(s) scanned, every protocol reference names v1.1
+  [ok] the declared amendment's own old-side line still passes
+  [ok] declares v1.2, governing file agrees
+  [ok] caught: record bumped to a version nothing else uses
+  [ok] declares v1.1, governing file agrees
+  [ok] 2 protocol file(s): implementation-review-protocol-v1.1.md governs, 1 recorded as superseded
+  [ok] 1 operational file(s) scanned, every protocol reference names v1.1
+  [ok] caught: PROTOCOL_HASH no longer matches the file
+  [ok] declares v1.1, governing file agrees
+  [ok] PROTOCOL_HASH matches the file on disk (296594a3c06cd2f9…)
+  [ok] 1 operational file(s) scanned, every protocol reference names v1.1
+  [ok] caught: an undeclared protocol file in specs/
+  [ok] caught: the record document contradicting itself
+
+every operational reference names the governing protocol
+
+--- scripts/test_run_review.py   exit 0 ---
+
+the protocol this run pins, at the commit it names (C01-F08)
+  [ok] refused: a tracked protocol modified since the commit being pinned
+  [ok] refused: a protocol that is not in the commit at all
+  [ok] an unrelated uncommitted change does not prevent init
+  [ok] the recorded commit and digest describe the same protocol bytes
+  [ok] init pins protocol and specs; spec_sha256 reproducible by hand
+  [ok] run.json is LF on this platform
+  [ok] freeze binds codex-input.md to the target hash
+  [ok] codex-input.md carries the protocol text, not just its hash
+  [ok] frozen evidence is LF, so its hashes are platform-neutral
+  [ok] recorded cycle passes the MC-2 gate end to end
+  [ok] invocation mode recorded, with its limit stated
+  [ok] refused: init twice on one run id
+  [ok] refused: freeze without init
+  [ok] refused: a run with no mc1_enforcement
+  [ok] refused: a run claiming an unrecognised enforcement status
+  [ok] a new run records its enforcement status
+  [ok] refused: protocol edited after init
+  [ok] refused: spec edited after init
+  [ok] refused: prompt file missing
+  [ok] refused: prompt file empty
+  [ok] refused: plan review with no artifact
+
+the four-cycle budget counts valid cycles
+  [ok] four cycles that fail MC-2 do not consume the budget
+  [ok] four cycles that pass MC-2 do consume the budget
+  [ok] no authorization: controller and runner agree the loop is over
+  [ok] an authorization naming MAX_4_REACHED is read, refused, and said out loud
+  [ok] an authorization for a different exit does not reach the budget
+  [ok] a fourth boundary that reduces nothing reports STALLED, not MAX_4_REACHED
+  [ok] clearing a real STALLED at the fourth boundary does not buy a fifth cycle
+  [ok] refused: previous cycle has no recorded output
+  [ok] refused: implementation review missing approved plan hash
+  [ok] refused: approved plan hash not a digest
+  [ok] refused: implementation review with no candidate commit
+  [ok] refused: candidate commit that does not resolve
+
+recorded hashes follow the cycle's own pin set (B01-F07)
+  [ok] with no amendment, the recorded hashes match the run
+  [ok] releasing a spec changes what the next cycle records
+  [ok] the earlier cycle's record is unchanged by the amendment
+  [ok] the input header quotes the cycle's own digests, not the run's
+
+the review input carries the spec and the target identity
+  [ok] the pinned spec is embedded, not merely hashed
+  [ok] refused: a drifted governing spec stops the freeze at the pin check
+  [ok] an implementation review input carries the §10.1 target identity
+
+C02-F08  the reviewed diff derived from the candidate
+  [ok] the diff is derived from the candidate, preserved, and bound by a change-set digest
+  [ok] a derived-diff implementation cycle passes MC-2
+  [ok] refused: the diff is not the change between the commits this target names
+
+C02-F09  preserved implementation evidence
+  [ok] a cycle with its implementation evidence preserved passes MC-2
+  [ok] refused: the test results has no preserved copy, and the live file is not a substitute
+  [ok] refused: the approval record has no preserved copy, and the live file is not a substitute
+  [ok] refused: the approved plan has no preserved copy, and the live file is not a substitute
+
+C02-F10  auxiliary control evidence
+  [ok] control sources preserved and their run observed, both bound to the record
+  [ok] refused: a control suite that does not pass, unnamed, and nothing created
+  [ok] refused: a known failure with no account of it
+  [ok] a named failure is recorded with its reason and its output, not hidden
+
+mutable candidate references
+  [ok] HEAD is resolved to an immutable SHA, the reference is recorded, and the tree matches
+  [ok] the frozen target still names the commit that was reviewed after HEAD moves on
+  [ok] refused: implementation review with no comparison base
+  [ok] refused: a diff supplied beside the candidate
+  [ok] refused: implementation review with no test results
+  [ok] refused: re-recording without superseding
+  [ok] refused: record against an unfrozen directory
+  [ok] refused: empty reviewer output
+  [ok] refused: cycle path already occupied
+
+bootstrap gate
+  [ok] refused: a real run created with no bootstrap review
+  [ok] a real run proceeds once the bootstrap review is approved
+  [ok] refused: a real run after a reviewed component changed
+
+authoritative findings
+  [ok] populated: both findings extracted and bound to the capture
+  [ok] explicit zero: recorded as asserted, not inferred
+  [ok] refused: no finding blocks and no explicit zero assertion
+  [ok] refused: --zero-findings contradicted by present findings
+  [ok] refused: class outside §4, and nothing written
+  [ok] refused: finding block with no class
+
+review-result integrity
+  [ok] refused: zero asserted over an unparsed finding signal
+  [ok] refused: identifier outside the canonical grammar
+  [ok] a malformed identifier writes nothing, corrected or otherwise
+  [ok] refused: no canonical grammar declared in the schema
+
+authoritative capture
+  [ok] an invalid capture is refused and preserved, not discarded
+  [ok] the first valid capture becomes authoritative, both kept
+  [ok] refused: a later capture cannot displace silently
+  [ok] refused: superseding without a stated reason
+  [ok] refused: a reason alone does not authorize supersession
+  [ok] refused: an approval naming nobody
+  [ok] refused: an approval whose reason is a placeholder
+  [ok] refused: an approval for a different capture
+  [ok] refused: an approval for a different cycle
+  [ok] refused: an approval of the wrong kind
+  [ok] refused: an approval with no timestamp
+  [ok] refused: an approval record that is not valid JSON
+  [ok] a refused supersession leaves the authoritative capture, findings and designation intact
+  [ok] a refused attempt is recorded in the log, not only on disk (3 attempts)
+  [ok] an authorized supersession moves the designation, keeps every attempt and records who authorized it
+  [ok] no staging files are left behind in the cycle
+
+C02-F06  designation interrupted before it was recorded
+  [ok] an interrupted designation is finished, and the first valid capture still governs
+  [ok] a recovered capture is still superseded by an approval bound to its bytes
+  [ok] an attempt that never completed is not recovered, and the retry governs
+  [ok] refused: a findings record that does not describe its own capture
+  [ok] STRUCTURAL: all 4 capture-log writes go through the atomic path
+  [ok] BEHAVIOURAL: the atomic write writes, with LF endings
+  [ok] BEHAVIOURAL: a write that dies partway leaves the previous generation whole
+  [ok] BEHAVIOURAL: a successful atomic write replaces completely and cleans up
+  [ok] the designated attempt holds its own findings, not just raw bytes
+  [ok] a half-published cycle is recovered even by a command that is then refused
+  [ok] the working copies match the designated generation
+
+recurrence blocks, and blocks the strict parser cannot see
+  [ok] parsed: a new finding
+  [ok] parsed: a recurrence with no Class line
+  [ok] parsed: a review mixing both forms
+  [ok] refused: a block carrying both Class and Status
+  [ok] refused: a block with neither Class nor Status
+  [ok] refused: an unrecognised Status
+  [ok] refused: a second block indented by one space
+  [ok] refused: a review whose only block is indented, caught by the signal net
+  [ok] a recurrence takes its class from the ledger, not the review
+  [ok] refused: a recurrence for an identifier never raised
+
+run pins and review targets are disjoint
+  [ok] refused: an artifact that is both a run pin and a review target
+  [ok] a cycle whose target is not a pinned artifact still freezes
+  [ok] refused: an amendment that starts from a pin set that never existed
+  [ok] refused: an amendment that removes the governing protocol
+  [ok] refused: an amendment that rewrites a retained pin's hash
+
+a spec added by amendment is embedded, not only hashed (B01-F04)
+  [ok] a spec added by amendment appears in the composed input
+  [ok] refused: an amendment adding a pin with no hash
+  [ok] refused: an amendment adding a pin with something other than a sha256
+  [ok] refused: an artifact added by amendment is checked like any other governing pin
+  [ok] refused: an amendment with nobody's name on it
+  [ok] refused: an amendment whose reason is a placeholder
+  [ok] refused: an amendment whose declared artifacts are not what changed
+  [ok] editing a pinned spec still blocks the next cycle
+  [ok] a recorded amendment releases the pin from cycle 02 onward
+  [ok] a frozen cycle records its governing pin set (2 artifacts)
+  [ok] refused: an amendment that would change what a completed cycle ran under
+  [ok] the amendment applies forward only; cycle 01 keeps its own pins
+  [ok] refused: one loop freezing against history that contradicts the other loop's completed cycle
+  [ok] refused: same governing paths under a completed cycle, different versions
+  [ok] refused: freezing a cycle after a covered component changed
+  [ok] an exempt run still freezes after a component changes
+  [ok] --bootstrap-exempt labels the run NOT_A_PROTOCOL_CYCLE
+
+a protocol run must be fit to be concluded (B01-F14)
+  [ok] a protocol run recording its enforcement status is concluded normally
+  [ok] refused: a protocol run that has lost its enforcement status
+  [ok] refused: a protocol run claiming an enforcement status that means nothing
+  [ok] refused: a run whose whole metadata record is gone
+
+an undeterminable loop state is not permission (B03-F01)
+  [ok] with a healthy ledger and CONTINUE, the next cycle opens
+  [ok] refused: a controller that cannot calculate is not permission
+  [ok] refused: a controller that exits non-zero saying nothing
+  [ok] refused: a controller that says CONTINUE and then fails
+  [ok] refused: a controller that exits 0 and reports no status
+  [ok] refused: a status this runner does not recognise
+  [ok] refused: two statuses in one run
+
+control suites are recorded, not targeted (B03-F02)
+  [ok] the manifest records every suite at freeze (2 of them)
+  [ok] target.json records the manifest digest, and target.sha256 covers target.json
+  [ok] no control suite appears in the review target
+  [ok] a later suite edit leaves the frozen record unchanged
+
+all controls fired; every refusal is reachable and the happy path passes MC-2
+
+--- scripts/test_validate_cycle.py   exit 0 ---
+  [ok] check  9 passes on digests that match the governing set
+  [ok] check 14 fails on: an implementation cycle claiming preserved governing artifacts while its diff is bound to no commits
+  [ok] check 14 still exempts a diff with nothing to date it
+  [ok] check  9 fails on: a protocol digest that is not a digest
+  [ok] check  9 fails on: a protocol digest that is well formed but not this cycle's
+  [ok] check  9 fails on: a spec digest that does not describe the governing set
+  [ok] check  9 fails on: governing pins declared with no hashes to check them against
+  [ok] check  9 fails on: both governing fields removed from a target that still claims its artifacts were preserved
+  [ok] check  9 still exempts evidence with nothing to date it
+  [ok] check  9 fails on: an invented governing set whose every field agrees with itself
+  [ok] check  9 fails on: a well formed governing set the run's history never produced
+  [ok] check  9 fails on: a governing set carrying a spec the run never pinned, self-consistent in every other way
+  [ok] check  9 fails on: an amendment history the runner rejects, replayed by the gate without checking it
+  [ok] check  9 fails on: the governing protocol is gone, every record still agreeing
+  [ok] check  9 fails on: a governing spec is gone, every record still agreeing
+  [ok] check  9 fails on: the governing protocol was edited after its digest was recorded
+  [ok] check  9 fails on: a governing spec was edited after its digest was recorded
+  [ok] check  9 fails on: a cycle claiming preserved governing copies that are not there
+
+cycle identity: the directory, the target, the run (C01-F07)
+  [ok] check  7 fails on: directory cycle-01 with a target that says cycle 2
+  [ok] check  7 fails on: a target claiming a run it does not sit in
+  [ok] check  7 fails on: a plan target sitting in the plan-review directory but declaring itself an implementation review
+  [ok] check  7 fails on: a cycle-number mismatch across a pin-amendment boundary, where the two numbers govern differently
+  [ok] check  7 fails on: a directory named cycle-1
+  [ok] check  7 fails on: a directory named cycle-001
+  [ok] check  7 fails on: a directory named cycle-00
+  [ok] check  9 does not invalidate cycles older than the field
+  [ok] clean plan cycle passes
+  [ok] checks 11-15 report N/A on a plan cycle, not PASS
+  [ok] clean implementation cycle passes all fifteen
+  [ok] check  4 fails on: missing required file
+  [ok] check  5 fails on: empty required file
+  [ok] check  6 fails on: target.sha256 does not match target
+  [ok] check  7 fails on: duplicate cycle identifier
+  [ok] check  8 fails on: referenced commit does not resolve
+  [ok] check  9 fails on: declared artifact hash is wrong
+  [ok] check  9 fails on: review_type outside the closed set
+  [ok] check 10 fails on: codex-input.md does not carry the target hash
+  [ok] check  7 fails on: target.json is not valid JSON
+  [ok] check 11 fails on: candidate commit does not resolve
+  [ok] check 12 fails on: candidate tree hash is wrong
+  [ok] check 13 fails on: approved-plan hash disagrees with the approval record
+  [ok] check 13 fails on: no approval record to match against
+  [ok] check 14 fails on: diff hash does not match the diff
+  [ok] check 14 fails on: diff artifact is missing
+  [ok] check 15 fails on: test-result hash does not match
+  [ok] check  9 fails on: §10.1 field absent: candidate_commit
+  [ok] check  9 fails on: §10.1 field absent: candidate_tree_hash
+  [ok] check  9 fails on: §10.1 field absent: approved_plan_hash
+  [ok] check  9 fails on: §10.1 field absent: diff_hash
+  [ok] check  9 fails on: §10.1 field absent: test_result_hash
+
+all negative controls fired; every check is falsifiable
+

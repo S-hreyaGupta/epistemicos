@@ -1,0 +1,59 @@
+{
+  "review_type": "plan",
+  "run_id": "BOOTSTRAP-002",
+  "cycle": 3,
+  "governing_pins": [
+    "specs/implementation-review-protocol-v1.1.md"
+  ],
+  "governing_pin_hashes": {
+    "specs/implementation-review-protocol-v1.1.md": "296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483"
+  },
+  "governing_artifacts_preserved": true,
+  "protocol_commit": "52013960b62aa4fa9f058142111dbfbe55560862",
+  "protocol_sha256": "296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483",
+  "spec_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "frozen_at": "2026-10-02T10:18:27Z",
+  "plan_files": [
+    {
+      "path": "scripts/authority.py",
+      "sha256": "c0a394d68ba5f13168dfc78b029ed6799f7bd16b25a21ba5f4ff4401e2efa6d6"
+    },
+    {
+      "path": "scripts/bootstrap_gate.py",
+      "sha256": "9389031341745c0556ac633bea31e4d3db5817c3165b06a9da4312f24d4f1168"
+    },
+    {
+      "path": "scripts/cycle_projection.py",
+      "sha256": "2395d041ecac4f5d588a125f13097a7167c6777b253eabc67284219680d7f186"
+    },
+    {
+      "path": "scripts/findings_format.py",
+      "sha256": "27dcf377b0014b3ac2563da61597675fc0bca9c95bce18d1b776bcb22ee53a90"
+    },
+    {
+      "path": "scripts/ledger.py",
+      "sha256": "2f86764173e423cb775cf7d47768440b7185f69681032117ee7cc7f154ddeb84"
+    },
+    {
+      "path": "scripts/loop_state.py",
+      "sha256": "2126a817c4a48ae6e45852cdc9f8f037f2b0512762d6174dfeecaea56eda460f"
+    },
+    {
+      "path": "scripts/run_pins.py",
+      "sha256": "8275d2aa1158f438ea8ca905f26618d1c5c53cd375a6ee96d4f7e8e31b303c33"
+    },
+    {
+      "path": "scripts/run_review.py",
+      "sha256": "95537673668f4557d972b28a3a6ccc761c98dcdfdf915da4d276b30a6576c1bc"
+    },
+    {
+      "path": "scripts/validate_cycle.py",
+      "sha256": "316026701ba259d3896bc915347613e03919e4151a9f6d2d8641d74a14ed38fe"
+    },
+    {
+      "path": "specs/evidence-schema-v1.0.md",
+      "sha256": "4203ba64bd5ba1db9cd56357c8bf9dd8e6efb419fab7f7635a415c272d3a739c"
+    }
+  ],
+  "auxiliary_evidence_sha256": "4aa2ed1d23359c1e44d5dd16bb20542a903d5ffa2526a2bd4ff81347c696c5d6"
+}

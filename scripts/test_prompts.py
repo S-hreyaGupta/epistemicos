@@ -552,16 +552,22 @@ def main() -> int:
             s_ = _il.spec_from_file_location("_bg_probe", gate_py)
             m_ = _il.module_from_spec(s_)
             s_.loader.exec_module(m_)
-            required = list(m_.COMPONENTS) + list(m_.ALWAYS)
-            unnamed = [c for c in required if c not in text]
-            if unnamed:
-                failures.append(
-                    "bootstrap-review.md does not name every component the gate "
-                    f"covers: {', '.join(unnamed)}. A component absent from the "
-                    "prompt is one the reviewer is never asked about, while the "
-                    "gate still treats it as reviewed.")
-            else:
-                ok(f"the prompt names all {len(required)} declared roots")
+            # C03-F02. There used to be two checks here: this one, that
+            # bootstrap-review.md names the gate's declared roots, and the one
+            # below, that the current prompt names the whole covered set. They
+            # were different because the two lists were different, the roots
+            # being a hand-written subset of a derived whole.
+            #
+            # Alex Zamurko's ruling of 2 October collapsed that distinction:
+            # there is one list now, in one manifest, and nothing is derived. So
+            # the two checks are one check, and keeping both would mean grading
+            # bootstrap-review.md, which is frozen and belongs to the first run,
+            # against files invented three weeks after it was written. That is
+            # the mistake the comment below already names.
+            #
+            # Removing a control is worth saying out loud rather than doing
+            # quietly: what it asserted is still asserted, by the check below,
+            # against a prompt that can still be corrected.
 
             # The declared roots are not the covered set. `covered()` adds every
             # file reached through the import closure, and those are the ones
@@ -584,26 +590,45 @@ def main() -> int:
             # this check ran green, and what it had graded was a prompt frozen
             # the day before. Third instance of one rule that was correct while
             # there was one run, after frozen_input and the finding-ID letter.
+            #
+            # C03-F02 extended that from the newest prompt to the newest
+            # UNFROZEN one. Cycle 03's prompt is frozen, and the covered set
+            # changed afterwards: specs/covered-components.json did not exist
+            # when that prompt was written. Grading it against today demands it
+            # name a file that had not been invented, which is the same thing
+            # the paragraph above refuses, arriving one cycle later.
             numbered = sorted(
                 (refresh_counts.run_and_cycle_for_prompt(b), b) for b in boots)
-            current = numbered[-1][1] if numbered else boot
+            unfrozen = []
+            for _, b in numbered:
+                try:
+                    if refresh_counts.frozen_input(b) is None:
+                        unfrozen.append(b)
+                except ValueError:
+                    # Already reported above as an unattributable name. Not
+                    # counted as unfrozen, because what it is cannot be said.
+                    pass
+            current = unfrozen[-1] if unfrozen else None
             try:
                 covered_now = sorted(m_.covered(REPO))
             except Exception as e:
                 failures.append(f"could not compute the gate's covered set: {e}")
                 covered_now = []
-            cur_text = current.read_text(encoding="utf-8")
-            missing_cov = [c for c in covered_now if c not in cur_text]
-            if missing_cov:
-                failures.append(
-                    f"{current.name} does not name every file the gate covers: "
-                    f"{', '.join(missing_cov)}. These reached coverage through "
-                    "the import closure rather than by being declared, so a "
-                    "reviewer is never asked about them while the gate treats "
-                    "them as reviewed.")
-            elif covered_now:
-                ok(f"{current.name} names all {len(covered_now)} files the gate "
-                   "covers, closure included")
+            if current is None:
+                ok(f"every bootstrap prompt is frozen, so none is graded "
+                   f"against today's {len(covered_now)} covered files")
+            else:
+                cur_text = current.read_text(encoding="utf-8")
+                missing_cov = [c for c in covered_now if c not in cur_text]
+                if missing_cov:
+                    failures.append(
+                        f"{current.name} does not name every file the gate "
+                        f"covers: {', '.join(missing_cov)}. A component absent "
+                        "from the prompt is one the reviewer is never asked "
+                        "about, while the gate still treats it as reviewed.")
+                elif covered_now:
+                    ok(f"{current.name} names all {len(covered_now)} files the "
+                       f"gate covers")
 
     print()
     if failures:

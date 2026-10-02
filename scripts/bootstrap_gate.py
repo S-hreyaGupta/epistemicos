@@ -45,9 +45,13 @@ import argparse
 import ast
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import authority  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 REVIEW_DIR = REPO / "bootstrap-review"
@@ -83,13 +87,32 @@ RUNNER_APPROVAL_DIR = "runner-approvals"
 # against it. A gate that covers the checker and not the document the checker
 # reads its expectations from has a seam running straight through the middle of
 # what it claims to cover.
-COMPONENTS = (
-    "specs/evidence-schema-v1.0.md",
-    "scripts/validate_cycle.py",
-    "scripts/run_review.py",
-    "scripts/ledger.py",
-    "scripts/loop_state.py",
-)
+# C03-F02. Alex Zamurko, 2 October 2026, on a covered set that had grown from
+# ten files to seventeen by textual reference:
+#
+#     Make the covered-component set explicit and authoritative... A filename
+#     appearing in source code, comments, documentation, strings, fixtures, or
+#     other covered files must not automatically add that file to the covered
+#     set... Treat test suites and execution records as review evidence unless
+#     explicitly declared as covered components.
+#
+# I proposed an explicit list here and he corrected it in the same conversation:
+#
+#     The weak point is having the gate maintain a second independent copy of
+#     the covered-file list. That creates two sources of truth and introduces
+#     synchronization risk... Store the covered-file set in one canonical
+#     manifest.
+#
+# So there is no list in this file. There is the location of the one list, and
+# everything that reads it reads it from there.
+COVERED_MANIFEST = "specs/covered-components.json"
+MANIFEST_SCHEMA = "covered-components/1"
+
+# One approval per manifest version, at a path derived from the version rather
+# than discovered. Alex Zamurko, 2 October: "A workflow message counts as
+# authorisation evidence only if it is persisted and referenced deterministically
+# as a durable approval record."
+SCOPE_APPROVAL_DIR = "approvals/covered-scope"
 
 # This file is always covered, whatever the roots are. It was not, which is the
 # hole Alex found on 9 September.
@@ -174,7 +197,26 @@ def references(path: Path) -> set[str]:
     # raises rather than returning nothing.
     if path.suffix != ".py":
         return found
+    return found | imports(path)
 
+
+def imports(path: Path) -> set[str]:
+    """Every scripts/*.py this file actually imports, from the syntax tree.
+
+    C03-F02. Split out from `references` because the two answer different
+    questions and the gate now needs them apart. An import is a fact about what
+    the interpreter will load. A filename appearing in text is a fact about the
+    text, and Alex Zamurko, 2 October: "A textual filename reference does not
+    establish that the referenced file is part of the reviewed object."
+
+    So this one, and only this one, is allowed to refuse a covered set for
+    omitting something. The textual scan stays, recorded for audit, binding
+    nothing.
+    """
+    found: set[str] = set()
+    if path.suffix != ".py":
+        return found
+    text = path.read_text(encoding="utf-8")
     tree = ast.parse(text, filename=str(path))
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -247,11 +289,261 @@ def closure(root: Path) -> dict[str, list[str]]:
     return reached
 
 
+def read_manifest(root: Path) -> dict:
+    """The canonical covered-component manifest, replayed against its history.
+
+    C03-F02. Four things are checked here, and each is one of the failures the
+    ruling names.
+
+    The schema, so a file of some other shape is refused rather than read
+    hopefully. The history, replayed from nothing through every recorded
+    addition and removal, which must end at the component list the file
+    declares: that is what makes a quiet edit fail, because an edit that does
+    not also write its own authorisation leaves the two disagreeing. The
+    version, which must match the last history entry, so a bump without a change
+    and a change without a bump are both refused. And an authorisation on every
+    entry, because "explicit, recorded" means somebody's name is on it.
+    """
+    p = root / COVERED_MANIFEST
+    if not p.is_file():
+        raise Refused(
+            f"the covered-component manifest is missing: {COVERED_MANIFEST}\n"
+            "  There is no fallback list. A gate that invents a scope when the "
+            "declaration is\n  gone is a gate deciding what it is approving.")
+    try:
+        m = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise Refused(f"{COVERED_MANIFEST} is not valid JSON: {e}")
+
+    if m.get("schema") != MANIFEST_SCHEMA:
+        raise Refused(
+            f"{COVERED_MANIFEST} declares schema {m.get('schema')!r}, "
+            f"expected {MANIFEST_SCHEMA!r}")
+
+    comps = m.get("components")
+    if not isinstance(comps, list) or not comps:
+        raise Refused(f"{COVERED_MANIFEST} declares no components")
+
+    hist = m.get("history")
+    if not isinstance(hist, list) or not hist:
+        raise Refused(
+            f"{COVERED_MANIFEST} carries no history, so its component list "
+            "rests on nothing.\n  Every scope change has to be recorded where "
+            "the scope is declared.")
+
+    replayed: list[str] = []
+    for i, e in enumerate(hist, 1):
+        if not isinstance(e, dict):
+            raise Refused(f"{COVERED_MANIFEST}: history entry {i} is not an "
+                          f"object")
+        if not str(e.get("authorized_by", "")).strip():
+            raise Refused(
+                f"{COVERED_MANIFEST}: history entry {i} names nobody who "
+                "authorised it.\n  A scope change with no author is a scope "
+                "change nobody made.")
+        if not str(e.get("reason", "")).strip():
+            raise Refused(
+                f"{COVERED_MANIFEST}: history entry {i} gives no reason")
+        if e.get("version") != i:
+            raise Refused(
+                f"{COVERED_MANIFEST}: history entry {i} declares version "
+                f"{e.get('version')!r}. Versions run from 1 with no gaps, or "
+                f"the record\n  cannot say which change produced which scope.")
+        for rel in e.get("removed") or []:
+            if rel not in replayed:
+                raise Refused(
+                    f"{COVERED_MANIFEST}: version {i} removes {rel!r}, which "
+                    f"the scope did not contain")
+            replayed.remove(rel)
+        for rel in e.get("added") or []:
+            if rel in replayed:
+                raise Refused(
+                    f"{COVERED_MANIFEST}: version {i} adds {rel!r}, which the "
+                    f"scope already contained")
+            replayed.append(rel)
+
+    if m.get("version") != len(hist):
+        raise Refused(
+            f"{COVERED_MANIFEST} declares version {m.get('version')!r} but "
+            f"records {len(hist)} change(s).\n  A bump with no change, or a "
+            "change with no bump, and either way the version stops\n  "
+            "identifying the scope.")
+
+    if sorted(replayed) != sorted(comps):
+        raise Refused(
+            f"{COVERED_MANIFEST}: the component list is not what its own "
+            "history produces.\n"
+            f"  declared  {sorted(comps)}\n"
+            f"  replayed  {sorted(replayed)}\n"
+            "  The list was edited without the account of it being updated to "
+            "match.\n  This is an internal consistency check and not proof of "
+            "anything: an edit that\n  changed both would pass it. The "
+            "authorisation evidence is the repository\n  record, checked "
+            "separately by manifest_provenance.")
+
+    if COVERED_MANIFEST not in comps:
+        raise Refused(
+            f"{COVERED_MANIFEST} does not cover itself.\n  A scope declaration "
+            "outside the scope it declares can be rewritten without\n  "
+            "invalidating any approval, which makes every approval it supports "
+            "conditional\n  on nobody having done so.")
+    return m
+
+
+def manifest_digest(root: Path) -> str:
+    return sha256_file(root / COVERED_MANIFEST)
+
+
+def manifest_provenance(root: Path) -> dict:
+    """Where the current manifest came from, according to the repository.
+
+    C03-F02. I proposed the manifest's own change history as the record of who
+    authorised a scope change, and Alex Zamurko, 2 October, refused it:
+
+        That history should not be the sole proof of authorisation because it
+        is stored inside the same mutable file. Otherwise, a scope change could
+        also rewrite its own history... The manifest's internal change history
+        is descriptive. The repository/workflow record is the independent
+        evidence that the scope change was actually authorised.
+
+    Which is correct, and is the same defect as a check that passes for a reason
+    other than the one it is named for: an edit that rewrites the list and the
+    account of the list in one action leaves the two agreeing and says nothing.
+
+    So the evidence the gate uses is outside the file. A scope change has to
+    exist as a commit, and the commit that introduced the manifest's current
+    bytes is recorded with the decision. That is not a signature and it is not
+    claimed to be one: under MC1_ENFORCEMENT: CONVENTION_ONLY a history rewrite
+    still reaches it. It is the difference between an act the repository saw and
+    an edit somebody made before running the gate, which is the difference the
+    ruling asks for.
+    """
+    def git(*args: str) -> tuple[int, str]:
+        try:
+            r = subprocess.run(["git", "-C", str(root), *args],
+                               capture_output=True, text=True)
+            return r.returncode, r.stdout.strip()
+        except FileNotFoundError:
+            return 127, ""
+
+    rc, dirty = git("status", "--porcelain", "--", COVERED_MANIFEST)
+    if rc != 0:
+        raise Refused(
+            f"the repository cannot be read, so the provenance of "
+            f"{COVERED_MANIFEST}\n  cannot be established and no scope can be "
+            "approved against it.")
+    if dirty.strip():
+        raise Refused(
+            f"{COVERED_MANIFEST} has uncommitted changes.\n"
+            "  A scope change that exists only on disk has no independent "
+            "record. Commit it,\n  so that what the review is approved against "
+            "is something the repository saw\n  rather than something it was "
+            "shown once.")
+
+    rc, commit = git("log", "-1", "--format=%H", "--", COVERED_MANIFEST)
+    if rc != 0 or not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise Refused(
+            f"{COVERED_MANIFEST} has no commit in the repository's history, so "
+            "there is no\n  record of the scope it declares having been "
+            "introduced by anyone.")
+    digest = manifest_digest(root)
+    version = read_manifest(root)["version"]
+
+    # C03-F02, Alex Zamurko's third correction on this one, 2 October:
+    #
+    #     One gap remains: a repository commit proves a scope change was
+    #     recorded, not that it was authorised... A valid scope change requires
+    #     both: provenance, the changed manifest exists in a repository commit;
+    #     and authorisation, human approval recorded independently of the
+    #     manifest.
+    #
+    # Each correction removed a thing standing in for the one next to it: first
+    # two lists standing in for one, then a file's own account of itself
+    # standing in for evidence, then a commit standing in for consent. The same
+    # shape three times.
+    #
+    # Deterministic path per version, so the approval is referenced rather than
+    # searched for, and bound to the manifest's exact bytes, so an approval for
+    # one scope cannot carry a later one.
+    appr = root / SCOPE_APPROVAL_DIR / f"v{version}.json"
+    try:
+        rec = authority.require_approval(
+            appr, "covered-scope-change",
+            {"manifest_version": str(version), "manifest_sha256": digest})
+    except authority.NotAuthorized as e:
+        raise Refused(
+            f"the covered-component scope is not authorised.\n\n{e}")
+
+    rc, appr_dirty = git("status", "--porcelain", "--",
+                         f"{SCOPE_APPROVAL_DIR}/v{version}.json")
+    if rc == 0 and appr_dirty.strip():
+        raise Refused(
+            f"{SCOPE_APPROVAL_DIR}/v{version}.json has uncommitted changes.\n"
+            "  The approval has to be in the repository record for the same "
+            "reason the manifest\n  does. An approval that exists only on disk "
+            "is one that can be written, used,\n  and removed with nothing "
+            "left behind.")
+
+    return {"path": COVERED_MANIFEST,
+            "sha256": digest,
+            "version": version,
+            "introduced_by_commit": commit,
+            "authorized_by": rec.get("authorized_by", ""),
+            "authorization_record": f"{SCOPE_APPROVAL_DIR}/v{version}.json",
+            "authorization_sha256": sha256_file(appr)}
+
+
+def undeclared_imports(root: Path) -> dict[str, list[str]]:
+    """Modules a declared component imports that the declaration does not name.
+
+    C03-F02. Removing the automatic expansion leaves a real hazard: a component
+    can import a module nobody declared, and editing that module changes the
+    component's behaviour without changing its bytes. That was the thing the
+    closure existed to prevent, and Alex Zamurko's ruling removes the mechanism
+    rather than the hazard.
+
+    So it is caught here instead, and refused rather than absorbed. The
+    difference matters: absorbing it widens the reviewed object silently, which
+    is the defect. Refusing says a component imports something nobody decided
+    about, and leaves the deciding to a person.
+
+    Imports only. A filename in a comment is not a dependency.
+    """
+    declared = set(read_manifest(root)["components"]) | set(ALWAYS)
+    out: dict[str, list[str]] = {}
+    for rel in sorted(declared):
+        p = root / rel
+        if not p.is_file() or p.suffix != ".py":
+            continue
+        for dep in sorted(imports(p)):
+            if dep == rel or dep in declared or not (root / dep).is_file():
+                continue
+            out.setdefault(dep, []).append(rel)
+    return out
+
+
 def covered(root: Path) -> dict[str, str]:
-    """Every path the decision must pin: declared roots, this file, and the
-    executable closure of both."""
+    """Every path the decision pins: the declared components and this file.
+
+    C03-F02. This used to add the executable closure of the declared set, which
+    is how ten files became seventeen, four of them control suites and one named
+    only inside a comment. Nothing is derived now.
+    """
+    missed = undeclared_imports(root)
+    if missed:
+        raise Refused(
+            "these modules are imported by a covered component and are not "
+            "declared:\n    "
+            + "\n    ".join(f"{dep}  imported by {', '.join(by)}"
+                            for dep, by in sorted(missed.items())) +
+            "\n\n  Editing one of them changes a reviewed component's "
+            "behaviour without changing\n  its bytes. Add it to COMPONENTS if "
+            "it is part of the implementation under\n  review, or stop "
+            "importing it. The gate will not decide that for you by widening\n"
+            "  the reviewed object on its own.")
+
     out: dict[str, str] = {}
-    for rel in list(COMPONENTS) + list(ALWAYS) + sorted(closure(root)):
+    for rel in sorted(set(read_manifest(root)["components"]) | set(ALWAYS)):
         p = root / rel
         if not p.is_file():
             raise Refused(f"component under bootstrap review is missing: {rel}")

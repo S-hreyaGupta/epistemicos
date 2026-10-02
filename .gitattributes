@@ -49,6 +49,18 @@ specs/** -text
 # last edited: "LF will be replaced by CRLF the next time Git touches it".
 runs/** -text
 
+# Scope-change approvals. C03-F02 put the covered-component manifest under
+# specs/**, which is pinned above, and the approval that authorises each version
+# of it under approvals/, which was not. The gate records the approval's own
+# SHA-256 alongside the decision, so a checkout that rewrote its line endings
+# would make the record stop describing the file it names.
+#
+# Git said so itself on the first write here, in the same words it used for
+# runs/ once before: "LF will be replaced by CRLF the next time Git touches it".
+# Second time that warning has been the only notice of a hash about to break,
+# which is an argument for reading them rather than scrolling past.
+approvals/** -text
+
 # Orchestration scripts are normalised to LF for the same reason go.mod and
 # go.sum are: they get hashed. The bootstrap review freezes validate_cycle.py
 # and its negative controls as a review target with a recorded SHA-256, and

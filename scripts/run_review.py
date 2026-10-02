@@ -1326,7 +1326,19 @@ def cmd_freeze(args: argparse.Namespace) -> int:
     # observed-run write found no directory and the whole freeze died.
     auxdir = cycle / "auxiliary"
     auxdir.mkdir(parents=True, exist_ok=True)
-    for _e in aux:
+
+    # Instruments: preserved for reading, deliberately not run here. The
+    # mutation probe takes twenty-odd minutes because it runs a whole suite per
+    # mutation, and a freeze that waits for it would be a freeze nobody
+    # performs. Its source is evidence even so, and a reviewer told about a tool
+    # they cannot inspect is in the position refresh_counts.py put cycle 02 in.
+    #
+    # Recorded separately from the suites so that "preserved and run" and
+    # "preserved only" cannot be read as the same claim.
+    instruments = [{"path": rel(p).replace("\\", "/"), "sha256": sha256_file(p)}
+                   for p in [REPO / "_probe" / "mutate_repairs.py"]
+                   if p.is_file()]
+    for _e in instruments + aux:
         _dst = auxdir / _e["path"]
         _dst.parent.mkdir(parents=True, exist_ok=True)
         _dst.write_bytes((REPO / _e["path"]).read_bytes())
@@ -1382,6 +1394,13 @@ def cmd_freeze(args: argparse.Namespace) -> int:
                                "that these results reproduce elsewhere. "
                                "Mutation sensitivity is a separate probe and "
                                "is not claimed by this file.",
+        },
+        "instruments": {
+            "note": "Preserved for reading and NOT run at freeze. Nothing in "
+                    "this file reports a result for them, and their presence "
+                    "here is not a claim that they were used or that they "
+                    "passed.",
+            "preserved": instruments,
         },
         "observed_run": {
             "path": "auxiliary/observed-run.txt",

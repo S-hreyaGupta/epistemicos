@@ -263,8 +263,13 @@ def closure(root: Path) -> dict[str, list[str]]:
     still verified. Those are not comparable, so the ambiguity resolves toward
     covering more.
     """
+    # C03-F02. Still walked, still recorded, and no longer load-bearing. What
+    # this returns is an observation about text, kept in the decision so a
+    # reader can see what the components mention, and used by nothing to decide
+    # what is covered.
+    declared = sorted(set(read_manifest(root)["components"]) | set(ALWAYS))
     reached: dict[str, list[str]] = {}
-    pending = list(COMPONENTS) + list(ALWAYS)
+    pending = list(declared)
     seen: set[str] = set()
 
     while pending:
@@ -282,9 +287,10 @@ def closure(root: Path) -> dict[str, list[str]]:
             if dep not in seen:
                 pending.append(dep)
 
-    # Roots are covered because they were declared, not because something
-    # reached them. Keep the two kinds separate in the record.
-    for rel in list(COMPONENTS) + list(ALWAYS):
+    # Declared components are not "reached"; they are declared. Keeping the two
+    # kinds separate was always the point of this, and it matters more now that
+    # only one of them means anything.
+    for rel in declared:
         reached.pop(rel, None)
     return reached
 
@@ -536,11 +542,12 @@ def covered(root: Path) -> dict[str, str]:
             "declared:\n    "
             + "\n    ".join(f"{dep}  imported by {', '.join(by)}"
                             for dep, by in sorted(missed.items())) +
-            "\n\n  Editing one of them changes a reviewed component's "
-            "behaviour without changing\n  its bytes. Add it to COMPONENTS if "
-            "it is part of the implementation under\n  review, or stop "
-            "importing it. The gate will not decide that for you by widening\n"
-            "  the reviewed object on its own.")
+            f"\n\n  Editing one of them changes a reviewed component's "
+            f"behaviour without changing\n  its bytes. Add it to "
+            f"{COVERED_MANIFEST} if it is part of the implementation\n  under "
+            f"review, with an authorisation recorded for the new version, or "
+            f"stop\n  importing it. The gate will not decide that for you by "
+            f"widening the reviewed\n  object on its own.")
 
     out: dict[str, str] = {}
     for rel in sorted(set(read_manifest(root)["components"]) | set(ALWAYS)):
@@ -729,11 +736,20 @@ def evaluate(root: Path) -> tuple[bool, list[str]]:
     """(ok, reasons). Never raises; the reasons are the useful output."""
     rec = root / "bootstrap-review" / "decision.json"
     if not rec.is_file():
+        # C03-F02. Read from the manifest, and say so if it cannot be read: a
+        # listing printed from a constant would be this function's own account
+        # of the scope rather than the declared one. `evaluate` never raises, so
+        # the failure becomes a line in the reasons like everything else.
+        try:
+            _declared = sorted(set(read_manifest(root)["components"])
+                               | set(ALWAYS))
+        except Refused as e:
+            _declared = [f"(the covered-component manifest cannot be read: {e})"]
         return False, [
             "no bootstrap review on record.",
             "  These components have not been independently reviewed, and they",
             "  cannot go through the process they enable:",
-            *[f"    {c}" for c in list(COMPONENTS) + list(ALWAYS)],
+            *[f"    {c}" for c in _declared],
             "  Ruled mandatory 8 September 2026, widened to the finding ledger",
             "  and loop controller on 9 September because they determine the",
             "  authoritative meaning of otherwise valid review evidence.",
@@ -850,16 +866,27 @@ def cmd_check(root: Path = REPO, quiet: bool = False) -> int:
         d = json.loads((root / "bootstrap-review" / "decision.json")
                        .read_text(encoding="utf-8"))
         if not quiet:
-            deps = closure(root)
+            # C03-F02. Printed from the decision rather than from the current
+            # manifest, because this is a report about what was approved. If
+            # the scope has moved since, the drift check above has already
+            # refused and this line is not reached.
+            scope = d.get("covered_scope", {})
             print("BOOTSTRAP_REVIEW: APPROVED")
             print(f"  decided by  {d.get('decided_by', '?')}")
             print(f"  decided at  {d.get('decided_at', '?')}")
-            for rel in list(COMPONENTS) + list(ALWAYS):
-                print(f"  root        {rel}  {d['components'][rel][:16]}…")
-            for rel in sorted(deps):
-                via = ", ".join(Path(v).name for v in deps[rel])
-                print(f"  dependency  {rel}  {d['components'][rel][:16]}…  "
-                      f"via {via}")
+            if scope:
+                print(f"  scope       {scope.get('path')} v"
+                      f"{scope.get('version')}  "
+                      f"{str(scope.get('sha256', ''))[:16]}…")
+                print(f"  authorised  {scope.get('authorized_by', '?')}  "
+                      f"in {str(scope.get('introduced_by_commit', ''))[:12]}")
+            for rel in sorted(d.get("components", {})):
+                print(f"  covers      {rel}  {d['components'][rel][:16]}…")
+            # Recorded, binding nothing. Alex Zamurko, 2 October: filename
+            # references "must not expand the review scope automatically".
+            for rel in sorted(closure(root)):
+                via = ", ".join(Path(v).name for v in closure(root)[rel])
+                print(f"  mentions    {rel}  via {via}")
         return 0
     if not quiet:
         print("BOOTSTRAP_REVIEW: NOT SATISFIED")
@@ -903,6 +930,13 @@ def cmd_record(a: argparse.Namespace) -> int:
     # So: approve, edit a component, record — and the approval covered code the
     # reviewer never saw, under evidence describing code that no longer exists.
     # `check` would then verify the decision against itself and pass forever.
+    # C03-F02. Before the drift comparison, because an unauthorised or
+    # uncommitted scope is a different fact and the reader needs the one that
+    # names the cause. Checked first, a manifest edited and not committed says
+    # so; checked second, it arrives as "the components have changed", which is
+    # true, unhelpful, and points at the wrong file.
+    manifest_provenance(REPO)
+
     if a.target:
         drift = target_drift(REPO, Path(a.target).resolve())
         if drift:
@@ -990,8 +1024,19 @@ def cmd_record(a: argparse.Namespace) -> int:
             "path": Path(a.target).resolve().relative_to(REPO).as_posix(),
             "sha256": sha256_file(Path(a.target).resolve()),
         },
-        "roots": list(COMPONENTS) + list(ALWAYS),
-        "dependencies": {k: v for k, v in sorted(closure(REPO).items())},
+        # C03-F02. These two fields described a scope that was partly declared
+        # and partly derived, which is the arrangement the ruling of 2 October
+        # removed. The decision now records which manifest it was issued
+        # against, by version, hash, the commit that introduced it and the
+        # approval that authorised it, so a reader can ask what was approved
+        # and get an answer from outside this file.
+        #
+        # `references` is still recorded, and binds nothing. Alex Zamurko:
+        # "Filename references inside those components may be recorded or
+        # validated where needed, but they must not expand the review scope
+        # automatically."
+        "covered_scope": manifest_provenance(REPO),
+        "references_observed": {k: v for k, v in sorted(closure(REPO).items())},
         "evidence": {n: sha256_file(REVIEW_DIR / n) for n in EVIDENCE},
         "authority": "Alex Zamurko, 8 September 2026: a one-time BOOTSTRAP_REVIEW "
                      "is mandatory before relying on these components for real "

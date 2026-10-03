@@ -45,6 +45,30 @@ def sha256_file(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+def sh(*args: str, cwd: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(args, cwd=str(cwd), capture_output=True, text=True)
+
+
+def force_rmtree(p: Path) -> None:
+    """Remove a tree that contains a git object store.
+
+    Git writes everything under .git/objects read-only, and on Windows
+    shutil.rmtree refuses a read-only file rather than clearing the bit. The
+    suite's final cleanup passes ignore_errors and does not care; this one
+    cannot, because a control below depends on the directory actually being
+    gone. Ignoring the error there would leave a readable history behind and
+    the control would pass while testing nothing.
+    """
+    import os
+    import stat
+
+    def _onerror(func, path, _exc):
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+
+    shutil.rmtree(p, onerror=_onerror)
+
+
 def build(with_evidence: bool = True) -> Path:
     """A throwaway repo carrying the real gate, components and a review target."""
     tmp = Path(tempfile.mkdtemp(prefix="bgate-")).resolve()
@@ -56,9 +80,29 @@ def build(with_evidence: bool = True) -> Path:
         shutil.copy2(SRC / n, tmp / "scripts" / n)
     shutil.copy2(REPO / "specs" / "evidence-schema-v1.0.md",
                  tmp / "specs" / "evidence-schema-v1.0.md")
+
+    # C03-F02. The scope is a file now, not a constant, so a fixture repository
+    # that lacks it has no scope at all and the gate says so. The real manifest
+    # is copied rather than invented, because a fixture carrying its own list
+    # would be the second source of truth Alex Zamurko's ruling removed, living
+    # in the suite instead of in the gate.
+    shutil.copy2(REPO / "specs" / "covered-components.json",
+                 tmp / "specs" / "covered-components.json")
+    shutil.copytree(REPO / "approvals", tmp / "approvals")
+
     if with_evidence:
         for n in EVIDENCE:
             write_lf(tmp / "bootstrap-review" / n, f"contents of {n}\n")
+
+    # A repository, because the gate requires a scope change to exist as a
+    # commit and not only as an edit. A fixture with no history cannot approve
+    # anything, which is the rule rather than an obstacle to it.
+    sh("git", "init", "-q", cwd=tmp)
+    sh("git", "config", "user.email", "t@t", cwd=tmp)
+    sh("git", "config", "user.name", "t", cwd=tmp)
+    sh("git", "add", "-A", cwd=tmp)
+    sh("git", "commit", "-qm", "fixture", cwd=tmp)
+
     freeze_target(tmp)
     return tmp
 
@@ -279,19 +323,89 @@ def main() -> int:
                    "component under bootstrap review is missing",
                    gate(root, "check"))
 
-    # A deleted *dependency* takes the other path: the closure no longer reaches
-    # it, so it is not required, but the decision still pins it. Without this the
-    # "was reviewed but no longer exists" branch would be dead code.
+    # The other path: a component the decision still pins, which the scope has
+    # since dropped and which is then deleted. Without this the "was reviewed
+    # but no longer exists" branch is dead code.
+    #
+    # C03-F02 changed how a file leaves the covered set. It used to be enough to
+    # stop mentioning it; now it takes a manifest version, an authorisation
+    # bound to that version's bytes, and a commit. So the fixture performs a
+    # real scope contraction, which also exercises the only route by which
+    # anything may leave the reviewed object.
     root = build(); made.append(root)
-    write_lf(root / "scripts" / "helper_two.py", "VALUE = 1\n")
-    lg = root / "scripts" / "ledger.py"
-    lg.write_text(lg.read_text(encoding="utf-8") + '\n_H = "helper_two.py"\n',
-                  encoding="utf-8")
+    write_lf(root / "scripts" / "zqx_leaving.py", "VALUE = 1\n")
+    m = json.loads((root / "specs" / "covered-components.json")
+                   .read_text(encoding="utf-8"))
+    m["version"] = 2
+    m["components"].append("scripts/zqx_leaving.py")
+    m["history"].append({
+        "version": 2, "at": "2026-10-02T21:00:00Z",
+        "authorized_by": "Alex Zamurko",
+        "reason": "fixture: a component joins the scope so that the next "
+                  "version can demonstrate one leaving it",
+        "added": ["scripts/zqx_leaving.py"], "removed": []})
+    write_lf(root / "specs" / "covered-components.json",
+             json.dumps(m, indent=2) + "\n")
+    v2 = root / "approvals" / "covered-scope" / "v2.json"
+    write_lf(v2, json.dumps({
+        "schema": "covered-scope-change/1",
+        "manifest_version": "2",
+        "manifest_sha256": sha256_file(root / "specs" /
+                                       "covered-components.json"),
+        "authorized_by": "Alex Zamurko",
+        "at": "2026-10-02T21:00:00Z",
+        "reason": "fixture: authorises version 2 of the covered set",
+    }, indent=2) + "\n")
+    sh("git", "add", "-A", cwd=root)
+    sh("git", "commit", "-qm", "scope v2", cwd=root)
     freeze_target(root)
-    approve(root)
-    (root / "scripts" / "helper_two.py").unlink()
-    expect_refused("approval surviving deletion of a pinned dependency",
-                   "no longer exists", gate(root, "check"))
+    r = approve(root)
+    if r.returncode != 0:
+        failures.append(f"an authorised scope change was refused:\n"
+                        f"{r.stdout}{r.stderr}")
+    else:
+        print("  [ok] an authorised scope change is accepted")
+
+        # Now the contraction. The decision above pins zqx_leaving.py; version 3
+        # removes it from the scope and the file is deleted. The decision still
+        # answers for it, which is the branch under test: a component that was
+        # reviewed and is no longer there.
+        m["version"] = 3
+        m["components"].remove("scripts/zqx_leaving.py")
+        m["history"].append({
+            "version": 3, "at": "2026-10-02T21:30:00Z",
+            "authorized_by": "Alex Zamurko",
+            "reason": "fixture: the component leaves the scope, by the only "
+                      "route anything may leave it",
+            "added": [], "removed": ["scripts/zqx_leaving.py"]})
+        write_lf(root / "specs" / "covered-components.json",
+                 json.dumps(m, indent=2) + "\n")
+        write_lf(root / "approvals" / "covered-scope" / "v3.json", json.dumps({
+            "schema": "covered-scope-change/1",
+            "manifest_version": "3",
+            "manifest_sha256": sha256_file(root / "specs" /
+                                           "covered-components.json"),
+            "authorized_by": "Alex Zamurko",
+            "at": "2026-10-02T21:30:00Z",
+            "reason": "fixture: authorises version 3, which removes one "
+                      "component from the covered set",
+        }, indent=2) + "\n")
+        sh("git", "add", "-A", cwd=root)
+        sh("git", "commit", "-qm", "scope v3", cwd=root)
+        (root / "scripts" / "zqx_leaving.py").unlink()
+
+        r = gate(root, "check")
+        blob = (r.stdout + r.stderr)
+        if r.returncode == 0:
+            failures.append(
+                "a decision still pinning a deleted component passed. The "
+                "approval answers for bytes that are not there.")
+        elif "zqx_leaving.py" not in blob:
+            failures.append(f"refused without naming the component the "
+                            f"decision can no longer account for\n{blob[:300]}")
+        else:
+            print("  [ok] refused: the decision pins a component that has "
+                  "left the scope and the tree")
 
     # ---- a decision that covers fewer components than required ----
     # This is also what an old decision looks like after the root list is
@@ -310,24 +424,22 @@ def main() -> int:
                        "does not cover every component", gate(root, "check"))
 
     print()
-    print("executable dependencies are derived, not listed")
+    print("the covered set is declared, not derived  (C03-F02)")
 
-    # The closure is empty on the real repository, because the four roots plus
-    # the gate happen to cover everything they reference. An empty result from a
-    # scanner that cannot find anything looks identical, so this builds a
-    # dependency that does not exist in the real tree and requires it to be
-    # found, pinned, and to invalidate the approval when edited.
-    # B01-F16: the first version of this control inserted
-    #     _HELPER = "helper_module.py"
-    # which is a string, so it exercised filename discovery — the route that
-    # already worked — and said nothing about imports, the route that did not.
-    # This uses a real import whose value the component actually reads, so the
-    # dependency genuinely affects behaviour rather than merely being named.
-    # The module name must appear nowhere in any covered file, including in
-    # comments. An earlier attempt used `helper_module`, which bootstrap_gate.py
-    # mentions in the docstring explaining this very finding — so the
-    # filename scan pulled it in from the documentation and the control passed
-    # with import discovery entirely removed. Same defect, one layer out.
+    # Everything in this section replaces controls that demonstrated the
+    # opposite rule. Alex Zamurko, 2 October 2026, having been shown a covered
+    # set that had grown from ten files to seventeen by textual reference:
+    #
+    #     Remove automatic scope expansion from filename references. A filename
+    #     appearing in source code, comments, documentation, strings, fixtures,
+    #     or other covered files must not automatically add that file to the
+    #     covered set.
+    #
+    # The hazard the derivation addressed is real and did not go away: a
+    # component can import a module nobody declared, and editing that module
+    # changes the component's behaviour without changing its bytes. So the
+    # hazard is refused instead of absorbed, and the first control here is the
+    # one the old mechanism would have passed silently.
     HELPER = "zqx_probe_dep"
     root = build(); made.append(root)
     write_lf(root / "scripts" / f"{HELPER}.py", "THRESHOLD = 64\n")
@@ -338,35 +450,116 @@ def main() -> int:
             f"import hashlib\nimport {HELPER}\n_T = {HELPER}.THRESHOLD",
             1),
         encoding="utf-8")
-    # Re-freeze: the edited component is what a reviewer would have seen in this
-    # scenario, and B01-F09 now binds the decision to the frozen target.
-    freeze_target(root)
+    # No re-freeze here, deliberately. Freezing computes the covered set, which
+    # is the thing that now refuses, so a fixture that re-froze would raise
+    # before reaching the command under test. The target frozen by build() is
+    # the right one anyway: it is what a reviewer saw before the import was
+    # added, which is the situation being described.
+    r = approve(root)
+    blob = (r.stdout + r.stderr)
+    if r.returncode == 0:
+        failures.append(
+            "a covered component imported a module the manifest does not "
+            "declare, and the gate approved anyway. Editing that module would "
+            "change a reviewed component's behaviour without changing its "
+            "bytes, which is what the removed derivation was for.")
+    elif f"scripts/{HELPER}.py" not in blob:
+        failures.append(f"refused, but without naming the undeclared "
+                        f"module\n{blob[:300]}")
+    elif "validate_cycle.py" not in blob:
+        failures.append("refused without naming which component imports it, "
+                        "so the reader cannot act on it")
+    else:
+        print("  [ok] refused: a component imports a module nobody declared")
 
+    # The other half, and the half the ruling is actually about: a filename that
+    # appears in text pulls nothing in. Without this the repair above could be
+    # "refuse everything that is mentioned", which is the defect it replaced.
+    root = build(); made.append(root)
+    write_lf(root / "scripts" / "zqx_unreferenced.py", "VALUE = 1\n")
+    lg = root / "scripts" / "ledger.py"
+    lg.write_text(
+        lg.read_text(encoding="utf-8")
+        + "\n# see zqx_unreferenced.py for the threshold table\n",
+        encoding="utf-8")
+    freeze_target(root)
     r = approve(root)
     if r.returncode != 0:
-        failures.append(f"could not approve the dependency fixture:\n{r.stdout}{r.stderr}")
+        failures.append(
+            f"a filename mentioned in a comment blocked the approval. That is "
+            f"the expansion the ruling removed, arriving as a refusal instead "
+            f"of as an addition:\n{r.stdout}{r.stderr}")
     else:
         d = json.loads((root / "bootstrap-review" / "decision.json")
                        .read_text(encoding="utf-8"))
-        if f"scripts/{HELPER}.py" not in d.get("components", {}):
+        if "scripts/zqx_unreferenced.py" in d.get("components", {}):
             failures.append(
-                "a module referenced by validate_cycle.py was not pulled into "
-                "the pinned set. The closure is empty on the real repo, so "
-                "without this control an inert scanner would look correct.")
-        elif f"scripts/{HELPER}.py" not in d.get("dependencies", {}):
-            failures.append("the dependency was pinned but not recorded as a "
-                            "dependency, so the record does not say why it is "
-                            "covered")
+                "a file named only in a comment entered the covered set. "
+                "Approving it commits the review to bytes no reviewer saw.")
+        elif "scripts/zqx_unreferenced.py" not in d.get("references_observed", {}):
+            failures.append(
+                "the mention was not recorded either. It binds nothing, but "
+                "the decision is supposed to say what the components mention.")
         else:
-            print("  [ok] a referenced local module is discovered and pinned")
+            print("  [ok] a filename in a comment is recorded and covers "
+                  "nothing")
 
-            h = root / "scripts" / f"{HELPER}.py"
-            h.write_text("VALUE = 2\n", encoding="utf-8")
-            expect_refused("approval surviving an edit to a dependency",
-                           "has changed since it was reviewed", gate(root, "check"))
+    # ---- the manifest is the only list, and it answers for itself ----
+    def _manifest(root: Path) -> dict:
+        return json.loads((root / "specs" / "covered-components.json")
+                          .read_text(encoding="utf-8"))
 
-    # A dependency appearing after the decision must also block: the reviewed
-    # bytes did not change, but what they reach did.
+    def _write_manifest(root: Path, m: dict, commit: bool = True) -> None:
+        write_lf(root / "specs" / "covered-components.json",
+                 json.dumps(m, indent=2) + "\n")
+        if commit:
+            sh("git", "add", "-A", cwd=root)
+            sh("git", "commit", "-qm", "scope change", cwd=root)
+
+    # A list that is not what its own history produces. This is an internal
+    # consistency check and is named as one: an edit that changed both would
+    # pass it, which is why the authorisation evidence lives outside the file.
+    root = build(); made.append(root)
+    write_lf(root / "scripts" / "zqx_unreferenced.py", "VALUE = 1\n")
+    m = _manifest(root)
+    m["components"].append("scripts/zqx_unreferenced.py")
+    _write_manifest(root, m)
+    expect_refused("a manifest whose list is not what its history produces",
+                   "not what its own history produces", approve(root))
+
+    # No approval at all. Alex Zamurko: "a repository commit proves a scope
+    # change was recorded, not that it was authorised."
+    root = build(); made.append(root)
+    (root / "approvals" / "covered-scope" / "v1.json").unlink()
+    sh("git", "add", "-A", cwd=root)
+    sh("git", "commit", "-qm", "remove the approval", cwd=root)
+    expect_refused("a scope with no recorded authorisation",
+                   "not authorised", approve(root))
+
+    # An approval that exists but was issued for different bytes.
+    root = build(); made.append(root)
+    ap = root / "approvals" / "covered-scope" / "v1.json"
+    rec = json.loads(ap.read_text(encoding="utf-8"))
+    rec["manifest_sha256"] = "e" * 64
+    write_lf(ap, json.dumps(rec, indent=2) + "\n")
+    sh("git", "add", "-A", cwd=root)
+    sh("git", "commit", "-qm", "rebind the approval", cwd=root)
+    expect_refused("an approval issued for a different manifest",
+                   "not authorised", approve(root))
+
+    # A scope change that exists only on disk.
+    root = build(); made.append(root)
+    m = _manifest(root)
+    m["note"] = "edited without committing"
+    _write_manifest(root, m, commit=False)
+    expect_refused("a scope change that was never committed",
+                   "uncommitted changes", approve(root))
+
+    # A component that starts importing new code after the decision must still
+    # block. Under the old rule the closure widened and the hashes stopped
+    # matching; under this one the import is undeclared and the gate refuses
+    # before it gets that far. Different mechanism, same requirement, and the
+    # requirement is the part worth keeping.
     root = build(); made.append(root)
     approve(root)
     if gate(root, "check").returncode != 0:
@@ -377,17 +570,17 @@ def main() -> int:
         lp.write_text(lp.read_text(encoding="utf-8") +
                       "\nimport zqx_late_dep\n_L = zqx_late_dep.LIMIT\n",
                       encoding="utf-8")
-        # loop_state.py itself changed too, so accept either reason; the point
-        # is that it no longer passes.
         r = gate(root, "check")
         blob = (r.stdout + r.stderr).lower()
         if r.returncode == 0:
             failures.append("a component that started reaching new code still "
                             "passed on an old approval")
-        elif "has changed" not in blob and "does not cover" not in blob:
+        elif ("has changed" not in blob and "does not cover" not in blob
+                and "not declared" not in blob):
             failures.append(f"blocked for an unexpected reason:\n{blob[:240]}")
         else:
-            print("  [ok] refused: a component reaching code the decision never saw")
+            print("  [ok] refused: a component reaching code the decision "
+                  "never saw")
 
     # ---- a corrupt record is a refusal, not a crash ----
     root = build(); made.append(root)
@@ -690,6 +883,15 @@ def main() -> int:
     # available, so a refusal here is about the unreadable history and not about
     # fixtures generally being refused.
     tng = build(); made.append(tng)
+    # C03-F02 gave every fixture a repository, because a scope change has to
+    # exist as a commit. This control needs the opposite and says so rather than
+    # relying on the builder's silence: the premise is a history that cannot be
+    # read, and a fixture that happens not to be a repository is the honest way
+    # to reach it.
+    force_rmtree(tng / ".git")
+    if (tng / ".git").exists():
+        failures.append("the fixture still has a repository, so the control "
+                        "below is not about an unreadable history")
     r = gate(tng, "exception")
     blob = r.stdout + r.stderr
     if "BOOTSTRAP_EXCEPTION: AVAILABLE" in r.stdout:

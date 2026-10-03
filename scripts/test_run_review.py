@@ -65,6 +65,14 @@ def make_repo() -> Path:
     # the gate hashes it and a stub would diverge from the real one.
     shutil.copy2(SRC.parent / "specs" / "evidence-schema-v1.0.md",
                  tmp / "specs" / "evidence-schema-v1.0.md")
+    # C03-F02. The gate reads its covered set from a manifest and requires an
+    # authorisation record for it, so a fixture that approves a bootstrap review
+    # needs both. Copied from the real repository rather than invented here: a
+    # second list written into this suite is the duplicate source of truth the
+    # ruling removed, wearing a different hat.
+    shutil.copy2(SRC.parent / "specs" / "covered-components.json",
+                 tmp / "specs" / "covered-components.json")
+    shutil.copytree(SRC.parent / "approvals", tmp / "approvals")
     write_lf(tmp / "specs" / "protocol.md", PROTOCOL_BODY)
     write_lf(tmp / "specs" / "spec.md", SPEC_BODY)
     write_lf(tmp / "specs" / "prompt.md", PROMPT_BODY)

@@ -290,6 +290,31 @@ MUTATIONS = [
      "test_ledger.py",
      "carries no classification"),
 
+    # C03-F02, Alex Zamurko's ruling of 2 October and its two corrections.
+    # Three rules: nothing enters the scope by being imported without being
+    # declared, the list must be what its own history produces, and a scope
+    # change that exists only on disk is not a scope change.
+    ("C03-F02a  an undeclared import is refused, not absorbed",
+     "bootstrap_gate.py",
+     "    if missed:",
+     "    if False:",
+     "test_bootstrap_gate.py",
+     "imported a module the manifest does not declare"),
+
+    ("C03-F02b  the manifest's list must be what its history produces",
+     "bootstrap_gate.py",
+     "    if sorted(replayed) != sorted(comps):",
+     "    if False:",
+     "test_bootstrap_gate.py",
+     "not what its history produces"),
+
+    ("C03-F02c  a scope change that exists only on disk is refused",
+     "bootstrap_gate.py",
+     "    if dirty.strip():",
+     "    if False:",
+     "test_bootstrap_gate.py",
+     "never committed"),
+
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
      "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",

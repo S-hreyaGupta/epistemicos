@@ -174,9 +174,25 @@ def authoritative_items(cycle_dir: Path) -> list[dict]:
 
     if raw.is_file() and p.is_file():
         try:
+            structured = json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            raise CannotCalculate(f"{cycle_dir.name}/findings.json is not valid "
+                                  f"JSON: {e}")
+        # C03-F01. Read before the reparse, because the reparse needs it. The
+        # runner records the grammar each cycle was parsed with, and this used
+        # to reparse with today's instead, so amending the grammar changed what
+        # a completed review meant. Codex: "a completed review's interpretation
+        # depends on today's schema."
+        #
+        # The compatibility path is explicit and bounded: a cycle recorded
+        # before the field existed carries no grammar, and only that case falls
+        # back to the live schema. It is the same distinction C02-F03 draws, in
+        # the one place left that was still reading the present tense.
+        _grammar = structured.get("finding_id_grammar")
+        try:
             import findings_format
             parsed, problems = findings_format.extract(
-                raw.read_text(encoding="utf-8", errors="replace"))
+                raw.read_text(encoding="utf-8", errors="replace"), _grammar)
         except Exception as e:
             raise CannotCalculate(
                 f"{cycle_dir.name}: the raw review cannot be reparsed, so the "
@@ -185,11 +201,6 @@ def authoritative_items(cycle_dir: Path) -> list[dict]:
             raise CannotCalculate(
                 f"{cycle_dir.name}: the raw review no longer parses "
                 "deterministically:\n  " + "\n  ".join(problems))
-        try:
-            structured = json.loads(p.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as e:
-            raise CannotCalculate(f"{cycle_dir.name}/findings.json is not valid "
-                                  f"JSON: {e}")
         raw_ids = [f["id"] for f in parsed]
         got_ids = [f.get("id") for f in structured.get("findings", [])]
         if raw_ids != got_ids:

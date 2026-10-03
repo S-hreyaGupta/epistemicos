@@ -348,6 +348,13 @@ MUTATIONS = [
      "test_run_review.py",
      "patch of an entirely different change"),
 
+    ("C03-F01  a finished review is reparsed with its own grammar",
+     "loop_state.py",
+     "        _grammar = structured.get(\"finding_id_grammar\")",
+     "        _grammar = None",
+     "test_ledger.py",
+     "broke a completed cycle"),
+
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
      "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",

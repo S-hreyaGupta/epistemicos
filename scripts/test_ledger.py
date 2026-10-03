@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -1157,6 +1158,94 @@ def main() -> int:
     else:
         print("  [ok] replay refuses a demonstration resting on an acceptance "
               "that predates the raise")
+
+    # ---- C03-F01: a completed cycle keeps the grammar it was parsed with ----
+    # Codex: "a completed review's interpretation depends on today's schema. A
+    # later grammar amendment excluding a previously valid identifier makes an
+    # unchanged historical raw review fail reconciliation, even though its
+    # frozen artifacts and recorded grammar remain intact."
+    #
+    # The amendment here is deliberately one that would be reasonable to make:
+    # three-digit finding numbers. It excludes every two-digit identifier ever
+    # issued, which is every identifier in both bootstrap runs.
+    print()
+    print("C03-F01  a finished review is read with its own grammar")
+
+    _gr, _gc = make_repo()
+    made.append(_gr)
+    _grev = _gr / "runs" / "T-001" / "plan-review"
+    for _i in (1, 2):
+        make_cycle(_gr, _grev, _i, _gc)
+    ledger(_gr, "raise", "--review", str(_grev), "--cycle", "1",
+           "--id", "C01-F01", "--class", "UNTESTED RULE",
+           "--source", "CODEX_REVIEW")
+    ledger(_gr, "respond", "--review", str(_grev), "--cycle", "1",
+           "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "will fix")
+
+    _schema = _gr / "specs" / "evidence-schema-v1.0.md"
+    _m = re.search(r"^FINDING_ID_GRAMMAR\s*=\s*(\S+)\s*$",
+                   _schema.read_text(encoding="utf-8"), re.M)
+    if not _m:
+        failures.append("the fixture schema declares no FINDING_ID_GRAMMAR, so "
+                        "this control cannot say what it is about")
+    else:
+        _was = _m.group(1)
+        _c1 = _grev / "cycle-01"
+        write_lf(_c1 / "codex-output-raw.md",
+                 "Finding ID: C01-F01\nClass: UNTESTED RULE\nEvidence: x\n")
+        write_lf(_c1 / "findings.json", json.dumps({
+            "schema": "cycle-findings/1", "cycle": 1, "count": 1,
+            "finding_id_grammar": _was,
+            "zero_findings_asserted": False,
+            "findings": [{"id": "C01-F01", "class": "UNTESTED RULE",
+                          "kind": "finding"}],
+        }, indent=2))
+
+        # The cycle computes before the amendment, or nothing below is
+        # attributable to the amendment.
+        _before = loop(_gr, _grev)
+        if _before.returncode != 0:
+            failures.append(
+                f"the C03-F01 fixture does not compute before the grammar is "
+                f"amended\n{(_before.stdout + _before.stderr)[-400:]}")
+        else:
+            write_lf(_schema, _schema.read_text(encoding="utf-8").replace(
+                f"FINDING_ID_GRAMMAR = {_was}",
+                r"FINDING_ID_GRAMMAR = \b[A-Z]{1,2}\d{2}-F\d{3}\b"))
+            _after = loop(_gr, _grev)
+            _blob = _after.stdout + _after.stderr
+            if _after.returncode != 0:
+                failures.append(
+                    f"amending the grammar broke a completed cycle. Its raw "
+                    f"review, its frozen artifacts and its recorded grammar are "
+                    f"all unchanged; only today's schema moved, and a finished "
+                    f"review is not a claim about today.\n{_blob[-500:]}")
+            else:
+                print("  [ok] a completed cycle still reconciles after the "
+                      "grammar is amended under it")
+
+            # The other half. The amendment has to mean something for evidence
+            # that has not been parsed yet, or the repair is just "ignore the
+            # schema", which is a different defect with the same symptom.
+            _c2 = _grev / "cycle-02"
+            write_lf(_c2 / "codex-output-raw.md",
+                     "Finding ID: C01-F02\nClass: UNTESTED RULE\nEvidence: y\n")
+            write_lf(_c2 / "findings.json", json.dumps({
+                "schema": "cycle-findings/1", "cycle": 2, "count": 1,
+                "zero_findings_asserted": False,
+                "findings": [{"id": "C01-F02", "class": "UNTESTED RULE",
+                              "kind": "finding"}],
+            }, indent=2))
+            _new = loop(_gr, _grev)
+            if _new.returncode == 0:
+                failures.append(
+                    "a cycle recording no grammar was read with the old one. "
+                    "Evidence that never declared which grammar it was parsed "
+                    "with has only today's to be read by, and this identifier "
+                    "is not valid under it.")
+            else:
+                print("  [ok] and evidence with no recorded grammar is held to "
+                      "the amended one")
 
     # The other half, and the one that tests replay rather than the command.
     # Refusing to WRITE a backdated acceptance does nothing about a history that

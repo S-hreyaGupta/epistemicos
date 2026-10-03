@@ -98,7 +98,7 @@ def canonical_id_grammar() -> re.Pattern:
     return re.compile(m.group(1))
 
 
-def extract(raw: str) -> tuple[list[dict], list[str]]:
+def extract(raw: str, grammar: str | None = None) -> tuple[list[dict], list[str]]:
     """(entries, problems) parsed deterministically from raw reviewer output.
 
     Each entry carries a `kind`:
@@ -110,8 +110,25 @@ def extract(raw: str) -> tuple[list[dict], list[str]]:
     Anything unparseable is a problem rather than a silent omission. The failure
     being prevented is findings going missing between the reviewer and the
     ledger, so this never quietly returns fewer than it saw.
+
+    C03-F01. `grammar` is the pattern a completed cycle was parsed with, which
+    the runner records in its findings.json. Codex: "a completed review's
+    interpretation depends on today's schema. A later grammar amendment
+    excluding a previously valid identifier makes an unchanged historical raw
+    review fail reconciliation, even though its frozen artifacts and recorded
+    grammar remain intact."
+
+    Which it did, because this read the live schema every time, including when
+    re-reading a review from three weeks ago. A caller that knows which grammar
+    a cycle was parsed with passes it; a caller parsing something new passes
+    nothing and gets today's. Preserving the schema bytes in a target was never
+    going to fix that, since the parser never consulted them.
     """
-    grammar = canonical_id_grammar()
+    pattern = re.compile(grammar) if grammar else canonical_id_grammar()
+    return _extract_with(raw, pattern)
+
+
+def _extract_with(raw: str, grammar: re.Pattern) -> tuple[list[dict], list[str]]:
     found: list[dict] = []
     problems: list[str] = []
 

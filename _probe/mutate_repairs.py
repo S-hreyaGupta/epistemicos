@@ -334,6 +334,13 @@ MUTATIONS = [
      "test_ledger.py",
      "rejection dated before the raise took effect"),
 
+    ("C02-F08b  the preserved patch names the change's own objects",
+     "validate_cycle.py",
+     "                        if _want and _got != _want:",
+     "                        if False:",
+     "test_run_review.py",
+     "patch of an entirely different change"),
+
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
      "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",

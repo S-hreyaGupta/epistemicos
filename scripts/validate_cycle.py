@@ -910,6 +910,34 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
                             f"commits this target names\n          recorded "
                             f"{_recorded}\n          derived  {_actual}\n"
                             f"          base {_b}\n          candidate {_c}")
+                    else:
+                        # C02-F08, second pass. The digest above says the
+                        # recorded change set is the one these commits produce.
+                        # It says nothing about the patch sitting in artifacts/,
+                        # which is the thing a reviewer actually reads, and
+                        # cycle 03 substituted one while every hash stayed
+                        # internally consistent.
+                        #
+                        # So the preserved patch has to name the same objects.
+                        _dp = str(target.get("diff_path") or "")
+                        _snap = cycle_dir / "artifacts" / _dp
+                        _src = _snap if _snap.is_file() else (repo_root / _dp)
+                        _ptext = (_src.read_text(encoding="utf-8",
+                                                 errors="replace")
+                                  if _src.is_file() else "")
+                        _want = run_pins.raw_blob_pairs(_raw)
+                        _got = run_pins.patch_blob_pairs(_ptext)
+                        if _want and _got != _want:
+                            _p14.append(
+                                "the preserved patch does not describe the "
+                                "change its own target names.\n          The "
+                                f"change touches {len(_want)} object pair(s) "
+                                f"and the patch names {len(_got)}; "
+                                f"{len(_want - _got)} of the change's are "
+                                "absent from it.\n          Hashing the patch "
+                                "and hashing the change set are two true "
+                                "statements about\n          two different "
+                                "things, which is what this check is for.")
         elif modern_markers(target):
             # The C02-F03 distinction, in the place the same mistake would
             # otherwise arrive next. A target carrying a marker of a later

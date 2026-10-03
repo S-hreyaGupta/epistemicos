@@ -1049,6 +1049,77 @@ def main() -> int:
                 print("  [ok] refused: the diff is not the change between the "
                       "commits this target names")
 
+    # ---- C02-F08, raised again by cycle 03 ----
+    # The swap above moves the candidate. Codex asked for the other direction,
+    # which the first repair did not cover: "retain the candidate, base, and
+    # correct diff_raw_sha256; substitute another patch and update diff_hash,
+    # the target digest, and the corresponding input content. The patch hash and
+    # raw-metadata comparison both pass independently."
+    #
+    # Every hash in the resulting cycle is correct about something. The patch
+    # hashes to its record, the change set hashes to its record, and the two
+    # records describe different changes.
+    t8 = make_repo(); made.append(t8)
+    do_init(t8)
+    base8 = impl_base(t8, "def h():\n    return 11\n")
+    write_lf(t8 / "results.txt", "11 passed\n")
+    head8 = sh("git", "rev-parse", "HEAD", cwd=t8).stdout.strip()
+    plan8 = impl_approval(t8)
+    r = runner(t8, "freeze", "--run", "T-001", "--type", "implementation",
+               "--prompt", "specs/prompt.md", "--candidate-commit", head8,
+               "--approved-plan-hash", plan8, "--base", base8,
+               "--test-results", "results.txt")
+    c8 = t8 / "runs" / "T-001" / "implementation-review" / "cycle-01"
+    if r.returncode != 0:
+        failures.append(f"the C02-F08 patch-substitution fixture could not be "
+                        f"frozen:\n{r.stdout}{r.stderr}")
+    else:
+        _th8 = (c8 / "target.sha256").read_text(encoding="utf-8").strip()
+        write_lf(t8 / "reply8.md",
+                 f"TARGET_SHA256 {_th8}\n\nNo findings in any category.\n")
+        _r8 = runner(t8, "record", "--cycle", str(c8), "--output", "reply8.md",
+                     "--invocation", "manual", "--zero-findings")
+        if _r8.returncode != 0:
+            failures.append(f"the C02-F08 patch-substitution fixture could not "
+                            f"be recorded:\n{_r8.stdout}{_r8.stderr}")
+        else:
+            # A real patch of a different change, rather than edited text. The
+            # point is that a reviewer handed this would read a coherent diff
+            # and have no way to tell it is not the one the target names.
+            write_lf(t8 / "other.py", "def other():\n    return 0\n")
+            sh("git", "add", "-A", cwd=t8)
+            sh("git", "commit", "-qm", "an unrelated change", cwd=t8)
+            _other = sh("git", "-c", "core.quotepath=false", "diff",
+                        "--no-color", "--full-index", "-M0", "HEAD~1", "HEAD",
+                        cwd=t8).stdout
+
+            _snap = c8 / "artifacts" / "candidate.diff"
+            write_lf(_snap, _other)
+            _tg8 = json.loads((c8 / "target.json").read_text(encoding="utf-8"))
+            _tg8["diff_hash"] = sha256_file(_snap)
+            write_lf(c8 / "target.json", json.dumps(_tg8, indent=2))
+            _new8 = sha256_file(c8 / "target.json")
+            write_lf(c8 / "target.sha256", _new8 + "\n")
+            _ci8 = c8 / "codex-input.md"
+            write_lf(_ci8, _ci8.read_text(encoding="utf-8").replace(_th8, _new8))
+
+            _rr = sh(sys.executable,
+                     str(t8 / "scripts" / "validate_cycle.py"), str(c8), cwd=t8)
+            _out8 = _rr.stdout + _rr.stderr
+            if _rr.returncode == 0:
+                failures.append(
+                    "a cycle carrying a patch of an entirely different change "
+                    "passed MC-2. Its patch hashes to its record and its change "
+                    "set hashes to its record; the two records are about "
+                    "different changes, which hashing each one separately "
+                    "cannot see.")
+            elif "does not describe the change its own target names" not in _out8:
+                failures.append(f"refused, but not for the substituted patch\n"
+                                f"{_out8[-400:]}")
+            else:
+                print("  [ok] refused: the preserved patch describes a "
+                      "different change from the one the target names")
+
     # ---- C02-F09: a missing snapshot is not replaced by a live file ----
     # "Deleting an implementation cycle's preserved diff, test results,
     # approved plan, or approval record does not necessarily invalidate it:

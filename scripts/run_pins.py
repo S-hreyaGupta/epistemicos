@@ -127,8 +127,13 @@ def diff_raw_argv(base: str, candidate: str,
     machine's absolute paths and nothing has to be rewritten to validate a cycle
     somewhere else.
     """
+    # --abbrev=40 because --full-index governs patch output only; raw output
+    # abbreviates object names unless told otherwise. C02-F08's second pass
+    # compares the blob identities in the patch with the ones here, and a
+    # seven-character name never equals a forty-character one, so the comparison
+    # was false on every honest cycle.
     argv = [*GIT_DIFF_CONFIG, "diff", "--raw", "--no-color", "--no-ext-diff",
-            "--full-index", "-M0", base, candidate]
+            "--full-index", "--abbrev=40", "-M0", base, candidate]
     if paths:
         argv += ["--", *paths]
     return argv
@@ -162,6 +167,43 @@ def diff_patch_argv(base: str, candidate: str,
 # same mistake as reading absence as age, pointing the other way.
 EVIDENCE_FORMATS = ("cycle-target/1",)
 CURRENT_EVIDENCE_FORMAT = EVIDENCE_FORMATS[-1]
+
+
+# C02-F08, raised again by cycle 03. The first repair derived the patch and
+# recorded a digest of the change set, and check 14 compared each against its own
+# record. Codex: "it never establishes that the preserved patch represents that
+# metadata... substitute another patch and update diff_hash, the target digest,
+# and the corresponding input content. The patch hash and raw-metadata
+# comparison both pass independently."
+#
+# Which is the same defect one layer in: two correct statements about two
+# unrelated things.
+#
+# The binding is the blob identities. Both derivations run with --full-index, so
+# the patch's `index <old>..<new>` lines carry the same object names the raw
+# change set lists, and a patch of some other change names different objects.
+# Comparing those rather than the patch text is what the correction asks for:
+# "another deterministic representation that establishes content correspondence
+# without depending on incidental formatting". Context width, rename detection
+# and whitespace all move the text and none of them move a blob id.
+_RAW_LINE = re.compile(
+    r"^:\d{6}\s+\d{6}\s+([0-9a-f]+)\s+([0-9a-f]+)\s+\S+\s+(.+)$")
+_PATCH_INDEX = re.compile(r"^index\s+([0-9a-f]+)\.\.([0-9a-f]+)", re.M)
+
+
+def raw_blob_pairs(raw: str) -> set[tuple[str, str]]:
+    """(before, after) object names from `git diff --raw` output."""
+    out: set[tuple[str, str]] = set()
+    for line in raw.splitlines():
+        m = _RAW_LINE.match(line.strip())
+        if m:
+            out.add((m.group(1), m.group(2)))
+    return out
+
+
+def patch_blob_pairs(patch: str) -> set[tuple[str, str]]:
+    """(before, after) object names from a unified patch's index lines."""
+    return {(m.group(1), m.group(2)) for m in _PATCH_INDEX.finditer(patch)}
 
 
 def spec_digest(entries: list[dict]) -> str:

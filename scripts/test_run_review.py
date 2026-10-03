@@ -1094,6 +1094,7 @@ def main() -> int:
                         cwd=t8).stdout
 
             _snap = c8 / "artifacts" / "candidate.diff"
+            _orig8 = _snap.read_text(encoding="utf-8")
             write_lf(_snap, _other)
             _tg8 = json.loads((c8 / "target.json").read_text(encoding="utf-8"))
             _tg8["diff_hash"] = sha256_file(_snap)
@@ -1119,6 +1120,38 @@ def main() -> int:
             else:
                 print("  [ok] refused: the preserved patch describes a "
                       "different change from the one the target names")
+
+            # And the case the recorded change-set digest catches on its own.
+            # The probe found that the blob comparison above subsumes it for a
+            # moved candidate, so without this control the digest rule could be
+            # removed and nothing would notice: the stronger check was answering
+            # for both. Here the patch and the commits agree with each other and
+            # only the recorded digest is wrong, which the blob comparison
+            # cannot see because it never consults it.
+            write_lf(_snap, _orig8)
+            _tg8 = json.loads((c8 / "target.json").read_text(encoding="utf-8"))
+            _tg8["diff_hash"] = sha256_file(_snap)
+            _tg8["diff_raw_sha256"] = "d" * 64
+            write_lf(c8 / "target.json", json.dumps(_tg8, indent=2))
+            _n8 = sha256_file(c8 / "target.json")
+            write_lf(c8 / "target.sha256", _n8 + "\n")
+            _ci8 = c8 / "codex-input.md"
+            write_lf(_ci8, _ci8.read_text(encoding="utf-8").replace(_new8, _n8))
+
+            _rr = sh(sys.executable,
+                     str(t8 / "scripts" / "validate_cycle.py"), str(c8), cwd=t8)
+            _out8 = _rr.stdout + _rr.stderr
+            if _rr.returncode == 0:
+                failures.append(
+                    "a target recording a change set these commits do not "
+                    "produce passed MC-2. The digest is the only thing tying "
+                    "the record to the repository, and nothing checked it.")
+            elif "not the change between the commits" not in _out8:
+                failures.append(f"refused, but not for the recorded change set\n"
+                                f"{_out8[-400:]}")
+            else:
+                print("  [ok] refused: the recorded change set is not what "
+                      "these commits produce")
 
     # ---- C02-F09: a missing snapshot is not replaced by a live file ----
     # "Deleting an implementation cycle's preserved diff, test results,

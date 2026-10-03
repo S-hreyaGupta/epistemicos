@@ -208,7 +208,14 @@ MUTATIONS = [
      # stale digest in codex-input.md, so it had never established anything
      # about check 14. Two probe runs, two different faults in my own work, both
      # of them invisible to a green suite.
-     "carrying another's diff"),
+     #
+     # And a third time, after C02-F08's second pass added the blob comparison.
+     # That check subsumes this one for a moved candidate, so the swap control
+     # stopped isolating this rule: removing the digest comparison left the
+     # scenario refused by the stronger check. The needle now points at the
+     # control that tampers with the recorded digest alone, which is the only
+     # case this rule answers for by itself.
+     "recording a change set these commits do not produce"),
 
     # Three fallbacks, three mutations. One would leave the other two unwatched
     # while the line reported them as covered, which is the mistake C02-F02

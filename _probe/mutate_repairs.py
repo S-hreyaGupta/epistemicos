@@ -315,6 +315,25 @@ MUTATIONS = [
      "test_bootstrap_gate.py",
      "never committed"),
 
+    # C02-F02's second pass. One rule, two guards, because §5 gives a finding
+    # two dispositions and a guard on one of them is a guard on half the rule.
+    # That is how this finding arrived twice.
+    ("C02-F02d  an acceptance cannot predate the raise, in replay",
+     "cycle_projection.py",
+     "            if self.raised_at is not None and c < self.raised_at:\n"
+     "                return False, _before_raise(self.raised_at, \"accepted\")",
+     "            if False:\n                pass",
+     "test_ledger.py",
+     "dated before the finding was raised took effect"),
+
+    ("C02-F02e  nor can a rejection, in replay",
+     "cycle_projection.py",
+     "            if self.raised_at is not None and c < self.raised_at:\n"
+     "                return False, _before_raise(self.raised_at, \"rejected\")",
+     "            if False:\n                pass",
+     "test_ledger.py",
+     "rejection dated before the raise took effect"),
+
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
      "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",

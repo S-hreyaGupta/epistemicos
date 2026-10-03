@@ -450,11 +450,28 @@ def main() -> int:
             f"import hashlib\nimport {HELPER}\n_T = {HELPER}.THRESHOLD",
             1),
         encoding="utf-8")
-    # No re-freeze here, deliberately. Freezing computes the covered set, which
-    # is the thing that now refuses, so a fixture that re-froze would raise
-    # before reaching the command under test. The target frozen by build() is
-    # the right one anyway: it is what a reviewer saw before the import was
-    # added, which is the situation being described.
+    # The target has to be re-frozen, or validate_cycle.py has drifted from it
+    # and the drift check refuses first. The probe caught exactly that: with the
+    # undeclared-import rule removed this control still went red, which means it
+    # was never testing that rule.
+    #
+    # It cannot re-freeze through freeze_target, because that calls covered(),
+    # which is the thing under test. So the target is written straight from the
+    # manifest. That is the one place in this suite allowed to read the
+    # component list without going through the gate, and it is allowed because
+    # the gate's refusal is the subject rather than the instrument.
+    _m = json.loads((root / "specs" / "covered-components.json")
+                    .read_text(encoding="utf-8"))
+    _tgt = root / "runs" / "B-001" / "plan-review" / "cycle-01" / "target.json"
+    write_lf(_tgt, json.dumps({
+        "review_type": "plan", "run_id": "B-001", "cycle": 1,
+        "plan_files": [{"path": rel, "sha256": sha256_file(root / rel)}
+                       for rel in sorted(set(_m["components"]) | {
+                           "scripts/bootstrap_gate.py"})],
+    }, indent=2) + "\n")
+    write_lf(root / "bootstrap-review" / "codex-input.md",
+             f"contents of codex-input.md\ntarget {sha256_file(_tgt)}\n")
+
     r = approve(root)
     blob = (r.stdout + r.stderr)
     if r.returncode == 0:

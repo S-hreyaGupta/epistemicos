@@ -222,6 +222,19 @@ class UnknownEvent(Exception):
     """History contains an event replay has no transition for. Not skippable."""
 
 
+def _before_raise(raised_at: int, what: str) -> str:
+    """C02-F02, raised again by cycle 03. One wording, used by both guards.
+
+    A disposition answers a finding. One dated before the finding was raised
+    answers nothing that existed yet, and the ledger commands refused it from
+    the start while replay accepted it, so a history illegal to write was legal
+    to read.
+    """
+    return (f"{what} in a cycle before the finding was raised in cycle "
+            f"{raised_at:02d}; a disposition cannot answer a finding that did "
+            f"not yet exist")
+
+
 class Walk:
     """One pass over a finding's history, and the only place transitions live.
 
@@ -253,7 +266,7 @@ class Walk:
     all three by construction, which is the property that was missing.
     """
 
-    __slots__ = ("state", "accepted", "reopened_at", "accepted_at",
+    __slots__ = ("state", "accepted", "reopened_at", "raised_at", "accepted_at",
                  "demonstrated_at", "live", "skipped")
 
     def __init__(self) -> None:
@@ -267,6 +280,17 @@ class Walk:
         # review target, and a recurrence is observed later than the resolution
         # it undoes. Both rules existed, in the write commands, and not here, so
         # replay honoured histories the commands would have refused to write.
+        # C02-F02, raised again by cycle 03. The cycle the finding was raised
+        # in. Codex: "cycle_projection does not retain the raising cycle, and
+        # Walk.apply does not enforce this chronological restriction... With
+        # cycles 1 to 4 valid, the stored history RAISED(3), ACCEPT(1),
+        # DEMONSTRATED(4) reconstructs RESOLVED."
+        #
+        # The command path refused that acceptance, because it predates the
+        # finding it answers. Replay did not, so the same history was illegal to
+        # write and legal to read, which is the whole shape of this finding and
+        # the third time it has been found in a different rule.
+        self.raised_at: int | None = None
         self.accepted_at: int | None = None
         self.demonstrated_at: int | None = None
         # The most recent event of each kind whose effect STILL obtains,
@@ -288,6 +312,7 @@ class Walk:
         """
         if ev == "RAISED":
             self.state, self.accepted, self.reopened_at = OPEN, False, None
+            self.raised_at = c
             self.accepted_at = self.demonstrated_at = None
             # A finding starting over carries nothing forward.
             self.live.clear()
@@ -303,6 +328,8 @@ class Walk:
                 # the first repair, which the reopening spent.
                 return False, (f"dated before the cycle {self.reopened_at:02d} "
                                f"reopening it would have to answer")
+            if self.raised_at is not None and c < self.raised_at:
+                return False, _before_raise(self.raised_at, "accepted")
             self.accepted, self.accepted_at = True, c
             return True, None
         if ev == "REJECT_WITH_REASON":
@@ -316,6 +343,8 @@ class Walk:
             if self.reopened_at is not None and c < self.reopened_at:
                 return False, (f"dated before the cycle {self.reopened_at:02d} "
                                f"reopening it would have to answer")
+            if self.raised_at is not None and c < self.raised_at:
+                return False, _before_raise(self.raised_at, "rejected")
             self.state = DISPUTED
             return True, None
         if ev == "DEMONSTRATED":

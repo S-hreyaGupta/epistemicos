@@ -995,32 +995,43 @@ def main() -> int:
     # recomputes the state from the history. Asserting on the stored state field
     # would be asserting on a value the forgery never touched, which is a
     # control that cannot come back false.
-    def _forge(*events):
-        """A three-cycle run whose finding carries a hand-written history."""
+    def _forge(*events, raised_at: int = 1, cycles: int = 3):
+        """A run whose finding carries a hand-written history.
+
+        `raised_at` exists for C02-F02's second pass. Cycle 03 found that the
+        evaluator did not keep the raising cycle, so a disposition dated before
+        the finding existed replayed as valid, and demonstrating the rule needs
+        a raise that is not in cycle 1.
+        """
         root, commit = make_repo()
         made.append(root)
         rev = root / "runs" / "T-001" / "plan-review"
-        for i in (1, 2, 3):
+        for i in range(1, cycles + 1):
             make_cycle(root, rev, i, commit)
-        ledger(root, "raise", "--review", str(rev), "--cycle", "1",
-               "--id", "C01-F01", "--class", "UNTESTED RULE",
+        # The identifier carries its own cycle, so a finding raised in cycle 3
+        # is C03-Fnn. Naming it C01-F01 made the raise refuse, and the fixture
+        # then read a ledger that had never been written: the control reported a
+        # missing file rather than the rule it was about.
+        fid = f"C{raised_at:02d}-F01"
+        ledger(root, "raise", "--review", str(rev), "--cycle", str(raised_at),
+               "--id", fid, "--class", "UNTESTED RULE",
                "--source", "CODEX_REVIEW")
         lp = rev / "ledger.json"
         data = json.loads(lp.read_text(encoding="utf-8"))
         for ev, c in events:
-            data["findings"]["C01-F01"]["history"].append(
+            data["findings"][fid]["history"].append(
                 {"cycle": c, "event": ev, "state": "OPEN",
                  "at": "2026-09-30T00:00:00Z", "note": "forged"})
         write_lf(lp, json.dumps(data, indent=2) + "\n")
-        return root, rev
+        return root, rev, fid
 
-    def _permits(root, rev, *args):
-        return ledger(root, *args, "--review", str(rev), "--id", "C01-F01")
+    def _permits(root, rev, *args, fid: str = "C01-F01"):
+        return ledger(root, *args, "--review", str(rev), "--id", fid)
 
     # 1. A demonstration in the acceptance's own cycle. cmd_resolve refuses it;
     #    replay used to resolve on it. If it had applied the finding would be
     #    RESOLVED and a reopen would be available.
-    _r, _v = _forge(("ACCEPT", 2), ("DEMONSTRATED", 2))
+    _r, _v, _f = _forge(("ACCEPT", 2), ("DEMONSTRATED", 2))
     _out = _permits(_r, _v, "reopen", "--cycle", "3", "--evidence", "x")
     if _out.returncode == 0:
         failures.append(
@@ -1037,7 +1048,7 @@ def main() -> int:
 
     # The pair. One cycle later is legal, so the refusal above is about the
     # ordering rather than about forged histories being rejected wholesale.
-    _r, _v = _forge(("ACCEPT", 1), ("DEMONSTRATED", 2))
+    _r, _v, _f = _forge(("ACCEPT", 1), ("DEMONSTRATED", 2))
     _out = _permits(_r, _v, "reopen", "--cycle", "3", "--evidence", "x")
     if _out.returncode != 0:
         failures.append(
@@ -1049,7 +1060,7 @@ def main() -> int:
 
     # 2. A reopening not later than the resolution it undoes. If it had applied
     #    the finding would be OPEN and a disposition would be available.
-    _r, _v = _forge(("ACCEPT", 1), ("DEMONSTRATED", 2), ("REOPENED", 2))
+    _r, _v, _f = _forge(("ACCEPT", 1), ("DEMONSTRATED", 2), ("REOPENED", 2))
     _out = _permits(_r, _v, "respond", "--cycle", "3",
                     "--disposition", "ACCEPT", "--note", "x")
     if _out.returncode == 0:
@@ -1064,7 +1075,7 @@ def main() -> int:
     #    had this guard and REJECT_WITH_REASON did not, though §5 gives a
     #    finding both dispositions. If it had applied the finding would be
     #    DISPUTED and no disposition would be available.
-    _r, _v = _forge(("ACCEPT", 1), ("DEMONSTRATED", 2), ("REOPENED", 3),
+    _r, _v, _f = _forge(("ACCEPT", 1), ("DEMONSTRATED", 2), ("REOPENED", 3),
                     ("REJECT_WITH_REASON", 2))
     _out = _permits(_r, _v, "respond", "--cycle", "3",
                     "--disposition", "ACCEPT", "--note", "x")
@@ -1075,6 +1086,77 @@ def main() -> int:
             f"REJECT_WITH_REASON did not.\n{(_out.stderr + _out.stdout)[:300]}")
     else:
         print("  [ok] replay refuses a rejection dated before its reopening")
+
+    # ---- C02-F02, raised again by cycle 03 ----
+    # Three ordering rules moved into the evaluator and a fourth stayed behind.
+    # Codex: "a chronological guard still exists only in commands... With cycles
+    # 1 to 4 valid, the stored history RAISED(3), ACCEPT(1), DEMONSTRATED(4)
+    # reconstructs RESOLVED: acceptance sees OPEN with no reopening restriction,
+    # and demonstration sees an acceptance from an earlier cycle."
+    #
+    # The command path refused that acceptance from the start, because it
+    # answers a finding that did not yet exist. Replay did not, which is the
+    # same divergence in a rule nobody had moved.
+
+    # 4. An acceptance dated before the raise. If it applied, the finding has an
+    #    acceptance in force and a demonstration would be available.
+    _r, _v, _f = _forge(("ACCEPT", 1), raised_at=3, cycles=4)
+    _out = _permits(_r, _v, "resolve", "--cycle", "4", "--evidence", "x",
+                    fid=_f)
+    if _out.returncode == 0:
+        failures.append(
+            "an acceptance dated before the finding was raised took effect on "
+            "replay. It answers a finding that did not exist in that cycle, and "
+            "cmd_respond refuses exactly this.")
+    elif "has no ACCEPT" not in (_out.stderr + _out.stdout):
+        failures.append(f"refused, but not for the absent acceptance\n"
+                        f"{(_out.stderr + _out.stdout)[:300]}")
+    else:
+        print("  [ok] replay refuses an acceptance dated before the raise")
+
+    # The pair. An acceptance in the raising cycle is legal, so the refusal
+    # above is about the ordering and not about raises after cycle 1.
+    _r, _v, _f = _forge(("ACCEPT", 3), raised_at=3, cycles=4)
+    _out = _permits(_r, _v, "resolve", "--cycle", "4", "--evidence", "x",
+                    fid=_f)
+    if _out.returncode != 0:
+        failures.append(
+            f"an acceptance in the raising cycle did not take effect, so the "
+            f"control above proves nothing\n{(_out.stderr + _out.stdout)[:300]}")
+    else:
+        print("  [ok] and honours one in the raising cycle, so that is the rule")
+
+    # 5. A rejection dated before the raise. ACCEPT and REJECT_WITH_REASON are
+    #    the two dispositions §5 gives a finding, and a guard on one of them is
+    #    a guard on half the rule, which is how this finding arrived twice.
+    _r, _v, _f = _forge(("REJECT_WITH_REASON", 1), raised_at=3, cycles=4)
+    _out = _permits(_r, _v, "respond", "--cycle", "3",
+                    "--disposition", "ACCEPT", "--note", "x", fid=_f)
+    if _out.returncode != 0:
+        failures.append(
+            f"a rejection dated before the raise took effect on replay, leaving "
+            f"the finding DISPUTED\n{(_out.stderr + _out.stdout)[:300]}")
+    else:
+        print("  [ok] replay refuses a rejection dated before the raise")
+
+    # 6. Codex's own reproduction, end to end: the demonstration rests on the
+    #    backdated acceptance. If the chain held, the finding is RESOLVED and a
+    #    reopening is available.
+    _r, _v, _f = _forge(("ACCEPT", 1), ("DEMONSTRATED", 4), raised_at=3,
+                        cycles=4)
+    _out = _permits(_r, _v, "reopen", "--cycle", "4", "--evidence", "x",
+                    fid=_f)
+    if _out.returncode == 0:
+        failures.append(
+            "RAISED(3), ACCEPT(1), DEMONSTRATED(4) reconstructed RESOLVED on "
+            "replay. That is the exact history cycle 03 described, and no "
+            "command would have written any of it.")
+    elif "not RESOLVED" not in (_out.stderr + _out.stdout):
+        failures.append(f"refused, but not for the finding not being "
+                        f"RESOLVED\n{(_out.stderr + _out.stdout)[:300]}")
+    else:
+        print("  [ok] replay refuses a demonstration resting on an acceptance "
+              "that predates the raise")
 
     # The other half, and the one that tests replay rather than the command.
     # Refusing to WRITE a backdated acceptance does nothing about a history that

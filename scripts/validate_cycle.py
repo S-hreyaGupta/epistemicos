@@ -911,45 +911,86 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
                             f"{_recorded}\n          derived  {_actual}\n"
                             f"          base {_b}\n          candidate {_c}")
                     else:
-                        # C02-F08, second pass. The digest above says the
-                        # recorded change set is the one these commits produce.
-                        # It says nothing about the patch sitting in artifacts/,
-                        # which is the thing a reviewer actually reads, and
-                        # cycle 03 substituted one while every hash stayed
-                        # internally consistent.
+                        # C02-F08, third pass. Alex Zamurko, 5 October: "generate
+                        # the patch directly from the recorded base commit and
+                        # candidate commit; compare the preserved patch
+                        # byte-for-byte with that generated patch; reject if
+                        # paths, modes, hunks, file entries, or repeated changes
+                        # differ; do not skip validation when the expected change
+                        # set is empty."
                         #
-                        # So the preserved patch has to name the same objects.
+                        # The previous version compared the patch's HEADERS with
+                        # the change set. That caught a substituted patch, a
+                        # wrong path, a dropped duplicate and an empty change
+                        # set, and it could not see a correct header over an
+                        # altered hunk body. I wrote that limit into the source
+                        # rather than closing it. Regenerating the patch closes
+                        # it: one comparison, over the whole artifact.
+                        #
+                        # The headers are still compared, demoted from a rule to
+                        # an explanation. They are what tells a reader whether
+                        # the patch is about a different change or about the same
+                        # files with different contents, and they never refuse on
+                        # their own. A second rule answering for the first is how
+                        # C02-F08 came back twice.
+                        #
+                        # Byte equality means the same git producing the same
+                        # formatting. The diff flags are pinned in run_pins for
+                        # exactly that reason, and the message below says the
+                        # difference may be formatting rather than content, so a
+                        # refusal is never read as more than it is.
                         _dp = str(target.get("diff_path") or "")
                         _snap = cycle_dir / "artifacts" / _dp
                         _src = _snap if _snap.is_file() else (repo_root / _dp)
-                        _ptext = (_src.read_text(encoding="utf-8",
-                                                 errors="replace")
-                                  if _src.is_file() else "")
-                        # C02-F08, second pass. No `if _want` guard: cycle 04
-                        # found that an empty change set skipped the comparison
-                        # entirely, so a cycle with nothing to review accepted
-                        # any patch at all. An empty change set is compared like
-                        # any other, and a freeze refuses to produce one anyway.
-                        _want = run_pins.raw_entries(_raw)
-                        _got = run_pins.patch_entries(_ptext)
-                        if _got != _want:
-                            _missing = [e for e in _want if e not in _got]
-                            _extra = [e for e in _got if e not in _want]
+                        _pbytes = _src.read_bytes() if _src.is_file() else b""
+                        _rcp, _pgen = git_unstripped(
+                            repo_root,
+                            run_pins.diff_patch_argv(str(_b), str(_c),
+                                                     list(_paths)))
+                        # The freeze wrote `patch.encode("utf-8")` of git's
+                        # decoded output, so this encodes the same way rather
+                        # than comparing raw stdout. Symmetric with how the
+                        # bytes under comparison were produced.
+                        _gen = _pgen.encode("utf-8")
+                        if _rcp != 0:
                             _p14.append(
-                                "the preserved patch does not describe the "
-                                "change its own target names.\n          the "
-                                f"change has {len(_want)} entry(ies), the patch "
-                                f"has {len(_got)}"
-                                + (f"\n          absent from the patch: "
-                                   + ", ".join(e[0] for e in _missing[:4])
-                                   if _missing else "")
-                                + (f"\n          not in the change: "
-                                   + ", ".join(e[0] for e in _extra[:4])
-                                   if _extra else "") +
-                                "\n          Path, mode and object name are all "
-                                "compared, and repeated entries count, because"
-                                "\n          each of those was a way past the "
-                                "previous version of this check.")
+                                f"the patch between {str(_b)[:12]} and "
+                                f"{str(_c)[:12]} cannot be regenerated here,\n"
+                                "          so the preserved patch cannot be "
+                                "shown to be this change")
+                        elif _pbytes != _gen:
+                            _want = run_pins.raw_entries(_raw)
+                            _got = run_pins.patch_entries(
+                                _pbytes.decode("utf-8", errors="replace"))
+                            if _got != _want:
+                                _missing = [e for e in _want if e not in _got]
+                                _extra = [e for e in _got if e not in _want]
+                                _p14.append(
+                                    "the preserved patch does not describe the "
+                                    "change its own target names.\n          the "
+                                    f"change has {len(_want)} entry(ies), the "
+                                    f"patch has {len(_got)}"
+                                    + (f"\n          absent from the patch: "
+                                       + ", ".join(e[0] for e in _missing[:4])
+                                       if _missing else "")
+                                    + (f"\n          not in the change: "
+                                       + ", ".join(e[0] for e in _extra[:4])
+                                       if _extra else "") +
+                                    "\n          Path, mode and object name are "
+                                    "all compared, and repeated entries count,"
+                                    "\n          because each of those was a way "
+                                    "past an earlier version of this check.")
+                            else:
+                                _p14.append(
+                                    "the preserved patch names the right files, "
+                                    "modes and objects and\n          is not the "
+                                    "patch these commits produce. The difference "
+                                    "is inside the\n          hunks, or in how "
+                                    "the patch was written, and a reviewer "
+                                    "reading it\n          would be reading lines "
+                                    "this candidate does not contain."
+                                    f"\n          preserved {len(_pbytes)} "
+                                    f"bytes, regenerated {len(_gen)} bytes")
         elif modern_markers(target):
             # The C02-F03 distinction, in the place the same mistake would
             # otherwise arrive next. A target carrying a marker of a later

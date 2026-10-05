@@ -1178,6 +1178,12 @@ def main() -> int:
                 _t = json.loads((c8 / "target.json").read_text(encoding="utf-8"))
                 _t["diff_hash"] = sha256_file(_snap)
                 _t["diff_raw_sha256"] = _rawsha8
+                # Restored too, so each control below starts from the same
+                # correct record and breaks exactly one thing. Without this the
+                # base left behind by one control silently became the premise of
+                # the next, and the next control stopped being about what it
+                # said it was about.
+                _t["base_commit"] = base8
                 _t.update(fields)
                 write_lf(c8 / "target.json", json.dumps(_t, indent=2))
                 _nx = sha256_file(c8 / "target.json")
@@ -1253,6 +1259,32 @@ def main() -> int:
                     "patch of real work, passed MC-2. An empty expected set "
                     "skipped the comparison, so a cycle with nothing to review "
                     "accepted any patch at all.")
+
+                # 3. Correct headers, altered hunk body. Alex Zamurko asked for
+                # this one on 5 October, and he was right that the header
+                # comparison could never see it: paths, modes and object names
+                # all stay correct while the reviewer reads lines the candidate
+                # does not contain. It is the case the gate now catches by
+                # regenerating the patch and comparing bytes.
+                _lines8 = _orig8.splitlines(keepends=True)
+                _added8 = [i for i, l in enumerate(_lines8)
+                           if l.startswith("+") and not l.startswith("+++")]
+                if not _added8:
+                    failures.append(
+                        "the fixture's patch has no added line to alter, so the "
+                        "hunk-body control would change nothing and pass for the "
+                        "wrong reason")
+                else:
+                    _lines8[_added8[0]] = "+    return 99  # not in the change\n"
+                    _reseal8("".join(_lines8))
+                    _refused8(
+                        "a patch whose headers are right and whose hunk body is "
+                        "not",
+                        "is not the patch these commits produce",
+                        "a patch showing the reviewer a line the candidate does "
+                        "not contain passed MC-2. Every path, mode and object "
+                        "name in it is correct, which is all the header "
+                        "comparison ever looked at.")
 
     # ---- C02-F08, the third hole: one of two entries sharing a blob pair ----
     # A set loses duplicates, so a change in which two files move between the

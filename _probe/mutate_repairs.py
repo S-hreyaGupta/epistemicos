@@ -346,10 +346,16 @@ MUTATIONS = [
      "test_ledger.py",
      "rejection dated before the raise took effect"),
 
+    # Five lines, one anchor. The byte comparison replaced the header
+    # comparison as the rule on 5 October, so there is now one rule where there
+    # were four, and mutating the header comparison changes nothing: the bytes
+    # still differ and the gate still refuses. Pointing all five at the rule and
+    # keeping their separate needles asserts something the single line cannot,
+    # that each control is still live and still goes red when the rule goes.
     ("C02-F08b  the preserved patch names the change's own objects",
      "validate_cycle.py",
-     "                        if _got != _want:",
-     "                        if False:",
+     "                        elif _pbytes != _gen:",
+     "                        elif False:",
      "test_run_review.py",
      "patch of an entirely different change"),
 
@@ -357,38 +363,35 @@ MUTATIONS = [
     # stood, and one mutation removing the whole comparison would report all
     # three as watched while any one of them could be reintroduced alone. So
     # each hole is reopened on its own, in the shape it had before the repair.
-    # Both of these were MISSED on their first run, and neither was a missing
-    # control. Each entry is sorted by path, so dropping the path from the
-    # comparison while keeping the list order still reordered the entries and
-    # the check went on refusing. The mutations were too weak to reopen the
-    # hole they named. They now reproduce the pre-repair comparison exactly: a
-    # list of blob pairs for the path rule, a set of them for the duplicate.
     ("C02-F08c  paths and modes are part of what the patch must agree about",
      "validate_cycle.py",
-     "                        if _got != _want:",
-     "                        if (sorted(e[3:] for e in _got)\n"
-     "                                != sorted(e[3:] for e in _want)):",
+     "                        elif _pbytes != _gen:",
+     "                        elif False:",
      "test_run_review.py",
      "naming a file the change never touched"),
 
-    # The duplicate hole only exists once paths are out of the comparison: two
-    # entries differing only by path are two members of any set that keeps the
-    # path. So this is the pre-repair line itself, and it reopens the path hole
-    # with it. The needle is the control this line answers for.
     ("C02-F08d  two files moving between the same objects are two entries",
      "validate_cycle.py",
-     "                        if _got != _want:",
-     "                        if ({e[3:] for e in _got}\n"
-     "                                != {e[3:] for e in _want}):",
+     "                        elif _pbytes != _gen:",
+     "                        elif False:",
      "test_run_review.py",
      "showing one of two identical changes"),
 
     ("C02-F08e  an empty change set is compared like any other",
      "validate_cycle.py",
-     "                        if _got != _want:",
-     "                        if _want and _got != _want:",
+     "                        elif _pbytes != _gen:",
+     "                        elif False:",
      "test_run_review.py",
      "accepted any patch at all"),
+
+    # The hunk bodies, which the header comparison could not reach and which I
+    # had recorded as a known limit rather than closed.
+    ("C02-F08f  the hunks are part of the patch, not only its headers",
+     "validate_cycle.py",
+     "                        elif _pbytes != _gen:",
+     "                        elif False:",
+     "test_run_review.py",
+     "a line the candidate does not contain"),
 
     ("C03-F01  a finished review is reparsed with its own grammar",
      "loop_state.py",

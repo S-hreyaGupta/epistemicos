@@ -925,19 +925,31 @@ def validate(cycle_dir: Path, repo_root: Path) -> Result:
                         _ptext = (_src.read_text(encoding="utf-8",
                                                  errors="replace")
                                   if _src.is_file() else "")
-                        _want = run_pins.raw_blob_pairs(_raw)
-                        _got = run_pins.patch_blob_pairs(_ptext)
-                        if _want and _got != _want:
+                        # C02-F08, second pass. No `if _want` guard: cycle 04
+                        # found that an empty change set skipped the comparison
+                        # entirely, so a cycle with nothing to review accepted
+                        # any patch at all. An empty change set is compared like
+                        # any other, and a freeze refuses to produce one anyway.
+                        _want = run_pins.raw_entries(_raw)
+                        _got = run_pins.patch_entries(_ptext)
+                        if _got != _want:
+                            _missing = [e for e in _want if e not in _got]
+                            _extra = [e for e in _got if e not in _want]
                             _p14.append(
                                 "the preserved patch does not describe the "
-                                "change its own target names.\n          The "
-                                f"change touches {len(_want)} object pair(s) "
-                                f"and the patch names {len(_got)}; "
-                                f"{len(_want - _got)} of the change's are "
-                                "absent from it.\n          Hashing the patch "
-                                "and hashing the change set are two true "
-                                "statements about\n          two different "
-                                "things, which is what this check is for.")
+                                "change its own target names.\n          the "
+                                f"change has {len(_want)} entry(ies), the patch "
+                                f"has {len(_got)}"
+                                + (f"\n          absent from the patch: "
+                                   + ", ".join(e[0] for e in _missing[:4])
+                                   if _missing else "")
+                                + (f"\n          not in the change: "
+                                   + ", ".join(e[0] for e in _extra[:4])
+                                   if _extra else "") +
+                                "\n          Path, mode and object name are all "
+                                "compared, and repeated entries count, because"
+                                "\n          each of those was a way past the "
+                                "previous version of this check.")
         elif modern_markers(target):
             # The C02-F03 distinction, in the place the same mistake would
             # otherwise arrive next. A target carrying a marker of a later

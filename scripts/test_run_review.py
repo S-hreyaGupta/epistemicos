@@ -1130,6 +1130,10 @@ def main() -> int:
             # cannot see because it never consults it.
             write_lf(_snap, _orig8)
             _tg8 = json.loads((c8 / "target.json").read_text(encoding="utf-8"))
+            # The real one, kept before it is spoiled below. The cycle 04
+            # controls further down need the record to be correct about
+            # everything except the one thing each of them breaks.
+            _rawsha8 = str(_tg8.get("diff_raw_sha256") or "")
             _tg8["diff_hash"] = sha256_file(_snap)
             _tg8["diff_raw_sha256"] = "d" * 64
             write_lf(c8 / "target.json", json.dumps(_tg8, indent=2))
@@ -1152,6 +1156,190 @@ def main() -> int:
             else:
                 print("  [ok] refused: the recorded change set is not what "
                       "these commits produce")
+
+            # ---- C02-F08, raised a third time by cycle 04 ----
+            # The comparison cycle 03 left behind matched unordered SETS of
+            # (before, after) blob pairs. Cycle 04 named three ways past it:
+            # "correct index headers with altered hunks or paths", "set
+            # comparison hides omission of an entry when another entry shares
+            # the same blob pair", and "an empty expected set bypasses
+            # comparison entirely through `if _want`".
+            #
+            # So the comparison is now over full entries — path, both modes,
+            # both object names — as a list rather than a set, and it runs
+            # whether or not the change set is empty. One control for each hole.
+            # Each edits the patch and reseals every record around it, so what
+            # refuses is the comparison and not some hash noticing the tamper.
+            _cur8 = _n8
+
+            def _reseal8(patch_text: str, **fields) -> None:
+                nonlocal _cur8
+                write_lf(_snap, patch_text)
+                _t = json.loads((c8 / "target.json").read_text(encoding="utf-8"))
+                _t["diff_hash"] = sha256_file(_snap)
+                _t["diff_raw_sha256"] = _rawsha8
+                _t.update(fields)
+                write_lf(c8 / "target.json", json.dumps(_t, indent=2))
+                _nx = sha256_file(c8 / "target.json")
+                write_lf(c8 / "target.sha256", _nx + "\n")
+                _ci = c8 / "codex-input.md"
+                write_lf(_ci,
+                         _ci.read_text(encoding="utf-8").replace(_cur8, _nx))
+                _cur8 = _nx
+
+            def _refused8(label: str, needle: str, passed: str) -> None:
+                _p = sh(sys.executable,
+                        str(t8 / "scripts" / "validate_cycle.py"), str(c8),
+                        cwd=t8)
+                _o = _p.stdout + _p.stderr
+                if _p.returncode == 0:
+                    failures.append(passed)
+                elif needle not in _o:
+                    failures.append(f"refused, but not for {label}\n"
+                                    f"{_o[-400:]}")
+                else:
+                    print(f"  [ok] refused: {label}")
+
+            # The baseline. Without it each refusal below could be a refusal
+            # left over from the digest control above, and all three would look
+            # green while establishing nothing. This is the mistake cycle 03
+            # found in B01-F11's control, so it is checked rather than assumed.
+            _reseal8(_orig8)
+            _p8 = sh(sys.executable, str(t8 / "scripts" / "validate_cycle.py"),
+                     str(c8), cwd=t8)
+            if _p8.returncode != 0:
+                failures.append(
+                    f"the cycle does not pass MC-2 with its own patch and its "
+                    f"own digests restored, so the three controls below prove "
+                    f"nothing:\n{(_p8.stdout + _p8.stderr)[-400:]}")
+            else:
+                print("  [ok] the restored cycle passes, so the refusals that "
+                      "follow are attributable")
+
+                # 1. Correct index lines, a different path. Under a set of blob
+                # pairs this is invisible: the objects are right and the path
+                # was never part of what was compared.
+                _wrong = (_orig8
+                          .replace("a/src.py b/src.py",
+                                   "a/elsewhere.py b/elsewhere.py")
+                          .replace("--- a/src.py", "--- a/elsewhere.py")
+                          .replace("+++ b/src.py", "+++ b/elsewhere.py"))
+                if _wrong == _orig8:
+                    failures.append(
+                        "the fixture's patch does not name src.py, so the "
+                        "path-substitution control changed nothing and would "
+                        "pass for the wrong reason")
+                else:
+                    _reseal8(_wrong)
+                    _refused8(
+                        "a patch whose index lines are right and whose path is "
+                        "not",
+                        "does not describe the change its own target names",
+                        "a patch naming a file the change never touched passed "
+                        "MC-2. Its blob names are correct, which is all the "
+                        "previous comparison looked at.")
+
+                # 2. An empty change set with a nonempty patch. Freeze refuses
+                # to produce one, so it is reached the only honest way left:
+                # a base equal to the candidate, with the digest of the empty
+                # change set recorded truthfully beside it. Every record here
+                # is correct; the patch is simply about something.
+                _reseal8(_orig8, base_commit=head8,
+                         diff_raw_sha256=hashlib.sha256(b"").hexdigest())
+                _refused8(
+                    "a nonempty patch for a change set with nothing in it",
+                    "does not describe the change its own target names",
+                    "a cycle whose two commits are the same commit, carrying a "
+                    "patch of real work, passed MC-2. An empty expected set "
+                    "skipped the comparison, so a cycle with nothing to review "
+                    "accepted any patch at all.")
+
+    # ---- C02-F08, the third hole: one of two entries sharing a blob pair ----
+    # A set loses duplicates, so a change in which two files move between the
+    # same pair of objects collapses to one entry, and a patch that omits either
+    # of them compares equal. That needs a fixture the others cannot provide:
+    # two files whose change is literally the same change.
+    t10 = make_repo(); made.append(t10)
+    do_init(t10)
+    write_lf(t10 / "one.py", "x = 0\n")
+    write_lf(t10 / "two.py", "x = 0\n")
+    write_lf(t10 / "results.txt", "2 passed\n")
+    sh("git", "add", "-A", cwd=t10)
+    sh("git", "commit", "-qm", "two files with identical contents", cwd=t10)
+    base10 = sh("git", "rev-parse", "HEAD", cwd=t10).stdout.strip()
+    write_lf(t10 / "one.py", "x = 1\n")
+    write_lf(t10 / "two.py", "x = 1\n")
+    sh("git", "add", "-A", cwd=t10)
+    sh("git", "commit", "-qm", "the same edit to both", cwd=t10)
+    head10 = sh("git", "rev-parse", "HEAD", cwd=t10).stdout.strip()
+    plan10 = impl_approval(t10)
+    r = runner(t10, "freeze", "--run", "T-001", "--type", "implementation",
+               "--prompt", "specs/prompt.md", "--candidate-commit", head10,
+               "--approved-plan-hash", plan10, "--base", base10,
+               "--test-results", "results.txt")
+    c10 = t10 / "runs" / "T-001" / "implementation-review" / "cycle-01"
+    if r.returncode != 0:
+        failures.append(f"the C02-F08 duplicate-entry fixture could not be "
+                        f"frozen:\n{r.stdout}{r.stderr}")
+    else:
+        _th10 = (c10 / "target.sha256").read_text(encoding="utf-8").strip()
+        write_lf(t10 / "reply10.md",
+                 f"TARGET_SHA256 {_th10}\n\nNo findings in any category.\n")
+        _r10 = runner(t10, "record", "--cycle", str(c10), "--output",
+                      "reply10.md", "--invocation", "manual", "--zero-findings")
+        if _r10.returncode != 0:
+            failures.append(f"the C02-F08 duplicate-entry fixture could not be "
+                            f"recorded:\n{_r10.stdout}{_r10.stderr}")
+        else:
+            _snap10 = c10 / "artifacts" / "candidate.diff"
+            _orig10 = _snap10.read_text(encoding="utf-8")
+            _ix10 = [l for l in _orig10.splitlines() if l.startswith("index ")]
+            _secs10 = ["diff --git " + s
+                       for s in _orig10.split("diff --git ")[1:]]
+            _keep10 = [s for s in _secs10
+                       if not s.splitlines()[0].endswith("b/two.py")]
+            if len(_ix10) != 2 or len(set(_ix10)) != 1:
+                # The premise, stated as a check. If the two files do not share
+                # one blob pair the omission below is an ordinary missing entry
+                # and the control is about nothing.
+                failures.append(
+                    f"the duplicate-entry fixture's two files do not share one "
+                    f"blob pair ({_ix10}), so dropping one of them does not "
+                    f"exercise what this control is about")
+            elif len(_secs10) != 2 or len(_keep10) != 1:
+                failures.append(
+                    f"the duplicate-entry fixture's patch has {len(_secs10)} "
+                    f"file section(s), not the two it was built to have")
+            else:
+                write_lf(_snap10, _orig10.split("diff --git ")[0]
+                         + "".join(_keep10))
+                _t10 = json.loads((c10 / "target.json")
+                                  .read_text(encoding="utf-8"))
+                _t10["diff_hash"] = sha256_file(_snap10)
+                write_lf(c10 / "target.json", json.dumps(_t10, indent=2))
+                _n10 = sha256_file(c10 / "target.json")
+                write_lf(c10 / "target.sha256", _n10 + "\n")
+                _ci10 = c10 / "codex-input.md"
+                write_lf(_ci10, _ci10.read_text(encoding="utf-8")
+                         .replace(_th10, _n10))
+
+                _p10 = sh(sys.executable,
+                          str(t10 / "scripts" / "validate_cycle.py"), str(c10),
+                          cwd=t10)
+                _o10 = _p10.stdout + _p10.stderr
+                if _p10.returncode == 0:
+                    failures.append(
+                        "a patch showing one of two identical changes passed "
+                        "MC-2. Both files move between the same pair of "
+                        "objects, so comparing sets of blob pairs cannot tell "
+                        "one file from two, and half the change under review "
+                        "was never shown to the reviewer.")
+                elif "does not describe the change its own target names" not in _o10:
+                    failures.append(f"refused, but not for the omitted file\n"
+                                    f"{_o10[-400:]}")
+                else:
+                    print("  [ok] refused: a patch omitting one of two files "
+                          "that share a blob pair")
 
     # ---- C02-F09: a missing snapshot is not replaced by a live file ----
     # "Deleting an implementation cycle's preserved diff, test results,

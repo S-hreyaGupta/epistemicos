@@ -186,24 +186,91 @@ CURRENT_EVIDENCE_FORMAT = EVIDENCE_FORMATS[-1]
 # "another deterministic representation that establishes content correspondence
 # without depending on incidental formatting". Context width, rename detection
 # and whitespace all move the text and none of them move a blob id.
+# C02-F08, raised again by cycle 04. The first version of this compared SETS of
+# blob-id pairs, which cycle 04 took apart in three ways:
+#
+#   "alter the displayed paths or added/removed lines... No check connects the
+#    altered text to the objects those headers name."
+#   "Set comparison also loses repeated changes involving identical blob pairs."
+#   "an empty expected set bypasses comparison entirely through `if _want`,
+#    allowing a nonempty unrelated patch for an empty change set."
+#
+# All three were mine and all three are plain once stated. So the comparison is
+# now over complete entries, as lists rather than sets, and it happens whether
+# or not the change set is empty.
+#
+# What this establishes: the patch declares the same paths, modes and object
+# names, in the same multiplicity, as the change between the two commits. What
+# it still does not establish: that the hunk bodies reconstruct the after-object
+# from the before-object. Doing that means applying the patch and comparing
+# trees, which needs a working tree the gate does not have. The honest statement
+# is that the headers are now fully checked and the bodies are not, which is
+# narrower than before and still not everything.
 _RAW_LINE = re.compile(
-    r"^:\d{6}\s+\d{6}\s+([0-9a-f]+)\s+([0-9a-f]+)\s+\S+\s+(.+)$")
-_PATCH_INDEX = re.compile(r"^index\s+([0-9a-f]+)\.\.([0-9a-f]+)", re.M)
+    r"^:(\d{6})\s+(\d{6})\s+([0-9a-f]+)\s+([0-9a-f]+)\s+(\S+)\s+(.+)$")
+_DIFF_HEADER = re.compile(r"^diff --git a/(.+?) b/(.+)$")
+_ZERO = "0" * 6
 
 
-def raw_blob_pairs(raw: str) -> set[tuple[str, str]]:
-    """(before, after) object names from `git diff --raw` output."""
-    out: set[tuple[str, str]] = set()
+def raw_entries(raw: str) -> list[tuple[str, str, str, str, str]]:
+    """(path, mode_before, mode_after, blob_before, blob_after), sorted.
+
+    A list, not a set. Two files changing between the same pair of objects are
+    two entries, and losing one of them was one of the three holes cycle 04
+    named.
+    """
+    out = []
     for line in raw.splitlines():
         m = _RAW_LINE.match(line.strip())
         if m:
-            out.add((m.group(1), m.group(2)))
-    return out
+            mb, ma, bb, ba, _status, path = m.groups()
+            out.append((path.strip(), mb, ma, bb, ba))
+    return sorted(out)
 
 
-def patch_blob_pairs(patch: str) -> set[tuple[str, str]]:
-    """(before, after) object names from a unified patch's index lines."""
-    return {(m.group(1), m.group(2)) for m in _PATCH_INDEX.finditer(patch)}
+def patch_entries(patch: str) -> list[tuple[str, str, str, str, str]]:
+    """The same tuples, read from a unified patch's headers.
+
+    Derived from the `diff --git` line, the `index` line, and whichever of the
+    mode lines is present. With rename detection off, both sides of the header
+    name one path.
+    """
+    out = []
+    path = mb = ma = bb = ba = None
+
+    def flush():
+        if path is not None and bb is not None:
+            out.append((path, mb or _ZERO, ma or _ZERO, bb, ba))
+
+    for line in patch.splitlines():
+        h = _DIFF_HEADER.match(line)
+        if h:
+            flush()
+            path, mb, ma, bb, ba = h.group(2).strip(), None, None, None, None
+            continue
+        if path is None:
+            continue
+        if line.startswith("new file mode "):
+            mb, ma = _ZERO, line.split()[-1]
+        elif line.startswith("deleted file mode "):
+            mb, ma = line.split()[-1], _ZERO
+        elif line.startswith("old mode "):
+            mb = line.split()[-1]
+        elif line.startswith("new mode "):
+            ma = line.split()[-1]
+        elif line.startswith("index "):
+            rest = line[len("index "):].strip()
+            ids, _, mode = rest.partition(" ")
+            before, _, after = ids.partition("..")
+            bb, ba = before.strip(), after.strip()
+            if mode.strip():
+                # One mode on the index line means the mode did not change.
+                if mb is None:
+                    mb = mode.strip()
+                if ma is None:
+                    ma = mode.strip()
+    flush()
+    return sorted(out)
 
 
 def spec_digest(entries: list[dict]) -> str:

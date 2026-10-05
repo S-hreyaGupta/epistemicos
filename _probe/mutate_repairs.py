@@ -315,12 +315,17 @@ MUTATIONS = [
      "test_bootstrap_gate.py",
      "not what its history produces"),
 
+    # This line used to point at a `git status --porcelain` guard. Cycle 04's
+    # repair replaced that query with a byte comparison against HEAD, so the
+    # needle stopped existing and the probe reported itself broken rather than
+    # reporting a catch. The rule is the same one; the line now names where it
+    # actually lives.
     ("C03-F02c  a scope change that exists only on disk is refused",
      "bootstrap_gate.py",
-     "    if dirty.strip():",
+     "    if committed(COVERED_MANIFEST) != _live:",
      "    if False:",
      "test_bootstrap_gate.py",
-     "never committed"),
+     "a scope change that was never committed"),
 
     # C02-F02's second pass. One rule, two guards, because §5 gives a finding
     # two dispositions and a guard on one of them is a guard on half the rule.
@@ -343,10 +348,36 @@ MUTATIONS = [
 
     ("C02-F08b  the preserved patch names the change's own objects",
      "validate_cycle.py",
-     "                        if _want and _got != _want:",
+     "                        if _got != _want:",
      "                        if False:",
      "test_run_review.py",
      "patch of an entirely different change"),
+
+    # C02-F08's third pass. Cycle 04 named three ways past the comparison as it
+    # stood, and one mutation removing the whole comparison would report all
+    # three as watched while any one of them could be reintroduced alone. So
+    # each hole is reopened on its own, in the shape it had before the repair.
+    ("C02-F08c  paths and modes are part of what the patch must agree about",
+     "validate_cycle.py",
+     "                        if _got != _want:",
+     "                        if ([e[3:] for e in _got]\n"
+     "                                != [e[3:] for e in _want]):",
+     "test_run_review.py",
+     "naming a file the change never touched"),
+
+    ("C02-F08d  two files moving between the same objects are two entries",
+     "validate_cycle.py",
+     "                        if _got != _want:",
+     "                        if sorted(set(_got)) != sorted(set(_want)):",
+     "test_run_review.py",
+     "showing one of two identical changes"),
+
+    ("C02-F08e  an empty change set is compared like any other",
+     "validate_cycle.py",
+     "                        if _got != _want:",
+     "                        if _want and _got != _want:",
+     "test_run_review.py",
+     "accepted any patch at all"),
 
     ("C03-F01  a finished review is reparsed with its own grammar",
      "loop_state.py",

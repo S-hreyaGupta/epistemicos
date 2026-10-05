@@ -200,24 +200,42 @@ def main() -> int:
     W("")
     rc, led = run_tool(str(SCRIPTS / "ledger.py"), "show", "--review", str(review))
     ledger_json = review / "ledger.json"
-    if rc != 0:
-        W("The ledger could not be read, so this package states no finding "
-          "counts:")
-        W("")
-        W(quote(led))
-    elif not ledger_json.is_file():
-        # `show` exits 0 on a review with no ledger, saying so. Taking exit 0 as
-        # "the file is there" crashed this tool the first time it met a run that
-        # had frozen a cycle and recorded nothing yet — which is the state every
-        # run passes through, and the defect class this layer keeps finding in
-        # itself: a zero exit read as an answer it was not giving.
-        W(f"No `{ledger_json.name}` yet, so there are no findings to present.")
-        W("")
-        W(quote(led))
-        W("")
-        W("This is the ordinary state of a run whose cycles are frozen and "
-          "whose review has not been recorded. It is not a defect, and it is "
-          "not an absence of findings: no review has reported yet.")
+    # SELF-F01, Alex Zamurko's ruling of 5 October: "Require the ledger whenever
+    # frozen review cycles exist. If the ledger is missing, unreadable, or
+    # inconsistent, return an explicit failure state such as CANNOT_ESTABLISH.
+    # Never translate missing evidence into zero findings."
+    #
+    # Until now this branch wrote a paragraph saying no review had reported and
+    # produced the package anyway. The paragraph was accurate and the package
+    # was the problem: a document headed "approval package" with nothing under
+    # the findings headings reads as a clean result to anyone who skims it, and
+    # the gate is read by people in a hurry. Absence of evidence had become
+    # evidence of absence, one heading at a time.
+    #
+    # `show` exits 0 on a review with no ledger, saying so in prose, so the
+    # file's existence is checked separately. That zero was read as an answer it
+    # was not giving once before, and it crashed this tool rather than lying,
+    # which is the luckier of the two outcomes.
+    _bad = ("could not be read" if rc != 0 else
+            "is missing" if not ledger_json.is_file() else "")
+    if not _bad:
+        try:
+            json.loads(ledger_json.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            _bad = f"is not readable as a ledger: {e}"
+    if _bad:
+        raise Refused(
+            f"FINDINGS_STATE: CANNOT_ESTABLISH\n"
+            f"  {review.name} has {len(cy)} frozen cycle(s) and its ledger "
+            f"{_bad}.\n"
+            "  A package cannot be produced. With cycles frozen, the ledger is "
+            "the only record of\n  what a reviewer found, so without it this "
+            "tool cannot distinguish a review that\n  found nothing from a "
+            "review that never reported. Those are opposite states and a\n"
+            "  package that stays quiet presents the second as the first.\n"
+            "  Record the review first, or repair the ledger, then build the "
+            "package.\n\n"
+            + quote(led))
     else:
         # Marked present only on the branch that actually produced them. The
         # coverage table is only worth reading if it cannot be satisfied by a
@@ -287,6 +305,59 @@ def main() -> int:
         W(quote(led))
         W("")
         W("</details>")
+    W("")
+
+    # ---- implementer-disclosed defects, outside §7 and outside the ledger ----
+    # Alex Zamurko, 5 October 2026: "it should also appear in the approval
+    # package under known unresolved implementer-disclosed defects, separately
+    # from the '2 OPEN reviewer findings'."
+    #
+    # Its own heading, below the findings and not inside them, because the two
+    # have different provenance and merging them would let a self-disclosure
+    # read as something a reviewer established. Not added to SECTION_7_ITEMS
+    # either: that list is the protocol's, and extending it here would be this
+    # tool legislating.
+    W("## Implementer-disclosed defects")
+    W("")
+    W("Found by the implementing agent, not raised by any reviewer, and "
+      "therefore not in the ledger above. They carry no cycle-generated "
+      "identifier because no cycle produced them.")
+    W("")
+    reg = REPO / "registers" / "implementer-disclosed.json"
+    try:
+        _rg = json.loads(reg.read_text(encoding="utf-8"))
+        _entries = _rg.get("entries", {})
+    except (OSError, json.JSONDecodeError) as e:
+        # Said out loud rather than skipped. The defect this section exists for
+        # is silence being read as nothing to report, and a missing register
+        # would reproduce it one level up. This does not refuse, unlike the
+        # ledger: the register is the implementing agent's own disclosure and
+        # not protocol evidence, which is a distinction worth a ruling if the
+        # reader disagrees with it.
+        W(f"**The register could not be read: {e}**")
+        W("")
+        W("That is not a statement that there are none. It is this tool unable "
+          "to tell you either way.")
+        _entries = None
+    if _entries is not None:
+        _live = {k: v for k, v in sorted(_entries.items())
+                 if v.get("state") != "RESOLVED"}
+        if not _live:
+            W("None outstanding.")
+        for _k, _v in _live.items():
+            W(f"### {_k} — `{_v.get('state', '?')}`")
+            W("")
+            W(_v.get("description", "(no description)"))
+            W("")
+            W(f"- affected: {_v.get('affected_component', '?')}")
+            W(f"- severity: {_v.get('severity', '?')}")
+            W(f"- discovered: {_v.get('discovery_source', '?')}")
+            W(f"- repair: {_v.get('proposed_repair', '?')}")
+            W("")
+            W("`REPAIRED_UNREVIEWED` means a repair has landed with controls "
+              "behind it and nobody independent has examined it. It is not a "
+              "resolution.")
+            W("")
     W("")
 
     # ---- MC-2 for every valid cycle, §7 item 10 ----

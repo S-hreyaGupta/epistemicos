@@ -1,0 +1,43 @@
+{
+  "schema": "implementer-disclosed/1",
+  "purpose": "Defects found by the implementing agent rather than raised by an independent reviewer. Alex Zamurko, 5 October 2026: 'do not fabricate reviewer provenance, but do not leave a known defect outside controlled state tracking either.'",
+  "not_the_ledger": "Entries here are never written into a review ledger and carry no cycle-generated identifier. A ledger finding is a finding a reviewer raised against a reviewed target, and its identifier encodes the cycle that raised it; inventing one for a defect no cycle produced would forge the provenance the ledger exists to establish.",
+  "states": {
+    "OPEN": "disclosed, not repaired",
+    "REPAIRED_UNREVIEWED": "a repair has landed with controls behind it, and nobody independent has examined it",
+    "REVIEWER_CONFIRMED": "an independent review examined the entry and agreed it was a defect",
+    "RESOLVED": "an independent review examined the repair in a later target and found it held"
+  },
+  "obligation": "Every entry not in RESOLVED must be put to the next independent review explicitly, and must appear in any approval package built while it is in that state.",
+  "entries": {
+    "SELF-F01": {
+      "description": "The approval package could present a run with frozen review cycles and no ledger as a document with empty findings headings. A reader skimming it would see no findings, when the true state was that no reviewer had reported. Absence of evidence became evidence of absence.",
+      "discovery_source": "Implementer-disclosed. The suite test_approval_package.py was red from 1 October 2026 and was declared as a known-red control suite in every freeze of BOOTSTRAP-002. Alex Zamurko named the underlying behaviour as a control defect rather than a failing test on 5 October 2026.",
+      "affected_component": "scripts/approval_package.py, with its controls in scripts/test_approval_package.py. Neither is a covered component and nothing covered imports them, so this defect is outside the BOOTSTRAP-002 review target.",
+      "severity": "High for an approval decision, low for the running system. It cannot corrupt a record or a cycle; it can mislead the person deciding, which is the one reader the package exists for.",
+      "state": "REPAIRED_UNREVIEWED",
+      "review_cycle": null,
+      "proposed_repair": "Require the ledger whenever frozen review cycles exist. If it is missing, unreadable or unparseable, refuse with FINDINGS_STATE: CANNOT_ESTABLISH rather than producing a package. Never translate missing evidence into zero findings. Control the missing and unreadable cases separately, with a positive case so the refusals cannot be refusing everything.",
+      "evidence": [
+        "scripts/approval_package.py: the CANNOT_ESTABLISH refusal, raised before any findings section is written",
+        "scripts/test_approval_package.py: 'refused: frozen cycles and a missing ledger', 'refused: frozen cycles and a unreadable ledger', and the positive 'a run with frozen cycles and a recorded ledger produces a package'",
+        "The suite passes as of 5 October 2026, having been red since before BOOTSTRAP-002 began"
+      ],
+      "required_of_next_review": true,
+      "history": [
+        {
+          "at": "2026-10-05T19:24:00+05:30",
+          "state": "OPEN",
+          "by": "Alex Zamurko",
+          "note": "Named as a functional control defect in workflow: 'absence of evidence must not become evidence of absence', and ruled that it be tracked in a register of its own rather than written into the reviewer ledger."
+        },
+        {
+          "at": "2026-10-05T21:35:00+05:30",
+          "state": "REPAIRED_UNREVIEWED",
+          "by": "implementing agent",
+          "note": "Repair landed with three controls. Unreviewed: no independent reviewer has looked at it, so the state says so rather than claiming the matter closed."
+        }
+      ]
+    }
+  }
+}

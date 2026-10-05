@@ -211,11 +211,54 @@ def main() -> int:
             if absent:
                 ok("each absent §7 item carries a stated reason")
 
-    # ---- a frozen run with no recorded review ----
-    # Every run passes through this state, and it is where the first version of
-    # this tool crashed: `ledger show` exits 0 on a review with no ledger, and
-    # exit 0 was read as "the file is there".
-    # --out again, for the same reason: BOOTSTRAP-002's package is tracked too.
+    # ---- SELF-F01: frozen cycles and no ledger is not zero findings ----
+    # Alex Zamurko, 5 October: "Require the ledger whenever frozen review cycles
+    # exist... Never translate missing evidence into zero findings", because
+    # "absence of evidence must not become evidence of absence."
+    #
+    # This is where the tool used to explain, inside a produced package, that no
+    # review had reported yet. The explanation was true and the package was
+    # still a package: headings with nothing under them, in a document titled
+    # for an approval decision. Now it refuses and names the state.
+    #
+    # Two fixtures, because missing and unreadable are two states, and one
+    # control covering both would pass while either of them went unwatched.
+    def _frozen_no_ledger(ledger_text):
+        f = Path(tempfile.mkdtemp()); made.append(f)
+        (f / "runs" / "T-001" / "plan-review" / "cycle-01").mkdir(parents=True)
+        (f / "scripts").mkdir()
+        for name in ("approval_package.py", "loop_state.py", "ledger.py",
+                     "validate_cycle.py", "cycle_projection.py", "authority.py",
+                     "run_pins.py", "findings_format.py"):
+            shutil.copy(SRC / name, f / "scripts" / name)
+        (f / "runs" / "T-001" / "run.json").write_text(json.dumps({
+            "run_id": "T-001", "mc1_enforcement": "CONVENTION_ONLY",
+            "max_cycles": 4}), encoding="utf-8")
+        if ledger_text is not None:
+            (f / "runs" / "T-001" / "plan-review" / "ledger.json").write_text(
+                ledger_text, encoding="utf-8")
+        return run("--run", "T-001", "--type", "plan", cwd=f,
+                   script=f / "scripts" / "approval_package.py")
+
+    for _label, _text in (("missing", None), ("unreadable", "{ not json")):
+        rr = _frozen_no_ledger(_text)
+        _o = rr.stdout + rr.stderr
+        if rr.returncode == 0:
+            failures.append(
+                f"a package was produced for a run with a frozen cycle and a "
+                f"{_label} ledger. Nothing in that run says what any reviewer "
+                f"found, and the package presented the silence under its own "
+                f"findings headings.")
+        elif "CANNOT_ESTABLISH" not in _o:
+            failures.append(f"refused for a {_label} ledger, but without the "
+                            f"explicit state:\n{_o[-400:]}")
+        else:
+            ok(f"refused: frozen cycles and a {_label} ledger, "
+               f"CANNOT_ESTABLISH")
+
+    # The positive, so the two refusals above cannot be "refuse everything".
+    # BOOTSTRAP-002 has four frozen cycles and a recorded ledger.
+    # --out again, because its package is tracked too.
     b2_dir = REPO / "runs" / "BOOTSTRAP-002" / "plan-review"
     b2_before = {p: p.read_bytes() for p in sorted(b2_dir.rglob("*"))
                  if p.is_file()}
@@ -226,22 +269,51 @@ def main() -> int:
         failures.append("building BOOTSTRAP-002's package altered its review "
                         "directory")
     if r.returncode != 0:
-        failures.append(f"a frozen run with no recorded review should still "
-                        f"produce a package:\n{r.stdout}{r.stderr}")
+        failures.append(f"a run with frozen cycles and a recorded ledger "
+                        f"should produce a package:\n{r.stdout}{r.stderr}")
     else:
         t2 = p2.read_text(encoding="utf-8")
-        if "no review has reported yet" not in t2:
+        if "### Unresolved findings" not in t2:
             failures.append(
-                "a run with frozen cycles and no ledger does not say so. "
-                "Silence there reads as 'no findings', which is the opposite "
-                "of 'nobody has looked'.")
-        elif "- [x] unresolved findings" in t2:
-            failures.append(
-                "a run with no ledger reports unresolved findings as present. "
-                "An empty heading satisfied the coverage table.")
+                "the package for a run with a ledger does not present "
+                "unresolved findings under their own heading")
         else:
-            ok("a frozen run with no recorded review says so, and claims no "
-               "findings")
+            ok("a run with frozen cycles and a recorded ledger produces a "
+               "package")
+
+        # SELF-F01's own ruling: implementer-disclosed defects appear in the
+        # package, under their own heading, separately from reviewer findings.
+        # Read out of the register rather than restated here, so an entry that
+        # stops being shown shows up as missing instead of being agreed with.
+        reg = json.loads(
+            (REPO / "registers" / "implementer-disclosed.json")
+            .read_text(encoding="utf-8"))
+        live = [k for k, v in reg.get("entries", {}).items()
+                if v.get("state") != "RESOLVED"]
+        required = ("description", "discovery_source", "affected_component",
+                    "severity", "state", "proposed_repair", "evidence")
+        thin = [f"{k}.{f}" for k, v in reg.get("entries", {}).items()
+                for f in required if not v.get(f)]
+        if thin:
+            failures.append(
+                "the register is missing fields the ruling names: "
+                + ", ".join(thin[:6]))
+        elif "## Implementer-disclosed defects" not in t2:
+            failures.append(
+                "the package has no implementer-disclosed section. A defect "
+                "disclosed outside the ledger and then absent from the package "
+                "is disclosed to nobody who matters.")
+        elif t2.index("## Implementer-disclosed defects") < t2.index("## Findings"):
+            failures.append("implementer-disclosed defects are presented above "
+                            "the reviewer findings; they must be separate and "
+                            "subordinate, not first")
+        elif [k for k in live if k not in t2]:
+            failures.append(
+                "the register holds unresolved entries the package does not "
+                "name: " + ", ".join(k for k in live if k not in t2))
+        else:
+            ok(f"{len(live)} implementer-disclosed defect(s) appear under "
+               f"their own heading, after the reviewer findings")
 
     for p in made:
         shutil.rmtree(p, ignore_errors=True)

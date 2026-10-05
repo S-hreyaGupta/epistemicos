@@ -38,6 +38,35 @@
           "note": "Repair landed with three controls. Unreviewed: no independent reviewer has looked at it, so the state says so rather than claiming the matter closed."
         }
       ]
+    },
+    "SELF-F02": {
+      "description": "The mutation probe writes a deliberately broken line into tracked source, runs a suite, and restores the file in a finally block. A finally does not run when the process is killed outright, which is what closing a terminal window does. A killed run therefore left a disabled check sitting in the repository, with every suite passing for a reason other than the one it names, and nothing else in the repository able to notice.",
+      "discovery_source": "Implementer-disclosed. The probe's own docstring has named this risk since late September, and the mitigation was a start-time guard that only catches it on the next run. It happened on 5 October 2026: a PowerShell window was closed mid-run and left 'if False:' in scripts/loop_state.py, where it sat until the next probe run refused to start.",
+      "affected_component": "_probe/mutate_repairs.py. Not a covered component; it is preserved in cycle evidence as an instrument, and the review of 4 October states explicitly that its results are assertions rather than executed evidence.",
+      "severity": "Moderate. It cannot alter a record or a frozen cycle. It can make every suite in the repository pass while a check is switched off, and a commit made in that window would carry the disabled check into the history. The window on 5 October was about forty minutes and nothing was committed in it.",
+      "state": "REPAIRED_UNREVIEWED",
+      "review_cycle": null,
+      "proposed_repair": "Record the mutation on disk before the file is touched, carrying the finding, the path, HEAD, and the digest of the text about to be written. The next run restores from HEAD and says what it did. The recovery is narrow on purpose: if HEAD has moved or the file is not byte for byte what the probe wrote, it refuses and says so rather than overwriting an edit made since.",
+      "evidence": [
+        "_probe/mutate_repairs.py: ACTIVE, recover(), the record written before the mutation and removed in the same finally as the restore",
+        "Demonstrated on 5 October 2026 by killing a run with Stop-Process -Force, which does not unwind: the sentinel named scripts/cycle_projection.py, and the next run restored it from HEAD, reported the recovery, and then ran clean",
+        ".gitignore: the record is untracked, because a commit is never mid-mutation"
+      ],
+      "required_of_next_review": true,
+      "history": [
+        {
+          "at": "2026-10-05T23:15:00+05:30",
+          "state": "OPEN",
+          "by": "implementing agent",
+          "note": "Observed directly: a closed window left a mutation applied, and the clean-tree guard reported it one run later."
+        },
+        {
+          "at": "2026-10-05T23:25:00+05:30",
+          "state": "REPAIRED_UNREVIEWED",
+          "by": "implementing agent",
+          "note": "Repair landed and was demonstrated by reproducing the kill rather than by simulating it. Unreviewed, like SELF-F01."
+        }
+      ]
     }
   }
 }

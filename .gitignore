@@ -41,6 +41,12 @@ coverage.out
 __pycache__/
 *.py[cod]
 
+# The mutation probe's crash record. It exists only while a mutation is applied
+# to tracked source, and names the file so the next run can put it back when a
+# killed process leaves one behind. Tracking it would commit a statement that
+# the repository is mid-mutation, which is never true of a commit.
+/_probe/.active-mutation.json
+
 # Working copies of reviewer replies, staged in the root on the way to `record`.
 # The authoritative copy is cycle-NN/codex-output-raw.md: preserved at record
 # time, hashed into target evidence, and checked by MC-2. A second copy in the

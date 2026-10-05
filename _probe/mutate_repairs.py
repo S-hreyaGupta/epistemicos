@@ -44,6 +44,8 @@ dirty, and says so loudly if it fails to leave one clean.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -51,6 +53,22 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO / "scripts"
+
+# The mutation currently applied, written before the file is touched and
+# removed after it is put back.
+#
+# The `finally` below covers an exception and a Ctrl+C. It does not run when
+# the process is killed outright, which is what closing a terminal window does.
+# On 5 October that left `if False:` sitting in loop_state.py, with this probe
+# reporting nothing at all because it never reached its own report. The start
+# guard caught it at the next run, which is one run late: a commit in between
+# would have carried a disabled check into the record, and the suites would all
+# have passed.
+#
+# So the mutation in progress is recorded on disk and the next run puts it
+# back. Untracked on purpose: a file that exists only while a mutation is
+# applied has no business in the history.
+ACTIVE = Path(__file__).resolve().parent / ".active-mutation.json"
 
 # (finding, file, exact source to replace, replacement, suite, needle)
 #
@@ -494,6 +512,66 @@ def run_suite(name: str) -> subprocess.CompletedProcess:
                           env=env, capture_output=True, text=True, timeout=900)
 
 
+def _sha_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _head() -> str:
+    r = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"],
+                       capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def recover() -> int:
+    """Put back a mutation that a killed run left applied. 0 = clear to start.
+
+    Deliberately narrow. It restores only when the file is byte for byte the
+    mutated content this probe wrote and HEAD is where it was, so an edit made
+    in between cannot be destroyed by a recovery that assumed it knew better.
+    When anything has moved it says what it knows and refuses, which is the
+    same rule as everywhere else here: a restore that might be wrong is worse
+    than a message that is certainly right.
+    """
+    if not ACTIVE.is_file():
+        return 0
+    try:
+        rec = json.loads(ACTIVE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"  [CANNOT RUN] {ACTIVE.name} cannot be read ({exc}), so a "
+              f"mutation may still be\n  applied and this probe cannot tell "
+              f"which one. Check `git status` and `git diff`\n  before running "
+              f"anything else against this tree.")
+        return 2
+    rel = str(rec.get("path", ""))
+    label = str(rec.get("finding", "an unnamed mutation"))
+    path = REPO / rel
+    if not rel or not path.is_file():
+        print(f"  [CANNOT RUN] {rel!r} is recorded as mutated and is not a "
+              f"file. Restore it by hand,\n  then delete {ACTIVE.name}.")
+        return 2
+    with path.open("r", encoding="utf-8", newline="") as fh:
+        live = fh.read()
+    if _head() != rec.get("head") or _sha_text(live) != rec.get("mutated"):
+        print(f"  [CANNOT RUN] a previous run was killed while {rel} carried "
+              f"the mutation for\n  {label}, and the file or the commit has "
+              f"moved since. It is not restored here,\n  because a recovery "
+              f"that guesses is worse than one that refuses. Read `git diff "
+              f"{rel}`,\n  put it back yourself, then delete {ACTIVE.name}.")
+        return 2
+    r = subprocess.run(["git", "-C", str(REPO), "checkout", "--", rel],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        print(f"  [CANNOT RUN] {rel} could not be restored from HEAD: "
+              f"{r.stderr.strip()}")
+        return 2
+    ACTIVE.unlink()
+    print(f"  [recovered] a previous run was killed while {rel} held the "
+          f"mutation for\n  {label}. It is restored from HEAD. That run "
+          f"established nothing about anything;\n  this one starts from a "
+          f"clean tree.\n")
+    return 0
+
+
 def modified(rel_paths: list[str]) -> list[str]:
     """Which of these repo-relative paths git reports as changed."""
     r = subprocess.run(
@@ -519,6 +597,13 @@ def main() -> int:
     if want and not selected:
         print(f"  [CANNOT RUN] nothing matches {', '.join(want)}")
         return 2
+
+    # Before the clean-tree guard, because the commonest reason this tree is
+    # dirty is this probe itself, and "commit or discard them first" is the
+    # wrong instruction for a file this process mutated and failed to put back.
+    rc = recover()
+    if rc:
+        return rc
 
     targets = sorted({f"scripts/{m[1]}" for m in selected})
     try:
@@ -566,10 +651,20 @@ def main() -> int:
             bad += 1
             continue
 
+        # The record goes down BEFORE the file is touched, and carries the
+        # digest of what is about to be written. Written after, a kill in the
+        # gap would leave a mutated file with nothing naming it, which is the
+        # state this is here to prevent.
+        mutated = original.replace(old, new, 1)
+        ACTIVE.write_text(json.dumps({
+            "finding": finding,
+            "path": f"scripts/{fname}",
+            "head": _head(),
+            "mutated": _sha_text(mutated),
+        }, indent=2) + "\n", encoding="utf-8")
         # newline="" so a run on Windows does not rewrite the file's endings
         # on its way past, and on the restore as well as the write.
-        path.write_text(original.replace(old, new, 1), encoding="utf-8",
-                        newline="")
+        path.write_text(mutated, encoding="utf-8", newline="")
         try:
             r = run_suite(suite)
         except subprocess.TimeoutExpired as _exc:
@@ -606,6 +701,7 @@ def main() -> int:
             continue
         finally:
             path.write_text(original, encoding="utf-8", newline="")
+            ACTIVE.unlink(missing_ok=True)
 
         blob = (r.stdout or "") + (r.stderr or "")
         if "Traceback (most recent call last)" in (r.stderr or ""):

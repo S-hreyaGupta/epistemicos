@@ -297,11 +297,18 @@
           "event": "ACCEPT",
           "note": "accepted; the chronological guards move into the shared evaluator",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-05T09:18:00Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "cycle 04 review: source inspection and the preserved controls support this repair. The reviewer states that assessment does not establish probe execution or certify every earlier repair.",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "protocol 5; chronological transition rules",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C02-F03": {
       "class": "MISSING REQUIREMENT",
@@ -321,11 +328,18 @@
           "event": "ACCEPT",
           "note": "accepted and repaired; the age exemption is refused to evidence carrying a modern marker",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-05T09:18:01Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "cycle 04 review: source inspection and the preserved controls support this repair. The reviewer states that assessment does not establish probe execution or certify every earlier repair.",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-2 check 9; B01-F07; C01-F03, C01-F04",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C02-F04": {
       "class": "MISSING REQUIREMENT",
@@ -345,11 +359,18 @@
           "event": "ACCEPT",
           "note": "accepted and repaired; a recurrence against a RESOLVED entry is refused rather than computed",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-05T09:18:02Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "cycle 04 review: source inspection and the preserved controls support this repair. The reviewer states that assessment does not establish probe execution or certify every earlier repair.",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "protocol 5-6, V40; recurrence accounting",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C02-F05": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
@@ -579,11 +600,18 @@
           "event": "ACCEPT",
           "note": "accepted. The parser selects the live schema rather than the one each cycle was frozen against. I had identified this and deliberately left it to enter through review rather than repair it off the draft.",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-05T09:18:03Z",
+          "cycle": 4,
+          "event": "DEMONSTRATED",
+          "note": "cycle 04 review: source inspection and the preserved controls support this repair. The reviewer states that assessment does not establish probe execution or certify every earlier repair.",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "2.1, 4, 5; V40",
       "source": "CODEX_REVIEW",
-      "state": "OPEN"
+      "state": "RESOLVED"
     },
     "C03-F02": {
       "class": "CONTRADICTORY IMPLEMENTATION MAPPING",

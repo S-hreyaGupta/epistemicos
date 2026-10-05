@@ -357,18 +357,29 @@ MUTATIONS = [
     # stood, and one mutation removing the whole comparison would report all
     # three as watched while any one of them could be reintroduced alone. So
     # each hole is reopened on its own, in the shape it had before the repair.
+    # Both of these were MISSED on their first run, and neither was a missing
+    # control. Each entry is sorted by path, so dropping the path from the
+    # comparison while keeping the list order still reordered the entries and
+    # the check went on refusing. The mutations were too weak to reopen the
+    # hole they named. They now reproduce the pre-repair comparison exactly: a
+    # list of blob pairs for the path rule, a set of them for the duplicate.
     ("C02-F08c  paths and modes are part of what the patch must agree about",
      "validate_cycle.py",
      "                        if _got != _want:",
-     "                        if ([e[3:] for e in _got]\n"
-     "                                != [e[3:] for e in _want]):",
+     "                        if (sorted(e[3:] for e in _got)\n"
+     "                                != sorted(e[3:] for e in _want)):",
      "test_run_review.py",
      "naming a file the change never touched"),
 
+    # The duplicate hole only exists once paths are out of the comparison: two
+    # entries differing only by path are two members of any set that keeps the
+    # path. So this is the pre-repair line itself, and it reopens the path hole
+    # with it. The needle is the control this line answers for.
     ("C02-F08d  two files moving between the same objects are two entries",
      "validate_cycle.py",
      "                        if _got != _want:",
-     "                        if sorted(set(_got)) != sorted(set(_want)):",
+     "                        if ({e[3:] for e in _got}\n"
+     "                                != {e[3:] for e in _want}):",
      "test_run_review.py",
      "showing one of two identical changes"),
 

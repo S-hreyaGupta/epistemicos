@@ -274,6 +274,29 @@ def main() -> int:
          "Smith, Jones, and Brown (2020) argue this.", ["smith|2020"])
     case("et al., narrative", "Smith et al. (2020) argue this.",
          ["smith|2020"])
+    # `Hayes (2012, 2017)`, which Alex Zamurko asked about on 28 September:
+    # "determine whether the existing multi-year citation grammar already
+    # supports a narrative citation containing multiple comma-separated years
+    # for the same author", with the two permitted outcomes being an
+    # implementation defect if it does and the existing no-grammar disposition
+    # if it does not.
+    #
+    # It does. `cite_narr` has read `YEAR (?:,(?:WS)?YEAR)*` since rc3 §G made
+    # the separator's whitespace optional for D2, and the corpus re-measure of
+    # 24 September records all three Hayes spans parsing with both years. So
+    # the classification is implementation, not grammar, and nothing here
+    # belongs to `conversion_artifact` or to a category of its own.
+    #
+    # What was missing was this: a control over the plain narrative form. The
+    # parenthetical `(Smith, 2020, 2021)` was controlled, and the math-wrapped
+    # `Baron $(2012,2016)$` was controlled, and the ordinary form between them
+    # was supported by a pattern nobody asserted against directly. A form held
+    # up only by its neighbours' controls is one edit away from being dropped
+    # silently.
+    case("narrative, two years for one author",
+         "Hayes (2012, 2017) reports this.", ["hayes|2012", "hayes|2017"])
+    case("narrative, two years and no space after the comma",
+         "Hayes (2012,2017) reports this.", ["hayes|2012", "hayes|2017"])
     # §12 names this one explicitly, particles included in the key.
     case("particle surname", "van der Maas (2022) argues this.",
          ["van der maas|2022"])

@@ -355,6 +355,22 @@ MUTATIONS = [
      "test_ledger.py",
      "broke a completed cycle"),
 
+    # C03-F02's second pass, raised by cycle 04. Two rules: the approval has to
+    # be in the record, and a question the repository cannot answer is not a yes.
+    ("C03-F02d  the approval itself must be in the repository record",
+     "bootstrap_gate.py",
+     "    if committed(_appr_rel) != appr.read_bytes():",
+     "    if False:",
+     "test_bootstrap_gate.py",
+     "untracked and ignored"),
+
+    ("C03-F02e  a provenance query that fails refuses rather than proceeds",
+     "bootstrap_gate.py",
+     "        if r.returncode != 0:",
+     "        if False:",
+     "test_bootstrap_gate.py",
+     "cannot be read at all: refused for the wrong reason"),
+
     ("C02-F01  a frozen prompt's exemption is bound to a recorded finding",
      "test_prompts.py",
      "        return fid in json.loads(lp.read_text(encoding=\"utf-8\")).get(\"findings\", {})",

@@ -432,19 +432,48 @@ def manifest_provenance(root: Path) -> dict:
         except FileNotFoundError:
             return 127, ""
 
-    rc, dirty = git("status", "--porcelain", "--", COVERED_MANIFEST)
-    if rc != 0:
+    def committed(rel: str) -> bytes:
+        """The bytes HEAD holds for this path, or a refusal.
+
+        C03-F02, raised again by cycle 04. The previous version asked `git
+        status --porcelain` whether a file had uncommitted changes and treated
+        silence as "committed". Cycle 04: "an ignored, untracked approval file
+        can satisfy authority.require_approval while producing empty ordinary
+        porcelain status output." Silence from that command means no DIFFERENCE
+        was reported, which is also what it says about a file git has never
+        heard of.
+
+        So the committed content is fetched and compared instead. There is no
+        answer this can give that means "I did not look".
+        """
+        try:
+            r = subprocess.run(["git", "-C", str(root), "show", f"HEAD:{rel}"],
+                               capture_output=True)
+        except FileNotFoundError:
+            raise Refused(
+                f"git is not available, so whether {rel} is in the repository "
+                "record\n  cannot be established. A provenance question that "
+                "cannot be answered is not\n  an answer of yes.")
+        if r.returncode != 0:
+            raise Refused(
+                f"{rel} is not in the repository record at HEAD.\n"
+                "  A scope change that exists only on disk has no independent "
+                "evidence that\n  anyone made it. Commit it, so that what the "
+                "review is approved against is\n  something the repository saw "
+                "rather than something it was shown once.\n\n  git said: "
+                + (r.stderr.decode("utf-8", "replace").strip() or "(nothing)"))
+        return r.stdout
+
+    # The same comparison for the manifest. It had the stronger check of the two
+    # and still rested on a status query; fetching the bytes says what the
+    # record actually holds rather than what differs from it.
+    _live = (root / COVERED_MANIFEST).read_bytes()
+    if committed(COVERED_MANIFEST) != _live:
         raise Refused(
-            f"the repository cannot be read, so the provenance of "
-            f"{COVERED_MANIFEST}\n  cannot be established and no scope can be "
-            "approved against it.")
-    if dirty.strip():
-        raise Refused(
-            f"{COVERED_MANIFEST} has uncommitted changes.\n"
-            "  A scope change that exists only on disk has no independent "
-            "record. Commit it,\n  so that what the review is approved against "
-            "is something the repository saw\n  rather than something it was "
-            "shown once.")
+            f"{COVERED_MANIFEST} differs from the version in the repository "
+            "record.\n  The scope on disk is not the scope anyone committed, so "
+            "there is no evidence\n  the change was made rather than merely "
+            "typed.")
 
     rc, commit = git("log", "-1", "--format=%H", "--", COVERED_MANIFEST)
     if rc != 0 or not re.fullmatch(r"[0-9a-f]{40}", commit):
@@ -480,15 +509,22 @@ def manifest_provenance(root: Path) -> dict:
         raise Refused(
             f"the covered-component scope is not authorised.\n\n{e}")
 
-    rc, appr_dirty = git("status", "--porcelain", "--",
-                         f"{SCOPE_APPROVAL_DIR}/v{version}.json")
-    if rc == 0 and appr_dirty.strip():
+    # C03-F02, raised again by cycle 04, and the worse half of it. This read
+    # `rc == 0 and appr_dirty.strip()`, so a failed query made the condition
+    # false and execution continued. Cycle 04: "Failure to establish approval
+    # provenance is treated as permission." That is the defect class this entire
+    # run has been removing, in the code I wrote three days ago to remove it.
+    #
+    # `committed` refuses rather than returning, so there is no path from "could
+    # not check" to "carry on".
+    _appr_rel = f"{SCOPE_APPROVAL_DIR}/v{version}.json"
+    if committed(_appr_rel) != appr.read_bytes():
         raise Refused(
-            f"{SCOPE_APPROVAL_DIR}/v{version}.json has uncommitted changes.\n"
-            "  The approval has to be in the repository record for the same "
-            "reason the manifest\n  does. An approval that exists only on disk "
-            "is one that can be written, used,\n  and removed with nothing "
-            "left behind.")
+            f"{_appr_rel} differs from the version in the repository record.\n"
+            "  The approval being consumed is not the approval anyone "
+            "committed. An approval\n  that exists only on disk can be written, "
+            "used, and removed with nothing left\n  behind, which is the whole "
+            "of what it was supposed to prevent.")
 
     return {"path": COVERED_MANIFEST,
             "sha256": digest,

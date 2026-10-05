@@ -570,7 +570,83 @@ def main() -> int:
     m["note"] = "edited without committing"
     _write_manifest(root, m, commit=False)
     expect_refused("a scope change that was never committed",
-                   "uncommitted changes", approve(root))
+                   "differs from the version in the repository record",
+                   approve(root))
+
+    # ---- C03-F02, raised again by cycle 04 ----
+    # The approval's committed state was checked with `git status --porcelain`,
+    # which says nothing about a file git has never heard of. Cycle 04: "an
+    # ignored, untracked approval file can satisfy authority.require_approval
+    # while producing empty ordinary porcelain status output."
+    #
+    # Each control below bumps the scope to version 2 and leaves the approval
+    # for it out of the repository record in a different way. The manifest is
+    # committed every time, so the manifest's own check cannot be what fires.
+    def _scope_v2(root: Path, commit_approval: bool, ignore: bool = False,
+                  stage_only: bool = False) -> None:
+        m = json.loads((root / "specs" / "covered-components.json")
+                       .read_text(encoding="utf-8"))
+        m["version"] = 2
+        m["history"].append({
+            "version": 2, "at": "2026-10-05T12:00:00Z",
+            "authorized_by": "Alex Zamurko",
+            "reason": "fixture: a second version so the approval for it can be "
+                      "left out of the repository record",
+            "added": [], "removed": []})
+        write_lf(root / "specs" / "covered-components.json",
+                 json.dumps(m, indent=2) + "\n")
+        if ignore:
+            write_lf(root / ".gitignore", "approvals/covered-scope/v2.json\n")
+        sh("git", "add", "-A", cwd=root)
+        sh("git", "commit", "-qm", "scope v2, approval handled separately",
+           cwd=root)
+        # Written after the commit, so the manifest is in the record and the
+        # approval is not.
+        write_lf(root / "approvals" / "covered-scope" / "v2.json", json.dumps({
+            "schema": "covered-scope-change/1",
+            "manifest_version": "2",
+            "manifest_sha256": sha256_file(root / "specs" /
+                                           "covered-components.json"),
+            "authorized_by": "Alex Zamurko",
+            "at": "2026-10-05T12:00:00Z",
+            "reason": "fixture: authorises version 2 of the covered set",
+        }, indent=2) + "\n")
+        if stage_only:
+            sh("git", "add", "-f", "approvals/covered-scope/v2.json", cwd=root)
+        if commit_approval:
+            sh("git", "add", "-f", "approvals/covered-scope/v2.json", cwd=root)
+            sh("git", "commit", "-qm", "approve scope v2", cwd=root)
+
+    root = build(); made.append(root)
+    _scope_v2(root, commit_approval=False, ignore=True)
+    expect_refused("an approval that is untracked and ignored",
+                   "not in the repository record", approve(root))
+
+    root = build(); made.append(root)
+    _scope_v2(root, commit_approval=False, stage_only=True)
+    expect_refused("an approval staged but never committed",
+                   "not in the repository record", approve(root))
+
+    # The positive. Without it the three refusals above could be "refuse every
+    # version 2", which would satisfy the controls and nothing else.
+    root = build(); made.append(root)
+    _scope_v2(root, commit_approval=True)
+    freeze_target(root)
+    r = approve(root)
+    if r.returncode != 0:
+        failures.append(f"a committed approval for a committed scope change "
+                        f"was refused:\n{r.stdout}{r.stderr}")
+    else:
+        print("  [ok] a committed approval for a committed scope is accepted")
+
+    # A provenance query that cannot be answered must refuse rather than
+    # proceed. Cycle 04: "Failure to establish approval provenance is treated as
+    # permission." Reached honestly by removing the repository, so the query
+    # fails rather than returning an answer nobody checked.
+    root = build(); made.append(root)
+    force_rmtree(root / ".git")
+    expect_refused("a repository whose record cannot be read at all",
+                   "not in the repository record", approve(root))
 
     # A component that starts importing new code after the decision must still
     # block. Under the old rule the closure widened and the hashes stopped

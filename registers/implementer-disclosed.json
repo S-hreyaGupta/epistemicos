@@ -67,6 +67,36 @@
           "note": "Repair landed and was demonstrated by reproducing the kill rather than by simulating it. Unreviewed, like SELF-F01."
         }
       ]
+    },
+    "SELF-F03": {
+      "description": "The §15 gold runner scored the candidate and the baseline by two different rules. A candidate work may match a gold item under any phrasing the manuscript used for it, and that remapping ran over the candidate only; the baseline, loaded later in the same function, never received it. Every before-and-after comparison therefore gave the candidate matches the baseline was denied, which inflates the apparent improvement by however many works the manuscript phrases two ways. The same block also popped a key that already matched gold, so a work already counted correct could be moved off its match and reported as a regression that never happened.",
+      "discovery_source": "Implementer-disclosed, 6 October 2026, and found by accident rather than by looking. The record-level diff of two extractor runs over gold paper 1 showed the outputs byte-identical, and the gold runner then scored them 93/98 and 96/98 with one regression. Two identical files cannot differ, so one of the two measurements had to be wrong. Running the same candidate file as both candidate and baseline reproduced it in one command.",
+      "affected_component": "scripts/gold_runner.py, with its controls in scripts/test_gold_runner.py. Not a covered component of BOOTSTRAP-002; it belongs to the citation product rather than to the review layer.",
+      "severity": "High for anything measured. It does not corrupt a record or a cycle, and it cannot produce a false green in the review layer. What it does is make every improvement figure quoted through --baseline too favourable, including the +0.011 and +0.040 recorded in citation_extract.py for rc3 B1a, and the figure measured for this very ruling today, which fell from +4 to +3 once the scorer was fixed. Any decision taken on one of those numbers was taken on a number that flattered the change.",
+      "state": "REPAIRED_UNREVIEWED",
+      "review_cycle": null,
+      "proposed_repair": "Lift the remapping into a function and apply it to both sides, so the two extractors are compared by one rule rather than the rule being compared with itself. Never move a key that already matches gold. Control it by scoring one candidate against itself: it must report zero regressions and one total, and the fixture must carry a variant or the control passes on the broken code too.",
+      "evidence": [
+        "scripts/gold_runner.py: apply_variants(), called for the candidate and for the baseline, with the `ck in G` guard",
+        "scripts/test_gold_runner.py: 'a candidate compared with itself: no regressions, one total'",
+        "Before the fix, one file against itself: baseline 93/98, candidate 96/98, 1 regression, exit 3. After: 96/98 both sides, 0 regressions, exit 0",
+        "The re-measure of the 6 October grammar change: paper 2 90/102 to 93/102, where the broken scorer had said 89 to 93"
+      ],
+      "required_of_next_review": true,
+      "history": [
+        {
+          "at": "2026-10-06T15:30:00+05:30",
+          "state": "OPEN",
+          "by": "implementing agent",
+          "note": "Observed as a contradiction between two measurements of the same thing, then reproduced deliberately by comparing a file with itself."
+        },
+        {
+          "at": "2026-10-06T16:20:00+05:30",
+          "state": "REPAIRED_UNREVIEWED",
+          "by": "implementing agent",
+          "note": "Repaired and controlled. The quoted historical figures are NOT corrected: they were measured with the defect and the honest thing is to say so rather than to restate them from a re-run nobody has reviewed."
+        }
+      ]
     }
   }
 }

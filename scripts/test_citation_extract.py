@@ -362,6 +362,44 @@ def main() -> int:
     case("Following (2019) is a stopword surname",
          "Text here. Following (2019) we did this.", [],
          want_unres=["stopword_surname"])
+    # Alex Zamurko's exclusion list, 6 October 2026. These are the members his
+    # list has and STOP did not, in the only position where the distinction can
+    # show: a capitalised lead-in word. Before the list, each of these refused
+    # the whole parse and the citation was lost.
+    for lead in ("Compare", "Contra", "According to", "Versus"):
+        case(f"{lead} Smith (2020) parses as smith|2020",
+             f"Text here. {lead} Smith (2020) argues this.", ["smith|2020"])
+    # And the boundary, so the list is not read as "discard anything in front".
+    # `Pircher` is not prose and not a particle, so the parse stays refused and
+    # the span is unresolved rather than keyed to a surname cut short.
+    case("a capitalised word that is not prose still refuses the parse",
+         "Text here. Pircher Verdorfer (2016) argues this.", [],
+         want_unres=["no_grammar_match"])
+    # A conjunction is in his list and must NOT be discarded, because one in
+    # front of an author says another author stands in front of it. Taken from
+    # gold paper 2, where an em-dash glues the first author to the word before
+    # it, so the run cannot reach him:
+    #
+    #     two of the most influential frameworks-Seuring and Müller (2008)
+    #
+    # With `and` discardable this produced `muller|2008` — the second author
+    # recorded as the whole citation. Unresolved is the right answer and is
+    # what his own last line requires.
+    case("a conjunction in front of the author is not discarded",
+         "Text here. We used frameworks-Seuring and Müller (2008) throughout.",
+         [], want_unres=["no_grammar_match"])
+    # The same word where it belongs, so the control above cannot be satisfied
+    # by refusing every `and`.
+    case("a conjunction inside an author list still parses",
+         "Text here. Smith and Jones (2020) argue this.", ["smith|2020"])
+    # And the discriminator between the two, which is punctuation and not
+    # judgement: a clause ending in front of the run means the conjunction
+    # joins clauses rather than authors.
+    case("a conjunction after a clause ending is discarded",
+         "Text here. A study confirms it, and Jones (2019) agrees.",
+         ["jones|2019"])
+    case("a conjunction opening the sentence is discarded",
+         "Text here. And Jones (2019) agrees.", ["jones|2019"])
 
     # ---- institutional, §12 row 7. The row this suite exists for. ----
     print("\ninstitutional")
@@ -5343,9 +5381,17 @@ def main() -> int:
         if touching:
             failures.append(f"§10/C-080: a record overlaps a numeric bracket "
                             f"span — {touching[0]}")
-        elif keys(id80) != ["smith|2020"]:
-            failures.append(f"§10/C-080: the author-date citation beside the "
-                            f"brackets must still parse, got {keys(id80)}")
+        # Both of them, since 6 October 2026. The fixture reads "... confirms
+        # it, and Jones (2019) agrees", and `and` in front of Jones refused the
+        # whole parse until Alex Zamurko's exclusion list made it discardable.
+        # So this control was asserting one key because the second was being
+        # lost, and the expectation was a record of the defect rather than of
+        # the requirement. C-080 is about numeric brackets producing no
+        # identity record; both author-date citations beside them resolving is
+        # the stronger version of the same guard.
+        elif keys(id80) != ["smith|2020", "jones|2019"]:
+            failures.append(f"§10/C-080: both author-date citations beside the "
+                            f"brackets must parse, got {keys(id80)}")
         else:
             ok(f"§10/C-080: {len(bracket_spans)} numeric brackets produced no "
                f"record of any kind, and the author-date citation beside them "

@@ -348,6 +348,67 @@ MAX_POSSESSIVE_YEAR_GAP_TOKENS = 3
 NUMCITE = re.compile(r"\[\d{1,3}(?:[ \t]*[,–—-][ \t]*\d{1,3})*\]")
 SUPCITE = re.compile(r"[¹²³⁰⁴-⁹]+")
 
+# Alex Zamurko, 6 October 2026: "A small exclusion list should also prevent
+# obvious surrounding prose from being absorbed into the candidate... The
+# exclusion should be case-insensitive, so In Smith (2020) cannot become
+# 'In Smith'."
+#
+# Kept apart from STOP rather than merged into it. rc2 §3.2 calls STOP closed
+# and versioned, so that set is the specification's; this one is his, and
+# merging them would lose which words came from where and let a later reader
+# attribute his list to rc2 or the other way about.
+#
+# What it actually does here is the opposite of what the ruling anticipated,
+# and that is worth writing down rather than quietly enjoying. Prose absorption
+# of the kind he describes cannot happen in this implementation: §6.1 admits
+# only capitalised tokens and a small eligible-lower set into the candidate
+# run, so `by`, `of`, `for`, `to`, `and`, `or`, `but`, `via`, `vs` and `cf`
+# never reach the grammar at all, and the capitalised lead-ins he lists were
+# already in STOP. Measured before the change, not assumed:
+#
+#     In Smith (2020)            ->  smith|2020
+#     According to Smith (2020)  ->  smith|2020, phrase `Smith`
+#     Work by Smith (2020)       ->  smith|2020, phrase `Smith`
+#     The study of Smith (2020)  ->  smith|2020, phrase `Smith`
+#
+# So his list adds recall rather than removing a defect: a capitalised lead-in
+# the set does not know refuses the whole parse, and `Compare Smith (2020)` was
+# unresolved for that reason alone. The lower-case members are inert here and
+# are kept anyway, because the set is his and a future change to §6.1's
+# eligibility would make them live again.
+EXCLUDED_CONTEXT = {
+    "in", "by", "from", "of", "for", "with", "without", "as", "at", "on",
+    "to", "via", "see", "cf", "cf.", "compare", "following", "according",
+    "unlike", "contra", "versus", "vs", "vs.", "the", "a", "an", "and", "or",
+    "but",
+}
+
+# His list holds three conjunctions, and a conjunction in front of an author is
+# not prose to be dropped on its own: it may be a sign that another author
+# stands in front of it. Discarding one blindly turns a two-author citation
+# into a one-author citation that looks complete.
+#
+# Found by the gold set rather than by reasoning, within minutes of adding the
+# list. Paper 2 contains:
+#
+#     two of the most influential frameworks-Seuring and Müller (2008)
+#
+# where an em-dash glues `Seuring` to the word before it, so the candidate run
+# cannot start there. With `and` discardable the parse proceeded from `Müller
+# (2008)` and produced `muller|2008`: the second author recorded as though he
+# were the whole of it. That is the same silent truncation Alex Zamurko named a
+# defect when `El Akremi` came out as `akremi`, arriving by way of his own
+# exclusion list, so the list is honoured and the conjunctions are kept out of
+# the one place they would cause it.
+#
+# The span stays unresolved, which is the last line of his own rule: no
+# deterministic confirmation, so no interpretation.
+#
+# Which of the two it is comes from the punctuation in front of the run, not
+# from the conjunction itself. `_prefix_discardable` holds that rule; this set
+# only names the words it applies to.
+_CONJUNCTIONS = {"and", "or", "but"}
+
 STOP = {
     "january", "february", "march", "april", "may", "june", "july", "august",
     "september", "october", "november", "december", "jan.", "feb.", "mar.",
@@ -1458,7 +1519,7 @@ def extract_citations(body: str, sents, heads, fixes: set[str],
         if parsed:
             span_start, L = parsed
             discarded = toks[:len(toks) - L]
-            if all(_discardable(t) for t in discarded):
+            if _prefix_discardable(body, run_start, s_start, discarded):
                 # §6.3's additive reduction. `run_start` is the complete C2
                 # run and `span_start` is what parsed; passing both is what
                 # lets author_phrase stay whole.
@@ -1542,7 +1603,46 @@ def _offset_of_token(body, c1_start, sent_start, toks, index):
 
 def _discardable(tok: str) -> bool:
     bare = tok.rstrip(",;:")
-    return bare.lower() in STOP or tok[-1:] in ",;:"
+    return (bare.lower() in STOP or bare.lower() in EXCLUDED_CONTEXT
+            or tok[-1:] in ",;:")
+
+
+def _prefix_discardable(body: str, run_start: int, sent_start: int,
+                        discarded: list[str]) -> bool:
+    """May the tokens in front of the parsed suffix be dropped?
+
+    Every one of them has to be discardable, as before. A conjunction is the
+    case that needs more than that, and these two are the reason:
+
+        A study (Smith, 2020) confirms it, and Jones (2019) agrees.
+        two of the most influential frameworks-Seuring and Müller (2008)
+
+    Both present the same run to the grammar — `and` then the author — because
+    in the second the em-dash glues `Seuring` to the word before it and §6.1
+    stops there. In the first `and` joins two clauses and `Jones (2019)` is a
+    whole citation. In the second it joins two authors and `Müller (2008)` is
+    half of one.
+
+    The word standing in front of the run is what separates them, and the
+    signal is punctuation rather than judgement: `it,` ends a clause, and
+    `frameworks-Seuring` does not. So a conjunction may be dropped only when
+    the run is preceded by a clause ending, or by nothing at all.
+
+    Alex Zamurko's rule holds either way: where the string does not say, the
+    span stays unresolved rather than being read as a surname.
+    """
+    if not all(_discardable(t) for t in discarded):
+        return False
+    if not any(t.rstrip(",;:").lower() in _CONJUNCTIONS for t in discarded):
+        return True
+    j = run_start
+    while j > sent_start and body[j - 1] in " \t\n":
+        j -= 1
+    k = j
+    while k > sent_start and body[k - 1] not in " \t\n":
+        k -= 1
+    prev = body[k:j]
+    return (not prev) or prev[-1:] in ",;:"
 
 
 def _paren_segments(c1: str, pat):

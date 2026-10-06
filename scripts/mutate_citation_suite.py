@@ -123,6 +123,20 @@ MUTATIONS = [
      # rule is actually about: a capitalised particle inside a parenthetical.
      "capitalised particle, parenthetical"),
 
+    ("the exclusion list is never consulted",
+     "    return (bare.lower() in STOP or bare.lower() in EXCLUDED_CONTEXT",
+     "    return (bare.lower() in STOP or False",
+     "Compare Smith (2020) parses as smith|2020"),
+
+    # The rule that decides which kind of `and` it is. Dropping the check means
+    # dropping every conjunction, which is what produced `muller|2008` out of
+    # `Seuring and Müller (2008)` on gold paper 2.
+    ("a conjunction is dropped without looking at what precedes the run",
+     "    if not any(t.rstrip(\",;:\").lower() in _CONJUNCTIONS "
+     "for t in discarded):",
+     "    if True:",
+     "a conjunction in front of the author is not discarded"),
+
     # Alex Zamurko's ruling of 6 October, one mutation per rule it states.
     ("a surname cannot carry a second word at all",
      '_JOIN = rf"(?:{WS}(?:{PARTICLE}){WS}{CORE_AFTER_PARTICLE})*"',
@@ -1421,9 +1435,15 @@ MUTATIONS = [
 ]
 
 # The STOP mutation needs to empty the set rather than edit its opening line.
+#
+# Anchor moved on 6 October 2026, when `_discardable` grew Alex Zamurko's
+# exclusion list beside rc2's STOP. Both halves are dropped here: with only one
+# removed the other still discards `In`, and the mutation would be caught by a
+# rule it is not aimed at.
 MUTATIONS[2] = (
     "the stop list is empty, so In and See become surnames",
-    "    return bare.lower() in STOP or tok[-1:] in \",;:\"",
+    "    return (bare.lower() in STOP or bare.lower() in EXCLUDED_CONTEXT\n"
+    "            or tok[-1:] in \",;:\")",
     "    return tok[-1:] in \",;:\"",
     "In Smith (2020) parses as smith|2020",
 )

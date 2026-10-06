@@ -97,9 +97,11 @@ MUTATIONS = [
      "STOP = set() or {",  # keeps the literal, drops nothing — see below
      "(intentionally inert, replaced below)"),
 
+    # Anchor moved on 6 October: the leading-particle loop became a function
+    # call so that `de las` and `de los` are admitted only behind `de`.
     ("particles are dropped from the key",
-     "    while i < len(toks) and bare(toks[i]).lower() in PARTICLES \\",
-     "    while False and bare(toks[i]).lower() in PARTICLES \\",
+     "    while i < len(toks) and _is_particle(toks[i], _prev):",
+     "    while False and _is_particle(toks[i], _prev):",
      "a lower-case core after a particle is a surname"),
 
     ("the author phrase is cut at the first comma",
@@ -107,10 +109,48 @@ MUTATIONS = [
      "    am = None",
      "comma-separated authors are not cut at the first comma"),
 
+    # The anchor moved on 6 October 2026 when the allow-list grew sequences and
+    # the alternation had to be built longest-first. Same rule, same control,
+    # new address — the old text appears nowhere now and this line would have
+    # reported itself broken rather than catching anything.
     ("particles are matched case-sensitively again",
-     'PARTICLE = "(?i:" + "|".join(PARTICLES) + ")"',
-     'PARTICLE = "|".join(PARTICLES)',
-     "the same particle surname, sentence-initial"),
+     'PARTICLE = ("(?i:" + "|".join(',
+     'PARTICLE = ("(?:" + "|".join(',
+     # Named control moved too, and the probe is why. With the alternation made
+     # case-sensitive, `the same particle surname, sentence-initial` stayed
+     # green while three others went red, so this line was reporting WRONG
+     # CONTROL about a mutation that was caught. `Da Silva` is the case the
+     # rule is actually about: a capitalised particle inside a parenthetical.
+     "capitalised particle, parenthetical"),
+
+    # Alex Zamurko's ruling of 6 October, one mutation per rule it states.
+    ("a surname cannot carry a second word at all",
+     '_JOIN = rf"(?:{WS}(?:{PARTICLE}){WS}{CORE_AFTER_PARTICLE})*"',
+     '_JOIN = ""',
+     "a particle joins a second word into the surname"),
+
+    # Longest-first is what lets `de las` beat `de`. Sorted the other way the
+    # engine takes `de`, then `las` has to be a core and is not.
+    ("the particle alternation is no longer longest-first",
+     "                    key=lambda p: (-len(p), p))) + \")\")",
+     "                    key=lambda p: (len(p), p))) + \")\")",
+     "a named multi-word particle sequence"),
+
+    # The token-level twin of _JOIN. With the particle optional again, two
+    # capitalised words become one surname on capitalisation alone, which is
+    # the thing the ruling forbids in terms.
+    # The control this names was added on 6 October, after this very mutation
+    # applied cleanly and left every suite green. The regex refuses two bare
+    # words before `first_core` is reached, so no document can exercise the
+    # builder's own guard, and the rule was held up entirely by a check one
+    # layer above it. `first_core` is now called directly.
+    ("the joining particle becomes optional again, at token level",
+     "        if not extra or j >= len(toks):",
+     "        if False:",
+     # The failure text, not the pass text. A hand-written control says one
+     # thing when it passes and another when it fails, and this probe reads
+     # what failed.
+     "first_core joined two capitalised words with no particle"),
 
     ("the unmarked-up References label is not recognised",
      "        ref = _unmarked_reference_label(text)",
@@ -137,9 +177,13 @@ MUTATIONS = [
      "STYLE_MIN_SAMPLE = 0",
      "two comma-less parentheticals aborted 2"),
 
+    # Anchor moved on 6 October with the rest of first_core's tail. Same rule,
+    # same control; the text it used to sit on no longer exists.
     ("the possessive is carried into the identity again",
-     '                out.extend(extra)\n\n    return POSSESSIVE.sub("", " ".join(out))',
-     '                out.extend(extra)\n\n    return " ".join(out)',
+     '        if toks[j].endswith(","):\n            break\n\n'
+     '    return POSSESSIVE.sub("", " ".join(out))',
+     '        if toks[j].endswith(","):\n            break\n\n'
+     '    return " ".join(out)',
      "a possessive surname keys to the bare name"),
 
     ("rc3 B1: the six-token cap comes back",

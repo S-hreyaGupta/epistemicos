@@ -155,6 +155,48 @@ def main() -> int:
     else:
         ok("a lost case is reported as a regression and exits 3")
 
+    # SELF-F03, 6 October 2026. The control that should have existed from the
+    # first day of this file and did not: one candidate compared with ITSELF.
+    #
+    # A file cannot regress against itself and cannot score two different
+    # totals. Until today it did both — 93/98 for the baseline and 96/98 for
+    # the candidate, from the same bytes, with one regression reported — because
+    # the author_phrase_variants remapping ran over the candidate only and the
+    # baseline never got it. Every before-and-after measurement this project has
+    # quoted through --baseline was biased toward the candidate by however many
+    # works the manuscript phrases two ways, and the recorded +0.011 and +0.040
+    # for rc3 B1a are among them.
+    #
+    # The variants have to be IN the fixture or this control passes vacuously:
+    # with no variants anywhere, the old code and the fixed code agree.
+    _v = [dict(G[0], author_phrase_variants=["Smith and Jones"]),
+          dict(G[1]), dict(G[2])]
+    _vg = write(t / "vgold.json", gold_doc(
+        [dict(G[0], author="Smith and Jones"), G[1], G[2]]))
+    _vc = write(t / "vcand.json", gold_doc(_v))
+    # Its own names: `blob` and `r` below belong to the §15.1 run above, and the
+    # controls after this one still read them.
+    _r = run("--gold", str(_vg), "--candidate", str(_vc), "--baseline", str(_vc))
+    _blob = _r.stdout + _r.stderr
+    _agg = [ln for ln in _blob.splitlines() if "aggregate:" in ln]
+    if _r.returncode != 0:
+        failures.append(
+            f"a candidate compared with itself exited {_r.returncode}, not 0. "
+            f"Nothing can regress against itself.\n{_blob[:400]}")
+    elif "**0**" not in _blob:
+        failures.append(
+            f"a candidate compared with itself did not report zero "
+            f"regressions.\n{_blob[:400]}")
+    elif not _agg or _agg[0].count("/") != 2 or len(set(
+            _agg[0].split("baseline", 1)[1].replace("correct,", "")
+            .replace("candidate", "").split())) != 1:
+        failures.append(
+            f"a candidate compared with itself scored two different totals. "
+            f"Both sides are the same bytes, so the difference is the scorer "
+            f"rather than the extractor.\n  {_agg[0] if _agg else '(no line)'}")
+    else:
+        ok("a candidate compared with itself: no regressions, one total")
+
     # Inside the Regressions section, not anywhere in the report. The first
     # version searched the whole output, and the lost case appears in the
     # missed-cases list too, so the control stayed green with regression

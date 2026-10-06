@@ -143,8 +143,37 @@ EXCLUDED_REASONS = {
 
 NAMECHAR = r"[^\W\d_]|['’\-]"
 CORE = r"[A-ZÀ-Þ][\w'’\-]+"
-PARTICLES = ("de", "del", "della", "der", "den", "di", "da", "dos", "du",
-             "la", "le", "van", "von", "ter", "ten", "zu", "zur")
+# Alex Zamurko, 6 October 2026, recorded in full in
+# specs/citation/RULING-COMPOUND-SURNAMES.md. The allow-list is his, and it is
+# ADDITIVE by his explicit instruction: "Keep all currently validated surname
+# particles, including 'zu' and 'zur', and add the new particles to that
+# existing list." So zu and zur stay, and do, das, des, el, al, bin and ibn
+# join them.
+#
+# `el` is his, not mine. An earlier draft of the ruling file recorded it as the
+# implementing agent's decision, on the reading that the set was ours to
+# define; he then supplied the set himself. The ruling file marks that
+# paragraph superseded rather than deleting it.
+#
+# One consequence of `al` worth stating rather than discovering: `Al Smith` now
+# reads as particle + core, a compound surname, where §12 has `(Adam Smith,
+# 1776)` as forename-first and unresolved. Arabic surnames usually write `al-`
+# hyphenated, so the exposure is narrow, but it is real and it is a consequence
+# of the allow-list rather than of anything inferred. Raised with him rather
+# than quietly narrowed.
+PARTICLES = ("de", "del", "della", "der", "den", "des", "di", "da", "das",
+             "do", "dos", "du", "la", "le", "van", "von", "ter", "ten",
+             "zu", "zur", "el", "al", "bin", "ibn")
+# The multi-word sequences he named. `van der`, `van den`, `von der` and `de
+# la` already fall out of the leading-particle run, because each word is itself
+# a particle. `de las` and `de los` do not: las and los are particles only
+# behind `de`, and adding them to the list above would admit them anywhere.
+# They are written as sequences so the grammar admits exactly what he listed.
+PARTICLE_SEQUENCES = ("de la", "de las", "de los",
+                      "van der", "van den", "von der")
+# Second position of a sequence, for the token-level surname builder, which
+# walks words rather than matching a pattern.
+PARTICLE_TAILS = {s.split()[1] for s in PARTICLE_SEQUENCES}
 # §4 lists the particles in lower case and says "single words, compared via
 # lower()". Joining them into a case-sensitive alternation did not do that, so
 # `van der Maas` parsed and `Van der Maas` did not — the same name, the second
@@ -157,7 +186,14 @@ PARTICLES = ("de", "del", "della", "der", "den", "di", "da", "dos", "du",
 #
 # Worth 15 citations across the nine in-profile papers, 10 fewer unresolved
 # spans, and nothing lost on any paper.
-PARTICLE = "(?i:" + "|".join(PARTICLES) + ")"
+# Sequences first and longest first, so `de la` is tried before `de` and the
+# alternation cannot settle for the shorter one and leave `la` to fail as a
+# core. Whitespace inside a sequence is the same run the rest of the grammar
+# uses, because a line break between `de` and `la` is still one particle.
+PARTICLE = ("(?i:" + "|".join(
+    p.replace(" ", r"[ \t\n]+")
+    for p in sorted(set(PARTICLES) | set(PARTICLE_SEQUENCES),
+                    key=lambda p: (-len(p), p))) + ")")
 WS = r"[ \t\n]+"
 # rc3 B1a, "SURNAME — personal, two cores. Worth 9", is NOT implemented, and
 # the reason is worth keeping rather than rediscovering.
@@ -205,7 +241,27 @@ CORE_AFTER_PARTICLE = r"[A-Za-zÀ-þ][\w'’\-]+"
 # particle ahead of it. A first draft here allowed a single leading particle
 # and broke `van der maas`, which needs two. The `*` is load-bearing.
 _LEAD = rf"(?:(?:{PARTICLE}){WS})+{CORE_AFTER_PARTICLE}|{CORE}"
-SURNAME = rf"(?:{_LEAD})"
+# Alex Zamurko, 6 October 2026: a surname may carry a further word when a
+# particle joins the two, and never on capitalisation alone. "Support stops
+# where identifying the surname would require inferring whether an adjacent
+# word is part of the author's name rather than applying one of those explicit
+# grammatical rules."
+#
+# This is rc3 B1a with its optional BARE second core removed, and that removal
+# is what makes it safe in a single pass. B1a was implemented on 21 September
+# and reverted the same day because the bare core let a surname reach backwards
+# into the sentence: `In Smith (2020)` became `in smith`, `World Bank (2024)`
+# became `world bank`. The note above CORE_AFTER_PARTICLE concluded it needed
+# rc2 or v3.4's two-pass split. It does not, under this narrower rule: `In`,
+# `World`, `Following` and `Adam` are not particles, so none of the four §12
+# cases can be reached, and each of them is controlled.
+#
+# Repeated rather than bounded. B1b's "at most two CORE elements" was a bound
+# on a production that could guess; this one cannot, because every repetition
+# must present a particle of its own. `Carrieri de la Cruz` is three cores and
+# two particles and is no more inferred than two.
+_JOIN = rf"(?:{WS}(?:{PARTICLE}){WS}{CORE_AFTER_PARTICLE})*"
+SURNAME = rf"(?:(?:{_LEAD}){_JOIN})"
 # rc3 B6 admits `2019a,b` here so the GROUP matches; the expansion into
 # separate year tokens happens at record time via `expand_year`. The
 # suffix on the base is required before any bare suffix may follow, which
@@ -993,9 +1049,21 @@ def first_core(authors: str) -> str:
 
     # Leading particles. A comma ends the surname, so a comma-terminated
     # particle is not one — it is the last token of a previous author.
-    while i < len(toks) and bare(toks[i]).lower() in PARTICLES \
-            and not toks[i].endswith(","):
+    #
+    # PARTICLE_TAILS is the second word of a named sequence, `de las` and `de
+    # los`. It is admitted only directly behind a particle, which is the whole
+    # of what the ruling licenses: `las` on its own is an ordinary Spanish
+    # article and has no business starting a surname.
+    def _is_particle(tok: str, prev_was_particle: bool) -> bool:
+        if tok.endswith(","):
+            return False
+        w = bare(tok).lower()
+        return w in PARTICLES or (prev_was_particle and w in PARTICLE_TAILS)
+
+    _prev = False
+    while i < len(toks) and _is_particle(toks[i], _prev):
         out.append(bare(toks[i]))
+        _prev = True
         i += 1
 
     if i >= len(toks):
@@ -1005,28 +1073,42 @@ def first_core(authors: str) -> str:
     out.append(bare(toks[i]))
     i += 1
 
-    # rc3 B1a's optional second core: (WS (PARTICLE WS)? CORE)?
+    # A further core, joined by a particle. Alex Zamurko, 6 October 2026: "Do
+    # not broaden the direct surname grammar to accept any two capitalised
+    # words automatically."
+    #
+    # The particle used to be optional here, which is the token-level twin of
+    # rc3 B1a's bare second core and admitted exactly what he has now ruled
+    # out: two capitalised words becoming one surname on capitalisation alone.
+    # It is required.
     #
     # Only reachable when the first core was not comma-terminated, because a
     # comma separates authors: `Smith, Jones, 2020` is two authors and
     # `Carrieri de Souza, 2023` is one. Without that guard the key for a
     # multi-author group would absorb the second author's surname.
     #
-    # One repetition, not a loop — B1b is explicit that the production admits
-    # at most two CORE elements and that institutional authors are a separate
-    # path.
-    if not first_ended_the_name and i < len(toks):
-        j, extra = i, []
-        if bare(toks[j]).lower() in PARTICLES and not toks[j].endswith(","):
+    # A loop rather than one repetition, matching _JOIN above: each turn has to
+    # present its own particle, so nothing is inferred by going round twice.
+    while not first_ended_the_name and i < len(toks):
+        j, extra, prev = i, [], False
+        while j < len(toks) and _is_particle(toks[j], prev):
             extra.append(bare(toks[j]))
+            prev = True
             j += 1
-        if j < len(toks):
-            nxt = bare(toks[j])
-            # A second CORE, and not a connective or the et-al. tail: those
-            # end the author phrase rather than continuing a surname.
-            if re.fullmatch(CORE, nxt) and nxt.lower() not in ("et", "al.", "and"):
-                extra.append(nxt)
-                out.extend(extra)
+        if not extra or j >= len(toks):
+            break
+        nxt = bare(toks[j])
+        # The core after the particle. Not a connective or the et-al. tail:
+        # those end the author phrase rather than continuing a surname, and
+        # `al.` in particular is the citation abbreviation however much it
+        # looks like the particle he added.
+        if not re.fullmatch(CORE, nxt) or nxt.lower() in ("et", "al.", "and"):
+            break
+        extra.append(nxt)
+        out.extend(extra)
+        i = j + 1
+        if toks[j].endswith(","):
+            break
 
     return POSSESSIVE.sub("", " ".join(out))
 

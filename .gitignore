@@ -41,6 +41,11 @@ coverage.out
 __pycache__/
 *.py[cod]
 
+# Scratch for before-and-after measurement: extractor outputs, candidates and
+# the baseline copy of a script taken from HEAD. Reproducible from the
+# repository and the bound corpus in minutes, and large, so it is not history.
+/_tmp/
+
 # The mutation probe's crash record. It exists only while a mutation is applied
 # to tracked source, and names the file so the next run can put it back when a
 # killed process leaves one behind. Tracking it would commit a statement that

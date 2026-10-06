@@ -312,11 +312,36 @@ def main() -> int:
          "As shown (De La Cruz and Dessein, 2021).", ["de la cruz|2021"])
     case("capitalised particle after a conjunction",
          "As shown (Enthoven and Van den Broeck, 2023).", ["enthoven|2023"])
-    # The limit of the rule, so the fix is not read as wider than it is.
-    # SURNAME is (PARTICLE WS)* CORE — particles lead. A particle *inside* a
-    # surname is outside the grammar as specified, and stays unresolved.
-    case("a particle inside the surname is still out of grammar",
-         "As shown (Oliveira da Silva et al., 2024).", [],
+    # This control used to assert the opposite, that `Oliveira da Silva` stayed
+    # unresolved because particles could only lead. It inverts by Alex
+    # Zamurko's ruling of 6 October 2026, recorded in
+    # specs/citation/RULING-COMPOUND-SURNAMES.md: a surname may carry a further
+    # word where a particle joins the two, because the particle is the explicit
+    # structure and nothing is being inferred.
+    #
+    # Rewritten rather than deleted. The limit it existed to pin still exists;
+    # it has moved, and the controls below are where it sits now.
+    case("a particle joins a second word into the surname",
+         "As shown (Oliveira da Silva et al., 2024).", ["oliveira da silva|2024"])
+    case("the same, with the other particle he named",
+         "As shown (Carrieri de Souza, 2023).", ["carrieri de souza|2023"])
+    # His allow-list, additively: `el` is new and `El Akremi` is the name the
+    # ruling was asked about. Before this it keyed as `akremi`, silently
+    # dropping the El, which he called a defect because it truncates rather
+    # than preserving uncertainty.
+    case("a particle he added, leading",
+         "As shown (El Akremi et al., 2015).", ["el akremi|2015"])
+    # A named sequence. `las` is a particle only behind `de`, so this is the
+    # control that says the sequence is admitted and the bare word is not.
+    case("a named multi-word particle sequence",
+         "As shown (De las Casas, 2019).", ["de las casas|2019"])
+    case("the second word of a sequence is not a particle on its own",
+         "As shown (Las Casas, 2019).", [], want_unres=["no_grammar_match"])
+    # The limit, in his words: "Do not broaden the direct surname grammar to
+    # accept any two capitalised words automatically." No particle, no hyphen,
+    # no apostrophe, so the grammar does not join them.
+    case("two bare capitalised words are not joined",
+         "As shown (Pircher Verdorfer, 2016).", [],
          want_unres=["no_grammar_match"])
     # rc3 B2: a lower-case core is admitted, but ONLY immediately after a
     # matched particle. `Da silva` is a name; `smith` on its own is not, and
@@ -1635,12 +1660,57 @@ def main() -> int:
 
     # The citation-side null, which is what stops a compound surname the
     # grammar cannot express from producing a confident wrong answer.
-    _f, v, _c = ce.person_form("El Akremi et al.")
+    #
+    # The example moved on 6 October 2026. `El Akremi et al.` was the case the
+    # grammar could not express, and under Alex Zamurko's ruling it can, so it
+    # now yields the whole surname and this control would have been asserting
+    # that a supported name produces nothing. The rule being pinned is
+    # unchanged: a surname the grammar cannot express yields no structure
+    # rather than a partial one, because rc2 is explicit that a false mismatch
+    # is worse than no check.
+    #
+    # `Pircher Verdorfer` is the case that is now outside the grammar, by his
+    # instruction not to join two capitalised words automatically.
+    _f, v, _c = ce.person_form("Pircher Verdorfer et al.")
     if v is not None:
         failures.append(f"a compound surname outside the grammar must yield "
                         f"no structure rather than a partial one — got {v}")
     else:
         ok("a surname the grammar cannot express yields no structure")
+
+    # The token-level surname builder, called directly.
+    #
+    # Added 6 October 2026 because the mutation probe showed the rule had no
+    # control of its own: making the joining particle optional again inside
+    # `first_core` left every suite green. The regex refuses two bare words
+    # before the builder is ever reached, so the builder's own guard is
+    # unreachable from any document, and a second rule answering for the first
+    # is how C02-F08 came back twice in the review layer.
+    #
+    # So it is exercised where it lives. `Pircher Verdorfer` keeps only the
+    # first word; `Carrieri de Souza` keeps all three because a particle joins
+    # them.
+    if ce.first_core("Pircher Verdorfer") != "Pircher":
+        failures.append(
+            f"first_core joined two capitalised words with no particle "
+            f"between them — got {ce.first_core('Pircher Verdorfer')!r}. "
+            f"Alex Zamurko, 6 October: do not accept any two capitalised "
+            f"words automatically.")
+    elif ce.first_core("Carrieri de Souza") != "Carrieri de Souza":
+        failures.append(
+            f"first_core dropped a particle-joined second word — got "
+            f"{ce.first_core('Carrieri de Souza')!r}")
+    else:
+        ok("first_core joins on a particle and never on capitalisation alone")
+
+    # And the positive, so the control above cannot be satisfied by a
+    # person_form that has stopped expressing anything at all.
+    _f, v, _c = ce.person_form("El Akremi et al.")
+    if v != ["el akremi"]:
+        failures.append(f"a surname the grammar CAN express must yield it "
+                        f"whole — got {v}")
+    else:
+        ok("a particle-led compound surname yields the whole name")
 
     # §6.8's possessive, on this side too. Nine corpus mismatches were this
     # and this alone.

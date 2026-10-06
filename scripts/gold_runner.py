@@ -97,6 +97,48 @@ def items_of(doc: dict, fields: tuple[str, ...], what: str) -> dict[tuple, dict]
     return out
 
 
+def apply_variants(items: dict[tuple, dict], G: dict[tuple, dict],
+                   fields: tuple[str, ...]) -> dict[tuple, tuple]:
+    """Let a work match gold under any phrasing the manuscript used for it.
+
+    A manuscript writing both `(Duru et al., 2015)` and `Duru, Therond, and
+    Fares (2015)` cites one work, and the annotation recorded whichever
+    phrasing the annotator saw. So a gold item matches a candidate work if it
+    matches *any* variant of it, and the work still contributes one item to the
+    denominator. Without this the same work scored as one miss and one false
+    positive; ten works in gold paper 2 are cited under more than one phrase.
+
+    A function, and applied to BOTH sides, because of what it was before.
+
+    Until 6 October 2026 this ran over the candidate only, inline, and the
+    baseline at §15.1 was built without it. Every before-and-after comparison
+    therefore scored the candidate with variant matching and the baseline
+    without, which flatters the candidate by however many works the manuscript
+    phrases two ways. Running this file against ITSELF as both candidate and
+    baseline reported 93/98 for the baseline and 96/98 for the candidate, plus
+    one regression. A file cannot regress against itself, and that is how this
+    was found: by a control that should have existed from the first day and did
+    not.
+
+    The `ck in G` guard is the second half of the same defect. The remap POPS
+    the old key, so a candidate key that already matched gold, and that also
+    carried a variant pointing at some other gold key, lost the match it had.
+    That produced the phantom regression above. A work already counted correct
+    is never moved.
+    """
+    remap: dict[tuple, tuple] = {}
+    for ck, cv in items.items():
+        if ck in G:
+            continue
+        for variant in cv.get("author_phrase_variants") or []:
+            alt = key_of({**cv, "author_phrase": variant}, fields)
+            if alt != ck and alt in G and ck not in remap and alt not in items:
+                remap[ck] = alt
+    for old, new in remap.items():
+        items[new] = items.pop(old)
+    return remap
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         prog="gold_runner.py", description=__doc__,
@@ -168,14 +210,7 @@ def main() -> int:
     # Without this the same work scored as one miss and one false positive.
     # Ten works in gold paper 2 are cited under more than one phrase, and that
     # accounted for every one of that paper's eleven extras.
-    _remap = {}
-    for ck, cv in C.items():
-        for variant in cv.get("author_phrase_variants") or []:
-            alt = key_of({**cv, "author_phrase": variant}, fields)
-            if alt != ck and alt in G and ck not in _remap and alt not in C:
-                _remap[ck] = alt
-    for old, new in _remap.items():
-        C[new] = C.pop(old)
+    _remap = apply_variants(C, G, fields)
     if _remap:
         print(f"  {len(_remap)} candidate work(s) matched on an alternative "
               f"phrasing the manuscript also used")
@@ -238,6 +273,13 @@ def main() -> int:
                 "the gold set.\n  Comparing it with the candidate would "
                 "measure two texts, not two extractors.")
         B = items_of(base, fields, "baseline")
+        # The same remapping the candidate gets. Both sides are scored by one
+        # rule or the comparison measures the rule rather than the two
+        # extractors; see apply_variants.
+        _bmap = apply_variants(B, G, fields)
+        if _bmap:
+            print(f"  {len(_bmap)} baseline work(s) matched on an alternative "
+                  f"phrasing the manuscript also used")
 
         b_tp = set(B) & set(G)
         c_tp = set(C) & set(G)

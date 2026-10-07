@@ -1,0 +1,21 @@
+{
+  "schema": "run-pin-amendments/1",
+  "amendments": [
+    {
+      "reason": "specs/evidence-schema-v1.0.md is pinned as run-governing at init and is also one of the eleven components the covered manifest requires the review target to hold. An artifact cannot hold both roles: it would have to stay byte-identical for the whole run while also being changeable to resolve a finding raised about it, so the first repair would break the run's own pin and stop the cycle meant to demonstrate that repair. This is the same collision BOOTSTRAP-002 resolved at its cycle 2, in the same direction and for the same reason, leaving the protocol as the sole governing pin. `run_review.py init` requires at least one --spec, so the pin exists before it can be removed; this amendment is the mechanism the gate names for removing it rather than a way around the gate. Authority: Alex Zamurko, Slack, 25 September 2026 15:40, recorded in runs/BOOTSTRAP-002/pin-amendments.json. That ruling was given for BOOTSTRAP-002 and is applied here to a new run without asking again, because it decides the artifact's role rather than one run's arrangements. Flagged to him rather than assumed silently.",
+      "affected_artifacts": [
+        "specs/evidence-schema-v1.0.md"
+      ],
+      "prior_pin_set": [
+        "specs/evidence-schema-v1.0.md",
+        "specs/implementation-review-protocol-v1.1.md"
+      ],
+      "new_pin_set": [
+        "specs/implementation-review-protocol-v1.1.md"
+      ],
+      "effective_cycle": 1,
+      "authorized_by": "Alex Zamurko",
+      "at": "2026-10-07T08:40:00Z"
+    }
+  ]
+}

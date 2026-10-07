@@ -1,0 +1,64 @@
+{
+  "review_type": "plan",
+  "run_id": "BOOTSTRAP-003",
+  "cycle": 1,
+  "governing_pins": [
+    "specs/implementation-review-protocol-v1.1.md"
+  ],
+  "governing_pin_hashes": {
+    "specs/implementation-review-protocol-v1.1.md": "296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483"
+  },
+  "governing_artifacts_preserved": true,
+  "protocol_commit": "badd8ec5b23b2153903df2b47fa713d69ccef0e8",
+  "protocol_sha256": "296594a3c06cd2f9c66976c369b15804f39bbb2be37b5e62234d37fafd28d483",
+  "spec_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "frozen_at": "2026-10-07T08:40:40Z",
+  "evidence_format": "cycle-target/1",
+  "plan_files": [
+    {
+      "path": "specs/covered-components.json",
+      "sha256": "49cf5da6961051efc096cc073fd0cca3b4b13f24bc1c9d8fb3e86e41a89ac30e"
+    },
+    {
+      "path": "specs/evidence-schema-v1.0.md",
+      "sha256": "4203ba64bd5ba1db9cd56357c8bf9dd8e6efb419fab7f7635a415c272d3a739c"
+    },
+    {
+      "path": "scripts/authority.py",
+      "sha256": "c0a394d68ba5f13168dfc78b029ed6799f7bd16b25a21ba5f4ff4401e2efa6d6"
+    },
+    {
+      "path": "scripts/bootstrap_gate.py",
+      "sha256": "901d18105cfa50d27ac948aa8beaf2e112de19f8ee2a38dd9c02b8c108c6985b"
+    },
+    {
+      "path": "scripts/cycle_projection.py",
+      "sha256": "27b1e5782d6b4cdc46d0bbb997722099d7f244bc6d90e65d235f3ac405572a17"
+    },
+    {
+      "path": "scripts/findings_format.py",
+      "sha256": "8933e7e86a184a4a6db7dc4cb9a65d7ab3962107f2291b66a42447e571eb6cbb"
+    },
+    {
+      "path": "scripts/ledger.py",
+      "sha256": "2f86764173e423cb775cf7d47768440b7185f69681032117ee7cc7f154ddeb84"
+    },
+    {
+      "path": "scripts/loop_state.py",
+      "sha256": "10f1e1460ba9663f60c21d279736912eb503c58d62f5104542b1059158108300"
+    },
+    {
+      "path": "scripts/run_pins.py",
+      "sha256": "661b7d89a267061cc454a93780c987c3de6c471b4c472230165ece74c8e1b5b2"
+    },
+    {
+      "path": "scripts/run_review.py",
+      "sha256": "9b2f02ef20640fa2f5cd5f72cc9e1bbbe2d869f2ecfd1c5274472097d5358a4b"
+    },
+    {
+      "path": "scripts/validate_cycle.py",
+      "sha256": "7b8c45b9fa7edb4fefa025c8c010499983750396300e399a66e299966f22e768"
+    }
+  ],
+  "auxiliary_evidence_sha256": "fa89eed875809d7607b5f7de8efc4215a8ee67f1a0df8f6ccf8ea07b54e518b7"
+}

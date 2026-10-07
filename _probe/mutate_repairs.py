@@ -421,7 +421,11 @@ MUTATIONS = [
      "        _through = {v for v in valid if v <= num}",
      "        _through = set(valid)",
      "test_ledger.py",
-     "a later cycle's event cannot satisfy an earlier review"),
+     # The needle is the control whose fixture has nothing else wrong with it.
+     # Pointed at the reviewer's own fixture this line reported MISSED, because
+     # that one carries a contradictory origin too and the other rule refuses
+     # it first. Same defect, two fixtures, and only one of them isolates this.
+     "consistent origin in a later cycle still cannot answer"),
 
     ("D01-F01b  a recorded origin must agree with its own history",
      "loop_state.py",

@@ -2095,7 +2095,7 @@ def main() -> int:
     print()
     print("a later cycle's raising event satisfying an earlier review (D01-F01)")
 
-    def _raised_in(cycle_of_event: int):
+    def _raised_in(cycle_of_event: int, keep_declared: bool = True):
         root, commit = make_repo()
         made.append(root)
         rev = root / "runs" / "T-001" / "plan-review"
@@ -2122,7 +2122,20 @@ def main() -> int:
             for h in led["findings"]["C01-F01"]["history"]:
                 if h.get("event") == "RAISED":
                     h["cycle"] = cycle_of_event
-            led["findings"]["C01-F01"]["cycle_raised"] = 1
+            # `keep_declared` is the difference between the reviewer's fixture
+            # and the one that isolates the boundary rule.
+            #
+            # His kept `cycle_raised: 1` against an event in cycle 2, which is
+            # also a contradiction, and the contradiction check refuses it
+            # before the boundary rule is consulted. The mutation probe caught
+            # that immediately: removing the boundary rule left the suite green
+            # because the other check was answering for it.
+            #
+            # With both moved to 2 the entry is internally consistent and the
+            # only thing wrong is that cycle 1's reviewer reported a finding
+            # whose origin its own boundary cannot see.
+            led["findings"]["C01-F01"]["cycle_raised"] = (
+                1 if keep_declared else cycle_of_event)
             write_lf(p, json.dumps(led, indent=2))
         return loop(root, rev)
 
@@ -2162,6 +2175,25 @@ def main() -> int:
     else:
         print("  [ok] refused, with no LOOP_STATUS: a later cycle's event "
               "cannot satisfy an earlier review")
+
+    # The same defect with nothing else wrong in the file, so that the
+    # boundary rule is the only thing that can refuse it. Without this the
+    # control above passes on the contradiction check and the boundary rule
+    # could be deleted unnoticed, which is what the probe reported.
+    _late = _raised_in(2, keep_declared=False)
+    _lblob = _late.stdout + _late.stderr
+    if _late.returncode == 0:
+        failures.append(
+            f"a finding reported by cycle 1, raised consistently in cycle 2, "
+            f"produced {status_of(_late.stdout)}. Cycle 1's boundary cannot "
+            f"see the event that raised it, so at that boundary the reviewer's "
+            f"finding has no state at all.\n{_lblob[:400]}")
+    elif "no authoritative state" not in _lblob:
+        failures.append(f"refused, but not for the finding without a state at "
+                        f"its own boundary\n{_lblob[:400]}")
+    else:
+        print("  [ok] refused: a consistent origin in a later cycle still "
+              "cannot answer for an earlier boundary")
 
     # The second half of D01-F01's correction: "Refuse contradictory
     # originating-cycle metadata and history." That rule needs a control the

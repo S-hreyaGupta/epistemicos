@@ -223,9 +223,12 @@ def main() -> int:
     #
     # Two fixtures, because missing and unreadable are two states, and one
     # control covering both would pass while either of them went unwatched.
-    def _frozen_no_ledger(ledger_text):
+    def _frozen_no_ledger(ledger_text, cycle_findings=None):
         f = Path(tempfile.mkdtemp()); made.append(f)
         (f / "runs" / "T-001" / "plan-review" / "cycle-01").mkdir(parents=True)
+        if cycle_findings is not None:
+            (f / "runs" / "T-001" / "plan-review" / "cycle-01"
+             / "findings.json").write_text(cycle_findings, encoding="utf-8")
         (f / "scripts").mkdir()
         for name in ("approval_package.py", "loop_state.py", "ledger.py",
                      "validate_cycle.py", "cycle_projection.py", "authority.py",
@@ -239,6 +242,37 @@ def main() -> int:
                 ledger_text, encoding="utf-8")
         return run("--run", "T-001", "--type", "plan", cwd=f,
                    script=f / "scripts" / "approval_package.py")
+
+    # BOOTSTRAP-003's reviewer on SELF-F01: "a readable ledger containing
+    # `{"findings": {}}` beside a valid review reporting a finding still
+    # produces an approval package with exit 0... the unresolved-findings
+    # section says 'None' and its coverage item is marked present."
+    #
+    # The first repair handled the two ways a ledger can fail to be READ. This
+    # is the third way it can fail to be TRUE, and it is the one that produces
+    # a confident answer rather than an error. The ledger below is valid and
+    # parses; it simply holds none of what the cycle beside it reported.
+    _reported = json.dumps({
+        "schema": "cycle-findings/1",
+        "count": 1,
+        "findings": [{"id": "D01-F01", "class": "MISSING REQUIREMENT",
+                      "kind": "finding"}],
+    }, indent=2)
+    rr = _frozen_no_ledger(json.dumps({"review": "plan-review",
+                                       "findings": {}}, indent=2),
+                           cycle_findings=_reported)
+    _o = rr.stdout + rr.stderr
+    if rr.returncode == 0:
+        failures.append(
+            "a package was produced from a ledger that holds none of what the "
+            "review beside it reported. The findings section would say None, "
+            "which is a confident wrong answer rather than a missing one.")
+    elif "CANNOT_ESTABLISH" not in _o or "reported" not in _o:
+        failures.append(f"refused for a ledger disagreeing with its own "
+                        f"review, but not for that reason:\n{_o[-400:]}")
+    else:
+        ok("refused: a readable ledger that holds none of what the review "
+           "reported")
 
     for _label, _text in (("missing", None), ("unreadable", "{ not json")):
         rr = _frozen_no_ledger(_text)

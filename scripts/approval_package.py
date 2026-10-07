@@ -50,6 +50,10 @@ sys.path.insert(0, str(SCRIPTS))
 # `.startswith("EXEMPT")`, which made a missing or unrecognised label produce a
 # package carrying no qualification at all.
 import run_pins  # noqa: E402
+# For `authoritative_items` only: what a cycle's review reported, read by the
+# controller's own reader so this file cannot develop a second opinion about
+# it. See the reconciliation under SELF-F01 below.
+import loop_state  # noqa: E402
 
 # The ten items §7 names, in its order. Presence is reported against this list
 # rather than against whatever the package happened to manage, so an item that
@@ -220,9 +224,38 @@ def main() -> int:
             "is missing" if not ledger_json.is_file() else "")
     if not _bad:
         try:
-            json.loads(ledger_json.read_text(encoding="utf-8"))
+            _led = json.loads(ledger_json.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
             _bad = f"is not readable as a ledger: {e}"
+        else:
+            # BOOTSTRAP-003, D01's review of SELF-F01: "a readable ledger
+            # containing `{"findings": {}}` beside a valid review reporting a
+            # finding still produces an approval package with exit 0... the
+            # unresolved-findings section says 'None' and its coverage item is
+            # marked present. Reconcile findings before asserting empty
+            # categories."
+            #
+            # The repair stopped at missing and unparseable, which are the two
+            # ways a ledger can fail to be read. A ledger that reads perfectly
+            # and disagrees with the reviews beside it is the third, and it is
+            # the one that produces a confident wrong answer instead of an
+            # error.
+            #
+            # The recorded findings come from loop_state's own reader rather
+            # than a second one written here. A second implementation of "what
+            # did this cycle report" is free to disagree with the first, which
+            # is the defect this layer has found in itself repeatedly.
+            _held = set(_led.get("findings", {}))
+            _absent = {}
+            for _c in cy:
+                for _item in loop_state.authoritative_items(_c):
+                    _fid = _item.get("id")
+                    if _fid and _fid not in _held:
+                        _absent.setdefault(_c.name, []).append(_fid)
+            if _absent:
+                _bad = ("holds none of what the reviews beside it reported: "
+                        + "; ".join(f"{k} reported {', '.join(v)}"
+                                    for k, v in sorted(_absent.items())))
     if _bad:
         raise Refused(
             f"FINDINGS_STATE: CANNOT_ESTABLISH\n"

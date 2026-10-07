@@ -558,12 +558,31 @@ def recover() -> int:
               f"that guesses is worse than one that refuses. Read `git diff "
               f"{rel}`,\n  put it back yourself, then delete {ACTIVE.name}.")
         return 2
-    r = subprocess.run(["git", "-C", str(REPO), "checkout", "--", rel],
-                       capture_output=True, text=True)
+    # The bytes HEAD holds for this path, written directly.
+    #
+    # This was `git checkout -- <path>`, which restores from the INDEX, not from
+    # HEAD, while the message below said HEAD. BOOTSTRAP-003's reviewer built
+    # the case: unchanged HEAD, mutated working bytes matching the sentinel,
+    # different bytes staged. Recovery returned 0, wrote the staged bytes, and
+    # reported that it had restored from HEAD. The sentence was false and the
+    # file was wrong, and nothing here could have noticed either.
+    #
+    # `git show HEAD:<path>` names its source in the command, cannot be
+    # satisfied by anything in the index, and leaves the index alone, which
+    # matters because someone else's staged work is not this probe's to revert.
+    r = subprocess.run(["git", "-C", str(REPO), "show", f"HEAD:{rel}"],
+                       capture_output=True)
     if r.returncode != 0:
-        print(f"  [CANNOT RUN] {rel} could not be restored from HEAD: "
-              f"{r.stderr.strip()}")
+        print(f"  [CANNOT RUN] {rel} could not be read from HEAD: "
+              f"{r.stderr.decode('utf-8', 'replace').strip()}")
         return 2
+    path.write_bytes(r.stdout)
+    # Verified rather than assumed: the file now holds what HEAD holds.
+    with path.open("r", encoding="utf-8", newline="") as fh:
+        if _sha_text(fh.read()) != hashlib.sha256(r.stdout).hexdigest():
+            print(f"  [CANNOT RUN] {rel} was rewritten from HEAD and does not "
+                  f"match HEAD afterwards. Restore it by hand.")
+            return 2
     ACTIVE.unlink()
     print(f"  [recovered] a previous run was killed while {rel} held the "
           f"mutation for\n  {label}. It is restored from HEAD. That run "
@@ -591,6 +610,18 @@ def main() -> int:
     # A filtered run is not a verification run: it says nothing about the
     # repairs it skipped, and the summary below says which it looked at rather
     # than claiming the whole set.
+    # Recovery first, before the arguments are even looked at.
+    #
+    # It used to sit after the filter check, so `mutate_repairs.py NOPE` exited
+    # on "nothing matches" with a mutation still applied to tracked source. The
+    # argument list has nothing to do with whether the working tree is in a
+    # state this probe left behind, and a tree left mutated should be put back
+    # whatever you asked for. Found by test_probe_recovery.py, whose fixture
+    # passes a filter that matches nothing precisely so that no mutation runs.
+    rc = recover()
+    if rc:
+        return rc
+
     want = [a for a in sys.argv[1:] if not a.startswith("-")]
     selected = [m for m in MUTATIONS
                 if not want or any(w.lower() in m[0].lower() for w in want)]
@@ -598,13 +629,10 @@ def main() -> int:
         print(f"  [CANNOT RUN] nothing matches {', '.join(want)}")
         return 2
 
-    # Before the clean-tree guard, because the commonest reason this tree is
-    # dirty is this probe itself, and "commit or discard them first" is the
-    # wrong instruction for a file this process mutated and failed to put back.
-    rc = recover()
-    if rc:
-        return rc
-
+    # The clean-tree guard follows recovery above, because the commonest reason
+    # this tree is dirty is this probe itself, and "commit or discard them
+    # first" is the wrong instruction for a file this process mutated and
+    # failed to put back.
     targets = sorted({f"scripts/{m[1]}" for m in selected})
     try:
         dirty = modified(targets)

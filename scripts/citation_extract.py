@@ -408,6 +408,9 @@ EXCLUDED_CONTEXT = {
 # from the conjunction itself. `_prefix_discardable` holds that rule; this set
 # only names the words it applies to.
 _CONJUNCTIONS = {"and", "or", "but"}
+# A year in brackets, closing the word in front of a run: `(2008)`, `(2008).`,
+# `(2020a)`. Built from YEAR so the two cannot drift apart.
+_COMPLETED_UNIT = re.compile(rf"\([^()]*(?:{YEAR})[^()]*\)[.,;:]?\Z")
 
 STOP = {
     "january", "february", "march", "april", "may", "june", "july", "august",
@@ -1642,7 +1645,23 @@ def _prefix_discardable(body: str, run_start: int, sent_start: int,
     while k > sent_start and body[k - 1] not in " \t\n":
         k -= 1
     prev = body[k:j]
-    return (not prev) or prev[-1:] in ",;:"
+    if (not prev) or prev[-1:] in ",;:":
+        return True
+    # Alex Zamurko, 7 October 2026, first question of his decision hierarchy:
+    # "Is there already a complete author-year citation immediately before
+    # `and`? If yes, `and` may connect a second citation or ordinary prose."
+    #
+    # A completed year parenthesis is that boundary. `Johns (2008) and Müller
+    # (2008)` is two citations and the clause rule above refused it, because
+    # `(2008)` is not punctuation that ends a clause. The same sentence with a
+    # comma after `and` already worked, which is the tell: the parse was
+    # turning on an incidental comma rather than on the structure.
+    #
+    # Measured before the change, over his twenty cases: this was the only
+    # defect among the High and Medium ones, and it loses a citation silently
+    # rather than reporting it unresolved, which is the worse of the two
+    # failures.
+    return bool(_COMPLETED_UNIT.search(prev))
 
 
 def _paren_segments(c1: str, pat):

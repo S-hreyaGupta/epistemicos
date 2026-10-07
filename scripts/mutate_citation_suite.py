@@ -123,6 +123,18 @@ MUTATIONS = [
      # rule is actually about: a capitalised particle inside a parenthetical.
      "capitalised particle, parenthetical"),
 
+    ("a completed year unit stops being a boundary",
+     "    return bool(_COMPLETED_UNIT.search(prev))",
+     "    return False",
+     "a completed year unit in front of the conjunction is a boundary"),
+
+    # The other half of the same rule: any bracket would do, so a parenthesis
+    # with no year in it starts salvaging the name after it.
+    ("any bracket counts as a completed unit, year or not",
+     "_COMPLETED_UNIT = re.compile(rf\"\\([^()]*(?:{YEAR})[^()]*\\)[.,;:]?\\Z\")",
+     "_COMPLETED_UNIT = re.compile(r\"\\([^()]*\\)[.,;:]?\\Z\")",
+     "a bracket with no year in it is not a boundary"),
+
     ("the exclusion list is never consulted",
      "    return (bare.lower() in STOP or bare.lower() in EXCLUDED_CONTEXT",
      "    return (bare.lower() in STOP or False",

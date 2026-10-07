@@ -202,3 +202,76 @@ would look has not been built yet.
 
 Not being built: anything that confirms a compound surname from capitalisation,
 and anything that reads the reference list to do it.
+
+---
+
+# The `and` taxonomy, 7 October 2026
+
+Alex Zamurko sent twenty cases of `and` in and around narrative citations, each
+with a provisional likelihood, the role the token plays, and the treatment he
+requires. He asked for likelihoods as High / Medium / Low / Rare rather than
+numbers, "without corpus counts, numeric probabilities would be invented", to
+be replaced by measured frequencies if the corpus is re-counted.
+
+His governing invariant, which he states is stronger than the exclusion list it
+replaces:
+
+    `and` is never removed before the parser determines what it connects. A
+    malformed larger candidate must not generate a smaller valid citation by
+    deletion. Where surface syntax cannot establish the author structure
+    deterministically, use reference-list confirmation; otherwise preserve
+    uncertainty.
+
+And his decision hierarchy, in order: is there a complete author-year citation
+immediately before the `and`; does the `and` sit inside the candidate author
+span before a year; can both sides parse under the explicit author grammar; is
+the candidate contaminated or ambiguous, in which case the bad portion is never
+discarded to keep a valid-looking suffix; can the reference list resolve it;
+otherwise UNRESOLVED.
+
+His scope instruction, by message the same afternoon: resolve the High and
+Medium cases now, record the Low ones as future work, and keep reference-list
+confirmation for later.
+
+## Measured before changing anything
+
+All twenty cases were run against the code as it stood. The results are in the
+git history of this file's commit rather than restated as a claim. One defect
+appeared among the High and Medium cases, in three of them:
+
+    3   High      Johns (2008) and Müller (2008)                 Müller lost
+    13  Medium    Smith and Jones (2020) and Müller (2021)       Müller lost
+    14  Low-Med   Smith and Jones (2020) and Brown and Green (2021)  same
+
+A citation was being dropped silently rather than reported unresolved, which is
+the worse of the two failures and the one the parser had no way to show.
+
+Case 20, `According to Smith (2020) and, more recently, Müller (2022)`, already
+worked, and that is what identified the cause: it has a comma after the `and`,
+so the parse was turning on incidental punctuation rather than on the structure
+in front of it.
+
+## What was built
+
+His hierarchy step 1, as a rule: a completed year parenthesis standing in front
+of the candidate run is a boundary, so a conjunction after it connects
+citations rather than authors. Four controls, including one that keeps the rule
+from widening into "any bracket will do".
+
+With that in, every High and Medium case in his table behaves as he specifies.
+
+## Future work, by his instruction
+
+    8   Low       `??? Seuring and Müller (2008)` salvages `seuring|2008`
+                  where he requires unresolved. The serial-author grammar
+                  accepts `Seuring and Müller` as a two-author list, so the
+                  contamination to its left is never consulted.
+    11  Low       `Johnson and Johnson (2020)` parses as two authors where he
+                  wants reference-list confirmation of person versus
+                  institution.
+    9, 10         Both land on unresolved, which is his stated fallback when
+                  reference-list confirmation is unavailable. They become
+                  correct rather than merely safe when that step exists.
+
+Reference-list confirmation remains deferred, by his instruction of 6 October
+and again on 7 October.

@@ -400,6 +400,29 @@ def main() -> int:
          ["jones|2019"])
     case("a conjunction opening the sentence is discarded",
          "Text here. And Jones (2019) agrees.", ["jones|2019"])
+    # Alex Zamurko's decision hierarchy, 7 October 2026, step 1: a completed
+    # author-year unit in front of the conjunction is itself the boundary. His
+    # cases 3, 13 and 14, which were losing the second citation entirely.
+    case("a completed year unit in front of the conjunction is a boundary",
+         "Text here. Johns (2008) and Muller (2008) agree.",
+         ["johns|2008", "muller|2008"])
+    case("the same with two authors on the left",
+         "Text here. Smith and Jones (2020) and Muller (2021) agree.",
+         ["smith|2020", "muller|2021"])
+    case("and on both sides of the second conjunction",
+         "Text here. Smith and Jones (2020) and Brown and Green (2021) agree.",
+         ["smith|2020", "brown|2021"])
+    # The boundary is the completed unit and not the bracket: a parenthesis
+    # with no year in it leaves the conjunction unexplained, so the parse stays
+    # refused rather than salvaging the right-hand name.
+    # One token, so the bracket and its contents are both in the word the rule
+    # inspects. An earlier version of this fixture wrote `(the method)`, where
+    # the preceding word is `method)` with no opening bracket in it: the rule
+    # and a mutation admitting any bracket at all both refuse that, for the
+    # same reason, and the probe reported the control as testing nothing.
+    case("a bracket with no year in it is not a boundary",
+         "Text here. We used (ibid) and Muller (2008) throughout.", [],
+         want_unres=["no_grammar_match"])
 
     # ---- institutional, §12 row 7. The row this suite exists for. ----
     print("\ninstitutional")

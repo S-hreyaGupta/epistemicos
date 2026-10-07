@@ -260,6 +260,25 @@ from widening into "any bracket will do".
 
 With that in, every High and Medium case in his table behaves as he specifies.
 
+## Measured, 7 October
+
+Against the gold sets, each step scored with the same baseline rule on both
+sides, after the scorer defect recorded as SELF-F03 was repaired:
+
+    gold paper 2    90/102  stage 1 baseline, his particle list
+                    93/102  stage 1
+                    94/102  stage 2 and this taxonomy work
+    gold paper 1    96/98   unchanged at every step
+
+Zero regressions at every step, and zero new false positives in the last one.
+The false positive stage 2 introduced on its own, `muller|2008` out of `Seuring
+and Müller (2008)`, is gone: it is the case the conjunction rule refuses.
+
+One qualification on all four numbers. They are produced by `gold_runner.py`,
+whose baseline arm was repaired on 6 October and has been reviewed by nobody
+since. They are better founded than the figures taken before that repair and
+they are still the implementing agent's own measurements.
+
 ## Future work, by his instruction
 
     8   Low       `??? Seuring and Müller (2008)` salvages `seuring|2008`

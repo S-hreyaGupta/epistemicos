@@ -1,0 +1,19 @@
+{
+  "schema": "cycle-capture/1",
+  "authoritative": 1,
+  "attempts": [
+    {
+      "attempt": 1,
+      "recorded_at": "2026-10-07T19:23:17Z",
+      "source": "C:\\EpistemicOS\\epistemicos\\reply003-02.md",
+      "invocation": "manual",
+      "note": "",
+      "sha256": "5aefc52566727fc8a859fed350b10f5eaf69d0856942bbe689029c036af63027",
+      "bytes": 3943,
+      "valid": true,
+      "problems": [],
+      "retry_reason": ""
+    }
+  ],
+  "authoritative_sha256": "5aefc52566727fc8a859fed350b10f5eaf69d0856942bbe689029c036af63027"
+}

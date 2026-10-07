@@ -18,9 +18,40 @@
           "event": "ACCEPT",
           "note": "reproduced as described: moving only the RAISED event to a later cycle turns STALLED into CONVERGED while the reviewer evidence and cycle_raised are unchanged",
           "state": "OPEN"
+        },
+        {
+          "at": "2026-10-07T19:24:56Z",
+          "cycle": 2,
+          "event": "DEMONSTRATED",
+          "note": "cycle 02 review: boundary-limited replay rejects a later RAISED event answering an earlier review, including where the origin metadata consistently names the later cycle, and the contradiction check rejects disagreement between cycle_raised and history. Delayed-origin reproductions refused without emitting LOOP_STATUS; the ledger suite passed independently.",
+          "state": "RESOLVED"
         }
       ],
       "requirement_id": "MC-2 authoritative-finding accounting; protocol section 6 boundary-specific finding sets and convergence",
+      "source": "CODEX_REVIEW",
+      "state": "RESOLVED"
+    },
+    "D02-F01": {
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "cycle_raised": 2,
+      "history": [
+        {
+          "at": "2026-10-07T19:24:54Z",
+          "cycle": 2,
+          "event": "RAISED",
+          "note": "a canonical finding identifier anywhere in a zero-finding reply is read as a finding block that failed to parse, so a review saying a named repair is demonstrated cannot be captured at all",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-10-07T19:24:55Z",
+          "cycle": 2,
+          "event": "ACCEPT",
+          "note": "reproduced: the reviewer supplied the target hash and a sentence naming D01-F01 as demonstrated, and both extract and capture_validity refused it. The cycle 02 prompt asked for exactly that reply, so I specified a review this recorder cannot accept.",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "section 4 review reporting; section 5 repair demonstration; section 6 convergence",
       "source": "CODEX_REVIEW",
       "state": "OPEN"
     }

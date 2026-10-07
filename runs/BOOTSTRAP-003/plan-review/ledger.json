@@ -1,0 +1,29 @@
+{
+  "findings": {
+    "D01-F01": {
+      "class": "MISSING REQUIREMENT",
+      "cycle_raised": 1,
+      "history": [
+        {
+          "at": "2026-10-07T12:07:51Z",
+          "cycle": 1,
+          "event": "RAISED",
+          "note": "the stateless-finding check replays history over every valid cycle, so a RAISED event dated to a later cycle satisfies an earlier boundary and the controller reports CONVERGED where that boundary's own reviewer reported an open finding",
+          "source": "CODEX_REVIEW",
+          "state": "OPEN"
+        },
+        {
+          "at": "2026-10-07T12:23:02Z",
+          "cycle": 1,
+          "event": "ACCEPT",
+          "note": "reproduced as described: moving only the RAISED event to a later cycle turns STALLED into CONVERGED while the reviewer evidence and cycle_raised are unchanged",
+          "state": "OPEN"
+        }
+      ],
+      "requirement_id": "MC-2 authoritative-finding accounting; protocol section 6 boundary-specific finding sets and convergence",
+      "source": "CODEX_REVIEW",
+      "state": "OPEN"
+    }
+  },
+  "review": "plan-review"
+}

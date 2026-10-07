@@ -294,3 +294,7 @@ they are still the implementing agent's own measurements.
 
 Reference-list confirmation remains deferred, by his instruction of 6 October
 and again on 7 October.
+
+Everything deferred on the citation side now lives in one place,
+`specs/citation/FUTURE-WORK.md`, including the Low cases above, reference-list
+confirmation, and the non-year publication-status rule he added on 7 October.

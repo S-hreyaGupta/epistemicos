@@ -634,15 +634,31 @@ def _run(a) -> int:
     # whose origin is not authoritative would be this controller deciding what
     # a review found, and "do not infer resolution or zero findings" cuts both
     # ways: inferring OPEN is still inferring.
+    # D01-F01, BOOTSTRAP-003 cycle 01. The replay above used to run over
+    # `set(valid)`, every valid cycle in the run, while each boundary is
+    # computed over `valid[:n]`. So a finding reported by cycle 1's reviewer,
+    # whose RAISED event is dated to cycle 2, reached a state here and had none
+    # at its own boundary, where it silently left OPEN_1 and the controller
+    # reported CONVERGED at a boundary whose reviewer had reported it.
+    #
+    # The reviewer's fixture: two valid cycles, cycle 1 reporting one finding
+    # and cycle 2 asserting zero. With RAISED(1) the controller says STALLED.
+    # Moving only that event to RAISED(2), with `cycle_raised: 1` and the
+    # reviewer evidence untouched, produced CONVERGED and exit 0.
+    #
+    # So the replay is limited to the cycles through the reporting boundary,
+    # which is the question actually being asked: does this finding have a
+    # state established by the cycles that had reported it by then.
     _stateless: list[str] = []
     _seen: set[str] = set()
     for num, d in dirs:
         if num not in valid:
             continue
+        _through = {v for v in valid if v <= num}
         for i in authoritative_findings(d):
             if i in _seen:
                 continue
-            if state_after(ledger["findings"][i], set(valid)) is None:
+            if state_after(ledger["findings"][i], _through) is None:
                 _seen.add(i)
                 _stateless.append(f"cycle-{num:02d}: {i}")
     if _stateless:
@@ -658,8 +674,40 @@ def _run(a) -> int:
             "review had reported\n  nothing, which is how an unresolved "
             "defect becomes CONVERGED. Repair the\n  invalidated cycle's "
             "evidence, or raise the finding in a cycle that counts.")
-    lines.append("  and every one of them has a state the valid cycles "
-                 "produce")
+    lines.append("  and every one of them has a state the cycles that had "
+                 "reported it produce")
+
+    # D01-F01's second half, in the reviewer's words: "Refuse contradictory
+    # originating-cycle metadata and history rather than allowing a later
+    # RAISED event to satisfy an earlier review."
+    #
+    # An entry carries `cycle_raised` and a RAISED event carrying its own
+    # cycle. Nothing compared them, so the fixture above could keep
+    # `cycle_raised: 1` while the event said 2 and the file read as coherent.
+    # The boundary rule above now refuses that case on its consequences; this
+    # refuses it on its face, which is the better error message and does not
+    # depend on a cycle happening to report the finding.
+    _contradictory: list[str] = []
+    for _fid, _entry in sorted(ledger.get("findings", {}).items()):
+        _declared = _entry.get("cycle_raised")
+        _events = [h.get("cycle") for h in _entry.get("history", [])
+                   if h.get("event") == "RAISED"]
+        if _declared is None or not _events:
+            continue
+        if any(c != _declared for c in _events):
+            _contradictory.append(
+                f"{_fid}: cycle_raised is {_declared}, its RAISED event(s) are "
+                f"in {', '.join(str(c) for c in _events)}")
+    if _contradictory:
+        raise CannotCalculate(
+            "a finding's recorded origin disagrees with its own history:\n  "
+            + "\n  ".join(_contradictory) +
+            "\n\n  One of the two is wrong and this controller cannot tell "
+            "which. Taking the event\n  lets a later cycle satisfy an earlier "
+            "review; taking the field lets the field\n  assert an origin no "
+            "event supports. Correct the ledger rather than choosing here.")
+    lines.append("  and none of them was raised in a cycle other than the one "
+                 "it records")
 
     # C02-F04. Having a state is not the same as having the right one.
     #

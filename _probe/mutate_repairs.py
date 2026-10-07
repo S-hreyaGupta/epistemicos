@@ -411,6 +411,25 @@ MUTATIONS = [
      "test_run_review.py",
      "a line the candidate does not contain"),
 
+    # D01-F01, BOOTSTRAP-003 cycle 01. Two rules, two mutations: the replay is
+    # limited to the cycles that had reported the finding, and the recorded
+    # origin must agree with the event that records it. Each needs its own
+    # line, because with the first in place removing the second changes nothing
+    # any control could see, which is the shape this probe keeps finding.
+    ("D01-F01a  a finding's state comes from the cycles that reported it",
+     "loop_state.py",
+     "        _through = {v for v in valid if v <= num}",
+     "        _through = set(valid)",
+     "test_ledger.py",
+     "a later cycle's event cannot satisfy an earlier review"),
+
+    ("D01-F01b  a recorded origin must agree with its own history",
+     "loop_state.py",
+     "        if any(c != _declared for c in _events):",
+     "        if False:",
+     "test_ledger.py",
+     "disagrees with its own RAISED event"),
+
     ("C03-F01  a finished review is reparsed with its own grammar",
      "loop_state.py",
      "        _grammar = structured.get(\"finding_id_grammar\")",

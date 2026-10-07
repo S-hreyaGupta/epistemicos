@@ -2078,6 +2078,130 @@ def main() -> int:
         print("  [ok] refused: a valid review's finding with no "
               "authoritative state, named")
 
+    # D01-F01, BOOTSTRAP-003 cycle 01. A later cycle's RAISED event satisfying
+    # an earlier cycle's review.
+    #
+    # The stateless check replayed each finding's history over every valid
+    # cycle, while each boundary is computed over the cycles up to it. So a
+    # finding reported by cycle 1 whose RAISED event sits in cycle 2 had a
+    # state here and none at its own boundary: it left OPEN_1 without being
+    # resolved by anything and the controller reported CONVERGED at a boundary
+    # whose own reviewer had reported it.
+    #
+    # The reviewer's fixture, rebuilt: cycle 1 reports one finding, cycle 2
+    # asserts zero, and only the raising event moves. `cycle_raised` and the
+    # reviewer evidence are untouched, which is what makes it a test of the
+    # controller rather than of a mangled file.
+    print()
+    print("a later cycle's raising event satisfying an earlier review (D01-F01)")
+
+    def _raised_in(cycle_of_event: int):
+        root, commit = make_repo()
+        made.append(root)
+        rev = root / "runs" / "T-001" / "plan-review"
+        make_cycle(root, rev, 1, commit)
+        make_cycle(root, rev, 2, commit)
+        # Always raised through the tool, in cycle 1. The identifier encodes
+        # its own cycle, so `raise --cycle 2 --id C01-F01` is refused outright
+        # and the fixture cannot be built that way; the first version of this
+        # control tried and died on the missing key. The reviewer's case is
+        # made by moving the recorded event afterwards, which is what he
+        # described: "changing only that history event".
+        ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--class", "UNTESTED RULE",
+               "--source", "CODEX_REVIEW")
+        # Cycle 1 reports it. Cycle 2 keeps make_cycle's zero-findings
+        # assertion, so the second cycle genuinely reports nothing and the only
+        # thing in question is where the raising event sits.
+        _reports_it(rev / "cycle-01", 1)
+        if cycle_of_event != 1:
+            # `cycle_raised` stays 1, as the reviewer had it: the file reads as
+            # coherent and only the event is out of place.
+            p = rev / "ledger.json"
+            led = json.loads(p.read_text(encoding="utf-8"))
+            for h in led["findings"]["C01-F01"]["history"]:
+                if h.get("event") == "RAISED":
+                    h["cycle"] = cycle_of_event
+            led["findings"]["C01-F01"]["cycle_raised"] = 1
+            write_lf(p, json.dumps(led, indent=2))
+        return loop(root, rev)
+
+    # The baseline first. With the event where it belongs this is an ordinary
+    # open finding, so the refusal below cannot be refusing the fixture.
+    _ok = _raised_in(1)
+    if _ok.returncode != 0:
+        failures.append(f"a finding raised in the cycle that reported it was "
+                        f"refused, so the control below establishes nothing\n"
+                        f"{_ok.stderr}{_ok.stdout}")
+    elif status_of(_ok.stdout) == "CONVERGED":
+        failures.append("a finding reported by cycle 1 and never resolved "
+                        "produced CONVERGED")
+    else:
+        print(f"  [ok] raised where it was reported, it is an ordinary open "
+              f"finding ({status_of(_ok.stdout)})")
+
+    _moved = _raised_in(2)
+    _mblob = _moved.stdout + _moved.stderr
+    if _moved.returncode == 0:
+        failures.append(
+            f"moving only the raising event to a later cycle produced "
+            f"{status_of(_moved.stdout)}. Cycle 1's reviewer reported this "
+            f"finding and cycle 1's boundary cannot see the event that raised "
+            f"it.\n{_mblob[:400]}")
+    # `LOOP_STATUS:` with its colon, because the refusal's own epilogue says
+    # "No LOOP_STATUS is emitted" and the bare word matches that sentence. The
+    # first version of this control failed on exactly that, which is the same
+    # mistake as a control passing on the wrong message, caught in the other
+    # direction.
+    elif any(ln.strip().startswith("LOOP_STATUS:")
+             for ln in _mblob.splitlines()):
+        failures.append(f"the controller refused and declared a status "
+                        f"anyway\n{_mblob[:400]}")
+    elif "C01-F01" not in _mblob:
+        failures.append(f"the refusal does not name the finding\n{_mblob[:400]}")
+    else:
+        print("  [ok] refused, with no LOOP_STATUS: a later cycle's event "
+              "cannot satisfy an earlier review")
+
+    # The second half of D01-F01's correction: "Refuse contradictory
+    # originating-cycle metadata and history." That rule needs a control the
+    # boundary rule above cannot satisfy, or removing it would change nothing
+    # observable and it would sit there unwatched.
+    #
+    # So: no cycle reports the finding at all. The boundary check never looks
+    # at it, and the only thing that can notice `cycle_raised: 1` against a
+    # RAISED event in cycle 2 is the comparison between the two.
+    def _contradiction_only():
+        root, commit = make_repo()
+        made.append(root)
+        rev = root / "runs" / "T-001" / "plan-review"
+        make_cycle(root, rev, 1, commit)
+        make_cycle(root, rev, 2, commit)
+        ledger(root, "raise", "--review", str(rev), "--cycle", "1",
+               "--id", "C01-F01", "--class", "UNTESTED RULE",
+               "--source", "CODEX_REVIEW")
+        p = rev / "ledger.json"
+        led = json.loads(p.read_text(encoding="utf-8"))
+        for h in led["findings"]["C01-F01"]["history"]:
+            if h.get("event") == "RAISED":
+                h["cycle"] = 2
+        write_lf(p, json.dumps(led, indent=2))
+        return loop(root, rev)
+
+    _contra = _contradiction_only()
+    _cblob = _contra.stdout + _contra.stderr
+    if _contra.returncode == 0:
+        failures.append(
+            f"a ledger entry whose cycle_raised disagrees with its own RAISED "
+            f"event was accepted, because no cycle happened to report it. One "
+            f"of the two fields is wrong either way.\n{_cblob[:400]}")
+    elif "disagrees with its own history" not in _cblob:
+        failures.append(f"refused, but not for the contradictory origin\n"
+                        f"{_cblob[:400]}")
+    else:
+        print("  [ok] refused: a recorded origin that disagrees with its own "
+              "history, even where nothing reported it")
+
     # C01-F05. Classification was `"DEVELOPMENT" if label.startswith("EXEMPT")
     # else "PROTOCOL"`, so a missing, empty or unrecognised label all meant
     # PROTOCOL. Absence bought the stronger claim.

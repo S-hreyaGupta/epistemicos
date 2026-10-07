@@ -125,6 +125,7 @@ def cycle_for_prompt(p: Path) -> int:
 RUN_LETTER = {
     "BOOTSTRAP-001": "B",
     "BOOTSTRAP-002": "C",
+    "BOOTSTRAP-003": "D",
 }
 
 

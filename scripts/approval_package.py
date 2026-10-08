@@ -436,12 +436,17 @@ def main() -> int:
           "to tell you either way.")
         _entries = None
     if _entries is not None:
+        # The state glossary is read from the register rather than restated
+        # here. Two copies of a definition are two definitions, and the one in
+        # this file would be the one nobody updates.
+        _gloss = _rg.get("states", {})
         _live = {k: v for k, v in sorted(_entries.items())
                  if v.get("state") != "RESOLVED"}
         if not _live:
             W("None outstanding.")
         for _k, _v in _live.items():
-            W(f"### {_k} — `{_v.get('state', '?')}`")
+            _st = _v.get("state", "?")
+            W(f"### {_k} — `{_st}`")
             W("")
             W(_v.get("description", "(no description)"))
             W("")
@@ -450,9 +455,34 @@ def main() -> int:
             W(f"- discovered: {_v.get('discovery_source', '?')}")
             W(f"- repair: {_v.get('proposed_repair', '?')}")
             W("")
-            W("`REPAIRED_UNREVIEWED` means a repair has landed with controls "
-              "behind it and nobody independent has examined it. It is not a "
-              "resolution.")
+            # This printed the REPAIRED_UNREVIEWED gloss under every entry
+            # whatever its state, so an OPEN defect with no repair at all was
+            # followed by a paragraph beginning "a repair has landed". The
+            # same shape as the rest of this run's findings: a label that was
+            # right for the case it was written against and was then applied
+            # to every case.
+            if _st in _gloss:
+                W(f"`{_st}` means {_gloss[_st]}. It is not a resolution.")
+            W("")
+
+        # Resolved entries used to leave no trace at all. A reader following a
+        # particular disclosure through successive packages would find it
+        # simply gone, with nothing to say whether it had been resolved or
+        # quietly deleted from the register. The ledger above prints a count of
+        # its resolved findings for the same reason; this is the register's.
+        _done = {k: v for k, v in sorted(_entries.items())
+                 if v.get("state") == "RESOLVED"}
+        if _done:
+            W(f"### Resolved and no longer outstanding — {len(_done)}")
+            W("")
+            W("Listed by identifier only. `RESOLVED` here means an independent "
+              "review examined the repair in a later target and found it held, "
+              "and the register carries that reviewer's own limits with it.")
+            W("")
+            for _k, _v in _done.items():
+                _hist = _v.get("history", [])
+                _by = _hist[-1].get("by", "?") if _hist else "?"
+                W(f"- **{_k}** · resolved per {_by}")
             W("")
     W("")
 

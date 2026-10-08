@@ -461,6 +461,61 @@ def main() -> int:
             ok(f"{len(live)} implementer-disclosed defect(s) appear under "
                f"their own heading, after the reviewer findings")
 
+        # The section as the package actually laid it out, split per entry, so
+        # the two controls below assert about one entry's own block rather
+        # than about the whole document. My earlier controls in this file
+        # passed by matching text that belonged to a different part of the
+        # page, which is the same defect as the one they were watching for.
+        _sec = t2.split("## Implementer-disclosed defects", 1)[-1]
+        _sec = _sec.split("## MC-2 conformance", 1)[0]
+        _blocks = {}
+        for _chunk in _sec.split("\n### ")[1:]:
+            _blocks[_chunk.split("\n", 1)[0].split(" ")[0].strip("*` ")] = _chunk
+
+        # The glossary paragraph under each entry must describe that entry's
+        # state. It used to print the REPAIRED_UNREVIEWED text unconditionally,
+        # so an OPEN defect with no repair carried a line reading "a repair has
+        # landed with controls behind it".
+        wrong_gloss = []
+        for k, v in reg.get("entries", {}).items():
+            st = v.get("state")
+            if st == "RESOLVED" or k not in _blocks:
+                continue
+            for other in reg.get("states", {}):
+                if other != st and f"`{other}` means" in _blocks[k]:
+                    wrong_gloss.append(f"{k} is {st} but its block explains {other}")
+        if wrong_gloss:
+            failures.append("an entry is glossed with a state it is not in: "
+                            + "; ".join(wrong_gloss))
+        elif not _blocks:
+            failures.append("no implementer-disclosed entry blocks were found "
+                            "to check, so this control proves nothing")
+        else:
+            ok("each disclosed defect is glossed with its own state, not with "
+               "REPAIRED_UNREVIEWED regardless")
+
+        # A resolved entry must still be named. Dropping it entirely leaves a
+        # reader following one disclosure across packages unable to tell
+        # resolution from deletion.
+        done = [k for k, v in reg.get("entries", {}).items()
+                if v.get("state") == "RESOLVED"]
+        if not done:
+            failures.append(
+                "the register currently holds no RESOLVED entry, so the "
+                "control for naming resolved entries did not exercise "
+                "anything. It is reported rather than passed.")
+        elif "### Resolved and no longer outstanding" not in _sec:
+            failures.append(
+                "resolved implementer-disclosed entries are dropped from the "
+                "package with no trace: " + ", ".join(sorted(done)))
+        elif [k for k in done if k not in _sec]:
+            failures.append(
+                "the resolved summary omits: "
+                + ", ".join(k for k in done if k not in _sec))
+        else:
+            ok(f"{len(done)} resolved disclosure(s) are still named, so "
+               f"resolution is distinguishable from deletion")
+
     for p in made:
         shutil.rmtree(p, ignore_errors=True)
 

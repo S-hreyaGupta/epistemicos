@@ -414,12 +414,14 @@ MUTATIONS = [
     # D02-F01, BOOTSTRAP-003 cycle 02. The signal net back to "any canonical
     # identifier anywhere", which is what made a correct zero-finding review
     # unrecordable.
+    # Anchor moved when the inline pattern became the shared DECLARATION
+    # constant. The signal tuple is where the zero-finding case is decided, so
+    # putting the bare identifier back there restores exactly the behaviour
+    # that made a correct review unrecordable.
     ("D02-F01  a named earlier finding is a reference, not a declaration",
      "findings_format.py",
-     "        r\"\\b[A-Z]{0,2}\\d{2}-F\\d{2,3}\\b\"\n"
-     "        r\"(?:[^\\n]*(?i:class|status)\\s*:\"\n"
-     "        r\"|[^\\n]*\\n(?:[^\\n]*\\n){0,2}?[ \\t]*(?i:class|status)\\s*:)\"),",
-     "        r\"\\b[A-Z]{0,2}\\d{2}-F\\d{2,3}\\b\"),",
+     "    DECLARATION,\n)",
+     "    re.compile(r\"\\b[A-Z]{0,2}\\d{2}-F\\d{2,3}\\b\"),\n)",
      "test_run_review.py",
      "a zero-finding review that names a demonstrated repair"),
 

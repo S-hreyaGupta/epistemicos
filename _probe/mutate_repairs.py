@@ -461,6 +461,45 @@ MUTATIONS = [
      "test_run_review.py",
      "a malformed declaration beside a finding that parses"),
 
+    # SELF-F04, raised by the BOOTSTRAP-003 cycle 03 reviewer. Three lines
+    # because the repair makes three separate claims, and a single mutation
+    # would let two of them rot while the probe stayed green.
+    #
+    # First: the machine interface answers on the path where nothing was
+    # computed. Falling through to the prose return is the defect exactly as
+    # reported, prose under exit 0 to a caller that asked for JSON.
+    ("SELF-F04  --json answers even when no boundary was walked",
+     "loop_state.py",
+     "        if getattr(a, \"as_json\", False):\n"
+     "            print(json.dumps({\n"
+     "                \"governing_boundary\": None,",
+     "        if False:\n"
+     "            print(json.dumps({\n"
+     "                \"governing_boundary\": None,",
+     "test_approval_package.py",
+     "did not emit JSON"),
+
+    # Second: the sets are omitted rather than emitted empty. This is the half
+    # that matters most and is the easiest to lose, because emitting [] looks
+    # tidier and passes any control that only checks the output is JSON.
+    ("SELF-F04b  an unwalked boundary reports no sets, not empty ones",
+     "loop_state.py",
+     "                \"sets_established\": False,",
+     "                \"sets_established\": False,\n"
+     "                \"open\": [], \"resolved\": [], \"disputed\": [],",
+     "test_approval_package.py",
+     "a boundary it never walked"),
+
+    # Third: the package states a reason instead of dying. Narrowing the except
+    # to something that cannot be raised there lets CannotCalculate escape as a
+    # traceback, which is the behaviour before the repair.
+    ("SELF-F04c  an unreadable cycle record is refused, not crashed",
+     "approval_package.py",
+     "            except loop_state.CannotCalculate as e:",
+     "            except ValueError as e:",
+     "test_approval_package.py",
+     "crashed rather than refusing"),
+
     # D01-F01, BOOTSTRAP-003 cycle 01. Two rules, two mutations: the replay is
     # limited to the cycles that had reported the finding, and the recorded
     # origin must agree with the event that records it. Each needs its own

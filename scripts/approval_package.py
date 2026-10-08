@@ -254,11 +254,24 @@ def main() -> int:
             # is the defect this layer has found in itself repeatedly.
             _held = set(_led.get("findings", {}))
             _absent = {}
-            for _c in cy:
-                for _item in loop_state.authoritative_items(_c):
-                    _fid = _item.get("id")
-                    if _fid and _fid not in _held:
-                        _absent.setdefault(_c.name, []).append(_fid)
+            # authoritative_items refuses a cycle whose record it cannot read
+            # at all, and that refusal used to leave here as an unhandled
+            # exception: the operator got a Python stack trace naming a line
+            # number instead of a stated reason, and the one reader this tool
+            # has is the person deciding. A crash and a refusal are not the
+            # same act. Both withhold the document, only one says why.
+            try:
+                for _c in cy:
+                    for _item in loop_state.authoritative_items(_c):
+                        _fid = _item.get("id")
+                        if _fid and _fid not in _held:
+                            _absent.setdefault(_c.name, []).append(_fid)
+            except loop_state.CannotCalculate as e:
+                raise Refused(
+                    "FINDINGS_STATE: CANNOT_ESTABLISH\n"
+                    "  A frozen cycle's own record of what the reviewer found "
+                    "cannot be read, so\n  there is nothing to reconcile the "
+                    "ledger against. The controller says:\n\n" + quote(str(e)))
             if _absent:
                 _bad = ("holds none of what the reviews beside it reported: "
                         + "; ".join(f"{k} reported {', '.join(v)}"
@@ -323,6 +336,22 @@ def main() -> int:
                 f"FINDINGS_STATE: CANNOT_ESTABLISH\n"
                 f"  The controller's machine-readable result could not be "
                 f"read: {e}")
+        # SELF-F04. The controller exits 0 when no cycle is valid, because
+        # "no valid cycle exists" is an answer rather than a failure, and it
+        # reports no sets in that case. Read through `.get(..., [])` below,
+        # absent sets would have become empty ones, and the package would have
+        # printed None under unresolved findings for a run whose boundary was
+        # never walked. That is SELF-F01's defect arriving by a different road,
+        # which is why it is tested here and not assumed away.
+        if not _proj.get("sets_established"):
+            raise Refused(
+                "FINDINGS_STATE: CANNOT_ESTABLISH\n"
+                "  The controller established no finding sets for this review, "
+                "and said so.\n  It reports: "
+                + str(_proj.get("detail", "(no detail given)")) +
+                "\n\n  No category is printed from that. An absent set is not "
+                "an empty one, and a\n  package that showed them as empty "
+                "would be describing a boundary nobody walked.")
         by_state: dict[str, list[str]] = {
             "OPEN": list(_proj.get("open", [])),
             "RESOLVED": list(_proj.get("resolved", [])),

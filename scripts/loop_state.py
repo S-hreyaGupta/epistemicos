@@ -590,6 +590,30 @@ def _run(a) -> int:
                      "NOT A PROTOCOL OUTCOME]")
 
     if not valid:
+        # SELF-F04, raised by the BOOTSTRAP-003 cycle 03 reviewer. This return
+        # sits far above the --json branch, so a caller that asked for machine
+        # output got this paragraph of English under exit 0. The flag exists
+        # precisely so that nothing downstream has to parse prose, and on the
+        # one path where there is nothing to report it handed over prose.
+        #
+        # The sets are omitted rather than emitted empty. An empty list reads
+        # as "nothing is open", which is the silent zero this layer keeps
+        # finding in itself, and it would be indistinguishable from a genuine
+        # clean boundary. sets_established says outright that no walk ran, and
+        # the normal branch below carries the same field so a caller tests one
+        # thing rather than inferring from which keys happen to be present.
+        if getattr(a, "as_json", False):
+            print(json.dumps({
+                "governing_boundary": None,
+                "status": "CONTINUE",
+                "label": label,
+                "valid_cycle_count": 0,
+                "sets_established": False,
+                "detail": "No valid cycle has been completed, so §6 has "
+                          "nothing to measure. No boundary was walked and no "
+                          "finding sets exist to report.",
+            }, indent=2, sort_keys=True))
+            return 0
         lines += ["", labelled("CONTINUE"),
                   "No valid cycle has been completed, so §6 has nothing to measure. "
                   "Repair the evidence and rerun."]
@@ -935,6 +959,11 @@ def _run(a) -> int:
             "status": status,
             "label": label,
             "valid_cycle_count": len(valid),
+            # SELF-F04. Carried on both branches so a caller asks one question,
+            # "were the sets established", rather than guessing from whether
+            # the keys are present. A caller that never looks at it still sees
+            # the sets here and no sets on the other branch.
+            "sets_established": True,
             "open": sorted(cur[OPEN]),
             "resolved": sorted(cur[RESOLVED]),
             "disputed": sorted(cur[DISPUTED]),

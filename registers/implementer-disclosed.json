@@ -164,14 +164,15 @@
       "discovery_source": "Raised by the BOOTSTRAP-003 cycle 03 reviewer, outside the finding format and therefore not captured in the ledger. Their words: 'loop_state.py:592 returns prose with exit 0 when every cycle is invalid, even with --json. The package rejects that unreadable result, so this path does not recreate SELF-F01's false clean package. It should nevertheless return a defined JSON result or an explicit failure.' Recorded here rather than left in the review body, because a defect that carries no identifier is one nothing in this repository will ask about again.",
       "affected_component": "scripts/loop_state.py, a covered component of the BOOTSTRAP-003 target. The --json branch itself was added on 8 October 2026 as the third repair of SELF-F01.",
       "severity": "Moderate, and lower than it looks. The one caller that exists, approval_package.py, refuses a result it cannot parse, so this does not reach an approval document today. What it is, is a success code asserting something the program never computed, in the interface built specifically so that callers would not have to guess. The next caller written against it will have no reason to expect prose.",
-      "state": "OPEN",
+      "state": "REPAIRED_UNREVIEWED",
       "review_cycle": 3,
-      "proposed_repair": "Not yet landed. The early return must honour --json. The emitted object must not carry empty open, resolved and disputed lists, because an empty list is the same silent zero this layer keeps finding: a caller cannot tell 'nothing is open' from 'the sets were never computed'. Either omit the set keys and carry an explicit flag saying the walk did not run, or exit non-zero. The sole caller must then be controlled against that shape rather than assumed to survive it.",
+      "proposed_repair": "The early return now honours --json, and the object it emits omits the open, resolved and disputed keys rather than sending them empty. An empty list is the same silent zero this layer keeps finding in itself: a caller cannot tell 'nothing is open' from 'the sets were never computed'. A sets_established field says which it is, and the ordinary branch carries the same field set true, so a caller asks one question instead of inferring from which keys happen to be present. The exit code stays 0, because 'no valid cycle exists' is an answer rather than a failure, and the flag's documented promise about exit codes is kept. Writing the controls for this then exposed a second defect in the same seam, which is repaired here too: approval_package.py reconciles each frozen cycle's own record before it ever consults the controller, and a cycle whose record cannot be read made CannotCalculate escape as a Python traceback. The operator was shown a line number where a stated reason belongs. It now refuses with FINDINGS_STATE: CANNOT_ESTABLISH and quotes the controller.",
       "evidence": [
-        "scripts/loop_state.py: the `if not valid:` early return prints prose and returns 0, and the `if getattr(a, 'as_json', False):` branch that would have emitted the object sits far below it, after the boundary walk the early return skipped",
-        "scripts/loop_state.py: the flag's own help text, 'Exits non-zero exactly as the ordinary run does', which is satisfied here and is the reason the gap is invisible from the argument parser",
-        "Reproduced by the BOOTSTRAP-003 cycle 03 reviewer against the frozen cycle-03 artifact, which is the version of loop_state.py preserved under runs/BOOTSTRAP-003/plan-review/cycle-03/artifacts/",
-        "No control exists for it. That is the disclosure: the defect is established and unrepaired, and this list says what shows it rather than what fixes it"
+        "scripts/loop_state.py: the --json branch inside the `if not valid:` return, with no set keys and sets_established false, and the same field set true on the ordinary branch",
+        "scripts/approval_package.py: the sets_established guard, and the try/except around authoritative_items that turns a controller refusal into a stated refusal",
+        "scripts/test_approval_package.py: '--json on a review with no valid cycle: JSON, no sets, and an explicit statement that none were established', 'refused, not crashed: a frozen cycle whose record cannot be read produces a stated reason', and the positive 'a review with valid cycles still reports its sets and says it established them', without which removing the flag entirely would leave the first two green",
+        "_probe/mutate_repairs.py: SELF-F04, SELF-F04b and SELF-F04c, one per claim the repair makes",
+        "The sets_established guard in the package is deliberately NOT controlled, and the test file says why: nothing today can reach it, because a run with no valid cycle is refused earlier and a run with one always establishes sets. A control there would pass whether or not the guard existed"
       ],
       "required_of_next_review": true,
       "history": [
@@ -180,6 +181,12 @@
           "state": "OPEN",
           "by": "BOOTSTRAP-003 cycle 03 reviewer",
           "note": "Raised as an additional interface issue alongside the cycle's one finding. Disclosed here under the ruling of 5 October: a known defect does not sit outside controlled state tracking merely because no identifier was minted for it."
+        },
+        {
+          "at": "2026-10-08T21:30:00+05:30",
+          "state": "REPAIRED_UNREVIEWED",
+          "by": "implementing agent",
+          "note": "Repaired and controlled, under Alex Zamurko's instruction of 8 October to repair and test D02-F01 and SELF-F04. Two things are worth recording about how it went rather than only that it went. The flag had no control of any kind before today: it was added yesterday as SELF-F01's third repair and the only thing exercising it was the package's own suite, indirectly, which is why the reviewer found this by reading source instead of by anything going red. And the first fixture written for it was wrong twice over, each time refusing for a reason unrelated to what it claimed to test: it omitted bootstrap_review, so the controller refused on run identity under C01-F05, and it assumed the package would reach the controller at all, when in fact the package reconciles each cycle's own record first. Chasing the second of those is what exposed the traceback defect repaired alongside this one."
         }
       ]
     }

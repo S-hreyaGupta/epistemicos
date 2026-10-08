@@ -516,6 +516,122 @@ def main() -> int:
             ok(f"{len(done)} resolved disclosure(s) are still named, so "
                f"resolution is distinguishable from deletion")
 
+    # ---- SELF-F04: the controller's machine interface on the path where
+    # nothing was computed, and this package's handling of it.
+    #
+    # Raised by the BOOTSTRAP-003 cycle 03 reviewer, who found it by reading
+    # rather than by running anything, because until now the --json flag added
+    # for SELF-F01's third repair had no control of its own at all. The flag
+    # exists so that nothing downstream parses prose, and on a run with no
+    # valid cycle it returned prose under exit 0.
+    def _no_valid_cycle() -> Path:
+        f = Path(tempfile.mkdtemp()); made.append(f)
+        # A cycle directory with no target.json cannot pass MC-2, so the
+        # controller reaches its "nothing to measure" return with the review
+        # itself perfectly well-formed. That is the point: this is not an
+        # error path, it is an answer path, and it still has to answer.
+        (f / "runs" / "T-004" / "plan-review" / "cycle-01").mkdir(parents=True)
+        (f / "scripts").mkdir()
+        for name in ("approval_package.py", "loop_state.py", "ledger.py",
+                     "validate_cycle.py", "cycle_projection.py", "authority.py",
+                     "run_pins.py", "findings_format.py"):
+            shutil.copy(SRC / name, f / "scripts" / name)
+        # bootstrap_review is not optional. C01-F05: a run with no label is a
+        # run whose identity is not established, and the controller refuses it
+        # rather than assuming the stronger classification. Leaving it out made
+        # the first version of this fixture refuse for that reason instead of
+        # reaching the path it was built to exercise.
+        (f / "runs" / "T-004" / "run.json").write_text(json.dumps({
+            "run_id": "T-004", "bootstrap_review": "APPROVED",
+            "mc1_enforcement": "CONVENTION_ONLY",
+            "max_cycles": 4}), encoding="utf-8")
+        (f / "runs" / "T-004" / "plan-review" / "ledger.json").write_text(
+            json.dumps({"review": "plan-review", "findings": {}}, indent=2),
+            encoding="utf-8")
+        return f
+
+    _f = _no_valid_cycle()
+    _r = run("--review", "runs/T-004/plan-review", "--json", cwd=_f,
+             script=_f / "scripts" / "loop_state.py")
+    try:
+        _j = json.loads(_r.stdout)
+    except json.JSONDecodeError:
+        _j = None
+    if _j is None:
+        failures.append(
+            "asked for --json on a review with no valid cycle, the controller "
+            "did not emit JSON. A caller that must not parse prose was handed "
+            "prose:\n" + (_r.stdout + _r.stderr)[-400:])
+    elif _j.get("sets_established") is not False:
+        failures.append(
+            "the controller emitted JSON for a review with no valid cycle but "
+            "did not say that no sets were established; a caller cannot tell "
+            "this from a genuine clean boundary")
+    elif any(k in _j for k in ("open", "resolved", "disputed")):
+        failures.append(
+            "the controller reported finding sets for a boundary it never "
+            "walked. An empty set here reads as 'nothing is open', which is "
+            "the silent zero this whole layer exists to refuse.")
+    else:
+        ok("--json on a review with no valid cycle: JSON, no sets, and an "
+           "explicit statement that none were established")
+
+    # The same fixture through the package. Writing the control above showed
+    # that the package never reaches its reading of the controller's sets on
+    # this route: it reconciles each frozen cycle's own record first, and a
+    # cycle with no record makes that refuse. The honest control is therefore
+    # about what actually happens, which is that a frozen cycle whose record
+    # cannot be read must produce a stated refusal.
+    #
+    # It produced a Python stack trace instead, naming a line number in
+    # loop_state.py. The package's whole contract is that it withholds the
+    # document and says why; a crash does the first half only, to the one
+    # reader this tool exists for.
+    #
+    # The sets_established guard further down stays, and is not controlled
+    # here, because nothing today can reach it: a run with no valid cycle is
+    # refused above, and a run with one always establishes sets. It is written
+    # as a guard against a future controller, and saying that is better than
+    # a control that would pass whether or not the guard were there.
+    _r2 = run("--run", "T-004", "--type", "plan", cwd=_f,
+              script=_f / "scripts" / "approval_package.py")
+    _o2 = _r2.stdout + _r2.stderr
+    if _r2.returncode == 0:
+        failures.append(
+            "a package was produced for a run whose frozen cycle carries no "
+            "record of what any reviewer found.")
+    elif "Traceback" in _o2:
+        failures.append(
+            "the package crashed rather than refusing. An operator is shown a "
+            "stack trace and a line number where a stated reason belongs:\n"
+            + _o2[-400:])
+    elif "CANNOT_ESTABLISH" not in _o2:
+        failures.append(f"refused a frozen cycle with no readable record, but "
+                        f"not with the explicit state:\n{_o2[-400:]}")
+    else:
+        ok("refused, not crashed: a frozen cycle whose record cannot be read "
+           "produces a stated reason")
+
+    # And the positive half, so the two refusals above cannot be refusing
+    # everything: a real run still reports its sets and says it established
+    # them. Without this, removing the flag entirely would leave both green.
+    _r3 = run("--review", "runs/BOOTSTRAP-003/plan-review", "--json",
+              "--development", cwd=REPO, script=SRC / "loop_state.py")
+    try:
+        _j3 = json.loads(_r3.stdout)
+    except json.JSONDecodeError:
+        _j3 = None
+    if _j3 is None or _j3.get("sets_established") is not True:
+        failures.append(
+            "a review with valid cycles does not report established sets, so "
+            "the two controls above would pass on a controller that never "
+            "establishes anything")
+    elif "open" not in _j3:
+        failures.append("a review with valid cycles reports no `open` set")
+    else:
+        ok("a review with valid cycles still reports its sets and says it "
+           "established them")
+
     for p in made:
         shutil.rmtree(p, ignore_errors=True)
 

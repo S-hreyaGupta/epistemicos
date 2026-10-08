@@ -2578,6 +2578,34 @@ def main() -> int:
             " Finding ID: B02-F01\nClass: UNTESTED RULE\nEvidence: x\n",
             "signals that one is present")
 
+    # D02-F01, BOOTSTRAP-003 cycle 02. The signal net treated any canonical
+    # identifier anywhere as evidence of a block the parser had missed, so a
+    # review assessing an earlier repair and reporting nothing new could not be
+    # recorded at all. The cycle 02 prompt asked for exactly that reply.
+    #
+    # The positive comes first because it is the one that was broken, and the
+    # three refusals after it are what stop the repair from becoming "mentioning
+    # an identifier is always fine".
+    parses("a zero-finding review that names a demonstrated repair",
+           "The repair to D01-F01 is demonstrated. No new findings.\n", [])
+    parses("the same naming several earlier findings",
+           "D01-F01 and C02-F08 are both demonstrated; C03-F02 holds.\n"
+           "This review makes no claim of convergence.\n", [])
+    # And the net still does its job: an identifier with a declaration attached
+    # is a block the parser failed to read, whichever line the declaration is
+    # on. Without these the repair above would have switched the net off for
+    # every malformed block that happens to lack a usable header.
+    refuses("an identifier with a Class line below it, header malformed",
+            "Finding-ID D02-F09\nClass: UNTESTED RULE\nEvidence: x\n",
+            "signals that one is present")
+    refuses("an identifier with a Status line below it, header malformed",
+            "Finding_ID D02-F09\nStatus: REPAIR NOT DEMONSTRATED\n"
+            "Evidence: x\n",
+            "signals that one is present")
+    refuses("an identifier and its class on one line",
+            "D02-F09 Class: UNTESTED RULE and here is why\n",
+            "signals that one is present")
+
     # And the class really does come from the ledger, not from the review.
     tf = make_repo(); made.append(tf)
     do_init(tf); do_freeze(tf)

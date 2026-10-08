@@ -411,6 +411,32 @@ MUTATIONS = [
      "test_run_review.py",
      "a line the candidate does not contain"),
 
+    # D02-F01, BOOTSTRAP-003 cycle 02. The signal net back to "any canonical
+    # identifier anywhere", which is what made a correct zero-finding review
+    # unrecordable.
+    ("D02-F01  a named earlier finding is a reference, not a declaration",
+     "findings_format.py",
+     "        r\"\\b[A-Z]{0,2}\\d{2}-F\\d{2,3}\\b\"\n"
+     "        r\"(?:[^\\n]*(?i:class|status)\\s*:\"\n"
+     "        r\"|[^\\n]*\\n(?:[^\\n]*\\n){0,2}?[ \\t]*(?i:class|status)\\s*:)\"),",
+     "        r\"\\b[A-Z]{0,2}\\d{2}-F\\d{2,3}\\b\"),",
+     "test_run_review.py",
+     "a zero-finding review that names a demonstrated repair"),
+
+    # SELF-F01, third pass. The package back to the ledger's cached state.
+    ("SELF-F01  the package reports the controller's state, not the cache",
+     "approval_package.py",
+     "        by_state: dict[str, list[str]] = {\n"
+     "            \"OPEN\": list(_proj.get(\"open\", [])),\n"
+     "            \"RESOLVED\": list(_proj.get(\"resolved\", [])),\n"
+     "            \"DISPUTED\": list(_proj.get(\"disputed\", [])),\n"
+     "        }",
+     "        by_state = {}\n"
+     "        for _fid, _f in sorted(data.get(\"findings\", {}).items()):\n"
+     "            by_state.setdefault(_f.get(\"state\", \"?\"), []).append(_fid)",
+     "test_approval_package.py",
+     "presenting a cleaner state than the authoritative one"),
+
     # D01-F01, BOOTSTRAP-003 cycle 01. Two rules, two mutations: the replay is
     # limited to the cycles that had reported the finding, and the recorded
     # origin must agree with the event that records it. Each needs its own

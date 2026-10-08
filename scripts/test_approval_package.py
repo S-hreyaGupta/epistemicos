@@ -290,6 +290,118 @@ def main() -> int:
             ok(f"refused: frozen cycles and a {_label} ledger, "
                f"CANNOT_ESTABLISH")
 
+    # SELF-F01, third pass. BOOTSTRAP-003 cycle 02: the package grouped
+    # findings by the `state` field cached in the ledger rather than by the
+    # state the controller reconstructs. Invalidate the cycle carrying a
+    # demonstration and the cached RESOLVED survives, so the controller says
+    # OPEN and CONTINUE while the package says "None" under unresolved and
+    # counts one resolved. Alex Zamurko called it critical, because the
+    # reporting layer was presenting a cleaner state than the authoritative
+    # reconstruction.
+    #
+    # The fixture needs cycles that actually pass MC-2, which test_ledger
+    # already knows how to build. Imported rather than copied: a second
+    # cycle-builder here would be free to drift from the one the controller's
+    # own suite uses, and this file would then be testing a shape no real run
+    # has.
+    import test_ledger as _TL
+
+    def _section(text: str, heading: str) -> str:
+        """Just that section, not everything after its heading.
+
+        The package ends with the full ledger inside a <details> block, so
+        `split(heading)[-1]` reaches a JSON dump naming every finding. The
+        first version of the resolved-section check did exactly that and
+        reported a finding as listed under a heading it never appeared beneath.
+        """
+        rest = text.split(heading, 1)[-1]
+        for stop in ("\n<details", "\n## ", "\n### "):
+            rest = rest.split(stop, 1)[0]
+        return rest
+
+    _lr, _commit = _TL.make_repo()
+    made.append(_lr)
+    shutil.copy2(SRC / "approval_package.py", _lr / "scripts")
+    shutil.copy2(SRC / "authority.py", _lr / "scripts")
+    _rev = _lr / "runs" / "T-001" / "plan-review"
+    _TL.make_cycle(_lr, _rev, 1, _commit)
+    _TL.make_cycle(_lr, _rev, 2, _commit)
+    # Cycle 1 reports the finding; cycle 2 demonstrates the repair.
+    for _n, _body, _entry in (
+            (1, "Finding ID: C01-F01\nClass: UNTESTED RULE\n",
+             {"id": "C01-F01", "class": "UNTESTED RULE"}),):
+        _c = _rev / f"cycle-{_n:02d}"
+        (_c / "codex-output-raw.md").write_text(_body, encoding="utf-8")
+        (_c / "findings.json").write_text(json.dumps({
+            "schema": "cycle-findings/1", "cycle": _n, "count": 1,
+            "findings": [_entry]}, indent=2), encoding="utf-8")
+    _TL.ledger(_lr, "raise", "--review", str(_rev), "--cycle", "1",
+               "--id", "C01-F01", "--class", "UNTESTED RULE",
+               "--source", "CODEX_REVIEW")
+    _TL.ledger(_lr, "respond", "--review", str(_rev), "--cycle", "1",
+               "--id", "C01-F01", "--disposition", "ACCEPT", "--note", "fix")
+    _TL.ledger(_lr, "resolve", "--review", str(_rev), "--cycle", "2",
+               "--id", "C01-F01", "--evidence", "demonstrated")
+
+    # The baseline: with both cycles valid the finding really is resolved, and
+    # the package should say so. Without this the control below would pass on a
+    # package that calls everything unresolved.
+    _pb = Path(tempfile.mkdtemp()) / "base.md"
+    _rb = run("--run", "T-001", "--type", "plan", "--out", str(_pb), cwd=_lr,
+              script=_lr / "scripts" / "approval_package.py")
+    if _rb.returncode != 0:
+        failures.append(f"a run whose demonstration is intact could not "
+                        f"produce a package:\n{_rb.stdout}{_rb.stderr}")
+    # The resolved section reports a COUNT, not identifiers, so this asserts on
+    # the count and on the unresolved section being empty. Checking for the
+    # identifier here passed for a while against the full-ledger dump at the
+    # foot of the document, which names every finding regardless of state.
+    elif ("1 resolved." not in _section(_pb.read_text(encoding="utf-8"),
+                                        "### Resolved findings")
+          or "None." not in _section(_pb.read_text(encoding="utf-8"),
+                                     "### Unresolved findings")):
+        failures.append(
+            "a genuinely resolved finding is not reported as resolved with "
+            "nothing unresolved, so the control below proves nothing")
+    else:
+        ok("a demonstrated repair is reported as resolved")
+
+    # Now invalidate only the cycle that carried the demonstration. The ledger
+    # is untouched and still caches RESOLVED.
+    (_rev / "cycle-02" / "codex-output-raw.md").write_text("", encoding="utf-8")
+    _cached = json.loads((_rev / "ledger.json").read_text(encoding="utf-8"))
+    if _cached["findings"]["C01-F01"].get("state") != "RESOLVED":
+        failures.append("the fixture's ledger does not cache RESOLVED, so "
+                        "nothing stale is being tested")
+    _pi = Path(tempfile.mkdtemp()) / "invalid.md"
+    _ri = run("--run", "T-001", "--type", "plan", "--out", str(_pi), cwd=_lr,
+              script=_lr / "scripts" / "approval_package.py")
+    _itext = _pi.read_text(encoding="utf-8") if _pi.exists() else ""
+    _unres = _section(_itext, "### Unresolved findings")
+    if _ri.returncode != 0:
+        # Refusing is also correct: his instruction was to derive the state
+        # from the controller or refuse when it cannot be established.
+        if "CANNOT_ESTABLISH" in (_ri.stdout + _ri.stderr):
+            ok("an invalidated demonstration makes the package refuse rather "
+               "than report the stale state")
+        else:
+            failures.append(f"the package failed for some other reason\n"
+                            f"{(_ri.stdout + _ri.stderr)[-400:]}")
+    elif "C01-F01" not in _unres:
+        failures.append(
+            "the cycle carrying the demonstration was invalidated, the "
+            "controller reconstructs the finding as OPEN, and the package "
+            "still does not list it as unresolved. The reporting layer is "
+            "presenting a cleaner state than the authoritative one.")
+    elif "None." not in _section(_itext, "### Resolved findings"):
+        failures.append(
+            "the finding is listed as unresolved and the resolved section "
+            "still counts one, so the two sections disagree about the same "
+            "finding")
+    else:
+        ok("an invalidated demonstration is reported as unresolved, not from "
+           "the ledger's cached RESOLVED")
+
     # The positive, so the two refusals above cannot be "refuse everything".
     # BOOTSTRAP-002 has four frozen cycles and a recorded ledger.
     # --out again, because its package is tracked too.

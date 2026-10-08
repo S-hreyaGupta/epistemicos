@@ -182,7 +182,14 @@ def main() -> int:
     W("## Loop status and valid iteration count")
     W("")
     args_loop = [str(SCRIPTS / "loop_state.py"), "--review", str(review)]
+    # Whether the authoritative run was refused and the development one used
+    # instead. The findings section below asks the same controller for the same
+    # boundary and must ask it the same way, or it would be reporting a
+    # different run's arithmetic than the status above it.
+    _loop_dev = False
     rc, text = run_tool(*args_loop)
+    if rc != 0 and "--development" in text:
+        _loop_dev = True
     if rc != 0 and "--development" in text:
         W("The controller refuses to state an authoritative loop result for "
           "this run, and says why:")
@@ -281,9 +288,65 @@ def main() -> int:
           "follows both.")
         W("")
         data = json.loads((review / "ledger.json").read_text(encoding="utf-8"))
-        by_state: dict[str, list[str]] = {}
-        for fid, f in sorted(data.get("findings", {}).items()):
-            by_state.setdefault(f.get("state", "?"), []).append(fid)
+
+        # SELF-F01, third pass. Alex Zamurko, 8 October: "The package must
+        # derive finding state from the controller's reconstructed state, not
+        # stale cached ledger state."
+        #
+        # This used to read `f["state"]`, the value the ledger caches when an
+        # event is written. That value is not recomputed when a cycle becomes
+        # invalid, so BOOTSTRAP-003 cycle 02 invalidated the cycle carrying a
+        # demonstration, left the stale RESOLVED in place, and watched the
+        # controller say OPEN and CONTINUE while this package said "None"
+        # under unresolved findings and counted one resolved. The reporting
+        # layer presented a cleaner state than the authoritative one, which is
+        # the worst direction for the error to point.
+        #
+        # The sets now come from the controller's own boundary walk, asked for
+        # in JSON rather than restated here or parsed out of its prose. If it
+        # cannot establish a state, neither can this package.
+        _lj = run_tool(*args_loop, "--json",
+                       *(["--development"] if _loop_dev else []))
+        if _lj[0] != 0:
+            raise Refused(
+                "FINDINGS_STATE: CANNOT_ESTABLISH\n"
+                "  The controller cannot establish the loop state for this "
+                "review, so there is no\n  authoritative state to sort the "
+                "findings into. The ledger's own `state` fields are\n  not an "
+                "answer: they are what was true when each event was written, "
+                "and a cycle\n  invalidated since leaves them saying so "
+                "anyway.\n\n" + quote(_lj[1]))
+        try:
+            _proj = json.loads(_lj[1])
+        except json.JSONDecodeError as e:
+            raise Refused(
+                f"FINDINGS_STATE: CANNOT_ESTABLISH\n"
+                f"  The controller's machine-readable result could not be "
+                f"read: {e}")
+        by_state: dict[str, list[str]] = {
+            "OPEN": list(_proj.get("open", [])),
+            "RESOLVED": list(_proj.get("resolved", [])),
+            "DISPUTED": list(_proj.get("disputed", [])),
+        }
+        # A finding in the ledger that the governing boundary places in none of
+        # the three. The controller refuses that case for findings a review
+        # reported, so reaching it here means something it does not police, and
+        # the honest thing is to show it rather than drop it.
+        _placed = set(by_state["OPEN"]) | set(by_state["RESOLVED"]) \
+            | set(by_state["DISPUTED"])
+        _unplaced = [k for k in sorted(data.get("findings", {}))
+                     if k not in _placed]
+        W(f"States below are reconstructed by the controller at its governing "
+          f"boundary, n={_proj.get('governing_boundary', '?')}, not read from "
+          f"the ledger's cached fields.")
+        W("")
+        if _unplaced:
+            W("> **" + ", ".join(_unplaced) + "** "
+              + ("is" if len(_unplaced) == 1 else "are")
+              + " in the ledger and in none of the three sets at that "
+                "boundary. Not counted below, and named here rather than "
+                "omitted.")
+            W("")
 
         W("### Unresolved findings — the human decides each one")
         W("")

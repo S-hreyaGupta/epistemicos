@@ -380,6 +380,22 @@ def main(argv: list[str]) -> int:
                          "NOT_A_PROTOCOL_CYCLE. The result is labelled "
                          "development evidence and is not an authoritative "
                          "protocol outcome. B01-F08.")
+    # SELF-F01, third pass. The approval package needs the reconstructed state
+    # of each finding at the governing boundary, and had been reading the
+    # `state` field cached in the ledger instead. BOOTSTRAP-003 cycle 02:
+    # invalidate the cycle carrying a demonstration, leave the stale RESOLVED
+    # in place, and the package reports "none unresolved, one resolved" while
+    # this controller says OPEN and CONTINUE.
+    #
+    # A flag rather than a second computation in the package. The boundary walk
+    # is long and exit order is load-bearing; a copy of it elsewhere would be
+    # free to disagree, which is the defect class this layer keeps finding in
+    # itself. This prints what the walk already produced, in a form a caller
+    # can read without parsing prose.
+    ap.add_argument("--json", action="store_true", dest="as_json",
+                    help="print the governing boundary and its §6 sets as "
+                         "JSON, for callers that must not restate the rule. "
+                         "Exits non-zero exactly as the ordinary run does.")
     a = ap.parse_args(argv[1:])
     try:
         return _run(a)
@@ -909,6 +925,21 @@ def _run(a) -> int:
         governing = (n_latest, status, detail, cur, shown)
 
     n, status, detail, cur, shown = governing
+
+    # SELF-F01. The same values the report below is built from, handed over
+    # before any of it is formatted, so a caller reads the walk's own result
+    # rather than a second opinion or a parsed paragraph.
+    if getattr(a, "as_json", False):
+        print(json.dumps({
+            "governing_boundary": n,
+            "status": status,
+            "label": label,
+            "valid_cycle_count": len(valid),
+            "open": sorted(cur[OPEN]),
+            "resolved": sorted(cur[RESOLVED]),
+            "disputed": sorted(cur[DISPUTED]),
+        }, indent=2, sort_keys=True))
+        return 0
 
     def fmt(ids: set[str]) -> str:
         return ", ".join(sorted(ids)) if ids else "-"

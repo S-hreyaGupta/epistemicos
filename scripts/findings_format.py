@@ -77,7 +77,30 @@ RECURRENCE_STATUS = "REPAIR NOT DEMONSTRATED"
 SIGNALS = (
     re.compile(r"finding\s*id\s*[:=]", re.I),
     re.compile(r"^\s*required correction\s*:", re.I | re.M),
-    re.compile(r"\b[A-Z]{0,2}\d{2}-F\d{2,3}\b"),
+    # D02-F01, BOOTSTRAP-003 cycle 02. This was `\b[A-Z]{0,2}\d{2}-F\d{2,3}\b`:
+    # any canonical identifier, anywhere in the text, at all.
+    #
+    # That made a correct review unrecordable. A reviewer who writes "the repair
+    # to D01-F01 is demonstrated, no new findings" trips the net, zero cannot be
+    # asserted, and the capture is refused. The cycle 02 prompt instructed the
+    # reviewer to assess D01-F01 explicitly, so the instruction and the recorder
+    # had been contradicting each other since that prompt was written. Alex
+    # Zamurko, 8 October: "The parser needs to distinguish 'reference to an
+    # existing finding' from 'new finding declaration.'"
+    #
+    # The net is not dropped. It exists because a finding block with a malformed
+    # header parses to nothing, and zero must not be assertable over a review
+    # the parser may have failed to read. What distinguishes a declaration from
+    # a reference is not the identifier: it is the Class or Status line that a
+    # finding block must carry. So the identifier counts only when one of those
+    # is attached to it, on its own line or within the two lines below.
+    #
+    # This only ever runs when NOTHING parsed, so an identifier mentioned in
+    # prose near a block that did parse cannot reach it.
+    re.compile(
+        r"\b[A-Z]{0,2}\d{2}-F\d{2,3}\b"
+        r"(?:[^\n]*(?i:class|status)\s*:"
+        r"|[^\n]*\n(?:[^\n]*\n){0,2}?[ \t]*(?i:class|status)\s*:)"),
 )
 
 

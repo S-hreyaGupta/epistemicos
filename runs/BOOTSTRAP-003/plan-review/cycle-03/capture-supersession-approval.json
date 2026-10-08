@@ -1,0 +1,11 @@
+{
+  "schema": "capture-supersession/1",
+  "authorized_by": "Alex Zamurko",
+  "at": "2026-10-08T16:37:00+05:30",
+  "channel": "WhatsApp",
+  "cycle": "cycle-03",
+  "superseded_sha256": "b37d3289c04e20c7eda5a27776f9b9b8055f92222a5e28353f1380efbb6f2215",
+  "superseding_sha256": "b37d3289c04e20c7eda5a27776f9b9b8055f92222a5e28353f1380efbb6f2215",
+  "reason": "The reviewer output is unchanged; the extraction over it was wrong. attempt-01 was recorded by a parser that read the reviewer's fenced example of a malformed declaration as a declaration of its own, so findings.json named D03-F90, an identifier the reviewer never raised. The parser was repaired under D02-F01 and now reads the same bytes as the single finding D02-F01. Re-extracting under the corrected parser is what this supersession is for. Asked on WhatsApp on 8 October 2026 whether the capture could be replaced with the original kept for audit history, Alex Zamurko answered to go ahead. attempt-01 is preserved; only the designation moves.",
+  "note": "The two hashes are equal because the superseding bytes are the same reviewer reply. What is being replaced is the extraction, not the review. Approved by the party outside the implementing agent, per the ruling of 9 September 2026."
+}

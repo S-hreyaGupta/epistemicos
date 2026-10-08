@@ -1,6 +1,6 @@
 {
   "schema": "cycle-capture/1",
-  "authoritative": 1,
+  "authoritative": 2,
   "attempts": [
     {
       "attempt": 1,
@@ -13,7 +13,30 @@
       "valid": true,
       "problems": [],
       "retry_reason": ""
+    },
+    {
+      "attempt": 2,
+      "recorded_at": "2026-10-08T14:08:39Z",
+      "source": "C:\\EpistemicOS\\epistemicos\\reply003-03.md",
+      "invocation": "manual",
+      "note": "",
+      "sha256": "b37d3289c04e20c7eda5a27776f9b9b8055f92222a5e28353f1380efbb6f2215",
+      "bytes": 2978,
+      "valid": true,
+      "problems": [],
+      "retry_reason": "attempt-01 named D03-F90, which the reviewer never raised: it was their fenced example, read as a declaration by the parser D02-F01 repaired. Same bytes, corrected extraction."
     }
   ],
-  "authoritative_sha256": "b37d3289c04e20c7eda5a27776f9b9b8055f92222a5e28353f1380efbb6f2215"
+  "authoritative_sha256": "b37d3289c04e20c7eda5a27776f9b9b8055f92222a5e28353f1380efbb6f2215",
+  "invalidated": [
+    {
+      "attempt": 1,
+      "invalidated_at": "2026-10-08T14:08:39Z",
+      "reason": "attempt-01 named D03-F90, which the reviewer never raised: it was their fenced example, read as a declaration by the parser D02-F01 repaired. Same bytes, corrected extraction.",
+      "superseded_by": 2,
+      "authorized_by": "Alex Zamurko",
+      "authority_reason": "The reviewer output is unchanged; the extraction over it was wrong. attempt-01 was recorded by a parser that read the reviewer's fenced example of a malformed declaration as a declaration of its own, so findings.json named D03-F90, an identifier the reviewer never raised. The parser was repaired under D02-F01 and now reads the same bytes as the single finding D02-F01. Re-extracting under the corrected parser is what this supersession is for. Asked on WhatsApp on 8 October 2026 whether the capture could be replaced with the original kept for audit history, Alex Zamurko answered to go ahead. attempt-01 is preserved; only the designation moves.",
+      "authorized_at": "2026-10-08T16:37:00+05:30"
+    }
+  ]
 }

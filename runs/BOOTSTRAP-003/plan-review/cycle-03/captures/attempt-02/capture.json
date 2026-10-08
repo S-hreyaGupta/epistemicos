@@ -1,0 +1,12 @@
+{
+  "attempt": 2,
+  "recorded_at": "2026-10-08T14:08:39Z",
+  "source": "C:\\EpistemicOS\\epistemicos\\reply003-03.md",
+  "invocation": "manual",
+  "note": "",
+  "sha256": "b37d3289c04e20c7eda5a27776f9b9b8055f92222a5e28353f1380efbb6f2215",
+  "bytes": 2978,
+  "valid": true,
+  "problems": [],
+  "retry_reason": "attempt-01 named D03-F90, which the reviewer never raised: it was their fenced example, read as a declaration by the parser D02-F01 repaired. Same bytes, corrected extraction."
+}

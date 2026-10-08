@@ -74,6 +74,44 @@ RECURRENCE_STATUS = "REPAIR NOT DEMONSTRATED"
 # real findings while the operator honestly asserts none. So zero has to survive
 # a broader net, and any signal the strict parse does not account for is
 # ambiguity rather than absence.
+# A fenced block, and everything in it. Reviewers quote example reviews as
+# evidence, and BOOTSTRAP-003 cycle 03 did exactly that: its evidence for
+# D02-F01 contained a specimen finding block, the parser read the specimen as a
+# declaration, and the capture recorded `D03-F90` as a finding the reviewer
+# never raised. Quoted material is not a declaration.
+#
+# Masked rather than removed, so every offset below still points where it did
+# and the block slicing is unaffected.
+FENCE = re.compile(r"^[ \t]*(```|~~~).*?^[ \t]*\1[ \t]*$", re.M | re.S)
+
+
+def mask_fences(raw: str) -> str:
+    """Fenced blocks blanked out, line structure and offsets preserved."""
+    return FENCE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), raw)
+
+
+# An identifier with a declaration attached: the same shape SIGNALS uses, with
+# the identifier captured so a signal can be matched against what parsed.
+# The Class or Status must be on the identifier's own line or the very next
+# one, and that next line must not carry an identifier of its own.
+#
+# A two-line window was tried first and was wrong. BOOTSTRAP-001 cycle 02 says
+# in prose "B01-F01, B01-F04 ... remain OPEN by the stated deferral", and two
+# lines below it a different, perfectly valid block begins with its own Status
+# line. The wider window tied the prose reference to that block's status and
+# reported a declaration nobody had written. Running the repair over four
+# frozen runs is what surfaced it, which is the only reason it was not shipped.
+DECLARATION = re.compile(
+    r"\b([A-Z]{0,2}\d{2}-F\d{2,3})\b"
+    # Same line: immediately after the identifier, not anywhere on the line.
+    # `[^\n]*` was tried and was wrong twice over. BOOTSTRAP-002 cycle 02
+    # contains a repair-assessment table whose first column is an identifier
+    # and whose later columns mention a status, and the loose version paired
+    # the two across the row and reported a declaration that is a table cell.
+    r"(?:[ \t,;:.\-]{0,4}(?i:class|status)\s*:"
+    r"|[^\n]*\n(?![^\n]*\b[A-Z]{0,2}\d{2}-F\d{2,3}\b)"
+    r"[ \t]*(?i:class|status)\s*:)")
+
 SIGNALS = (
     re.compile(r"finding\s*id\s*[:=]", re.I),
     re.compile(r"^\s*required correction\s*:", re.I | re.M),
@@ -97,10 +135,7 @@ SIGNALS = (
     #
     # This only ever runs when NOTHING parsed, so an identifier mentioned in
     # prose near a block that did parse cannot reach it.
-    re.compile(
-        r"\b[A-Z]{0,2}\d{2}-F\d{2,3}\b"
-        r"(?:[^\n]*(?i:class|status)\s*:"
-        r"|[^\n]*\n(?:[^\n]*\n){0,2}?[ \t]*(?i:class|status)\s*:)"),
+    DECLARATION,
 )
 
 
@@ -155,13 +190,18 @@ def _extract_with(raw: str, grammar: re.Pattern) -> tuple[list[dict], list[str]]
     found: list[dict] = []
     problems: list[str] = []
 
-    starts = [(m.start(), m.group(1)) for m in FINDING_HEADER.finditer(raw)]
+    # Everything below reads the masked text. A finding block is a structure the
+    # review declares, not something it quotes, and the parser had no way to
+    # tell the difference until cycle 03 handed it one.
+    text = mask_fences(raw)
+
+    starts = [(m.start(), m.group(1)) for m in FINDING_HEADER.finditer(text)]
     raw_count = len(starts)
 
     # B02-F01, checked before anything else. If the loose pass sees a boundary
     # the strict pass does not, the difference is named rather than dropped, and
     # it is fatal regardless of how many blocks parsed cleanly.
-    loose = [m.group(1) for m in LOOSE_HEADER.finditer(raw)]
+    loose = [m.group(1) for m in LOOSE_HEADER.finditer(text)]
     strict_ids = [fid for _, fid in starts]
     if len(loose) != len(strict_ids):
         missed = [i for i in loose if i not in strict_ids] or ["(unnamed)"]
@@ -173,8 +213,8 @@ def _extract_with(raw: str, grammar: re.Pattern) -> tuple[list[dict], list[str]]
             "accepting the smaller set.")
 
     for i, (pos, fid) in enumerate(starts):
-        end = starts[i + 1][0] if i + 1 < len(starts) else len(raw)
-        block = raw[pos:end]
+        end = starts[i + 1][0] if i + 1 < len(starts) else len(text)
+        block = text[pos:end]
 
         if not grammar.fullmatch(fid):
             problems.append(f"finding identifier {fid!r} does not match the "
@@ -233,11 +273,54 @@ def _extract_with(raw: str, grammar: re.Pattern) -> tuple[list[dict], list[str]]
     # runs whenever nothing was structured, so a review that parses to nothing
     # still has to survive the broader search.
     if not found:
-        hits = [p.pattern for p in SIGNALS if p.search(raw)]
+        hits = [p.pattern for p in SIGNALS if p.search(text)]
         if hits:
             problems.append(
                 "no finding blocks parsed, but the raw review carries signals "
                 "that one is present:\n    " + "\n    ".join(hits) +
                 "\n  Zero cannot be asserted over a review the parser may have "
                 "failed to read.")
+
+    # D02-F01, second pass. BOOTSTRAP-003 cycle 03: "the signal net runs only
+    # when `found` is empty. The new malformed declarations covered by this
+    # repair remain invisible when another finding parses successfully."
+    #
+    # True, and it is the same gate twice. B02-F01 moved it from "no raw blocks"
+    # to "nothing structured", which is a smaller gate and still a gate: one
+    # block that parses switches the net off for every block that does not. His
+    # reproduction is a canonical finding followed by `Finding-ID D03-F91` with
+    # its own class, and the second one vanishes.
+    #
+    # So declarations are reconciled against what parsed, always, rather than
+    # consulted only when nothing did. An identifier carrying a class or a
+    # status that no parsed block accounts for is a block the parser could not
+    # read, whatever else it managed.
+    _declared = {m.group(1) for m in DECLARATION.finditer(text)}
+    _unaccounted = sorted(_declared - {f["id"] for f in found})
+    if _unaccounted:
+        problems.append(
+            f"declaration(s) the parser could not read: "
+            f"{', '.join(_unaccounted)}\n"
+            "  Each carries a Class or Status line and matches no finding block "
+            "this parser recognised.\n  A block it cannot see is a finding the "
+            "loop never hears about, and one block parsing\n  correctly says "
+            "nothing about the others.")
+
+    # What masking costs, stated rather than guarded against.
+    #
+    # A reviewer who fences their entire review parses to nothing and trips no
+    # net, because quoted material is deliberately ignored. A guard for that
+    # case was written and removed within the hour: it fired on "no new
+    # findings" plus a quoted example, which is precisely the shape cycle 03's
+    # own review had and precisely what this repair exists to accept. Refusing
+    # the common correct case to catch an uncommon careless one is the wrong
+    # trade.
+    #
+    # The residual risk is bounded by something outside this parser. Zero is
+    # never inferred: recording a zero-finding cycle takes an explicit
+    # --zero-findings from the operator, over a raw review preserved in full
+    # for anyone to read. So the fully-fenced review ends as a human asserting
+    # zero over a document that visibly contains findings, which is a different
+    # failure from a parser silently dropping them, and the one the rest of
+    # this layer is built to surface.
     return found, problems

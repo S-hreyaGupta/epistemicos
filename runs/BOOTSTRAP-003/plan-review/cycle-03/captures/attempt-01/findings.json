@@ -1,0 +1,25 @@
+{
+  "schema": "cycle-findings/1",
+  "review_result_status": "VALID",
+  "raw_finding_count": 2,
+  "finding_id_grammar": "^[A-Z]{0,2}\\d{2}-F\\d{2,3}$",
+  "cycle": 3,
+  "extracted_at": "2026-10-08T09:18:58Z",
+  "source": "captures/attempt-01/raw.md",
+  "source_attempt": 1,
+  "source_sha256": "b37d3289c04e20c7eda5a27776f9b9b8055f92222a5e28353f1380efbb6f2215",
+  "count": 2,
+  "zero_findings_asserted": false,
+  "findings": [
+    {
+      "id": "D02-F01",
+      "class": "CONTRADICTORY IMPLEMENTATION MAPPING",
+      "kind": "recurrence"
+    },
+    {
+      "id": "D03-F90",
+      "class": "UNTESTED RULE",
+      "kind": "finding"
+    }
+  ]
+}

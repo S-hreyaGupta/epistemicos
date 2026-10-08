@@ -2606,6 +2606,43 @@ def main() -> int:
             "D02-F09 Class: UNTESTED RULE and here is why\n",
             "signals that one is present")
 
+    # D02-F01, second pass. BOOTSTRAP-003 cycle 03: the net ran only when
+    # nothing parsed, so a malformed declaration beside a valid finding was
+    # invisible. His reproduction, rebuilt: one canonical block, then one whose
+    # header the strict parser cannot see.
+    refuses("a malformed declaration beside a finding that parses",
+            NEW + "\nFinding-ID B02-F09\nClass: UNTESTED RULE\n"
+            "Evidence: second defect\n",
+            "declaration(s) the parser could not read")
+    refuses("the same with a Status line",
+            NEW + "\nFinding_ID B01-F11\nStatus: REPAIR NOT DEMONSTRATED\n"
+            "Evidence: second defect\n",
+            "declaration(s) the parser could not read")
+
+    # And the defect that arrived inside cycle 03's own review: its evidence
+    # quoted a specimen finding block in a code fence, the parser read the
+    # specimen as a declaration, and the capture recorded a finding the
+    # reviewer never raised.
+    parses("a finding block quoted inside a code fence is not a declaration",
+           NEW + "\nFor example, a review might contain:\n\n"
+           "```\nFinding ID: B03-F90\nClass: UNTESTED RULE\n"
+           "Evidence: illustrative only\n```\n",
+           ["B02-F01"], ["finding"])
+    parses("a tilde fence too, and a zero-finding review around it",
+           "No new findings. For illustration only:\n\n"
+           "~~~\nFinding ID: B03-F91\nStatus: REPAIR NOT DEMONSTRATED\n~~~\n",
+           [])
+    # A review whose only blocks are fenced parses to nothing, deliberately.
+    # A guard against that was written and removed the same hour: it fired on
+    # the control above, a zero-finding review quoting an example, which is the
+    # exact shape this repair exists to accept. The risk is left to the
+    # explicit --zero-findings step instead, and this control pins the
+    # behaviour so the trade is visible rather than assumed.
+    parses("a review whose only finding blocks are fenced parses to nothing",
+           "Here is my review.\n\n```\nFinding ID: B03-F92\n"
+           "Class: UNTESTED RULE\nEvidence: x\n```\n",
+           [])
+
     # And the class really does come from the ledger, not from the review.
     tf = make_repo(); made.append(tf)
     do_init(tf); do_freeze(tf)

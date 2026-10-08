@@ -442,6 +442,23 @@ MUTATIONS = [
      "test_approval_package.py",
      "presenting a cleaner state than the authoritative one"),
 
+    # D02-F01's second pass, BOOTSTRAP-003 cycle 03. Two rules again: quoted
+    # material is not a declaration, and declarations are reconciled against
+    # what parsed rather than consulted only when nothing did.
+    ("D02-F01b  a fenced block is quoted material, not a declaration",
+     "findings_format.py",
+     "    text = mask_fences(raw)",
+     "    text = raw",
+     "test_run_review.py",
+     "a finding block quoted inside a code fence is not a declaration"),
+
+    ("D02-F01c  declarations are reconciled with what actually parsed",
+     "findings_format.py",
+     "    if _unaccounted:",
+     "    if False:",
+     "test_run_review.py",
+     "a malformed declaration beside a finding that parses"),
+
     # D01-F01, BOOTSTRAP-003 cycle 01. Two rules, two mutations: the replay is
     # limited to the cycles that had reported the finding, and the recorded
     # origin must agree with the event that records it. Each needs its own

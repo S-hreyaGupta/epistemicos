@@ -48,6 +48,18 @@
           "state": "REPAIRED_UNREVIEWED",
           "by": "implementing agent",
           "note": "Second repair: the findings each frozen cycle reported are reconciled against the ledger before any category is asserted empty, read through loop_state's own reader rather than a second one written in the package generator. A disagreement is CANNOT_ESTABLISH. Controlled by a fixture whose ledger is valid and parses and simply holds none of what the cycle beside it reported."
+        },
+        {
+          "at": "2026-10-08T06:30:00Z",
+          "state": "OPEN",
+          "by": "BOOTSTRAP-003 cycle 02 reviewer",
+          "note": "Closure still unsupported, second time. The membership check fixed the readable-but-empty ledger, and the package then grouped findings by the `state` field cached in the ledger rather than by the state the controller reconstructs. In an isolated fixture the reviewer invalidated the cycle containing a demonstration while retaining its cached RESOLVED: the controller reconstructed the finding as OPEN and reported CONTINUE, and the package exited 0, printed None under unresolved findings and counted one resolved. Required: generate the categories from the governing projected state, or refuse when that state cannot be established."
+        },
+        {
+          "at": "2026-10-08T12:20:00+05:30",
+          "state": "REPAIRED_UNREVIEWED",
+          "by": "implementing agent",
+          "note": "Third repair. The controller gained a --json flag that prints the governing boundary and its sets from the walk it already performs, and the package reads that instead of the cached fields; if the controller cannot establish a state, the package refuses with CANNOT_ESTABLISH. A flag rather than a second boundary walk in the package: the exit order is load-bearing and a copy of it would be free to disagree. Two controls, the reviewer's own fixture and its baseline, because a package that called everything unresolved would satisfy the first alone. Both of my first attempts at those controls passed by matching the full-ledger dump at the foot of the document rather than the section they named, which is the same defect in the control as in the tool."
         }
       ]
     },

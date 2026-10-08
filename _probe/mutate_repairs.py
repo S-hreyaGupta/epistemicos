@@ -431,7 +431,12 @@ MUTATIONS = [
      "            \"RESOLVED\": list(_proj.get(\"resolved\", [])),\n"
      "            \"DISPUTED\": list(_proj.get(\"disputed\", [])),\n"
      "        }",
-     "        by_state = {}\n"
+     # The old behaviour exactly, including the three keys, so the mutation
+     # reproduces the defect rather than crashing the tool. Its first version
+     # left by_state without them and the package died on a KeyError, which
+     # the probe correctly reported as the wrong control: a crash is not the
+     # defect, and a control that fires on one establishes nothing about it.
+     "        by_state = {\"OPEN\": [], \"RESOLVED\": [], \"DISPUTED\": []}\n"
      "        for _fid, _f in sorted(data.get(\"findings\", {}).items()):\n"
      "            by_state.setdefault(_f.get(\"state\", \"?\"), []).append(_fid)",
      "test_approval_package.py",

@@ -332,8 +332,8 @@ def main() -> int:
         # the three. The controller refuses that case for findings a review
         # reported, so reaching it here means something it does not police, and
         # the honest thing is to show it rather than drop it.
-        _placed = set(by_state["OPEN"]) | set(by_state["RESOLVED"]) \
-            | set(by_state["DISPUTED"])
+        _placed = (set(by_state.get("OPEN", ())) | set(by_state.get("RESOLVED", ()))
+                   | set(by_state.get("DISPUTED", ())))
         _unplaced = [k for k in sorted(data.get("findings", {}))
                      if k not in _placed]
         W(f"States below are reconstructed by the controller at its governing "

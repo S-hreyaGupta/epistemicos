@@ -1,7 +1,9 @@
 {
   "schema": "implementer-disclosed/1",
-  "purpose": "Defects found by the implementing agent rather than raised by an independent reviewer. Alex Zamurko, 5 October 2026: 'do not fabricate reviewer provenance, but do not leave a known defect outside controlled state tracking either.'",
-  "not_the_ledger": "Entries here are never written into a review ledger and carry no cycle-generated identifier. A ledger finding is a finding a reviewer raised against a reviewed target, and its identifier encodes the cycle that raised it; inventing one for a defect no cycle produced would forge the provenance the ledger exists to establish.",
+  "purpose": "Known defects that carry no cycle-generated identifier, and therefore cannot sit in a reviewer ledger. Alex Zamurko, 5 October 2026: 'do not fabricate reviewer provenance, but do not leave a known defect outside controlled state tracking either.'",
+  "purpose_correction": "This field used to read 'defects found by the implementing agent rather than raised by an independent reviewer', and that description was wrong about its own contents. Alex Zamurko noticed on 9 October 2026: 'Finish reconciling the findings, including SELF-F04, which Codex identified but was recorded as self-disclosed.' SELF-F04 was raised by the BOOTSTRAP-003 cycle 03 reviewer. It is here not because the implementing agent found it but because the reviewer wrote it outside the finding format, with no Finding ID header, so the recorder could not extract it and no cycle identifier was ever minted for it. The membership rule is about the identifier, not about who looked. Each entry's own discovery_source says who found it, and that field was accurate throughout; only this summary was not. Alex also ruled the same day that the rules themselves stay as they are, so nothing moved between registers.",
+  "not_the_ledger": "Entries here are never written into a review ledger and carry no cycle-generated identifier. A ledger finding is a finding a reviewer raised against a reviewed target, and its identifier encodes the cycle that raised it; inventing one for a defect no cycle produced would forge the provenance the ledger exists to establish. The same applies to a defect a reviewer did raise but outside the format the recorder reads: the finding is real and the provenance is real, but no cycle produced an identifier for it, and writing one by hand would make the ledger claim an extraction that never happened.",
+  "known_gap": "A reviewer observation written outside the finding format is captured only if a human notices it and brings it here. The raw review is preserved either way, so nothing is lost, but nothing automatic connects the two. SELF-F04 is the first instance. Putting it to the next reviewer explicitly, so it can be raised in the format and receive a real identifier, is the only route by which it would ever reach the ledger.",
   "states": {
     "OPEN": "disclosed, not repaired",
     "REPAIRED_UNREVIEWED": "a repair has landed with controls behind it, and nobody independent has examined it",
@@ -74,13 +76,18 @@
       "description": "The mutation probe writes a deliberately broken line into tracked source, runs a suite, and restores the file in a finally block. A finally does not run when the process is killed outright, which is what closing a terminal window does. A killed run therefore left a disabled check sitting in the repository, with every suite passing for a reason other than the one it names, and nothing else in the repository able to notice.",
       "discovery_source": "Implementer-disclosed. The probe's own docstring has named this risk since late September, and the mitigation was a start-time guard that only catches it on the next run. It happened on 5 October 2026: a PowerShell window was closed mid-run and left 'if False:' in scripts/loop_state.py, where it sat until the next probe run refused to start.",
       "affected_component": "_probe/mutate_repairs.py. Not a covered component; it is preserved in cycle evidence as an instrument, and the review of 4 October states explicitly that its results are assertions rather than executed evidence.",
-      "severity": "Moderate. It cannot alter a record or a frozen cycle. It can make every suite in the repository pass while a check is switched off, and a commit made in that window would carry the disabled check into the history. The window on 5 October was about forty minutes and nothing was committed in it.",
+      "severity": "Moderate when first disclosed, and worse than that in hindsight. It cannot alter a record or a frozen cycle. It can make every suite in the repository pass while a check is switched off, and a commit made in that window would carry the disabled check into the history. The window on 5 October was about forty minutes and nothing was committed in it. On 8 October the same mechanism emptied a 1163-line covered component and left it that way overnight, which is the upper bound of what this defect can do and is higher than this field first claimed.",
       "state": "REPAIRED_UNREVIEWED",
       "review_cycle": null,
-      "proposed_repair": "Record the mutation on disk before the file is touched, carrying the finding, the path, HEAD, and the digest of the text about to be written. The next run restores from HEAD and says what it did. The recovery is narrow on purpose: if HEAD has moved or the file is not byte for byte what the probe wrote, it refuses and says so rather than overwriting an edit made since.",
+      "sub_entries": ["SELF-F05"],
+      "sub_entries_note": "Alex Zamurko, 9 October: different failures of the same underlying mechanism, kept together while preserving their individual records. The one-slot sentinel gap has no identifier of its own and is recorded in this entry's history, because the repair that removes it is the same one.",
+      "proposed_repair": "Third repair, and the only one still standing. The first two are in the history below, each of which failed in real use. Do not write to the real repository at all: create a git worktree of HEAD in a temporary directory, apply the mutation there, run the suite there, and delete the directory afterwards. A killed run then costs a folder that was going to be thrown away, and the next run sweeps up anything abandoned, which is safe in a way restoring a source file never was because a temporary checkout holds nobody's work. The two earlier repairs, the sentinel and the restore-from-HEAD recovery, stay in the source with their controls for a tree damaged before 9 October, but nothing creates that situation any more. The cost, recorded as AR-6 in specs/ACCEPTED-RISKS.md, is that the probe now tests committed source rather than the working tree, and refuses to run when the files it would mutate differ from HEAD.",
       "evidence": [
+        "_probe/mutate_repairs.py: make_sandbox(), drop_sandboxes(), restore_in(), and run_suite() taking the sandbox root",
+        "First run after the change: both of the probe's own repairs reported caught, and `git status --porcelain` empty afterwards with no restore having been needed",
+        "Three real kills on 9 October before the change, each recovered and reported by the old machinery: run_review.py, bootstrap_gate.py, validate_cycle.py",
+        "The superseded machinery and its controls are retained: _probe/mutate_repairs.py recover(), scripts/test_probe_recovery.py with seven controls",
         "_probe/mutate_repairs.py: ACTIVE, recover(), the record written before the mutation and removed in the same finally as the restore",
-        "Demonstrated on 5 October 2026 by killing a run with Stop-Process -Force, which does not unwind: the sentinel named scripts/cycle_projection.py, and the next run restored it from HEAD, reported the recovery, and then ran clean",
         ".gitignore: the record is untracked, because a commit is never mid-mutation"
       ],
       "required_of_next_review": true,
@@ -114,6 +121,24 @@
           "state": "REPAIRED_UNREVIEWED",
           "by": "BOOTSTRAP-003 cycle 03 reviewer",
           "note": "Looked at and not confirmed. The reviewer: 'No new contrary evidence established here. Their prior assessments retain their stated limits; this review adds no fresh execution verification.' The state does not move. A review that found nothing against a repair is not a review that found the repair holds, and the second repair has still never been examined by anyone independent. Recorded so the next reader can see that cycle 03 looked rather than assuming it did not."
+        },
+        {
+          "at": "2026-10-09T14:25:00+05:30",
+          "state": "OPEN",
+          "by": "implementing agent",
+          "note": "Reopened. The second repair failed in real use, twice, in two different ways, and both are gaps in it rather than separate defects. First, SELF-F05: the recovery assumed the file on disk would be either the original or the full mutation, and a kill between truncating and writing leaves a third state it could not recognise, so it refused and the tree stayed broken. Second, the sentinel holds one mutation at a time, so a kill that leaves two files changed is only half recorded: on 9 October recovery restored bootstrap_gate.py correctly and had no idea loop_state.py was also carrying a mutation that disabled the four-cycle ceiling. The clean-tree guard caught the second file on the next run, which is the only reason it surfaced the same day. Recommended to Alex Zamurko that this entry be reopened rather than left REPAIRED_UNREVIEWED beside two neighbours, on the grounds that a repair which has failed twice in the field is not a repair with unrelated company."
+        },
+        {
+          "at": "2026-10-09T17:51:00+05:30",
+          "state": "OPEN",
+          "by": "Alex Zamurko",
+          "note": "Agreed, in Slack: 'Agreed on reopening SELF-F02. SELF-F05 and the latest issue appear to be different failures of the same underlying mechanism, so let's keep them together while preserving their individual records.' So SELF-F05 keeps its own entry below and is listed here as a sub-entry, and the one-slot sentinel gap is recorded in this history rather than given an identifier of its own, because its repair is the same one."
+        },
+        {
+          "at": "2026-10-09T18:40:00+05:30",
+          "state": "REPAIRED_UNREVIEWED",
+          "by": "implementing agent",
+          "note": "Third repair, and the first one that is not a patch on the same wrong idea. Alex Zamurko, 9 October: 'rather than continuing to fix recovery problems one by one, can we run these destructive tests in a separate, disposable copy of the repository? That would prevent interrupted tests from changing the actual controller.' The probe now creates a git worktree of HEAD in a temporary directory, applies the mutation there, runs the suite there, and deletes the directory at the end. The real controller is never written to, so a killed run costs a folder that was going to be thrown away. The leftover sweep is trivially safe in a way none of the recovery code was, because an abandoned temporary checkout contains nobody's work. Both earlier gaps stop existing rather than being guarded: there is no file to leave half written and no sentinel to under-record. Verified on first run: the probe reported both of its own repairs caught and `git status` was completely clean afterwards, with no restore having been needed. recover() and the sentinel stay in the source for a tree damaged before today, with their seven controls intact, but nothing creates that situation any more."
         }
       ]
     },
@@ -187,6 +212,43 @@
           "state": "REPAIRED_UNREVIEWED",
           "by": "implementing agent",
           "note": "Repaired and controlled, under Alex Zamurko's instruction of 8 October to repair and test D02-F01 and SELF-F04. Two things are worth recording about how it went rather than only that it went. The flag had no control of any kind before today: it was added yesterday as SELF-F01's third repair and the only thing exercising it was the package's own suite, indirectly, which is why the reviewer found this by reading source instead of by anything going red. And the first fixture written for it was wrong twice over, each time refusing for a reason unrelated to what it claimed to test: it omitted bootstrap_review, so the controller refused on run identity under C01-F05, and it assumed the package would reach the controller at all, when in fact the package reconciles each cycle's own record first. Chasing the second of those is what exposed the traceback defect repaired alongside this one."
+        }
+      ]
+    },
+    "SELF-F05": {
+      "description": "The mutation probe wrote each mutation with a plain file write, which truncates the target to nothing before any new bytes arrive. A process killed inside that window leaves an empty file. Worse, the recovery built for SELF-F02 restores only a file that is byte for byte the mutation the probe recorded writing, so an empty file matches nothing it knows about, and it refused to touch it. Every guard behaved exactly as designed and the outcome was a covered component reduced to zero bytes, sitting in the working tree until somebody read `git status` by hand.",
+      "discovery_source": "Implementer-disclosed, 9 October 2026, found by looking at damage rather than by any check reporting it. Shreya Gupta ran a routine `git status` at the start of the day and it listed scripts/loop_state.py as modified. The diff was `@@ -1,1163 +0,0 @@` against git's empty blob: 1163 lines gone. A sentinel from 01:07 the previous night named a mutation whose digest did not match what was on disk, which is the signature of a kill between the truncate and the write.",
+      "affected_component": "_probe/mutate_repairs.py. Not a covered component; it is preserved in cycle evidence as an instrument. Its blast radius is any file it mutates, which includes several covered components.",
+      "severity": "High, and the highest of the five so far by what it actually did. It emptied scripts/loop_state.py, a covered component, for roughly thirteen hours. Nothing reached the history, because the green-suite gate before each commit would have gone red on an unimportable module, and because the next probe run refused to start against a dirty tree. But the damage was real, it was silent, and the only thing that surfaced it was a human reading a status line.",
+      "state": "REPAIRED_UNREVIEWED",
+      "review_cycle": null,
+      "tracked_under": "SELF-F02",
+      "proposed_repair": "Two parts, and a third that supersedes both. First, write through a temporary file in the same directory and os.replace onto the target, which is atomic on Windows and POSIX, so a kill at any point leaves either the old content or the new and never nothing. Second, teach the recovery that an empty file is the one case it can restore without risk: nobody edits a source file down to zero bytes and walks away, so there is no human work for the refusal to protect, though HEAD must still match. Third, and this is what actually removes the defect rather than guarding it: stop writing to the real repository at all. See SELF-F02's third repair, the disposable checkout, which makes both of the above unreachable in normal operation.",
+      "evidence": [
+        "_probe/mutate_repairs.py: write_atomic(), used for the mutation and for the restore, and the empty-file branch in recover()",
+        "scripts/test_probe_recovery.py: 'an empty file left by a kill mid-write is restored, and says so' and 'a write that does not complete leaves the original intact', the second made by forcing os.fsync to raise partway through a write",
+        "_probe/mutate_repairs.py: SELF-F05 and SELF-F05b, the first two mutations this probe has ever aimed at its own source",
+        "The second control's first wording named only the empty outcome, and when the probe mutated the repair the other branch fired instead, so it reported a wrong control. The control was right and its wording was too narrow to recognise itself, which is a small copy of the defect class this layer exists to find. Both branches now state the property rather than a symptom."
+      ],
+      "required_of_next_review": true,
+      "history": [
+        {
+          "at": "2026-10-09T14:25:00+05:30",
+          "state": "OPEN",
+          "by": "implementing agent",
+          "note": "Disclosed on finding a covered component emptied in the working tree, with a sentinel pointing at a mutation that never landed."
+        },
+        {
+          "at": "2026-10-09T15:00:00+05:30",
+          "state": "REPAIRED_UNREVIEWED",
+          "by": "implementing agent",
+          "note": "Atomic write and the empty-file recovery, with two controls and two probe lines. Writing the probe line for it also required teaching the probe to mutate files outside scripts/, which it had never been able to do, so until that afternoon every repair to the instrument itself had been taken on trust. The first version of that change kept a hardcoded scripts/ prefix in the target list a hundred lines above the loop, so for the one new path both the clean-tree guard and the left-modified guard were checking a filename that does not exist and both looked like they had passed. That lasted about an hour and is the same defect class in miniature."
+        },
+        {
+          "at": "2026-10-09T18:40:00+05:30",
+          "state": "REPAIRED_UNREVIEWED",
+          "by": "implementing agent",
+          "note": "Superseded in practice by SELF-F02's third repair. With the probe working in a disposable checkout, there is no file of anyone's for a half-written write to damage. The repair above is kept rather than removed, because it costs nothing and because a tree damaged before today can still arrive at the recovery path. Alex Zamurko's instruction is what produced the better fix: 'rather than continuing to fix recovery problems one by one, can we run these destructive tests in a separate, disposable copy of the repository?'"
         }
       ]
     }

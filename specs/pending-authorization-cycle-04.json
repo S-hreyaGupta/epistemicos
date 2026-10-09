@@ -1,0 +1,27 @@
+{
+  "schema": "loop-authorization/1",
+  "NOT_YET_IN_EFFECT": "This file is deliberately NOT at runs/BOOTSTRAP-003/plan-review/loop-authorizations.json, which is the only path the controller reads. Alex Zamurko's authorisation of a fourth review is conditional: 'Once these are done, I authorise one additional independent review of the corrected and frozen version', and on 9 October at 6:22 pm, 'complete the independently authorised fourth review, IF all conditions are satisfied.' Installing it now would clear STALLED before the conditions it depends on are met, which would be the implementing agent granting itself a permission the approver made conditional. It is drafted here so that the wording can be checked in advance, and it moves into place when `python scripts/exit_criteria.py` reports the conditions met and Alex confirms.",
+  "conditions_outstanding": [
+    "EC-1 through EC-4, each needing both its machine checks and Alex's judgement; see specs/BOOTSTRAP-EXIT-CRITERIA.md",
+    "Alex's accept-or-reject on each of the six entries in specs/ACCEPTED-RISKS.md",
+    "The exit criteria document frozen and its hash recorded"
+  ],
+  "authorizations": [
+    {
+      "after_valid_cycle": 3,
+      "outcome": "STALLED",
+      "authorized_by": "Alex Zamurko",
+      "at": "2026-10-09T14:38:00+05:30",
+      "reason": "Cycle 03 resolved nothing, so §6 stopped the loop one cycle short of its budget. The stall is a judgement about progress and reflects timing rather than deadlock: the reviewer found D02-F01's repair incomplete, and the completion landed after cycle 03 was already frozen, so no reviewer has yet seen it. Three further blocking repairs are in the same position. One cycle of the budget remains and examining four unreviewed blocking repairs is what it is for. MAX_4_REACHED is not cleared by this and is not clearable; after cycle 04 the budget is spent.",
+      "source": {
+        "medium": "Slack",
+        "reference": "workflow channel, 9 October 2026, 2:38 pm, message beginning 'I'm happy to support one more independent review'",
+        "quote": "Once these are done, I authorise one additional independent review of the corrected and frozen version.",
+        "conditional": true,
+        "conditions_quoted": "A few things to take care of before moving ahead: 1. First, let's fix the testing tool so it can't report success while leaving any checks disabled. Then rerun all 54 tests and confirm everything is properly restored. 2. Finish reconciling the findings, including SELF-F04. 3. Keep the original STALLED result in the records and confirm that the rules allow an authorised fourth cycle. 4. Make sure the authorisation is properly documented and can be verified.",
+        "limits": "The implementing agent typed this record, including the quote. It makes the claim checkable by anyone who can read that channel; it does not establish that the message exists or that Alex wrote this file. See AR-2 in specs/ACCEPTED-RISKS.md."
+      }
+    }
+  ],
+  "rules_check": "Asked and answered from the code rather than asserted. scripts/loop_state.py defines UNCLEARABLE = ('MAX_4_REACHED',), so STALLED is clearable by a recorded authorization naming its boundary and outcome, and the budget is not. That asymmetry is B01-F02 and Alex Zamurko's ruling of 15 September: 'Four valid cycles is the maximum and no authorization extends it. The other exits stay clearable, because STALLED and the adjudication outcomes are judgements about progress that a human can reasonably overrule; the budget is not a judgement.' Cycle 04 is the fourth valid cycle, so it is inside the budget and needs only the stall cleared. This will be demonstrated by running the controller with the authorization in place, rather than left as a reading of the source."
+}

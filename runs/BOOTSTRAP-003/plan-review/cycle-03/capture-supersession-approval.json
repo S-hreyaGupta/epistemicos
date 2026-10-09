@@ -2,6 +2,12 @@
   "schema": "capture-supersession/1",
   "authorized_by": "Alex Zamurko",
   "at": "2026-10-08T16:37:00+05:30",
+  "source": {
+    "medium": "WhatsApp",
+    "reference": "Direct message to Shreya Gupta, 8 October 2026, approximately 4:37 pm IST, in reply to a message asking whether the cycle 03 capture could be replaced with the original kept for audit history. WhatsApp has no permalink, so this description is the reference: the conversation and the approximate time are what a reader would use to find it.",
+    "quote": "Ofc, go ahead with replacing a capture",
+    "limits": "The implementing agent typed this record, including the quote. It makes the claim checkable by anyone who can read that conversation; it does not establish that the message exists. See AR-2 in specs/ACCEPTED-RISKS.md."
+  },
   "channel": "WhatsApp",
   "cycle": "cycle-03",
   "superseded_sha256": "b37d3289c04e20c7eda5a27776f9b9b8055f92222a5e28353f1380efbb6f2215",

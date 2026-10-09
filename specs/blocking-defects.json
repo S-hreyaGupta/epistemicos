@@ -1,0 +1,48 @@
+{
+  "schema": "blocking-defects/1",
+  "purpose": "Which open defects block the bootstrap phase from exiting. A classification, not a discovery: every item here is already recorded in the reviewer ledger or the implementer-disclosed register, and this file says only which of them Alex Zamurko has ruled blocking.",
+  "why_a_file": "EC-1 asks whether any critical defect is open. 'Critical' is a judgement, so a check cannot derive this list, and a list that lived only in a conversation could not be checked against. Writing it down lets the exit-criteria script say which items it is evaluating, and lets a later reader see which classification a decision was taken under.",
+  "ruled_by": "Alex Zamurko",
+  "ruled_at": "2026-10-09T17:16:00+05:30",
+  "source": "Slack, workflow channel: 'Agreed. Let's proceed with the four proposed blockers: D02-F01, SELF-F04, SELF-F02 and SELF-F05, provided SELF-F05 is a separate issue from SELF-F02.'",
+  "source_caveat": "The proviso was not met. SELF-F05 is a gap in SELF-F02's repair rather than a separate issue, and a third gap was found the same day. Alex was told this and answered on 9 October at 5:51 pm: keep them together under a reopened SELF-F02 while preserving each individual record. That is how they appear below.",
+  "after_this_date": "A finding raised after 9 October 2026 is unclassified until Alex rules on it, and EC-1 cannot be evaluated while any finding is unclassified. Silence is not a classification.",
+  "blocking": {
+    "D02-F01": {
+      "where": "reviewer ledger, BOOTSTRAP-003 plan-review",
+      "condition": "EC-1",
+      "why": "A finding the parser cannot read is a finding the loop never hears about, and a loop measuring a smaller finding set than the review produced is how a false convergence is reached.",
+      "repair_landed": "2026-10-08",
+      "independently_examined_in_cycle": null
+    },
+    "SELF-F02": {
+      "where": "implementer-disclosed register",
+      "condition": "EC-2",
+      "why": "The testing tool could leave a disabled check in the repository, so every suite would pass for a reason other than the one it names. Alex's second condition, word for word: testing tools must restore the repository correctly.",
+      "repair_landed": "2026-10-09, third attempt, by removing the need to restore at all",
+      "reopened": "2026-10-09, on the implementing agent's recommendation and Alex's agreement, after its repair failed twice in real use",
+      "sub_entries": ["SELF-F05", "SELF-F05b-sentinel-single-slot"],
+      "independently_examined_in_cycle": null
+    },
+    "SELF-F04": {
+      "where": "implementer-disclosed register",
+      "condition": "EC-1",
+      "why": "A machine-readable interface returned prose with a success code on the path where it had computed nothing. Reporting success for work never done is Alex's first condition.",
+      "repair_landed": "2026-10-08",
+      "independently_examined_in_cycle": null
+    },
+    "SELF-F05": {
+      "where": "implementer-disclosed register, tracked under SELF-F02",
+      "condition": "EC-2",
+      "why": "A killed run emptied a covered component and the recovery refused to restore it, so the repository held a 1163-line file reduced to nothing overnight. Kept as its own record because its mechanism is distinct, and grouped under SELF-F02 because it is a gap in that repair rather than an independent defect.",
+      "repair_landed": "2026-10-09",
+      "independently_examined_in_cycle": null
+    }
+  },
+  "not_blocking": {
+    "citation-future-work": "Deferred by Alex on 8 October: reference-list confirmation, the `and` taxonomy cases 8 and 11, and non-year publication-status values. Belongs to the citation product, not the review layer.",
+    "spec-code-test-mapping": "Absent from section 7 of the approval package. A bootstrap run reviews code directly and has no plan, so there is no mapping to produce. Named in the package rather than omitted.",
+    "SELF-F01": "RESOLVED. Examined by the BOOTSTRAP-003 cycle 03 reviewer, with that reviewer's three stated limits recorded alongside.",
+    "SELF-F03": "RESOLVED. Examined by the BOOTSTRAP-003 cycle 01 reviewer, with two stated limits."
+  }
+}

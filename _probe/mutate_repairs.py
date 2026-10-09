@@ -47,8 +47,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -649,9 +651,85 @@ MUTATIONS = [
 ]
 
 
-def run_suite(name: str) -> subprocess.CompletedProcess:
+# Alex Zamurko, 9 October 2026: "rather than continuing to fix recovery
+# problems one by one, can we run these destructive tests in a separate,
+# disposable copy of the repository?"
+#
+# He is right, and it ends a family of defects rather than shrinking it. This
+# probe has always written its mutations into the live controller and put them
+# back afterwards, so every way a run can die is a way to leave a check
+# switched off in the real tree. SELF-F02 was the first, SELF-F05 the second,
+# and the one-slot sentinel the third, each a patch on the same wrong idea.
+#
+# A git worktree is a second checkout of the same commit in its own directory,
+# sharing the object store. The mutation goes there, the suite runs there, and
+# the directory is deleted at the end. A kill now costs a folder that was
+# going to be thrown away. There is nothing to recover, because nothing the
+# probe touches is anybody's work.
+#
+# The recovery machinery below stays, because a tree can still carry damage
+# from before today, but it stops being what the safety of a run depends on.
+SANDBOX_PREFIX = "epistemicos-probe-"
+
+
+def drop_sandboxes() -> list[str]:
+    """Remove worktrees this probe left behind. Returns what was removed.
+
+    Safe in a way none of the recovery code is: these directories contain no
+    work. Deleting one that is still in use by a concurrent run would be the
+    only hazard, and the pid in the name keeps runs out of each other's way.
+    """
+    r = subprocess.run(["git", "-C", str(REPO), "worktree", "list",
+                        "--porcelain"], capture_output=True, text=True)
+    gone = []
+    for line in r.stdout.splitlines():
+        if not line.startswith("worktree "):
+            continue
+        p = line[len("worktree "):].strip()
+        name = Path(p).name
+        if not name.startswith(SANDBOX_PREFIX):
+            continue
+        if name == f"{SANDBOX_PREFIX}{os.getpid()}":
+            continue
+        subprocess.run(["git", "-C", str(REPO), "worktree", "remove",
+                        "--force", p], capture_output=True, text=True)
+        gone.append(name)
+    subprocess.run(["git", "-C", str(REPO), "worktree", "prune"],
+                   capture_output=True, text=True)
+    return gone
+
+
+def make_sandbox() -> Path:
+    """A second checkout of HEAD, for the probe to break at will."""
+    path = Path(tempfile.gettempdir()) / f"{SANDBOX_PREFIX}{os.getpid()}"
+    if path.exists():
+        subprocess.run(["git", "-C", str(REPO), "worktree", "remove",
+                        "--force", str(path)], capture_output=True, text=True)
+        shutil.rmtree(path, ignore_errors=True)
+    r = subprocess.run(["git", "-C", str(REPO), "worktree", "add", "--detach",
+                        "--quiet", str(path), "HEAD"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError("could not create the disposable checkout:\n"
+                           + (r.stderr or r.stdout).strip())
+    return path
+
+
+def restore_in(root: Path, rel: str) -> None:
+    """Put one file in the sandbox back to HEAD.
+
+    Cheaper and more exact than remembering the original text, and there is no
+    index in play to confuse it with: the worktree was created detached at
+    HEAD and nothing stages anything in it.
+    """
+    subprocess.run(["git", "-C", str(root), "checkout", "--", rel],
+                   capture_output=True, text=True)
+
+
+def run_suite(name: str, root: Path) -> subprocess.CompletedProcess:
     env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
-    return subprocess.run([sys.executable, str(SCRIPTS / name)],
+    return subprocess.run([sys.executable, str(root / "scripts" / name)],
+                          cwd=str(root),
                           env=env, capture_output=True, text=True, timeout=900)
 
 
@@ -856,10 +934,22 @@ def main() -> int:
               "already differ from HEAD:\n")
         for p in dirty:
             print(f"      {p}")
-        print("\n  Commit or discard them first. Started from here, each restore "
-              "would put the\n  file back to whatever it held at the start, which "
-              "is not the same as putting\n  it back to the repaired source, and "
-              "the result would say nothing about the\n  repairs.")
+        print("\n  Commit or discard them first. A mutation is applied to a "
+              "checkout of HEAD, so\n  anything uncommitted here is not what "
+              "would be tested, and the result would\n  say nothing about the "
+              "source you are actually running.")
+        return 2
+
+    # Everything destructive from here happens in a copy.
+    stale = drop_sandboxes()
+    if stale:
+        print(f"  [cleaned] {len(stale)} abandoned checkout(s) from a killed "
+              f"run, removed:\n      " + "\n      ".join(stale) +
+              "\n      Nothing was lost. That is the point of them.\n")
+    try:
+        work = make_sandbox()
+    except RuntimeError as exc:
+        print(f"  [CANNOT RUN] {exc}")
         return 2
 
     bad = 0
@@ -868,7 +958,7 @@ def main() -> int:
         # cannot be pointed at itself is one whose repairs are taken on trust,
         # and this run has been finding out what that costs.
         _rel = rel_of(fname)
-        path = REPO / _rel
+        path = work / _rel
         # newline="" on the READ as well, not only on the writes below. Without
         # it Python translates CRLF to LF on the way in, so `original` is not
         # the file's bytes and restoring it rewrites every line ending in the
@@ -894,24 +984,20 @@ def main() -> int:
             bad += 1
             continue
 
-        # The record goes down BEFORE the file is touched, and carries the
-        # digest of what is about to be written. Written after, a kill in the
-        # gap would leave a mutated file with nothing naming it, which is the
-        # state this is here to prevent.
+        # No sentinel is written any more, because there is nothing for a
+        # later run to recover: this file lives in a directory that exists to
+        # be deleted. The sentinel and recover() stay in this file for a tree
+        # damaged before today, and test_probe_recovery still exercises them,
+        # but no new run creates that situation.
+        #
+        # Still written atomically. Not for safety now, but because a half
+        # written file in the sandbox would make a suite fail for a reason
+        # that has nothing to do with the mutation, and this probe's whole
+        # value is that a red suite means the thing it names.
         mutated = original.replace(old, new, 1)
-        ACTIVE.write_text(json.dumps({
-            "finding": finding,
-            "path": _rel,
-            "head": _head(),
-            "mutated": _sha_text(mutated),
-        }, indent=2) + "\n", encoding="utf-8")
-        # newline="" so a run on Windows does not rewrite the file's endings
-        # on its way past, and on the restore as well as the write. Atomic
-        # since SELF-F05: the window between truncating this file and filling
-        # it is the window that emptied loop_state.py.
         write_atomic(path, mutated)
         try:
-            r = run_suite(suite)
+            r = run_suite(suite, work)
         except subprocess.TimeoutExpired as _exc:
             # Not a catch and not a miss. The suite never finished, so nothing
             # at all is known about the control this mutation is aimed at, and
@@ -945,8 +1031,7 @@ def main() -> int:
             bad += 1
             continue
         finally:
-            write_atomic(path, original)
-            ACTIVE.unlink(missing_ok=True)
+            restore_in(work, _rel)
 
         blob = (r.stdout or "") + (r.stderr or "")
         if "Traceback (most recent call last)" in (r.stderr or ""):
@@ -968,16 +1053,24 @@ def main() -> int:
         else:
             print(f"  [caught] {finding}")
 
+    # The real tree, which this run should not have touched at all. Before the
+    # sandbox this was the last line of defence; now it is an assertion that
+    # the isolation held, and a failure here means something reached past it.
     left = modified(targets)
     if left:
-        print(f"\n  [LEFT MODIFIED] the probe did not restore everything it "
-              f"wrote to:\n")
+        print(f"\n  [ESCAPED] the real working tree changed during a run that "
+              f"should only have\n  written to a disposable checkout:\n")
         for p in left:
             print(f"      {p}")
         print("\n  Restore them with `git checkout --` before running anything "
-              "else. Until then\n  every suite in the repository is reading "
-              "source this probe broke on purpose.")
+              "else, and treat the\n  isolation as broken rather than the "
+              "restore as missing.")
         bad += 1
+
+    subprocess.run(["git", "-C", str(REPO), "worktree", "remove", "--force",
+                    str(work)], capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(REPO), "worktree", "prune"],
+                   capture_output=True, text=True)
 
     print()
     _of = (f"{len(selected)} selected repair(s)" if want

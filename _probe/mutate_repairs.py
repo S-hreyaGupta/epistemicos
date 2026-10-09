@@ -500,6 +500,30 @@ MUTATIONS = [
      "test_approval_package.py",
      "crashed rather than refusing"),
 
+    # SELF-F05, and the first two mutations this probe has ever aimed at its
+    # own source. On 8 October it emptied a 1163-line covered component and
+    # the tree stayed that way overnight, so these two lines are the reason to
+    # believe it will not happen again rather than the hope that it will not.
+    #
+    # Writing into the real file instead of a temporary one restores the exact
+    # defect: the target is truncated first and a failure partway leaves it
+    # empty.
+    ("SELF-F05  a mutation is written atomically, never half",
+     "_probe/mutate_repairs.py",
+     "    tmp = path.with_name(path.name + \".probe-tmp\")",
+     "    tmp = path",
+     "test_probe_recovery.py",
+     "emptied the target"),
+
+    # And the recovery half: refusing the empty file is the behaviour that let
+    # the broken tree survive until morning.
+    ("SELF-F05b  an empty file is restored, not refused",
+     "_probe/mutate_repairs.py",
+     "    if not live.strip() and _head() == rec.get(\"head\"):",
+     "    if False:",
+     "test_probe_recovery.py",
+     "was left empty"),
+
     # D01-F01, BOOTSTRAP-003 cycle 01. Two rules, two mutations: the replay is
     # limited to the cycles that had reported the finding, and the recorded
     # origin must agree with the event that records it. Each needs its own
@@ -636,6 +660,33 @@ def _head() -> str:
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+def write_atomic(path: Path, text: str) -> None:
+    """Replace a file's contents, or leave them alone. Never in between.
+
+    SELF-F05. `Path.write_text` opens for writing, which truncates to zero
+    before any new bytes arrive. Kill the process in that window, which is what
+    closing a PowerShell window does, and the file is empty. On the night of
+    8 October it emptied scripts/loop_state.py, 1163 lines of a covered
+    component, and the tree sat that way until the next morning.
+
+    What made it worse is that recovery is built to restore only a file that is
+    byte for byte the mutation this probe wrote. An empty file is not that, so
+    recovery looked at it, could not prove it was its own writing, and refused.
+    The guard behaved exactly as designed and the repository stayed broken.
+
+    A temporary file in the same directory, flushed and fsynced, then
+    os.replace, which is atomic on Windows and on POSIX. Same directory because
+    a replace across filesystems is not atomic. After this, a kill at any point
+    leaves either the old content or the new.
+    """
+    tmp = path.with_name(path.name + ".probe-tmp")
+    with tmp.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+
 def recover() -> int:
     """Put back a mutation that a killed run left applied. 0 = clear to start.
 
@@ -665,7 +716,20 @@ def recover() -> int:
         return 2
     with path.open("r", encoding="utf-8", newline="") as fh:
         live = fh.read()
-    if _head() != rec.get("head") or _sha_text(live) != rec.get("mutated"):
+    # SELF-F05, the half the atomic write cannot cover. A tree can already be
+    # in this state from before that repair, which ours was, and a flush can
+    # still fail. An empty file is the one case where refusing to act is not
+    # the cautious choice: nobody edits a source file down to zero bytes and
+    # walks away, so there is no human work here to protect. HEAD still has to
+    # match, because restoring from a commit that has moved would put back
+    # something nobody reviewed.
+    if not live.strip() and _head() == rec.get("head"):
+        print(f"  [recovering] {rel} is empty. A previous run was killed "
+              f"between truncating\n  the file and writing the mutation for "
+              f"{label}, so what is on disk is neither\n  the original nor the "
+              f"mutation. Restoring from HEAD: an empty source file is\n  not "
+              f"somebody's edit to preserve.")
+    elif _head() != rec.get("head") or _sha_text(live) != rec.get("mutated"):
         print(f"  [CANNOT RUN] a previous run was killed while {rel} carried "
               f"the mutation for\n  {label}, and the file or the commit has "
               f"moved since. It is not restored here,\n  because a recovery "
@@ -690,7 +754,16 @@ def recover() -> int:
         print(f"  [CANNOT RUN] {rel} could not be read from HEAD: "
               f"{r.stderr.decode('utf-8', 'replace').strip()}")
         return 2
-    path.write_bytes(r.stdout)
+    # SELF-F05 again. The restore is the half that matters most: a kill here
+    # empties the file while the sentinel still points at a mutation, which is
+    # the state that needed a human this morning. Bytes, not text, because what
+    # HEAD holds is what goes back, with no encoding or newline step in between.
+    _tmp = path.with_name(path.name + ".probe-tmp")
+    with _tmp.open("wb") as fh:
+        fh.write(r.stdout)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(_tmp, path)
     # Verified rather than assumed: the file now holds what HEAD holds.
     with path.open("r", encoding="utf-8", newline="") as fh:
         if _sha_text(fh.read()) != hashlib.sha256(r.stdout).hexdigest():
@@ -703,6 +776,25 @@ def recover() -> int:
           f"established nothing about anything;\n  this one starts from a "
           f"clean tree.\n")
     return 0
+
+
+def rel_of(fname: str) -> str:
+    """The repo-relative path a mutation entry names.
+
+    A bare name means scripts/, which is every entry written before 9 October.
+    A name carrying a slash is repo-relative, which exists so the probe can be
+    aimed at its own source.
+
+    One function because the first version of this rule was written inline in
+    the loop and the target list a hundred lines above kept its own copy with
+    the prefix hardcoded. For the one entry that needed the new form, the
+    clean-tree guard and the left-modified guard were both checking
+    `scripts/_probe/mutate_repairs.py`, which does not exist, so both reported
+    nothing and both looked like they had passed. A check that answers about a
+    path that is not there is the same defect this probe exists to find, and it
+    lasted about an hour.
+    """
+    return fname if "/" in fname else f"scripts/{fname}"
 
 
 def modified(rel_paths: list[str]) -> list[str]:
@@ -747,7 +839,7 @@ def main() -> int:
     # this tree is dirty is this probe itself, and "commit or discard them
     # first" is the wrong instruction for a file this process mutated and
     # failed to put back.
-    targets = sorted({f"scripts/{m[1]}" for m in selected})
+    targets = sorted({rel_of(m[1]) for m in selected})
     try:
         dirty = modified(targets)
     except RuntimeError as exc:
@@ -767,7 +859,11 @@ def main() -> int:
 
     bad = 0
     for finding, fname, old, new, suite, needle in selected:
-        path = SCRIPTS / fname
+        # Aimed at its own source when the entry says so. An instrument that
+        # cannot be pointed at itself is one whose repairs are taken on trust,
+        # and this run has been finding out what that costs.
+        _rel = rel_of(fname)
+        path = REPO / _rel
         # newline="" on the READ as well, not only on the writes below. Without
         # it Python translates CRLF to LF on the way in, so `original` is not
         # the file's bytes and restoring it rewrites every line ending in the
@@ -800,13 +896,15 @@ def main() -> int:
         mutated = original.replace(old, new, 1)
         ACTIVE.write_text(json.dumps({
             "finding": finding,
-            "path": f"scripts/{fname}",
+            "path": _rel,
             "head": _head(),
             "mutated": _sha_text(mutated),
         }, indent=2) + "\n", encoding="utf-8")
         # newline="" so a run on Windows does not rewrite the file's endings
-        # on its way past, and on the restore as well as the write.
-        path.write_text(mutated, encoding="utf-8", newline="")
+        # on its way past, and on the restore as well as the write. Atomic
+        # since SELF-F05: the window between truncating this file and filling
+        # it is the window that emptied loop_state.py.
+        write_atomic(path, mutated)
         try:
             r = run_suite(suite)
         except subprocess.TimeoutExpired as _exc:
@@ -842,7 +940,7 @@ def main() -> int:
             bad += 1
             continue
         finally:
-            path.write_text(original, encoding="utf-8", newline="")
+            write_atomic(path, original)
             ACTIVE.unlink(missing_ok=True)
 
         blob = (r.stdout or "") + (r.stderr or "")

@@ -166,6 +166,81 @@ def main() -> int:
     else:
         ok("no sentinel, nothing recovered, nothing written")
 
+    # ---- SELF-F05: the state that actually happened ----
+    #
+    # 8 October, close to one in the morning. A run was killed between
+    # truncating scripts/loop_state.py and writing the mutation into it, and
+    # the tree was left holding an empty 1163-line covered component. Recovery
+    # compared the empty file against the digest of what it had meant to write,
+    # found no match, and refused. Every guard behaved as designed and the
+    # repository stayed broken until someone read `git status` by hand.
+    #
+    # The sentinel here names a mutation that never landed, which is the whole
+    # point: on disk there is neither the original nor the mutation.
+    t4 = build()
+    (t4 / "scripts" / "subject.py").write_bytes(b"")
+    sentinel(t4, MUTATED_BYTES)
+
+    r4 = run_probe(t4)
+    after4 = (t4 / "scripts" / "subject.py").read_bytes()
+    blob4 = r4.stdout + r4.stderr
+    if after4 == b"":
+        failures.append(
+            "an empty source file with a live sentinel was left empty. "
+            "Refusing is the right instinct everywhere else here, and it is "
+            "wrong in this one case: nobody edits a file down to zero bytes, "
+            "so there is no human work being protected by the refusal.")
+    elif after4 != HEAD_BYTES:
+        failures.append(f"the empty file was rewritten with something that is "
+                        f"not HEAD: {after4[:80]!r}")
+    elif "empty" not in blob4:
+        failures.append(f"the file was restored without saying it had been "
+                        f"found empty, so a reader cannot tell this from an "
+                        f"ordinary recovery\n{blob4[:300]}")
+    elif (t4 / "_probe" / ".active-mutation.json").exists():
+        failures.append("the sentinel survived recovery from the empty case")
+    else:
+        ok("an empty file left by a kill mid-write is restored, and says so")
+
+    # The other half, and the one that stops the case above from arising. A
+    # write that fails partway must leave the original untouched rather than a
+    # truncated file. os.fsync is made to raise, which is the closest a test
+    # can get to the process dying with the file open.
+    t5 = build()
+    subj = t5 / "scripts" / "subject.py"
+    sys.path.insert(0, str(t5 / "_probe"))
+    for _m in ("mutate_repairs",):
+        sys.modules.pop(_m, None)
+    import mutate_repairs as _mr  # noqa: E402
+
+    _real_fsync = os.fsync
+    os.fsync = lambda fd: (_ for _ in ()).throw(OSError("simulated kill"))
+    try:
+        _mr.write_atomic(subj, "this text must never reach the file\n")
+    except OSError:
+        pass
+    finally:
+        os.fsync = _real_fsync
+    # Both branches below are the same violation, so both say so in the same
+    # words. The first version named only the empty case, and when the probe
+    # mutated this repair the other branch fired instead: the write landed and
+    # fsync raised after it, leaving the target holding the new text. The
+    # control was right and its wording was too narrow to recognise itself,
+    # which is a smaller copy of the defect class this whole layer chases.
+    if subj.read_bytes() == b"":
+        failures.append(
+            "a write that did not complete emptied the target. write_text "
+            "truncates before it fills, and this repair exists so the target "
+            "is never left half written.")
+    elif subj.read_bytes() != HEAD_BYTES:
+        failures.append(
+            f"a write that did not complete changed the target anyway: "
+            f"{subj.read_bytes()[:80]!r}. The new content must not be visible "
+            f"until the whole of it is on disk.")
+    else:
+        ok("a write that does not complete leaves the original intact")
+    sys.path.remove(str(t5 / "_probe"))
+
     for p in made:
         shutil.rmtree(p, ignore_errors=True)
 

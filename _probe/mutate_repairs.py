@@ -513,7 +513,12 @@ MUTATIONS = [
      "    tmp = path.with_name(path.name + \".probe-tmp\")",
      "    tmp = path",
      "test_probe_recovery.py",
-     "emptied the target"),
+     # The property, not one of its symptoms. The first needle here said
+     # "emptied the target", and when the mutation was applied the write
+     # landed before fsync raised, so the control fired on its other branch
+     # and the probe called it a wrong control. The control was right and the
+     # needle was too narrow to recognise it.
+     "a write that did not complete"),
 
     # And the recovery half: refusing the empty file is the behaviour that let
     # the broken tree survive until morning.

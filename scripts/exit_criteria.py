@@ -135,13 +135,42 @@ def ec1() -> Condition:
                 "specs/BOOTSTRAP-EXIT-CRITERIA.md.")
     else:
         try:
-            blocking = json.loads(bf.read_text(encoding="utf-8"))
-            names = sorted(blocking.get("blocking", {}))
-            c.check(PASS, f"{len(names)} defect(s) classified as blocking",
-                    ", ".join(names))
+            blocking = json.loads(bf.read_text(encoding="utf-8")).get(
+                "blocking", {})
         except json.JSONDecodeError as e:
             c.check(UNKNOWN, f"the blocking-defect classification is not valid "
                              f"JSON: {e}")
+            return c
+
+        # The first version of this counted the blocking defects and called
+        # that a pass. It reported EC-1 PASS on 10 October with all four of
+        # them open, because counting a list is not asking whether anything on
+        # it is closed. A condition named "no critical open defect" that never
+        # looks at whether the critical defects are open is a check passing
+        # for a reason other than the one it is named for, which is the defect
+        # class this entire document exists to prevent, written into the
+        # document itself.
+        #
+        # A defect is closed here when a reviewer has examined its repair,
+        # which is EC-4's bar and Alex Zamurko's: "Behavioural claims require
+        # independent execution." So EC-1 and EC-4 move together, and that is
+        # correct rather than redundant: EC-4 asks whether the evidence
+        # exists, EC-1 asks whether anything critical is still open. Today the
+        # answer to both is no and they should not disagree.
+        _open = sorted(k for k, v in blocking.items()
+                       if not v.get("independently_examined_in_cycle"))
+        if not blocking:
+            c.check(UNKNOWN, "nothing is classified as blocking",
+                    "An empty list is not the same as nothing being critical. "
+                    "Either no\nfinding has been classified yet, or the file "
+                    "is wrong.")
+        elif _open:
+            c.check(FAIL, f"{len(_open)} of {len(blocking)} blocking "
+                          f"defect(s) are still open",
+                    ", ".join(_open) + "\nEach has a repair that no reviewer "
+                    "has examined. Until one has, this\ncondition is not met.")
+        else:
+            c.check(PASS, f"all {len(blocking)} blocking defect(s) closed")
     return c
 
 
@@ -214,10 +243,23 @@ def ec2() -> Condition:
     dirty = [ln[3:].strip() for ln in r.stdout.splitlines() if ln.strip()
              and not ln.strip().endswith("full-sweep.txt")]
     if dirty:
-        c.check(FAIL, "source differs from HEAD after testing",
-                ", ".join(dirty))
+        # Said as what it is rather than as the worst thing it could be. The
+        # first wording was "source differs from HEAD after testing", which
+        # reads as the probe having escaped its sandbox, and on 10 October it
+        # fired because the implementing agent had edited a file and not
+        # committed it. Two causes, one message, and it named the alarming
+        # one. The probe has its own check for escape and says both
+        # possibilities out loud; this one is about something narrower.
+        c.check(FAIL, "the source on disk is not the source any sweep "
+                      "describes",
+                ", ".join(dirty) +
+                "\nThese differ from HEAD, and a recorded sweep describes a "
+                "commit. Either\ncommit them and re-sweep, or discard them. "
+                "This is not evidence of the probe\nreaching the real tree; "
+                "the probe checks that itself and reports it separately.")
     else:
-        c.check(PASS, "the real source is unchanged")
+        c.check(PASS, "the working tree matches HEAD, so a sweep of HEAD "
+                      "describes what is here")
 
     r = subprocess.run(["git", "-C", str(REPO), "worktree", "list",
                         "--porcelain"], capture_output=True, text=True)

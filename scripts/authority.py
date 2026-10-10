@@ -62,6 +62,29 @@ from pathlib import Path
 
 MIN_REASON = 20
 
+# Alex Zamurko, 9 October 2026: "Make sure the authorisation is properly
+# documented and can be verified, rather than relying only on a name entered
+# into a file."
+#
+# He is right that a name in a file establishes nothing. This does not fix
+# that, and it would be dishonest to present it as a fix. What it does is make
+# the claim CHECKABLE BY A PERSON: the record must say where the authorisation
+# was given and quote the words that gave it, so a reader who can reach that
+# channel can confirm or refute it in a few seconds. Before this, there was
+# nothing to check against at all.
+#
+# What it still does not establish, recorded as AR-2 in
+# specs/ACCEPTED-RISKS.md: the implementing agent types all of this, and could
+# type a quote that was never said. Only the approver writing or signing the
+# record themselves removes that, and that is a decision about how much of
+# Alex's time each supersession is worth.
+MIN_QUOTE = 15
+
+# The day the source requirement took effect. An approval dated on or after
+# this must declare schema `<kind>/2` and carry one; anything earlier is read
+# under the rule that existed when it was written.
+SOURCE_REQUIRED_FROM = "2026-10-09"
+
 
 class NotAuthorized(Exception):
     """No usable approval for this action. The caller refuses and changes nothing."""
@@ -75,7 +98,13 @@ def _fail(path: Path, why: str, bindings: dict[str, str], kind: str) -> None:
              f"    schema          {kind}/1",
              "    authorized_by   the person approving, by name",
              f"    reason          why, in at least {MIN_REASON} characters",
-             "    at              when, ISO 8601"]
+             "    at              when, ISO 8601",
+             "    source          where the authorisation was actually given:",
+             "                      medium     Slack, WhatsApp, email, commit",
+             "                      reference  a permalink, or a description "
+             "precise enough to find it",
+             f"                      quote      their own words, at least "
+             f"{MIN_QUOTE} characters"]
     for k, v in bindings.items():
         lines.append(f"    {k:<15} {v}")
     lines += ["",
@@ -108,10 +137,25 @@ def require_approval(path: Path, kind: str, bindings: dict[str, str]) -> dict:
     except json.JSONDecodeError as e:
         raise NotAuthorized(f"the approval record at {path} is not valid JSON: {e}")
 
-    if rec.get("schema") != f"{kind}/1":
+    # Two versions, and the difference is the `source` requirement below.
+    #
+    # Alex Zamurko asked on 9 October 2026 that an authorisation say where it
+    # was given. Applying that to every approval already on record would mean
+    # one of two bad things: editing records made weeks earlier to add a field
+    # nobody asked for at the time, which is rewriting evidence, or a gate
+    # that refuses its own history.
+    #
+    # So a record states which rule it was made under. `/1` predates the
+    # requirement and is read as it was written. `/2` carries a source. This
+    # is C03-F01's principle, which Codex forced on the review parser in
+    # BOOTSTRAP-002: a completed record is read with its own grammar, not
+    # today's, or amending a rule silently changes what a finished decision
+    # meant.
+    _declared = str(rec.get("schema", ""))
+    if _declared not in (f"{kind}/1", f"{kind}/2"):
         raise NotAuthorized(
             f"the approval record declares schema {rec.get('schema')!r}, "
-            f"expected {kind + '/1'!r}.\n"
+            f"expected {kind + '/1'!r} or {kind + '/2'!r}.\n"
             "  An approval for one kind of decision does not authorize another.")
 
     who = str(rec.get("authorized_by", "")).strip()
@@ -134,6 +178,66 @@ def require_approval(path: Path, kind: str, bindings: dict[str, str]) -> dict:
     if not str(rec.get("at", "")).strip():
         raise NotAuthorized("the approval record has no `at` timestamp, so it "
                             "cannot be placed in the sequence of events.")
+
+    # A `/1` record written after the rule took effect is the hole in
+    # grandfathering, so it is closed here rather than left to goodwill. It
+    # does not force anything: the writer sets `at` and could backdate it,
+    # which is AR-1 and is accepted for bootstrap. What it does is make an
+    # anomaly visible to a reader instead of silent.
+    if _declared.endswith("/1") and str(rec.get("at", "")) >= SOURCE_REQUIRED_FROM:
+        # The phrase "predates the requirement" is kept on one line on
+        # purpose. The first version wrapped it across a newline, and the
+        # control that looks for it reported a refusal for the wrong reason:
+        # the refusal was right and the sentence was split where the check
+        # was reading. A message is part of the interface when something
+        # matches on it.
+        raise NotAuthorized(
+            f"this approval predates the requirement in its schema but not "
+            f"in its date.\n"
+            f"  It is dated {rec.get('at')} and declares {_declared!r}. "
+            f"Records written before\n  {SOURCE_REQUIRED_FROM} are read "
+            f"under the older rule, which did not ask where the\n  "
+            f"authorisation was given. One written after it is not.\n"
+            f"  Declare {kind}/2 and add a source.")
+
+    # Where the authorisation was actually given, and in whose words. A record
+    # without this is a claim with nothing behind it; with it, a reader can go
+    # and look. That is a smaller thing than proof and a larger thing than
+    # nothing.
+    #
+    # Only `/2` is asked for it. The first version of this skipped the whole
+    # rest of the function for a `/1` record, with an early `return rec`, and
+    # that skipped the hash bindings below as well: a `/1` approval issued for
+    # a completely different manifest was accepted. The suites caught it on
+    # the first run, which is the one good thing to say about it. Grandfather
+    # the new requirement, not the old ones.
+    if _declared.endswith("/2"):
+        src = rec.get("source")
+        if not isinstance(src, dict):
+            raise NotAuthorized(
+                "the approval record has no `source`.\n"
+                "  A name and a reason are what the implementing agent typed. "
+                "The source is where\n  the person actually said it, so that "
+                "someone else can check. It needs a medium,\n  a reference "
+                "precise enough to find the message, and their own words.")
+        _missing = [k for k in ("medium", "reference", "quote")
+                    if not str(src.get(k, "")).strip()]
+        if _missing:
+            raise NotAuthorized(
+                f"the approval record's source is missing "
+                f"{', '.join(_missing)}.\n"
+                "  Each of the three does different work: the medium says "
+                "where to look, the\n  reference says where exactly, and the "
+                "quote is what has to match when you\n  get there. Two out of "
+                "three cannot be checked.")
+        if len(str(src["quote"]).strip()) < MIN_QUOTE:
+            raise NotAuthorized(
+                f"the approval record quotes "
+                f"{len(str(src['quote']).strip())} characters; at least "
+                f"{MIN_QUOTE} are required.\n"
+                "  A quote too short to be distinctive cannot be matched "
+                "against the message it\n  came from, which is the only thing "
+                "it is here for.")
 
     wrong = []
     for field, expected in bindings.items():

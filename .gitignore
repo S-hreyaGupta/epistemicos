@@ -46,6 +46,14 @@ __pycache__/
 # repository and the bound corpus in minutes, and large, so it is not history.
 /_tmp/
 
+# The mutation probe's disposable checkouts, one per run, named for its pid.
+# Each is a git worktree of HEAD that the probe breaks on purpose and deletes
+# when it finishes; the next run sweeps any a killed run left behind. They
+# live inside the repository rather than in the system temp directory so that
+# a throwaway clone takes its own with it when the clone is deleted, which is
+# how five of them accumulated unnoticed on 9 October.
+/.probe-sandboxes/
+
 # The mutation probe's crash record. It exists only while a mutation is applied
 # to tracked source, and names the file so the next run can put it back when a
 # killed process leaves one behind. Tracking it would commit a statement that

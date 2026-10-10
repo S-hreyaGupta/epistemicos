@@ -502,6 +502,27 @@ MUTATIONS = [
      "test_approval_package.py",
      "crashed rather than refusing"),
 
+    # Alex Zamurko's fourth condition of 9 October: an authorisation has to be
+    # verifiable rather than a name in a file. Two lines, because the source
+    # block and the length of its quote fail differently: a missing source
+    # leaves nothing to check at all, while a two-word quote leaves something
+    # that cannot be matched against the message it came from.
+    ("EC-4a  an approval says where it was given",
+     "authority.py",
+     "    src = rec.get(\"source\")\n"
+     "    if not isinstance(src, dict):",
+     "    src = rec.get(\"source\") or {}\n"
+     "    if False:",
+     "test_run_review.py",
+     "an approval with no source at all"),
+
+    ("EC-4b  a quote has to be long enough to match",
+     "authority.py",
+     "    if len(str(src[\"quote\"]).strip()) < MIN_QUOTE:",
+     "    if False:",
+     "test_run_review.py",
+     "quote is too short to match"),
+
     # SELF-F05, and the first two mutations this probe has ever aimed at its
     # own source. On 8 October it emptied a 1163-line covered component and
     # the tree stayed that way overnight, so these two lines are the reason to
@@ -671,37 +692,62 @@ MUTATIONS = [
 # from before today, but it stops being what the safety of a run depends on.
 SANDBOX_PREFIX = "epistemicos-probe-"
 
+# Inside the repository, gitignored, rather than in the shared system temp.
+#
+# The first version put them in tempfile.gettempdir() and swept them by asking
+# git which worktrees it knew about. Both halves of that were wrong, and the
+# control written for Alex Zamurko's "prove the tree survives an interrupted
+# run" found it within the hour: that control clones the repository, runs a
+# probe inside the clone, and deletes the clone. The sandbox the clone made
+# outlived it in the shared temp, and no repository remembered the worktree
+# any more, so nothing could ever sweep it. Five of them had piled up by
+# midnight on 9 October.
+#
+# Living here, a deleted clone takes its sandboxes with it. And the sweep
+# below reads the directory rather than asking git, so a checkout whose
+# registration is gone is still found. A question answered by looking is
+# better than one answered by asking something that might have forgotten.
+SANDBOX_ROOT = REPO / ".probe-sandboxes"
 
-def drop_sandboxes() -> list[str]:
-    """Remove worktrees this probe left behind. Returns what was removed.
+
+def drop_sandboxes() -> tuple[list[str], list[str]]:
+    """Remove checkouts this probe left behind. Returns (swept, stuck).
 
     Safe in a way none of the recovery code is: these directories contain no
-    work. Deleting one that is still in use by a concurrent run would be the
-    only hazard, and the pid in the name keeps runs out of each other's way.
+    work. The only hazard would be deleting one a concurrent run is using, and
+    the pid in the name keeps runs out of each other's way.
+
+    Both lists are returned because the first version returned only the fully
+    deleted ones, and on Windows `git worktree remove` deregisters the
+    checkout while `rmtree` can leave the folder behind if anything still
+    holds a handle. So the registration was gone, the sweep had plainly done
+    something, and it reported nothing at all. A run reporting silence after
+    acting is the shape of defect this probe exists to find, and it took the
+    control written for Alex Zamurko's interrupted-run requirement to notice
+    it.
     """
-    r = subprocess.run(["git", "-C", str(REPO), "worktree", "list",
-                        "--porcelain"], capture_output=True, text=True)
-    gone = []
-    for line in r.stdout.splitlines():
-        if not line.startswith("worktree "):
+    if not SANDBOX_ROOT.is_dir():
+        return [], []
+    mine = f"{SANDBOX_PREFIX}{os.getpid()}"
+    swept, stuck = [], []
+    for p in sorted(SANDBOX_ROOT.iterdir()):
+        if not p.name.startswith(SANDBOX_PREFIX) or p.name == mine:
             continue
-        p = line[len("worktree "):].strip()
-        name = Path(p).name
-        if not name.startswith(SANDBOX_PREFIX):
-            continue
-        if name == f"{SANDBOX_PREFIX}{os.getpid()}":
-            continue
+        # Through git first, so its registration goes too, then from disk in
+        # case git never knew about it or has since forgotten.
         subprocess.run(["git", "-C", str(REPO), "worktree", "remove",
-                        "--force", p], capture_output=True, text=True)
-        gone.append(name)
+                        "--force", str(p)], capture_output=True, text=True)
+        shutil.rmtree(p, ignore_errors=True)
+        (stuck if p.exists() else swept).append(p.name)
     subprocess.run(["git", "-C", str(REPO), "worktree", "prune"],
                    capture_output=True, text=True)
-    return gone
+    return swept, stuck
 
 
 def make_sandbox() -> Path:
     """A second checkout of HEAD, for the probe to break at will."""
-    path = Path(tempfile.gettempdir()) / f"{SANDBOX_PREFIX}{os.getpid()}"
+    SANDBOX_ROOT.mkdir(parents=True, exist_ok=True)
+    path = SANDBOX_ROOT / f"{SANDBOX_PREFIX}{os.getpid()}"
     if path.exists():
         subprocess.run(["git", "-C", str(REPO), "worktree", "remove",
                         "--force", str(path)], capture_output=True, text=True)
@@ -911,6 +957,27 @@ def main() -> int:
     if rc:
         return rc
 
+    # Before the filter, for the same reason recovery is. `mutate_repairs.py
+    # NOPE` used to exit on "nothing matches" with a mutation still applied,
+    # which BOOTSTRAP-003 raised and which was fixed by moving recovery up.
+    # Three days later this function was added below the filter and the
+    # identical defect came back wearing a different name: a run matching
+    # nothing left an abandoned checkout lying around forever. Found by the
+    # control written for Alex Zamurko's request to prove the tree survives
+    # an interrupted run, which is the first thing that has ever looked.
+    _swept, _stuck = drop_sandboxes()
+    if _swept:
+        print(f"  [cleaned] {len(_swept)} abandoned checkout(s) from a killed "
+              f"run, removed:\n      " + "\n      ".join(_swept) +
+              "\n      Nothing was lost. That is the point of them.\n")
+    if _stuck:
+        print(f"  [cleaned] {len(_stuck)} abandoned checkout(s) deregistered, "
+              f"but the folder\n      remains on disk, most likely because "
+              f"something still holds a handle:\n      "
+              + "\n      ".join(_stuck) +
+              "\n      Harmless, and said out loud rather than left for "
+              "someone to find.\n")
+
     want = [a for a in sys.argv[1:] if not a.startswith("-")]
     selected = [m for m in MUTATIONS
                 if not want or any(w.lower() in m[0].lower() for w in want)]
@@ -940,12 +1007,21 @@ def main() -> int:
               "source you are actually running.")
         return 2
 
+    # What the real files hold before anything starts. The end-of-run check
+    # used to compare against HEAD, which cannot tell a mutation that escaped
+    # from an edit someone made while the run was going. On 9 October it
+    # reported ESCAPED for two files the implementing agent had edited during
+    # the sweep, and the message asserted the isolation was broken when it had
+    # not been. A check that names one cause while unable to distinguish two
+    # is the defect this probe exists to find, so it now compares against the
+    # tree it actually started from and says both possibilities out loud.
+    before = {}
+    for rel in targets:
+        p = REPO / rel
+        before[rel] = (hashlib.sha256(p.read_bytes()).hexdigest()
+                       if p.is_file() else None)
+
     # Everything destructive from here happens in a copy.
-    stale = drop_sandboxes()
-    if stale:
-        print(f"  [cleaned] {len(stale)} abandoned checkout(s) from a killed "
-              f"run, removed:\n      " + "\n      ".join(stale) +
-              "\n      Nothing was lost. That is the point of them.\n")
     try:
         work = make_sandbox()
     except RuntimeError as exc:
@@ -1056,15 +1132,28 @@ def main() -> int:
     # The real tree, which this run should not have touched at all. Before the
     # sandbox this was the last line of defence; now it is an assertion that
     # the isolation held, and a failure here means something reached past it.
-    left = modified(targets)
+    left = []
+    for rel in targets:
+        p = REPO / rel
+        now = (hashlib.sha256(p.read_bytes()).hexdigest()
+               if p.is_file() else None)
+        if now != before.get(rel):
+            left.append(rel)
     if left:
-        print(f"\n  [ESCAPED] the real working tree changed during a run that "
-              f"should only have\n  written to a disposable checkout:\n")
+        print(f"\n  [CHANGED DURING THE RUN] these differ from what they held "
+              f"when this run\n  started:\n")
         for p in left:
             print(f"      {p}")
-        print("\n  Restore them with `git checkout --` before running anything "
-              "else, and treat the\n  isolation as broken rather than the "
-              "restore as missing.")
+        print("\n  Two things look identical from here and this cannot tell "
+              "them apart.\n"
+              "  Either a mutation escaped the disposable checkout, which "
+              "would mean the\n  isolation is broken, or somebody edited "
+              "these files while the run was in\n  progress. Read `git diff` "
+              "and decide which.\n\n"
+              "  Either way this run's result is not evidence about the "
+              "source as it stands\n  now. If it was an edit, commit it and "
+              "run again; the result would otherwise\n  describe a commit "
+              "nobody is using.")
         bad += 1
 
     subprocess.run(["git", "-C", str(REPO), "worktree", "remove", "--force",

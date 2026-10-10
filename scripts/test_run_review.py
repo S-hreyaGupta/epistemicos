@@ -2008,13 +2008,22 @@ def main() -> int:
         print("  [ok] refused: a reason alone does not authorize supersession")
 
     def approve(**over):
-        rec = {"schema": "capture-supersession/1",
+        rec = {"schema": "capture-supersession/2",
                "cycle": cyc.name,
                "superseded_sha256": superseded,
                "superseding_sha256": superseding,
                "authorized_by": "Alex Zamurko",
                "reason": "attempt 2 truncated mid-finding; recapture is complete",
-               "at": "2026-09-09T21:40:00Z"}
+               "at": "2026-09-09T21:40:00Z",
+               # Alex Zamurko, 9 October 2026: an authorisation must be
+               # verifiable rather than resting on a name someone typed. The
+               # source says where he actually said it and quotes the words,
+               # so a reader can go and check. It does not prove authorship
+               # and the code says so; see AR-2 in specs/ACCEPTED-RISKS.md.
+               "source": {
+                   "medium": "Slack",
+                   "reference": "workflow channel, 9 September 2026, 9:38 pm",
+                   "quote": "go ahead and replace that capture"}}
         rec.update(over)
         write_lf(approval_path, json.dumps(rec, indent=2) + "\n")
 
@@ -2046,6 +2055,49 @@ def main() -> int:
     # Both refusals existed in require_approval and neither was exercised, while
     # the suite's closing line reported every refusal as reachable.
     refuse_with("an approval with no timestamp", "no `at` timestamp", at="")
+
+    # Alex Zamurko, 9 October 2026: "Make sure the authorisation is properly
+    # documented and can be verified, rather than relying only on a name
+    # entered into a file." Four refusals, because the source has three parts
+    # that each do different work and a quote too short to match is the same
+    # as no quote at all.
+    refuse_with("an approval with no source at all", "no `source`", source=None)
+    refuse_with("an approval whose source names no medium", "medium",
+                source={"medium": "", "reference": "somewhere",
+                        "quote": "go ahead and replace that capture"})
+    refuse_with("an approval whose source cannot be located", "reference",
+                source={"medium": "Slack", "reference": "",
+                        "quote": "go ahead and replace that capture"})
+    refuse_with("an approval quoting nothing", "quote",
+                source={"medium": "Slack", "reference": "workflow channel",
+                        "quote": ""})
+    refuse_with("an approval whose quote is too short to match", "at least",
+                source={"medium": "Slack", "reference": "workflow channel",
+                        "quote": "ok fine"})
+
+    # Grandfathering, and the hole in it.
+    #
+    # Requiring a source from approvals recorded before anyone asked for one
+    # would mean either editing those records, which is rewriting evidence, or
+    # a gate that refuses its own history. So a record declares which rule it
+    # was made under, exactly as C03-F01 made a finished review reparse with
+    # its own grammar rather than today's.
+    #
+    # This case proves the old rule is actually applied rather than merely
+    # described: a pre-cutoff `/1` record with no source at all must get past
+    # the source check and fail on the hash binding instead. If the source
+    # check still ran, the refusal would name the source and this would fail.
+    refuse_with("a /1 approval from before the rule is read under the old one",
+                "does not match",
+                schema="capture-supersession/1", at="2026-09-09T21:40:00Z",
+                source=None, superseding_sha256="0" * 64)
+
+    # And the hole: declaring the old schema on a record written after the
+    # rule took effect would opt out of it by typing one character.
+    refuse_with("a /1 approval dated after the rule does not get the old one",
+                "predates the requirement",
+                schema="capture-supersession/1", at="2026-10-09T12:00:00Z",
+                source=None)
 
     write_lf(approval_path, "{ this is not json\n")
     r = runner(t16, "record", "--cycle", str(cyc), "--output", "other.md",

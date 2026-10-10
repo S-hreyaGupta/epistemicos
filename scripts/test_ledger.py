@@ -1889,7 +1889,15 @@ def main() -> int:
                 "after_valid_cycle": n, "outcome": "STALLED",
                 "authorized_by": "Alex Zamurko",
                 "reason": "test fixture: another loop approved at the gate",
-                "at": "2026-09-09T00:00:00Z"} for n in boundaries]}, indent=2))
+                "at": "2026-09-09T00:00:00Z",
+                # Alex Zamurko, 9 October 2026: an authorisation must say
+                # where it was given, so that someone else can check it
+                # rather than take a typed name on trust.
+                "source": {
+                    "medium": "Slack",
+                    "reference": "test fixture, no real message",
+                    "quote": "one more loop at that boundary, please"},
+                } for n in boundaries]}, indent=2))
 
     def authorized_continuation(root, rev):
         four_then_resolved(root, rev)

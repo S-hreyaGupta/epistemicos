@@ -5,6 +5,27 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Alex Zamurko, 10 October 2026, on what independent execution evidence has
+  # to be: "If Codex cannot execute, use a separate independent runner against
+  # the exact frozen commit... provided the implementing agent does not control
+  # that evidence."
+  #
+  # A push run is already tied to a commit and published by GitHub, which is
+  # the substance of that. This adds the ability to aim it at a named commit
+  # deliberately, so the evidence for a frozen review cycle can be produced
+  # from the cycle's own target commit rather than from whatever happened to
+  # be on main that day.
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "commit, tag or branch to run against (blank = this branch)"
+        required: false
+        default: ""
+      sweep:
+        description: "also run the full mutation sweep (slow, ~1-2 h)"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   go:
@@ -58,6 +79,23 @@ jobs:
           # exists. A shallow clone fails those for a reason that has nothing
           # to do with the code.
           fetch-depth: 0
+          # Blank on a push, so it behaves exactly as before. Set by hand when
+          # the evidence has to describe one particular frozen commit.
+          ref: ${{ inputs.ref || github.sha }}
+
+      # Printed where the run page shows it, because the whole value of this
+      # evidence is that a reader can tell which bytes it describes without
+      # taking anyone's word for it.
+      - name: which commit this run describes
+        run: |
+          {
+            echo "### commit under test"
+            echo '```text'
+            echo "requested  ${{ inputs.ref || '(push)' }}"
+            echo "resolved   $(git rev-parse HEAD)"
+            echo "subject    $(git log -1 --format=%s)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/setup-python@v5
         with:
@@ -133,6 +171,16 @@ jobs:
       - name: section 7 approval package
         if: ${{ !cancelled() }}
         run: bash .github/ci-step.sh "test_approval_package" python scripts/test_approval_package.py
+
+      # Added 10 October. It was written on 7 October and has never run here,
+      # which is the same gap this job was created to close: a suite that
+      # exists and nothing reaches. It is also the suite that proves the
+      # testing tool leaves the repository untouched when it is killed, which
+      # is Alex Zamurko's first required action, so having it verified only on
+      # the implementing agent's own machine was the wrong place for it.
+      - name: the testing tool cannot damage the repository
+        if: ${{ !cancelled() }}
+        run: bash .github/ci-step.sh "test_probe_recovery" python scripts/test_probe_recovery.py
 
       - name: section 15 gold runner
         if: ${{ !cancelled() }}
@@ -223,6 +271,82 @@ jobs:
             echo "Cycles, ledgers and packages are the record a human decides"
             echo "from. A suite may read them and must not rewrite them; if a"
             echo "tool needs to produce one, give it --out."
+            exit 1
+          }
+
+  # The mutation sweep, run by GitHub rather than by the implementing agent.
+  #
+  # EC-2 claims every repair goes red when removed, and until now the only
+  # evidence for that was a log produced on the machine of the person whose
+  # repairs they are. Alex Zamurko's condition for independent execution
+  # evidence is that the implementing agent does not control it. This is the
+  # cheapest honest version: GitHub checks out the commit, runs the sweep, and
+  # publishes the output on a page nobody here can edit.
+  #
+  # What it establishes and what it does not, stated so the tick is not read
+  # for more than it covers. It establishes that the sweep ran on that exact
+  # commit and what it reported. It does not establish that the mutations are
+  # the right mutations or that the controls are good controls, because the
+  # implementing agent wrote both. That half is a reviewer reading the sources.
+  #
+  # Not on push: it takes one to two hours and would make every commit wait.
+  # Run it deliberately, against a frozen cycle's target commit, which is when
+  # the evidence is actually needed.
+  mutation-sweep:
+    name: every repair goes red when removed
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.sweep }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: dependencies
+        run: pip install -r requirements-ci.txt
+
+      # The probe makes git worktrees, and git refuses to do that without an
+      # identity configured. On a runner there is none.
+      - name: git identity for the worktrees
+        run: |
+          git config user.email "ci@epistemicos.invalid"
+          git config user.name "ci"
+
+      # -u so the log is readable as it goes rather than arriving in blocks at
+      # the end, which cost an afternoon locally on 10 October.
+      - name: full mutation sweep
+        run: python -u _probe/mutate_repairs.py | tee sweep.txt
+
+      - name: the result, on the run page
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "### mutation sweep"
+            echo "commit \`$(git rev-parse HEAD)\`"
+            echo '```text'
+            tail -n 20 sweep.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Kept as a downloadable file, because a sweep is the evidence a frozen
+      # cycle cites and a run page is not forever.
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: mutation-sweep-${{ github.sha }}
+          path: sweep.txt
+
+      - name: the repository is untouched
+        if: ${{ !cancelled() }}
+        run: |
+          git diff --exit-code || {
+            echo "The sweep changed tracked files. It writes only to a"
+            echo "disposable checkout, so this means the isolation failed."
             exit 1
           }
 

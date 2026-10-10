@@ -203,6 +203,27 @@ WS = r"[ \t\n]+"
 # It was implemented on 21 September and reverted the same day. It works —
 # `Carrieri de Souza`, `Oliveira da Silva`, `El Akremi`, `Pircher Verdorfer`
 # all key correctly, worth +0.011 recall on gold paper 1 and +0.040 on paper 2.
+#
+# INVALID MEASUREMENT. Those two figures are wrong and are left here as
+# written rather than corrected or deleted. They were produced through
+# `gold_runner.py --baseline` while SELF-F03 was present: the runner scored
+# the candidate and the baseline by different rules, applying a phrasing
+# remap to the candidate only, so every improvement figure measured that way
+# is too favourable by however many works the manuscript phrases two ways.
+# The defect was found on 6 October and repaired; these numbers were never
+# recomputed.
+#
+# Alex Zamurko, 9 and 10 October 2026: "Historical performance figures are
+# unreliable, but citation evaluation is outside the current bootstrap scope.
+# Mark the figures invalid and recalculate when citation work resumes." And:
+# "marked invalid directly beside the affected historical figures, preserving
+# the original values for traceability."
+#
+# So the original values stay, the warning sits with them, and the direction
+# of the error is known: the real improvement is smaller than stated, never
+# larger. What is not known is by how much. Recompute when the citation work
+# resumes; until then no decision should rest on them. See AR-5 in
+# specs/ACCEPTED-RISKS.md and SELF-F03 in registers/implementer-disclosed.json.
 # It also breaks four §12 conformance requirements, because a second CORE lets
 # SURNAME swallow the word in front of it:
 #

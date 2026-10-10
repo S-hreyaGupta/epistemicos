@@ -1,6 +1,10 @@
 # Bootstrap exit criteria
 
-Status: DRAFT, awaiting Alex Zamurko's ruling. Not frozen.
+Status: RULED, not yet frozen. Alex Zamurko answered all four judgements on
+9 October 2026 and refined the first on 10 October. They are recorded under
+each condition below, in his words. Freezing is the last step before the
+fourth review, and it waits on the conditions themselves being met rather than
+on any further decision from him.
 
 Alex Zamurko, 9 October 2026, 4:41 pm:
 
@@ -52,11 +56,27 @@ not support, and no reporting tool can claim success for work it did not do.
 3. Every mutation in the probe set that targets a convergence or reporting
    rule goes red in a control that names it.
 
-**The judgement, Alex's.** Which open defects are critical. A check can count
-open findings; it cannot decide that one of them blocks the phase. The current
-answer, agreed on 9 October, is four: D02-F01, SELF-F02, SELF-F04, SELF-F05.
-Any finding raised after that date needs its own classification before this
-condition can be evaluated again.
+**The judgement, Alex's, and he has given it.** 9 October 2026, on what
+counts as critical: "Anything permitting false success, false convergence,
+invalid approval or unreliable verification, because these undermine the
+reliability of the entire review process."
+
+Refined on 10 October into two kinds, because the first wording made AR-1's
+acceptance look like a contradiction of it:
+
+Critical functional defects are failures that can produce incorrect decisions
+during normal operation, and these block bootstrap. Adversarial integrity
+risks are deliberate manipulation of writable code or records, and these may
+be conditionally accepted for internal bootstrap but cannot be claimed as
+protected. AR-1 is the second kind. It permits an invalid approval in the
+sense that someone determined to forge one can, and it is accepted on that
+basis with no claim of protection attached.
+
+The four blocking defects under this ruling, recorded in
+`specs/blocking-defects.json`: D02-F01, SELF-F02, SELF-F04, SELF-F05. A
+finding raised after 9 October is unclassified until he rules on it, and this
+condition cannot be evaluated while any finding is unclassified. Silence is
+not a classification.
 
 ## EC-2 Reliable verification
 
@@ -75,11 +95,21 @@ The third item became checkable rather than hopeful on 9 October, when the
 probe moved to a disposable checkout. Before that, the question "did the tool
 restore the repository" had a different answer every time it was killed.
 
-**The judgement, Alex's.** Whether the mutation set covers the repairs that
-matter. A sweep can only test the mutations someone wrote. Fifty-six entries
-catching fifty-six repairs says nothing about a repair nobody wrote a mutation
-for, and no check can close that gap because it is a question about what is
-absent.
+**The judgement, Alex's, and he has given it.** 9 October 2026: "Every known
+blocking failure must have a reproducible test. Exhaustive coverage is
+unnecessary." And on AR-3: "Complete mutation coverage is unrealistic. Testing
+every known blocking repair is sufficient for bootstrap, provided coverage
+limitations are documented."
+
+So the bar is every known blocking repair, not every repair. The set currently
+exceeds it, covering all fifty-six rather than the four blocking ones, which
+is worth saying because the bar is what will hold when the set stops keeping
+pace with the code.
+
+The limitation he required documented: a sweep can only test the mutations
+someone wrote. Fifty-six catching fifty-six says nothing about a repair nobody
+wrote a mutation for, and no check closes that gap, because it is a question
+about what is absent.
 
 ## EC-3 Complete audit records
 
@@ -100,11 +130,20 @@ from the record back to the thing that produced them.
 5. An approval package can be produced for every run, or the run states why it
    cannot.
 
-**The judgement, Alex's.** Whether a record is true, as distinct from present.
-`MC1_ENFORCEMENT` is `CONVENTION_ONLY`: the same writable code performs these
-checks on itself, and nothing prevents someone editing the records it reads.
-Every check in this section establishes that a record exists and is internally
-consistent. None of them establishes that it describes what actually happened.
+**The judgement, Alex's, and he has given it.** 9 October 2026: "Records must
+match original evidence and frozen code. Hashes alone cannot establish truth."
+
+That raises the bar above what the checks measure, deliberately. The five
+checks above establish that a record exists, is internally consistent, and
+agrees with the digests beside it. Matching the *original evidence* means
+comparing the record against the thing it describes, and for an approval that
+thing is a message in Slack or WhatsApp which the repository cannot reach.
+That comparison is a person's work, and AR-2 is where it is recorded as such.
+
+`MC1_ENFORCEMENT` remains `CONVENTION_ONLY`: the same writable code performs
+these checks on itself, and nothing prevents someone editing the records it
+reads. Under his 10 October split that is an adversarial integrity risk,
+accepted for bootstrap and never to be described as protected.
 
 ## EC-4 Independent verification of blocking repairs
 
@@ -118,12 +157,27 @@ reviewer who is not the implementing agent, in evidence that is preserved.
 3. The reviewer's own words about that item are quoted in the record, with the
    limits the reviewer stated.
 
-**The judgement, Alex's.** Whether the evidence is adequate for each item.
-These are not equivalent, and the difference has mattered already: for SELF-F01
-the reviewer read the source and the saved output of a run, because it could
-not execute anything on that machine. That is evidence. Whether it is enough
-for a blocking item is a decision, and it is recorded as Alex's with its own
-line in the assessment rather than absorbed into a tick.
+**The judgement, Alex's, and he has given it.** 9 October 2026: "Behavioural
+claims require independent execution because source inspection alone cannot
+establish runtime behaviour."
+
+That settles the case this condition was written around. For SELF-F01 the
+cycle 03 reviewer read the source and the saved output of a run, because it
+could not execute anything on that machine. Under this ruling that is not
+enough for a blocking item, and AR-4 is marked blocking on exactly that basis.
+
+**What counts as independent execution,** from his 10 October reply, in order
+of preference. Codex executes the tests itself. Failing that, a separate
+runner executes them against the exact frozen commit and Codex assesses that
+evidence, which he accepts "provided the implementing agent does not control
+that evidence". Failing both, SELF-F01 remains unverified and this condition
+is not met.
+
+The practical form of "does not control" is the tests running on GitHub
+against the frozen commit, with the log published by GitHub rather than pasted
+in. That establishes the run happened and passed. It does not establish that
+the tests are good tests, since the implementing agent wrote them, and that
+half is Codex reading the test sources. Both halves are needed.
 
 ## What moves to the backlog
 

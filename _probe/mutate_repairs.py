@@ -507,12 +507,17 @@ MUTATIONS = [
     # block and the length of its quote fail differently: a missing source
     # leaves nothing to check at all, while a two-word quote leaves something
     # that cannot be matched against the message it came from.
+    # Re-pointed on 10 October: the source check moved inside the `/2`
+    # branch when approvals were versioned, so the anchor's indentation
+    # changed and the mutation could no longer be applied. The probe said so
+    # rather than counting it as a catch, which is the fifth time a line here
+    # has followed its rule to a new address.
     ("EC-4a  an approval says where it was given",
      "authority.py",
-     "    src = rec.get(\"source\")\n"
-     "    if not isinstance(src, dict):",
-     "    src = rec.get(\"source\") or {}\n"
-     "    if False:",
+     "        src = rec.get(\"source\")\n"
+     "        if not isinstance(src, dict):",
+     "        src = rec.get(\"source\") or {}\n"
+     "        if False:",
      "test_run_review.py",
      "an approval with no source at all"),
 

@@ -1,10 +1,22 @@
 # Bootstrap exit criteria
 
-Status: RULED, not yet frozen. Alex Zamurko answered all four judgements on
-9 October 2026 and refined the first on 10 October. They are recorded under
-each condition below, in his words. Freezing is the last step before the
-fourth review, and it waits on the conditions themselves being met rather than
-on any further decision from him.
+Status: FROZEN, 10 October 2026. Alex Zamurko answered all four judgements on
+9 October and refined the first on 10 October; they are recorded under each
+condition below, in his words.
+
+Frozen means this document is now the version the fourth review is judged
+against, and changing it takes a new version rather than an edit. Its digest
+is recorded in `BOOTSTRAP-EXIT-CRITERIA.sha256` and `scripts/exit_criteria.py`
+refuses to report anything if the two disagree. That is not tamper-proofing,
+which AR-1 says plainly we do not have; it is so that a later reader can tell
+which criteria a decision was taken against, and so that an edit has to be a
+decision rather than a drift.
+
+Frozen is not met. The conditions below are checked by
+`scripts/exit_criteria.py`, and as of freezing EC-3 passes, EC-1 fails, and
+EC-2 and EC-4 cannot be established. Three of those resolve through the fourth
+review. Freezing the criteria before the review is the point: the bar is set
+before the thing that has to clear it, not after.
 
 Alex Zamurko, 9 October 2026, 4:41 pm:
 

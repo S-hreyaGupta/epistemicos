@@ -28,6 +28,7 @@ decisions quietly, which is the thing the whole protocol is built to prevent.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -400,11 +401,51 @@ def ec4() -> Condition:
     return c
 
 
+def frozen_criteria() -> str | None:
+    """Refuse everything if the criteria are not the ones that were frozen.
+
+    A document that says "frozen" and is editable without consequence says
+    nothing. This makes the word mean something: the digest recorded beside it
+    is checked before any condition is reported, and a mismatch stops the run
+    rather than producing a verdict against criteria nobody agreed to.
+
+    It is not tamper-proofing. Anyone who can edit the document can edit the
+    digest, which is AR-1 and is accepted for bootstrap. What it does is make
+    a change to the bar a deliberate act with two files in the diff, rather
+    than something that can drift under a decision while nobody is looking.
+    """
+    doc = SPECS / "BOOTSTRAP-EXIT-CRITERIA.md"
+    rec = SPECS / "BOOTSTRAP-EXIT-CRITERIA.sha256"
+    if not doc.is_file():
+        return "the exit criteria document is missing"
+    if not rec.is_file():
+        return ("no recorded digest for the exit criteria, so there is "
+                "nothing to say\n  which version this run is checking "
+                "against")
+    want = rec.read_text(encoding="utf-8").split()[0].strip()
+    got = hashlib.sha256(doc.read_bytes()).hexdigest()
+    if want != got:
+        return ("the exit criteria have changed since they were frozen.\n"
+                f"  frozen   {want}\n  on disk  {got}\n\n"
+                "  Nothing is reported against criteria that are not the ones "
+                "agreed. If the\n  change is intended, it takes a new version "
+                "and a new digest, with the reason\n  recorded, rather than "
+                "an edit. If it is not intended, find out what changed\n  "
+                "before trusting anything else in this repository.")
+    return None
+
+
 def main() -> int:
     print("bootstrap exit criteria, machine-checkable half")
     print(f"  {REPO}")
     print("  specs/BOOTSTRAP-EXIT-CRITERIA.md holds the judgements this "
           "cannot make.")
+
+    _bad = frozen_criteria()
+    if _bad:
+        print(f"\n  [CANNOT RUN] {_bad}")
+        return 2
+    print("  criteria digest matches the frozen record.")
 
     conditions = [ec1(), ec2(), ec3(), ec4()]
     for c in conditions:
